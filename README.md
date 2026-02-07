@@ -50,7 +50,7 @@ Pathly automatisiert die Jobsuche und Bewerbung unter **strikter Einhaltung** vo
 
 ## ✨ Features
 
-### Phase 1: Manuelle Bewerbung
+### Phase 1: Manuelle Bewerbung ✅
 - 📄 CV & Cover Letter Upload
 - 🎨 Template Auswahl (Notion-Style, Classic, ATS-Optimized)
 - 🔍 Job Scraping (StepStone, LinkedIn, Indeed)
@@ -59,7 +59,7 @@ Pathly automatisiert die Jobsuche und Bewerbung unter **strikter Einhaltung** vo
 - 💬 Quote Generator (3 relevante Zitate zur Auswahl)
 - ✅ **Manual Application Tracking** (schöne Tabelle)
 
-### Phase 2: Automatische Bewerbung
+### Phase 2: Automatische Bewerbung 🚧
 - ⏰ Daily Job Scout (mit Jitter gegen Rate Limits)
 - 🧠 Smart Filtering (Blacklist, Skill Match)
 - 🤖 Chrome Extension (Plasmo Framework)
@@ -68,7 +68,7 @@ Pathly automatisiert die Jobsuche und Bewerbung unter **strikter Einhaltung** vo
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Tech Stack v3.1
 
 | Layer | Technology | Purpose |
 |-------|-----------|----------|
@@ -77,12 +77,29 @@ Pathly automatisiert die Jobsuche und Bewerbung unter **strikter Einhaltung** vo
 | **State** | Zustand + React Query | Client vs Server State |
 | **Validation** | Zod + React Hook Form | Type-Safe Forms |
 | **Backend** | Supabase (PostgreSQL) | Database + Auth + Storage |
-| **AI** | Claude Sonnet 4.5 | Cover Letter Generation |
-| **AI** | Claude Haiku 4 | Quality Judge |
-| **Research** | Perplexity API | Company Intelligence |
-| **Scraping** | Playwright + ScraperAPI | Job Data Extraction |
+| **AI Generation** | Claude Sonnet 4.5 | Cover Letter Generation |
+| **AI Judge** | Claude Haiku 4 | Quality Scoring |
+| **AI Controller** | GPT-4o-mini | Job Routing & Classification |
+| **Embeddings** | OpenAI text-embedding-3-small | Writing Style Similarity |
+| **Research** | Perplexity Sonar Pro | Company Intelligence |
+| **Scraping Tier 1** | Firecrawl | JS-heavy sites (LinkedIn, Greenhouse) |
+| **Scraping Tier 2** | SerpAPI | Google Jobs aggregator |
+| **Scraping Tier 3** | ScraperAPI | Anti-bot bypass |
+| **Scraping Fallback** | Playwright | Local, always works |
+| **Email** | Resend | Transactional Emails |
 | **Extension** | Plasmo Framework | Chrome Extension |
 | **Deploy** | Vercel | Hosting |
+
+### 🔄 Smart Scraping System
+
+Pathly uses an **intelligent 5-tier fallback system**:
+
+```
+Firecrawl (Modern, JS-heavy) → SerpAPI (Google Jobs) → 
+ScraperAPI (Anti-bot) → BrightData (LinkedIn) → Playwright (Local)
+```
+
+**See [docs/SCRAPING_STRATEGY.md](./docs/SCRAPING_STRATEGY.md) for complete details.**
 
 ---
 
@@ -92,7 +109,7 @@ Pathly automatisiert die Jobsuche und Bewerbung unter **strikter Einhaltung** vo
 job-automation-saas/
 ├── docs/
 │   ├── ARCHITECTURE.md          # Complete System Design
-│   ├── CLAUDE.md                # Agent Instructions
+│   ├── SCRAPING_STRATEGY.md     # Smart Fallback Logic ✨ NEW
 │   ├── WORKFLOWS.md             # Step-by-Step Processes
 │   └── API.md                   # API Documentation
 ├── database/
@@ -103,16 +120,16 @@ job-automation-saas/
 │   ├── dashboard/
 │   │   ├── manual-apply/        # Manual Application Flow
 │   │   ├── auto-apply/          # Automated Inbox
-│   │   └── history/             # Application History Table
+│   │   └── history/             # Application History Table ✨ NEW
 │   ├── api/
 │   │   ├── jobs/scrape/
 │   │   ├── research/company/
 │   │   └── cover-letter/generate/
 │   └── (landing)/               # Marketing Pages
 ├── components/
-│   ├── ApplicationHistoryTable.tsx
+│   ├── ApplicationHistoryTable.tsx  # ✨ NEW
 │   ├── CVTemplateSelector.tsx
-│   └── QuoteSelector.tsx
+│   └── QuoteSelector.tsx            # ✨ NEW
 ├── chrome-extension/            # Plasmo Extension
 │   ├── background/
 │   ├── content-script.tsx
@@ -120,6 +137,13 @@ job-automation-saas/
 ├── scripts/
 │   ├── cron-job-scout.py        # Daily Job Discovery
 │   └── worker-queue.py          # Background Processor
+├── lib/
+│   └── scrapers/                # Scraping implementations ✨ NEW
+│       ├── firecrawl.ts
+│       ├── serpapi.ts
+│       ├── scraperapi.ts
+│       └── playwright.ts
+├── CLAUDE.md                    # Agent Instructions
 └── .env.example
 ```
 
@@ -147,7 +171,7 @@ pip install -r requirements.txt
 
 # Setup Environment
 cp .env.example .env.local
-# Add your API keys (see docs/SETUP.md)
+# Add your API keys (see .env.example for details)
 
 # Setup Database
 supabase db reset
@@ -174,9 +198,10 @@ npm run dev
 - `user_profiles` - User data with encrypted PII
 - `documents` - Uploaded CVs with style embeddings
 - `job_queue` - Scraped jobs with status tracking
-- `company_research` - Perplexity API cache
-- `application_history` - **Double-apply prevention** + visual table
+- `company_research` - Perplexity API cache ✨ NEW
+- `application_history` - **Double-apply prevention** + visual table ✨ NEW
 - `form_selectors` - Learning system for form filling
+- `scraping_logs` - Performance tracking for all scrapers ✨ NEW
 
 ### Compliance Features
 - ✅ Row Level Security (RLS) on all tables
@@ -238,7 +263,8 @@ Pathly uses a **3-stage generation process**:
 
 ### Q1 2026 (MVP)
 - [x] Manual application flow
-- [x] Application history tracking
+- [x] Application history tracking ✨ NEW
+- [x] Smart scraping fallback system ✨ NEW
 - [ ] Chrome Extension Beta
 - [ ] 10 Beta Users
 
@@ -252,6 +278,29 @@ Pathly uses a **3-stage generation process**:
 - [ ] Interview Prep AI
 - [ ] Salary Negotiation Coach
 - [ ] 1,000 Users
+
+---
+
+## 💸 Cost Breakdown
+
+| Service | MVP (0-100 users) | Scale (100-1000 users) |
+|---------|-------------------|------------------------|
+| **Firecrawl** | €20/mo (500 req) | €99/mo (10k req) |
+| **SerpAPI** | €50/mo (5k searches) | €50/mo |
+| **OpenAI** | €5/mo | €50/mo |
+| **Perplexity** | €20/mo (50 calls) | €200/mo (500 calls) |
+| **Claude** | €100/mo | €500/mo |
+| **ScraperAPI** | €0 (1k req free) | €49/mo |
+| **Resend** | €0 (3k emails) | €0 (stays free) |
+| **Supabase** | €0 (Free tier) | €25/mo (Pro) |
+| **Vercel** | €0 (Hobby) | €20/mo (Pro) |
+| **Monitoring** | €0 (Sentry Free) | €26/mo |
+| **TOTAL** | **~€195/mo** | **~€1,019/mo** |
+
+**Break-Even:**
+- @ €29/mo subscription
+- MVP: 7 paying users
+- Scale: 36 paying users
 
 ---
 
@@ -270,9 +319,23 @@ MIT License - See [LICENSE](./LICENSE)
 ## 🙏 Credits
 
 - **Architecture:** Yannik Galetto
-- **AI Models:** Anthropic (Claude), Perplexity
+- **AI Models:** Anthropic (Claude), OpenAI (GPT-4o-mini), Perplexity
+- **Scraping:** Firecrawl, SerpAPI, ScraperAPI
 - **Inspiration:** Vibecoding Manifesto by Jack Roberts
 
 ---
 
+## 📚 Documentation
+
+- **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - Complete system design
+- **[SCRAPING_STRATEGY.md](./docs/SCRAPING_STRATEGY.md)** - Smart fallback logic ✨ NEW
+- **[CLAUDE.md](./CLAUDE.md)** - Agent instructions for AI-assisted development
+- **[.env.example](./.env.example)** - Environment variables template
+
+---
+
 **Made with ❤️ in Berlin**
+
+**Version:** 3.1  
+**Last Updated:** 2026-02-07  
+**Status:** ✅ Production-Ready Design
