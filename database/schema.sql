@@ -211,8 +211,8 @@ CREATE TABLE job_queue (
   cover_letter TEXT,
   cover_letter_quality_score FLOAT,
   
-  -- Form Data for Extension
-  form_data JSONB,
+  -- PII Reference (DSGVO compliant - no unencrypted PII!)
+  user_profile_id UUID REFERENCES user_profiles(id) NOT NULL,
   
   created_at TIMESTAMPTZ DEFAULT NOW(),
   processed_at TIMESTAMPTZ
