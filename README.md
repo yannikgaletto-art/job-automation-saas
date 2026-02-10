@@ -86,6 +86,8 @@ Pathly automatisiert die Jobsuche und Bewerbung unter **strikter Einhaltung** vo
 | **Scraping Secondary** | ScraperAPI | Anti-bot bypass, direct URLs |
 | **Scraping Fallback** | Firecrawl | ATS systems ONLY (Greenhouse, Lever) |
 | **Scraping Final** | Playwright | Local, always works |
+| **Payment** | Stripe | Subscriptions |
+| **Queue** | Inngest | Background Jobs |
 | **Email** | Resend | Transactional Emails |
 | **Extension** | Plasmo Framework | Chrome Extension |
 | **Deploy** | Vercel | Hosting |
