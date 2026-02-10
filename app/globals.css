@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Notion-Linear Hybrid Color Tokens */
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F7F7F5;
+    --bg-tertiary: #FAFAF9;
+    --bg-hover: #F5F5F4;
+
+    --border-light: #E7E7E5;
+    --border-medium: #D6D6D3;
+    --border-focus: #0066FF;
+
+    --text-primary: #37352F;
+    --text-secondary: #73726E;
+    --text-tertiary: #A8A29E;
+
+    --primary: #0066FF;
+    --primary-dark: #0052CC;
+    --primary-light: #3385FF;
+
+    --success: #00C853;
+    --warning: #FFA000;
+    --danger: #D32F2F;
+    --info: #2196F3;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-bg-tertiary text-text-primary;
+  }
+}
+
+@layer utilities {
+  /* Custom scrollbar */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
