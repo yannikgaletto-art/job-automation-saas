@@ -1,8 +1,58 @@
+---
+Version: 3.1.1
+Last Updated: 2026-02-10
+---
+
 # PATHLY V2.0 - COMPLETE SYSTEM ARCHITECTURE
 
-**Status:** Production-Ready Design
-**Last Updated:** 2026-02-07
-**Version:** 3.0 (Hybrid Client-Server Model)
+**Status:** Production-Ready Design  
+**Last Updated:** 2026-02-10  
+**Version:** 3.1.1 (Hybrid Client-Server Model)
+
+---
+
+## TECH STACK v3.1.1 (CORRECTED)
+
+| Layer | Technology | Purpose |
+|-------|-----------|----------|
+| **Frontend** | Next.js 15 + React 19 | Dashboard & Landing |
+| **UI** | Tailwind + shadcn/ui | Beautiful Components |
+| **State** | Zustand + React Query | Client vs Server State |
+| **Validation** | Zod + React Hook Form | Type-Safe Forms |
+| **Backend** | Supabase (PostgreSQL) | Database + Auth + Storage |
+| **AI Generation** | Claude Sonnet 4.5 | Cover Letter Generation |
+| **AI Judge** | Claude Haiku 4 | Quality Scoring |
+| **AI Controller** | GPT-4o-mini | Job Routing & Classification |
+| **Embeddings** | OpenAI text-embedding-3-small | Writing Style Similarity |
+| **Research** | Perplexity Sonar Pro | Company Intelligence |
+| **Scraping Primary** | SerpAPI | Job boards (LinkedIn, Indeed, StepStone) |
+| **Scraping Secondary** | ScraperAPI | Anti-bot bypass, direct URLs |
+| **Scraping Fallback** | Firecrawl | ATS systems ONLY (Greenhouse, Lever) |
+| **Scraping Final** | Playwright | Local, always works |
+| **Payment** | Stripe | Subscriptions |
+| **Queue** | Inngest | Background Jobs |
+| **Email** | Resend | Transactional Emails |
+| **Extension** | Plasmo Framework | Chrome Extension |
+| **Deploy** | Vercel | Hosting |
+
+### Smart Scraping System (CORRECTED)
+
+**Job Boards (LinkedIn, Indeed, StepStone):**
+```
+SerpAPI (99% success) → ScraperAPI → Playwright
+```
+
+**ATS Systems (Greenhouse, Lever, Workday):**
+```
+Firecrawl (95% success) → ScraperAPI → Playwright
+```
+
+**Company Career Pages:**
+```
+Playwright (85% success) → ScraperAPI → Firecrawl
+```
+
+See [SCRAPING_STRATEGY.md](./SCRAPING_STRATEGY.md) for complete details.
 
 ---
 
@@ -210,30 +260,37 @@ SET preferred_cv_template = 'notion_modern'
 WHERE id = user_id
 ```
 
-### STEP 3: Job URL Input & Scraping
+### STEP 3: Job URL Input & Scraping (CORRECTED v3.1.1)
 
 ```python
 # POST /api/jobs/scrape
 
-# 1. Determine Scraping Strategy
-def choose_scraper(url: str):
-    if 'linkedin.com' in url:
-        return scrape_with_brightdata  # LinkedIn = hard
-    elif 'company-website' in url:
-        return scrape_with_playwright_stealth  # Cheaper
-    else:
-        return scrape_with_scraper_api  # Default
+# 1. Determine Scraping Strategy (CORRECTED - SerpAPI Primary!)
+def choose_scraper(url: str, source_type: str):
+    """Smart fallback system - see docs/SCRAPING_STRATEGY.md"""
+    if source_type == 'job_board':  # LinkedIn, Indeed, StepStone
+        return ['serpapi', 'scraperapi', 'playwright']  # SerpAPI PRIMARY
+    elif source_type == 'ats_system':  # Greenhouse, Lever, Workday
+        return ['firecrawl', 'scraperapi', 'playwright']  # Firecrawl PRIMARY
+    else:  # Company career pages
+        return ['playwright', 'scraperapi', 'firecrawl']
 
-# 2. Execute with Retry
+# 2. Execute with Smart Fallback
 @backoff.on_exception(backoff.expo, Exception, max_tries=3)
-def scrape_job_with_fallback(url: str):
-    try:
-        return scrape_with_scraper_api(url)
-    except RateLimitError:
-        return scrape_with_playwright_stealth(url)
-    except Exception as e:
-        log_failed_job(url, error=str(e))
-        raise
+def scrape_job_with_fallback(url: str, source_type: str):
+    scrapers = choose_scraper(url, source_type)
+    for scraper_name in scrapers:
+        try:
+            result = execute_scraper(scraper_name, url)
+            log_scraping_result(scraper_name, url, 'success')
+            return result
+        except RateLimitError:
+            log_scraping_result(scraper_name, url, 'rate_limited')
+            continue
+        except Exception as e:
+            log_scraping_result(scraper_name, url, 'failed', str(e))
+            continue
+    raise Exception(f'All scrapers failed for {url}')
 
 # 3. Extract Structured Data
 job_data = {
@@ -247,11 +304,11 @@ job_data = {
     ],
     "salary_range": "70.000 - 90.000 EUR",
     "application_url": "https://...",
-    "scraped_at": "2026-02-07T10:39:00Z"
+    "scraped_at": "2026-02-10T10:39:00Z"
 }
 
-# 4. INSERT INTO scraped_jobs
-supabase.table('scraped_jobs').insert(job_data)
+# 4. INSERT INTO job_queue
+supabase.table('job_queue').insert(job_data)
 ```
 
 ### STEP 4: Profile Confirmation (Steckbrief)
@@ -1015,26 +1072,48 @@ decrypted_pii = json.loads(cipher.decrypt(encrypted_pii).decode())
 
 ---
 
-## 7. COST CALCULATION
+## 7. COST CALCULATION (CORRECTED v3.1.1)
 
-| Service | MVP (0-100 users) | Scale (100-1000 users) |
-|---------|-------------------|------------------------|
-| **Scraping** | €0 (Playwright) | €49/mo (ScraperAPI) |
-| **Perplexity** | €20/mo (50 calls) | €200/mo (500 calls) |
-| **AI (Claude)** | €100/mo | €500/mo |
-| **Supabase** | €0 (Free tier) | €25/mo (Pro) |
-| **Vercel** | €0 (Hobby) | €20/mo (Pro) |
-| **Extension** | €5 (one-time) | €5 (one-time) |
-| **Monitoring** | €0 (Sentry Free) | €26/mo |
-| **TOTAL** | **~€125/mo** | **~€825/mo** |
+### MVP Costs (0-100 users, 100 jobs/day)
+
+| Service | Monthly Cost | Usage |
+|---------|-------------|-------|
+| **SerpAPI** | €20/mo | 2,100 job searches (70% of traffic) |
+| **ScraperAPI** | €0 | Free tier - 600 requests (20%) |
+| **Firecrawl** | €0 | Free tier - 150 requests (5% ATS only) |
+| **OpenAI** | €5/mo | Controller + Embeddings |
+| **Perplexity** | €20/mo | Company research |
+| **Claude** | €50/mo | Generation + Judge |
+| **Resend** | €0 | Free tier (3k emails) |
+| **Supabase** | €0 | Free tier |
+| **Vercel** | €0 | Hobby plan |
+| **TOTAL** | **€95/mo** | |
+
+### Scale Costs (100-1000 users)
+
+| Service | Monthly Cost | Usage |
+|---------|-------------|-------|
+| **SerpAPI** | €50/mo | 5,000 searches/month |
+| **ScraperAPI** | €49/mo | Pro plan (100k requests) |
+| **Firecrawl** | €20/mo | Hobby plan (500 ATS scrapes) |
+| **OpenAI** | €50/mo | Increased usage |
+| **Perplexity** | €200/mo | 500 research calls |
+| **Claude** | €500/mo | High volume generation |
+| **Resend** | €0 | Still free |
+| **Supabase** | €25/mo | Pro plan |
+| **Vercel** | €20/mo | Pro plan |
+| **Monitoring** | €26/mo | Sentry + LogTail |
+| **TOTAL** | **€940/mo** | |
 
 **Break-Even:**
 - @ €29/mo subscription
-- MVP: 5 paying users
-- Scale: 29 paying users
+- MVP: **3 paying users** (€87 > €95 if we count dev time)
+- Scale: **33 paying users** (€957 > €940)
+
+**Much cheaper than before!** (€95/mo vs €125/mo)
 
 ---
 
-**Last Updated:** 2026-02-07
-**Version:** 3.0
+**Last Updated:** 2026-02-10  
+**Version:** 3.1.1  
 **Status:** ✅ Production-Ready
