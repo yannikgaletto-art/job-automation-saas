@@ -14,7 +14,7 @@ import OpenAI from 'openai';
 
 export const MODELS = {
     CLAUDE_SONNET: {
-        id: 'claude-3-5-sonnet-20241022',
+        id: 'claude-3-5-sonnet-latest',
         provider: 'anthropic' as const,
         cost_per_1m_tokens: 3.0,
         strengths: ['creative_writing', 'complex_reasoning'],

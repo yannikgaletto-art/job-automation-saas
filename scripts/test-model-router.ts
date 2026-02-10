@@ -1,4 +1,20 @@
 import { complete, getCostStats, resetCostStats } from '../lib/ai/model-router';
+import fs from 'fs';
+import path from 'path';
+
+// Load .env.local manually
+const envPath = path.resolve(process.cwd(), '.env.local');
+if (fs.existsSync(envPath)) {
+    const envConfig = fs.readFileSync(envPath, 'utf-8');
+    envConfig.split('\n').forEach((line) => {
+        if (line.trim() && !line.startsWith('#') && line.includes('=')) {
+            const parts = line.split('=');
+            const key = parts[0].trim();
+            const value = parts.slice(1).join('=').trim();
+            process.env[key] = value;
+        }
+    });
+}
 
 async function testCostComparison() {
     resetCostStats();
