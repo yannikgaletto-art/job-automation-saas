@@ -17,11 +17,13 @@ AI-powered personalization at 100% automation scale.
 - Web Scraping (LinkedIn, Indeed, Xing, Google Jobs)
 - Document Generation (CV optimization, cover letters)
 - Email Automation (Follow-ups, interview scheduling)
-- AI Content Creation (Claude 3.5 Sonnet)
+- AI Content Creation (Claude 3.5 Sonnet + Haiku)
+- Company Intelligence (Perplexity for real-time research)
 
 **Hybrid Intelligence Protocol:**
-* **Research & Matching:** Use Perplexity/Claude for company intelligence
-* **Generation:** Use Claude 3.5 Sonnet for CV/cover letter optimization
+* **Research & Matching:** Use Perplexity for company intelligence, Claude for analysis
+* **Generation:** Use Claude 3.5 Sonnet for CV/cover letter creation
+* **Quality Assurance:** Use Claude Haiku for fast, cost-efficient validation
 * **Scraping:** Use Playwright + Apify fallback for anti-bot resistance
 
 ---
@@ -45,11 +47,11 @@ AI-powered personalization at 100% automation scale.
 
 **STATS (stats.md) - The Metrics Dashboard**
 * **Update After:** Every scraping run, every application sent
-* **Track:** Jobs scraped, applications sent, interviews scheduled, response rate
+* **Track:** Jobs scraped, applications sent, interviews scheduled, response rate, quality scores
 
 ---
 
-## 2. THE 5-AGENT ARCHITECTURE
+## 2. THE 7-AGENT ARCHITECTURE
 
 ### AGENT 1: JOB DISCOVERY (Scraper Agent)
 **Responsibility:** Find and parse job postings
@@ -90,31 +92,152 @@ AI-powered personalization at 100% automation scale.
 
 ---
 
-### AGENT 3: CV OPTIMIZATION (CV Agent)
-**Responsibility:** Optimize master CV for specific job
+### AGENT 3: COMPANY RESEARCH (Research Agent) 🆕
+**Responsibility:** Gather real-time company intelligence before application
+
+**Directive:** `directives/company_research.md`
+
+**Why Critical:**
+LLMs hallucinate company facts. This agent fetches REAL data to prevent fake claims in cover letters.
+
+**Process:**
+1. **Search Company News:** Perplexity API - "[Company Name] latest news 2026"
+2. **Extract Vision/Values:** Parse company website, LinkedIn About section
+3. **Find Matching Quotes:** Identify 3 authentic quotes that align with user's experience
+4. **Recent Developments:** Product launches, funding rounds, leadership changes
+
+**Example Output:**
+```json
+{
+  "company_name": "Stripe",
+  "recent_news": "Launched Stripe Billing 2.0 in Jan 2026",
+  "vision": "Increase the GDP of the internet",
+  "values": ["User-first", "Move fast", "Think rigorously"],
+  "matching_quotes": [
+    "Our payment infrastructure processes $1T annually",
+    "We're hiring engineers who obsess over API design",
+    "Remote-first culture since 2020"
+  ]
+}
+```
+
+**Tech Stack:**
+- Perplexity API (primary research tool)
+- Fallback: Serper API (Google search)
+- Cache: 30 days in Supabase `company_intel` table
+
+**Cost Optimization:**
+- Cache results for 30 days (companies rarely change vision)
+- Reuse intel for multiple applications to same company
+- Cost per company: ~€0.05 (Perplexity API)
+
+**Output:** Store in Supabase `company_intel` table, pass to CV Optimization Agent
+
+---
+
+### AGENT 4: CV OPTIMIZATION (CV Agent)
+**Responsibility:** Optimize master CV for specific job using company research
 
 **Directive:** `directives/cv_optimization.md`
 
 **Process:**
-1. Extract job requirements + company culture keywords
-2. Claude prompt: "Optimize CV for this job, keep format identical"
-3. Generate markdown version
-4. Convert to PDF (wkhtmltopdf)
-5. Store in Supabase `cv_versions` table
-
-**Cost Optimization:**
-- Cache similar job descriptions (embeddings)
-- Reuse CV versions for similar roles
-- Cost per CV: ~€0.003 (3k tokens input + 1k output)
+1. **Fetch Research:** Get company intel from Agent 3
+2. **Extract Job Requirements:** Parse job description for must-have skills
+3. **Claude Prompt with Context:**
+   ```
+   You are a professional CV optimizer.
+   Job: [JOB_DESC]
+   Company Intel: [COMPANY_INTEL from Agent 3]
+   Master CV: [MASTER_CV]
+   Task: Optimize CV to match this job. Use REAL company facts. Keep format identical.
+   ```
+4. **Generate Markdown:** Claude 3.5 Sonnet output
+5. **Convert to PDF:** wkhtmltopdf
+6. **Store Version:** Supabase `cv_versions` table
 
 **Quality Gate:**
 - Match score must increase by 10%+
 - Format must be identical to master CV
 - Generation time < 10 seconds
+- NO hallucinated company facts (validated against Agent 3 data)
+
+**Cost:**
+- ~€0.003 per CV (3k tokens input + 1k output)
+
+**Output:** Optimized CV (markdown + PDF), pass to QA Agent
 
 ---
 
-### AGENT 4: APPLICATION AUTOMATION (Apply Agent)
+### AGENT 5: QUALITY ASSURANCE (QA Agent / "The Judge") 🆕
+**Responsibility:** Validate generated content BEFORE sending to user
+
+**Directive:** `directives/quality_assurance.md`
+
+**The 3-Stage Generation Process:**
+```
+Generate (Agent 4) → Judge (Agent 5) → Iterate (Agent 4) → Final Output
+```
+
+**Why Necessary:**
+LLMs cannot reliably critique their own output. A separate agent catches:
+- Cliché phrases ("Hiermit bewerbe ich mich...")
+- Hallucinated facts ("Stripe was founded in Berlin" ❌)
+- Unnatural language ("As a passionate Software Engineer...")
+- Generic statements ("I'm a team player")
+
+**Validation Checklist:**
+1. ✅ **No Negative-List Phrases:**
+   - "Hiermit bewerbe ich mich"
+   - "Mit großem Interesse"
+   - "Ich bin ein Teamplayer"
+   - "Zu meinen Stärken gehört"
+
+2. ✅ **Naturalness Score (1-10):**
+   - Score > 7 required to pass
+   - Measured by: sentence variety, active voice, specificity
+
+3. ✅ **Fact-Check Against Company Intel:**
+   - Every company claim must exist in Agent 3's research data
+   - If claim not found → Flag as hallucination
+
+4. ✅ **Format Compliance:**
+   - CV format identical to master CV (margins, font, sections)
+   - Cover letter max 1 page
+
+**Process:**
+```python
+# Agent 4 generates CV/Cover Letter
+cv_draft = agent_4.generate(job, company_intel)
+
+# Agent 5 validates
+qa_result = agent_5.validate(cv_draft, negative_list, company_intel)
+
+if qa_result.score < 7:
+    # Iterate: Send feedback to Agent 4
+    cv_final = agent_4.regenerate(cv_draft, qa_result.feedback)
+else:
+    cv_final = cv_draft
+```
+
+**Model Choice:**
+- **Claude Haiku** (fast, cheap, excellent at critique)
+- Cost: ~€0.0005 per validation (500 tokens)
+- Latency: <2 seconds
+
+**Output:**
+- Validation score (1-10)
+- List of issues found
+- Approved/Rejected status
+- If rejected → Feedback for Agent 4 to iterate
+
+**Metrics to Track:**
+- % of CVs that pass first validation
+- Average naturalness score
+- Most common issues caught
+
+---
+
+### AGENT 6: APPLICATION AUTOMATION (Apply Agent)
 **Responsibility:** Fill and submit application forms
 
 **Directive:** `directives/application_automation.md`
@@ -128,8 +251,8 @@ AI-powered personalization at 100% automation scale.
 ```typescript
 1. Detect form type (Easy Apply vs. Standard)
 2. Fill fields from user profile
-3. Upload optimized CV
-4. Upload cover letter (if required)
+3. Upload QA-approved CV (from Agent 5)
+4. Upload QA-approved cover letter (if required)
 5. Take screenshot for verification
 6. Submit (if confidence > 90%) OR flag for review
 ```
@@ -137,11 +260,13 @@ AI-powered personalization at 100% automation scale.
 **Tracking:**
 - Log every application in `applications` table
 - Status: pending, sent, rejected, interview_scheduled
-- Store application timestamp, CV version used
+- Store application timestamp, CV version used, QA score
+
+**Output:** Application submitted, log to Supabase
 
 ---
 
-### AGENT 5: FOLLOW-UP AUTOMATION (Email Agent)
+### AGENT 7: FOLLOW-UP AUTOMATION (Email Agent)
 **Responsibility:** Send follow-up emails, schedule interviews
 
 **Directive:** `directives/email_follow_up.md`
@@ -162,6 +287,8 @@ AI-powered personalization at 100% automation scale.
 - Email parsing: Mailgun Inbound
 - Calendar: Google Calendar API
 
+**Output:** Emails sent, interviews scheduled
+
 ---
 
 ## 3. THE 3-LAYER ARCHITECTURE
@@ -173,9 +300,11 @@ AI-powered personalization at 100% automation scale.
 
 **Critical Directives:**
 - `job_board_scraper.md` - How to scrape LinkedIn/Indeed/Xing
+- `job_matching.md` - How to calculate match scores
+- `company_research.md` - How to research companies with Perplexity 🆕
 - `cv_optimization.md` - How to optimize CV with Claude
+- `quality_assurance.md` - How to validate generated content 🆕
 - `application_automation.md` - How to fill forms with Playwright
-- `company_enrichment.md` - How to research companies with Perplexity
 - `email_follow_up.md` - How to write effective follow-ups
 
 ---
@@ -189,9 +318,11 @@ AI-powered personalization at 100% automation scale.
 2. Agent: [PLAN MODE]
    - Step 1: Scrape LinkedIn for "Software Engineer" + "Berlin"
    - Step 2: Filter jobs with match_score > 70%
-   - Step 3: Generate optimized CVs for top 10 matches
-   - Step 4: Auto-apply to "Easy Apply" jobs
-   - Step 5: Flag complex forms for manual review
+   - Step 3: Research top 10 companies (Agent 3)
+   - Step 4: Generate optimized CVs with company intel (Agent 4)
+   - Step 5: QA validation (Agent 5) - iterate if needed
+   - Step 6: Auto-apply to "Easy Apply" jobs (Agent 6)
+   - Step 7: Flag complex forms for manual review
 3. Agent: "Here's the plan. Proceed? [Y/N]"
 4. User: "Y"
 5. Agent: [EXECUTION MODE] -> Run scripts
@@ -212,7 +343,9 @@ AI-powered personalization at 100% automation scale.
 
 **Critical Scripts:**
 - `scrape_job_boards.py` - LinkedIn scraper
+- `research_companies.py` - Perplexity company research 🆕
 - `customize_cv_ai.py` - CV optimizer (Claude API)
+- `validate_content_qa.py` - QA validation (Haiku API) 🆕
 - `auto_apply_pipeline.py` - End-to-end application workflow
 - `send_follow_ups.py` - Email automation
 - `schedule_interviews.py` - Calendar integration
@@ -220,7 +353,7 @@ AI-powered personalization at 100% automation scale.
 **Tech Stack Compliance:**
 - Database: Supabase (see `tech_stack.md`)
 - UI Framework: Next.js 14 + Tailwind CSS
-- AI: Claude 3.5 Sonnet (primary), GPT-4 (fallback)
+- AI: Claude 3.5 Sonnet (primary), Haiku (QA), GPT-4 (fallback)
 
 ---
 
@@ -233,7 +366,9 @@ AI-powered personalization at 100% automation scale.
 
 **Critical Skills:**
 - `linkedin_scraper.py` - Reusable LinkedIn scraping logic
+- `perplexity_research.py` - Company research wrapper 🆕
 - `cv_optimizer.py` - CV optimization with caching
+- `qa_validator.py` - Content validation with Haiku 🆕
 - `email_sender.py` - SMTP wrapper with retry logic
 - `form_filler.py` - Playwright form automation
 - `pdf_generator.py` - Markdown to PDF conversion
@@ -310,17 +445,25 @@ If you write reusable code in `execution/`, ask the user:
 ### E. Cost Optimization
 **AI API Costs:**
 - Claude 3.5 Sonnet: $3 per 1M input tokens, $15 per 1M output tokens
-- Target: <€0.50 per application (CV + cover letter)
+- Claude Haiku: $0.25 per 1M input tokens, $1.25 per 1M output tokens 🆕
+- Perplexity API: ~$5 per 1000 requests 🆕
+
+**New Cost Breakdown per Application:**
+- Company Research (Perplexity): €0.05
+- CV Generation (Sonnet): €0.003
+- QA Validation (Haiku): €0.0005
+- Cover Letter (Sonnet): €0.004
+- **Total: ~€0.06 per application** (88% cost reduction vs. Sonnet-only!)
 
 **Caching Strategy:**
+- Cache company intel for 30 days (reuse across applications)
 - Cache job descriptions (embeddings) for 7 days
 - Reuse CV versions for similar roles (same company + similar title)
-- Cache company research for 30 days
 
 **Monthly Budget:**
 - 100 applications/week = 400/month
-- Cost: 400 × €0.50 = €200/month
-- Add 20% buffer = €240/month target
+- Cost: 400 × €0.06 = €24/month
+- Add 20% buffer = **€29/month target** (vs. €240 before optimization!)
 
 ---
 
@@ -336,21 +479,27 @@ job-automation-saas/
 │
 ├── directives/            # SOPs
 │   ├── job_board_scraper.md
+│   ├── job_matching.md
+│   ├── company_research.md       # 🆕 Perplexity research protocol
 │   ├── cv_optimization.md
+│   ├── quality_assurance.md      # 🆕 3-stage validation process
 │   ├── application_automation.md
-│   ├── company_enrichment.md
 │   └── email_follow_up.md
 │
 ├── execution/             # Production Scripts
 │   ├── scrape_job_boards.py
+│   ├── research_companies.py     # 🆕
 │   ├── customize_cv_ai.py
+│   ├── validate_content_qa.py    # 🆕
 │   ├── auto_apply_pipeline.py
 │   ├── send_follow_ups.py
 │   └── schedule_interviews.py
 │
 ├── skills/                # Reusable Modules
 │   ├── linkedin_scraper.py
+│   ├── perplexity_research.py    # 🆕
 │   ├── cv_optimizer.py
+│   ├── qa_validator.py           # 🆕
 │   ├── email_sender.py
 │   ├── form_filler.py
 │   └── pdf_generator.py
@@ -358,6 +507,7 @@ job-automation-saas/
 ├── tests/                 # Unit & Integration Tests
 │   ├── test_scraper_health.py
 │   ├── test_cv_generation.py
+│   ├── test_qa_validation.py     # 🆕
 │   └── test_application_flow.py
 │
 ├── app/                   # Next.js Frontend
@@ -372,21 +522,28 @@ job-automation-saas/
 
 **Sequential Workflow (End-to-End Application):**
 ```
-Job Discovery → Job Matching → CV Optimization → Application → Follow-up
-    ↓              ↓              ↓                  ↓            ↓
- Supabase       Supabase       Supabase          Supabase    Supabase
-  jobs          jobs           cv_versions      applications emails
- (new rows)   (match_score)   (new versions)    (new rows)  (sent)
+Job Discovery → Job Matching → Company Research → CV Optimization → QA Validation → Application → Follow-up
+    ↓              ↓                 ↓                   ↓                 ↓              ↓            ↓
+ Supabase       Supabase         Supabase           Supabase          Supabase      Supabase    Supabase
+  jobs          jobs           company_intel      cv_versions      qa_results   applications  emails
+ (new rows)  (match_score)    (cached 30d)       (versioned)      (score>7)     (submitted)   (sent)
 ```
+
+**Critical Path Dependencies:**
+- Agent 4 (CV Optimization) **requires** Agent 3 (Company Research) output
+- Agent 6 (Application) **requires** Agent 5 (QA) approval
+- If QA fails → Loop back to Agent 4 (max 2 iterations)
 
 **Parallel Workflows:**
 - Job Discovery runs every 6 hours (cron job)
 - Email Follow-up runs daily at 9 AM
 - CV Optimization runs on-demand (user triggers)
+- Company Research runs on-demand (triggered by Agent 4)
 
 **Conflict Resolution:**
 - If 2 agents try to apply to same job → First one wins (database constraint)
 - If scraper and manual upload conflict → Manual upload takes priority
+- If QA rejects 3 times → Flag for human review
 
 ---
 
@@ -404,6 +561,8 @@ Before marking any task DONE:
 8. ✅ Did I log the action to Supabase?
 9. ✅ Is the data DSGVO compliant (consent, purpose limitation)?
 10. ✅ Did I check if a reusable Skill already exists in `/skills`?
+11. ✅ Did the QA Agent validate the output (for CV/cover letter generation)? 🆕
+12. ✅ Did I use cached company intel if available (check `company_intel` table)? 🆕
 
 ---
 
@@ -422,6 +581,13 @@ Before marking any task DONE:
 2. Switch to GPT-4 fallback (if Claude is rate-limited)
 3. Alert user: "Rate limited, processing queue (ETA: X minutes)"
 
+### QA Agent Rejects Content 3 Times
+**Action:**
+1. **STOP automated process**
+2. Alert user: "Quality issues detected, manual review required"
+3. Show user: original draft, QA feedback, and suggested fixes
+4. Ask: "Approve current version OR regenerate with feedback?"
+
 ### DSGVO Data Breach
 **Action:**
 1. **CRITICAL:** Immediately notify user
@@ -431,6 +597,7 @@ Before marking any task DONE:
 
 ---
 
-**System Status:** INITIALIZED. v1.0 ACTIVE.
+**System Status:** INITIALIZED. v2.0 ACTIVE.
 **Last Updated:** 2026-02-11
 **Next Review:** After 100 applications processed
+**Major Changes:** Added QA Agent (3-stage generation) + Research Agent (Perplexity integration)
