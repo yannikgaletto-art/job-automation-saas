@@ -1,4 +1,4 @@
-# PATHLY V2.0 - AGENT OPERATING SYSTEM
+# Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
 **Version:** 2.0  
@@ -107,9 +107,21 @@ Each agent has a **Directive** (SOP) that defines:
 - **Pillar 2:** Cron job (daily, 8-10 AM with jitter)
 
 **Tools:**
-- Playwright (primary scraper, headless browser)
-- ScraperAPI (fallback for LinkedIn)
-- BeautifulSoup (HTML parsing)
+
+**Scraping Strategy (Pillar-Specific):**
+
+*Pillar 1 (Manual - User-submitted URL):*
+- **ScraperAPI** - For LinkedIn, Indeed (primary)
+- **Firecrawl** - For ATS systems (Greenhouse, Lever, Workday)
+- **Playwright** - For company career pages (headless browser)
+
+*Pillar 2 (Automation - Job Board Search):*
+- **SerpAPI** - Primary (aggregates all job boards)
+- **ScraperAPI** - Fallback
+- **Playwright** - Final fallback
+
+*Parsing:*
+- **BeautifulSoup** - HTML to structured data
 
 **Anti-Bot Protocol:**
 - User-Agent rotation (50+ signatures)
@@ -120,13 +132,13 @@ Each agent has a **Directive** (SOP) that defines:
 
 **Process:**
 ```python
-# Pillar 1: User-submitted URL
-job_data = scrape_job_url(user_url)
+# Pillar 1: User-submitted URL (platform-specific)
+job_data = scrape_job_url(user_url, platform="linkedin")
 
-# Pillar 2: Automated search
-jobs = scrape_job_boards(
+# Pillar 2: Automated search (SerpAPI aggregates all platforms)
+jobs = serp_api_search(
     query="Software Engineer Berlin",
-    platforms=["linkedin", "indeed", "xing"],
+    sources=["linkedin", "indeed", "xing"],
     limit=50
 )
 ```
@@ -150,8 +162,9 @@ jobs = scrape_job_boards(
 
 **Error Handling:**
 - Retry 3 times with exponential backoff
-- If blocked → Switch to ScraperAPI
-- If both fail → Log to `failed_scrapes`, notify admin
+- Pillar 1: If platform scraper fails → Try ScraperAPI → Fallback to Playwright
+- Pillar 2: If SerpAPI fails → Try ScraperAPI → Fallback to Playwright
+- If all fail → Log to `failed_scrapes`, notify admin
 
 ---
 
@@ -1210,8 +1223,10 @@ Before marking any task DONE:
 - OpenAI text-embedding-3-small (embeddings)
 
 **Scraping:**
-- Playwright (primary)
-- ScraperAPI (fallback)
+- SerpAPI (Pillar 2 primary)
+- ScraperAPI (Pillar 1 + fallback)
+- Firecrawl (ATS systems)
+- Playwright (company pages)
 - BeautifulSoup (parsing)
 
 **Chrome Extension:**
