@@ -1,331 +1,744 @@
-# AGENT MASTER OPERATING SYSTEM - JOB AUTOMATION SAAS
+# PATHLY V2.0 - AGENT OPERATING SYSTEM
 
-> **Role:** You are the Job Application Automation Architect
-> **Mission:** Automate the entire job application process from discovery to interview scheduling
-> **Compliance:** DSGVO & NIS2 compliant by design
+**Project:** Pathly V2.0  
+**Version:** 2.0  
+**Last Updated:** 2026-02-11  
+**Status:** Active Development  
 
 ---
 
-## 0. IDENTITY AND CORE PHILOSOPHY
+## 0. IDENTITY & MISSION
 
-**The Automation Paradox:**
-Job applications must appear personalized, but the process is repetitive.
-**The Solution:**
-AI-powered personalization at 100% automation scale.
+**What is Pathly?**
 
-**Core Expertise:**
-- Web Scraping (LinkedIn, Indeed, Xing, Google Jobs)
-- Document Generation (CV optimization, cover letters)
-- Email Automation (Follow-ups, interview scheduling)
-- AI Content Creation (Claude 3.5 Sonnet + Haiku)
-- Company Intelligence (Perplexity for real-time research)
+Pathly is a **DSGVO & NIS2 compliant** job application SaaS with a hybrid architecture.
 
-**Hybrid Intelligence Protocol:**
-* **Research & Matching:** Use Perplexity for company intelligence, Claude for analysis
-* **Generation:** Use Claude 3.5 Sonnet for CV/cover letter creation
-* **Quality Assurance:** Use Claude Haiku for fast, cost-efficient validation
-* **Scraping:** Use Playwright + Apify fallback for anti-bot resistance
+**Core Principle:**
+> "AI assists, humans decide. Every application must pass through user review."
+
+**Two Pillars:**
+
+```
+╔════════════════════════════════════════════════════════════╗
+║  PILLAR 1: MANUAL APPLICATION (On-Demand)                  ║
+║  ───────────────────────────────────────────────────────  ║
+║  User uploads CV + Cover Letters + Job URL                 ║
+║         ↓                                                   ║
+║  AI optimizes CV & generates cover letter                  ║
+║         ↓                                                   ║
+║  User reviews, edits, approves                             ║
+║         ↓                                                   ║
+║  User applies manually OR via Chrome Extension             ║
+╚════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════╗
+║  PILLAR 2: AUTOMATION (Background Worker)                  ║
+║  ───────────────────────────────────────────────────────  ║
+║  Cron job scrapes matching jobs (8-10 AM daily)            ║
+║         ↓                                                   ║
+║  AI researches company & generates documents               ║
+║         ↓                                                   ║
+║  Status: ready_for_review (notification to user)           ║
+║         ↓                                                   ║
+║  User reviews, approves → status: ready_to_apply           ║
+║         ↓                                                   ║
+║  Chrome Extension fills form, user clicks Submit           ║
+╚════════════════════════════════════════════════════════════╝
+```
+
+**DSGVO Compliance:**
+- ✅ No full automation (Art. 22 compliance)
+- ✅ Mandatory human approval before submission
+- ✅ PII encryption (Fernet)
+- ✅ Audit logging for all AI generations
+- ✅ User consent tracking
 
 ---
 
 ## 1. THE CEO SYSTEM (MAPS FRAMEWORK)
 
-**Protocol:** Before executing any task, synchronize with the CEO's strategic context.
+**Protocol:** Before executing any task, synchronize with CEO's strategic context.
 
-**MISSION (mission.md) - The North Star**
-* **Goal:** 100+ relevant applications per week with 5%+ response rate
-* **Target:** Tech professionals (SWE, PM, Data Scientists)
-* **Compliance:** DSGVO/NIS2 compliant data processing
+### Mission (mission.md) - The North Star
+* **Goal:** Help users land their dream job through intelligent automation
+* **Target:** Tech professionals (SWE, PM, Data Scientists, Designers)
+* **Compliance:** DSGVO/NIS2 by design
+* **Quality:** Authentic, individual applications (no generic AI text)
 
-**ACTIONS (actions.md) - The Tactical Backlog**
-* **Next 3 Steps:** Defines what to build next
-* **Priority System:** P1 (Critical) > P2 (Important) > P3 (Nice-to-have)
+### Actions (actions.md) - The Tactical Backlog
+* **Next Steps:** Defines what to build next
+* **Priority:** P1 (Critical) > P2 (Important) > P3 (Nice-to-have)
+* **Update Rule:** After every planning session
 
-**PAST (past.md) - The Project Log**
+### Past (past.md) - The Project Log
 * **Append After:** Every major feature completion
-* **Format:** Date, Feature, Outcome, Metrics
+* **Format:** Date, Feature, Outcome, Learnings
+* **Purpose:** Learn from history, avoid repeating mistakes
 
-**STATS (stats.md) - The Metrics Dashboard**
-* **Update After:** Every scraping run, every application sent
-* **Track:** Jobs scraped, applications sent, interviews scheduled, response rate, quality scores
+### Stats (stats.md) - The Metrics Dashboard
+* **Track:** Applications sent, interviews scheduled, response rate
+* **Update:** After every scraping run, every application
+* **KPIs:** Quality scores, user satisfaction, system uptime
 
 ---
 
-## 2. THE 7-AGENT ARCHITECTURE
+## 2. THE 5-AGENT ARCHITECTURE
+
+**Agent = Specialized AI Worker**
+
+Each agent has a **Directive** (SOP) that defines:
+- What it does
+- How to do it
+- Error handling
+- Success criteria
+
+**Agents work for BOTH pillars (Manual + Automation).**
+
+---
 
 ### AGENT 1: JOB DISCOVERY (Scraper Agent)
-**Responsibility:** Find and parse job postings
 
-**Directive:** `directives/job_board_scraper.md`
+**Responsibility:** Find and parse job postings from various sources.
+
+**Directive:** `directives/job_discovery.md`
+
+**Triggers:**
+- **Pillar 1:** User submits job URL
+- **Pillar 2:** Cron job (daily, 8-10 AM with jitter)
 
 **Tools:**
-- Playwright (Primary scraper)
-- Apify (Fallback for LinkedIn)
+- Playwright (primary scraper, headless browser)
+- ScraperAPI (fallback for LinkedIn)
 - BeautifulSoup (HTML parsing)
 
 **Anti-Bot Protocol:**
-- User-Agent rotation
-- Random delays (2-5 seconds)
+- User-Agent rotation (50+ signatures)
+- Random delays (2-5 seconds, human-like)
 - Headless browser with stealth plugin
-- Proxy rotation (via Bright Data)
+- Residential proxies (Bright Data)
+- CAPTCHA handling (2Captcha API)
 
-**Output:** Store in Supabase `jobs` table
+**Process:**
+```python
+# Pillar 1: User-submitted URL
+job_data = scrape_job_url(user_url)
+
+# Pillar 2: Automated search
+jobs = scrape_job_boards(
+    query="Software Engineer Berlin",
+    platforms=["linkedin", "indeed", "xing"],
+    limit=50
+)
+```
+
+**Output Schema:**
+```json
+{
+  "title": "Senior Software Engineer",
+  "company": "TechCorp GmbH",
+  "location": "Berlin, Germany",
+  "description": "We are looking for...",
+  "requirements": ["5+ years Python", "AWS experience"],
+  "salary_range": "70k-90k EUR",
+  "job_url": "https://...",
+  "application_url": "https://...",
+  "scraped_at": "2026-02-11T15:30:00Z"
+}
+```
+
+**Database:** Store in `job_queue` table.
+
+**Error Handling:**
+- Retry 3 times with exponential backoff
+- If blocked → Switch to ScraperAPI
+- If both fail → Log to `failed_scrapes`, notify admin
 
 ---
 
 ### AGENT 2: JOB MATCHING (Matcher Agent)
-**Responsibility:** Calculate match score between user profile and job
+
+**Responsibility:** Calculate match score between user profile and job.
 
 **Directive:** `directives/job_matching.md`
 
+**Triggers:**
+- After Agent 1 scrapes new jobs
+- Only for Pillar 2 (Automation)
+- Pillar 1 skips matching (user already chose job)
+
 **Algorithm:**
-1. Extract required skills from job description
-2. Compare with user's master CV skills
-3. Calculate match score (0-100%)
-4. Flag jobs above 70% threshold
+
+1. **Extract Skills from Job Description**
+   ```python
+   required_skills = extract_skills_from_text(job_description)
+   # Returns: ["Python", "AWS", "Docker", "React"]
+   ```
+
+2. **Compare with User Profile**
+   ```python
+   user_skills = get_user_skills(user_id)
+   match_score = calculate_similarity(
+       user_skills, 
+       required_skills,
+       method="cosine_similarity"
+   )
+   ```
+
+3. **Threshold Filtering**
+   ```python
+   if match_score >= 0.70:  # 70% match
+       status = "matched"
+   else:
+       status = "rejected"
+   ```
 
 **Tech Stack:**
-- Embeddings: OpenAI text-embedding-3-small
-- Vector Search: Supabase pgvector
+- **Embeddings:** OpenAI `text-embedding-3-small`
+- **Vector Search:** Supabase pgvector
+- **Caching:** 7 days (job requirements rarely change)
 
-**Output:** Update `jobs.match_score` in Supabase
+**Output:** Update `job_queue.match_score` and `status`.
+
+**Quality Gate:**
+- Only jobs with match_score >= 70% proceed to Agent 3
+- Track false positives (user rejects high-scored jobs)
+- Improve algorithm based on user feedback
 
 ---
 
-### AGENT 3: COMPANY RESEARCH (Research Agent) 🆕
-**Responsibility:** Gather real-time company intelligence before application
+### AGENT 3: COMPANY RESEARCH (Research Agent)
+
+**Responsibility:** Gather real-time company intelligence to prevent AI hallucinations.
 
 **Directive:** `directives/company_research.md`
 
 **Why Critical:**
-LLMs hallucinate company facts. This agent fetches REAL data to prevent fake claims in cover letters.
+> LLMs hallucinate company facts. This agent fetches REAL data for authentic cover letters.
+
+**Triggers:**
+- After Agent 2 approves job (Pillar 2)
+- After user submits job URL (Pillar 1)
 
 **Process:**
-1. **Search Company News:** Perplexity API - "[Company Name] latest news 2026"
-2. **Extract Vision/Values:** Parse company website, LinkedIn About section
-3. **Find Matching Quotes:** Identify 3 authentic quotes that align with user's experience
-4. **Recent Developments:** Product launches, funding rounds, leadership changes
 
-**Example Output:**
+1. **Deep Company Research (Perplexity API)**
+   ```python
+   from perplexity import Client
+   
+   client = Client(api_key=os.getenv('PERPLEXITY_API_KEY'))
+   
+   research = client.chat.completions.create(
+       model="sonar-pro",
+       messages=[{
+           "role": "user",
+           "content": f"""
+           Research {company_name} comprehensively:
+           
+           1. Company founding & history
+           2. Core values & mission statement  
+           3. Recent news (last 3 months)
+           4. Press releases & milestones (2024-2026)
+           5. Vision & strategic goals
+           6. Company culture
+           
+           Format: Structured JSON with sources.
+           """
+       }],
+       return_citations=True,
+       search_recency_filter="month"
+   )
+   ```
+
+2. **Quote Suggestions (Optional)**
+   ```python
+   quotes = client.chat.completions.create(
+       model="sonar-pro",
+       messages=[{
+           "role": "user",
+           "content": f"""
+           Based on company values: {company_values}
+           
+           Find 3 matching quotes from:
+           - Industry thought leaders
+           - CEOs/Founders of relevant companies
+           - Historical innovators
+           
+           Criteria:
+           - Related to values
+           - Not overused (not Steve Jobs)
+           - Authentic & inspiring
+           """
+       }]
+   )
+   ```
+
+**Output Schema:**
 ```json
 {
   "company_name": "Stripe",
-  "recent_news": "Launched Stripe Billing 2.0 in Jan 2026",
+  "founded": "2010",
+  "core_values": ["User-first", "Move fast", "Think rigorously"],
+  "recent_news": [
+    {
+      "title": "Stripe launches Billing 2.0",
+      "date": "2026-01-15",
+      "url": "https://...",
+      "relevance": "High"
+    }
+  ],
   "vision": "Increase the GDP of the internet",
-  "values": ["User-first", "Move fast", "Think rigorously"],
-  "matching_quotes": [
-    "Our payment infrastructure processes $1T annually",
-    "We're hiring engineers who obsess over API design",
-    "Remote-first culture since 2020"
-  ]
+  "suggested_quotes": [
+    {
+      "quote": "Payment infrastructure that scales...",
+      "author": "Patrick Collison (Stripe CEO)",
+      "match_score": 0.95
+    }
+  ],
+  "citations": ["source1", "source2"],
+  "researched_at": "2026-02-11T15:35:00Z"
 }
 ```
 
-**Tech Stack:**
-- Perplexity API (primary research tool)
-- Fallback: Serper API (Google search)
-- Cache: 30 days in Supabase `company_intel` table
+**Database:** Store in `company_research` table.
 
-**Cost Optimization:**
-- Cache results for 30 days (companies rarely change vision)
+**Caching Strategy:**
+- Cache results for **30 days** (companies rarely change vision)
 - Reuse intel for multiple applications to same company
-- Cost per company: ~€0.05 (Perplexity API)
+- Update cache if job is > 30 days old
 
-**Output:** Store in Supabase `company_intel` table, pass to CV Optimization Agent
+**Error Handling:**
+- If Perplexity fails → Fallback to Serper API (Google search)
+- If both fail → Proceed without company intel (flag as limited)
+- Never hallucinate data
 
 ---
 
 ### AGENT 4: CV OPTIMIZATION (CV Agent)
-**Responsibility:** Optimize master CV for specific job using company research
+
+**Responsibility:** Optimize master CV for specific job using company research.
 
 **Directive:** `directives/cv_optimization.md`
 
+**Triggers:**
+- After Agent 3 completes research
+- For BOTH Pillar 1 and Pillar 2
+
 **Process:**
-1. **Fetch Research:** Get company intel from Agent 3
-2. **Extract Job Requirements:** Parse job description for must-have skills
-3. **Claude Prompt with Context:**
+
+1. **Fetch Context**
+   ```python
+   job = get_job_details(job_id)
+   company_intel = get_company_research(job.company)
+   master_cv = get_user_cv(user_id)
    ```
-   You are a professional CV optimizer.
-   Job: [JOB_DESC]
-   Company Intel: [COMPANY_INTEL from Agent 3]
-   Master CV: [MASTER_CV]
-   Task: Optimize CV to match this job. Use REAL company facts. Keep format identical.
+
+2. **Claude Prompt with Full Context**
+   ```python
+   optimized_cv = anthropic.messages.create(
+       model="claude-sonnet-4.5",
+       messages=[{
+           "role": "user",
+           "content": f"""
+           You are a professional CV optimizer.
+           
+           JOB DESCRIPTION:
+           {job.description}
+           
+           JOB REQUIREMENTS:
+           {job.requirements}
+           
+           COMPANY INTELLIGENCE (from Perplexity research):
+           - Founded: {company_intel.founded}
+           - Values: {company_intel.core_values}
+           - Recent News: {company_intel.recent_news}
+           - Vision: {company_intel.vision}
+           
+           MASTER CV:
+           {master_cv.content}
+           
+           TASK:
+           Optimize this CV to match the job requirements.
+           
+           RULES:
+           1. Keep ALL facts truthful (use ONLY company_intel data)
+           2. Reorder bullet points (most relevant first)
+           3. Add missing keywords from job description
+           4. Quantify achievements where possible
+           5. Keep original format identical
+           6. Maximum 2 pages
+           7. NO hallucinated company facts
+           
+           Return optimized CV in Markdown format.
+           """
+       }],
+       temperature=0.3  # Low temperature = less creativity
+   )
    ```
-4. **Generate Markdown:** Claude 3.5 Sonnet output
-5. **Convert to PDF:** wkhtmltopdf
-6. **Store Version:** Supabase `cv_versions` table
+
+3. **Convert to PDF**
+   ```python
+   from markdown_pdf import MarkdownPdf
+   
+   pdf = MarkdownPdf(toc_level=2)
+   pdf.add_section(Section(optimized_cv.content))
+   pdf.save(f"{user_id}/cv_{job_id}.pdf")
+   ```
+
+4. **Store Version**
+   ```python
+   supabase.table('cv_versions').insert({
+       'user_id': user_id,
+       'job_id': job_id,
+       'content_markdown': optimized_cv.content,
+       'file_url': f"storage/cvs/{user_id}/cv_{job_id}.pdf",
+       'match_score_before': job.match_score,
+       'match_score_after': calculate_new_score(optimized_cv),
+       'created_at': datetime.now()
+   })
+   ```
 
 **Quality Gate:**
-- Match score must increase by 10%+
-- Format must be identical to master CV
-- Generation time < 10 seconds
-- NO hallucinated company facts (validated against Agent 3 data)
+- ✅ Match score increases by 10%+
+- ✅ Format identical to master CV
+- ✅ Generation time < 10 seconds
+- ✅ NO hallucinated facts (validate against Agent 3 data)
 
-**Cost:**
-- ~€0.003 per CV (3k tokens input + 1k output)
-
-**Output:** Optimized CV (markdown + PDF), pass to QA Agent
+**Output:** Optimized CV (markdown + PDF), passed to Agent 5.
 
 ---
 
-### AGENT 5: QUALITY ASSURANCE (QA Agent / "The Judge") 🆕
-**Responsibility:** Validate generated content BEFORE sending to user
+### AGENT 5: COVER LETTER GENERATION (Writer Agent)
 
-**Directive:** `directives/quality_assurance.md`
+**Responsibility:** Generate authentic, individual cover letters with integrated QA.
 
-**The 3-Stage Generation Process:**
+**Directive:** `directives/cover_letter_generation.md`
+
+**Why 3-Stage Generation:**
+> LLMs cannot reliably critique their own output. A separate validation step catches clichés, hallucinations, and unnatural language.
+
+**Triggers:**
+- After Agent 4 completes CV optimization
+- For BOTH Pillar 1 and Pillar 2
+
+**The 3-Stage Process:**
+
 ```
-Generate (Agent 4) → Judge (Agent 5) → Iterate (Agent 4) → Final Output
+STAGE 1: Generate (Sonnet 4.5)
+   ↓
+STAGE 2: Judge (Haiku 4)
+   ↓
+STAGE 3: Iterate (if score < 8) OR Approve (if score >= 8)
 ```
 
-**Why Necessary:**
-LLMs cannot reliably critique their own output. A separate agent catches:
-- Cliché phrases ("Hiermit bewerbe ich mich...")
-- Hallucinated facts ("Stripe was founded in Berlin" ❌)
-- Unnatural language ("As a passionate Software Engineer...")
-- Generic statements ("I'm a team player")
+**Implementation:**
 
-**Validation Checklist:**
-1. ✅ **No Negative-List Phrases:**
-   - "Hiermit bewerbe ich mich"
-   - "Mit großem Interesse"
-   - "Ich bin ein Teamplayer"
-   - "Zu meinen Stärken gehört"
-
-2. ✅ **Naturalness Score (1-10):**
-   - Score > 7 required to pass
-   - Measured by: sentence variety, active voice, specificity
-
-3. ✅ **Fact-Check Against Company Intel:**
-   - Every company claim must exist in Agent 3's research data
-   - If claim not found → Flag as hallucination
-
-4. ✅ **Format Compliance:**
-   - CV format identical to master CV (margins, font, sections)
-   - Cover letter max 1 page
-
-**Process:**
 ```python
-# Agent 4 generates CV/Cover Letter
-cv_draft = agent_4.generate(job, company_intel)
+MAX_ITERATIONS = 3
 
-# Agent 5 validates
-qa_result = agent_5.validate(cv_draft, negative_list, company_intel)
+for iteration in range(MAX_ITERATIONS):
+    # ═══════════════════════════════════════════════════════
+    # STAGE 1: GENERATION (Claude Sonnet 4.5)
+    # ═══════════════════════════════════════════════════════
+    
+    cover_letter = anthropic.messages.create(
+        model="claude-sonnet-4.5",
+        messages=[{
+            "role": "user",
+            "content": f"""
+            CONTEXT:
+            - Job: {job.title} at {job.company}
+            - Company Values: {company_intel.core_values}
+            - Recent News: {company_intel.recent_news[0]}
+            
+            USER PROFILE:
+            {optimized_cv.content}
+            
+            WRITING STYLE (CRITICAL - EXACT IMITATION):
+            
+            Structure (from user's reference cover letters):
+            - Paragraph 1: Quote opening (if quote selected)
+            - Paragraph 2: Relevant experience
+            - Paragraph 3: Additional expertise
+            - Paragraph 4: Cultural fit
+            - Closing: Personal, not generic
+            
+            Sentence Requirements:
+            - Minimum 3 sentences starting with conjunctions:
+              "Daher", "Deshalb", "Gleichzeitig", "Während"
+            - Average length: 15-25 words
+            - Vary structure (not all same pattern)
+            
+            Tone:
+            - Professional but personal
+            - First-person perspective
+            - Moderately enthusiastic (not overly)
+            
+            User's Voice (phrases from reference letters):
+            - "möchte ich gerne... einbringen"
+            - "durfte ich eigenverantwortlich"
+            - "fühle ich mich wohl"
+            - "resoniert stark mit mir"
+            
+            COMPANY CONNECTION:
+            Integrate subtly (don't force):
+            - Recent news: {company_intel.recent_news[0].title}
+            - Core value: {company_intel.core_values[0]}
+            - Vision: {company_intel.vision}
+            
+            FORBIDDEN PHRASES:
+            - "Hiermit bewerbe ich mich"
+            - "I am excited to apply"
+            - "I believe I would be a great fit"
+            - "Mit großem Interesse habe ich"
+            - Any generic opening/closing
+            
+            SELECTED QUOTE (if any):
+            {selected_quote}
+            
+            Write the cover letter NOW in {language}.
+            """
+        }],
+        temperature=0.7
+    )
+    
+    # ═══════════════════════════════════════════════════════
+    # STAGE 2: JUDGE (Claude Haiku 4)
+    # ═══════════════════════════════════════════════════════
+    
+    judge_result = anthropic.messages.create(
+        model="claude-haiku-4",
+        messages=[{
+            "role": "user",
+            "content": f"""
+            TASK: Strict quality check of this cover letter.
+            
+            COVER LETTER:
+            {cover_letter.content}
+            
+            REFERENCE STYLE (the goal):
+            {user_reference_letter}
+            
+            COMPANY FACTS (validate against these ONLY):
+            {company_intel}
+            
+            EVALUATE (score 1-10 for each):
+            
+            1. NATURALNESS (no AI language)
+               - Conjunctions at sentence start? (min 3x required)
+               - Sentence length varies? (15-25 words avg)
+               - NO forbidden phrases?
+               - Sounds like a real person?
+            
+            2. STYLE MATCH (matches user's reference letters)
+               - Tone matches references?
+               - User's voice recognizable?
+               - Structure followed?
+               - Personal phrases used?
+            
+            3. FACTUAL ACCURACY (no hallucinations)
+               - All company facts in company_intel?
+               - No invented news/products?
+               - No fake statistics?
+            
+            4. INDIVIDUALITY (not generic)
+               - Concrete examples from CV?
+               - Specific to THIS job?
+               - Not interchangeable with other applications?
+            
+            FORMAT YOUR RESPONSE AS JSON:
+            {{
+              "naturalness_score": 8,
+              "style_match_score": 7,
+              "factual_accuracy_score": 10,
+              "individuality_score": 8,
+              "overall_score": 8.25,
+              
+              "issues_found": [
+                "Only 1 sentence with conjunction start (need 3)",
+                "Phrase 'freue mich auf' sounds generic"
+              ],
+              
+              "suggestions": [
+                "Start more sentences with 'Daher', 'Deshalb'",
+                "Make closing more personal",
+                "Add specific project example from CV"
+              ],
+              
+              "hallucinations_detected": [],
+              
+              "decision": "ITERATE"  // or "APPROVE"
+            }}
+            """
+        }],
+        temperature=0.0  # Deterministic judging
+    )
+    
+    # Parse judge result
+    judge = json.loads(judge_result.content)
+    
+    # ═══════════════════════════════════════════════════════
+    # STAGE 3: DECISION
+    # ═══════════════════════════════════════════════════════
+    
+    if judge['overall_score'] >= 8.0:
+        # APPROVED ✅
+        break
+    
+    elif iteration < MAX_ITERATIONS - 1:
+        # ITERATE with feedback
+        previous_feedback = judge['suggestions']
+        continue
+    
+    else:
+        # Max iterations reached → Flag for human review
+        flag_for_manual_review(job_id, judge)
+        break
+    
+    # Log iteration
+    supabase.table('generation_logs').insert({
+        'job_id': job_id,
+        'iteration': iteration + 1,
+        'scores': judge,
+        'issues': judge['issues_found'],
+        'created_at': datetime.now()
+    })
 
-if qa_result.score < 7:
-    # Iterate: Send feedback to Agent 4
-    cv_final = agent_4.regenerate(cv_draft, qa_result.feedback)
-else:
-    cv_final = cv_draft
+# Store final cover letter
+supabase.table('cover_letters').insert({
+    'user_id': user_id,
+    'job_id': job_id,
+    'content': cover_letter.content,
+    'quality_scores': judge,
+    'iterations_needed': iteration + 1,
+    'created_at': datetime.now()
+})
+
+return {
+    'cover_letter': cover_letter.content,
+    'quality_scores': judge,
+    'iterations': iteration + 1,
+    'status': 'approved' if judge['overall_score'] >= 8 else 'needs_review'
+}
 ```
 
-**Model Choice:**
-- **Claude Haiku** (fast, cheap, excellent at critique)
-- Cost: ~€0.0005 per validation (500 tokens)
-- Latency: <2 seconds
-
-**Output:**
-- Validation score (1-10)
-- List of issues found
-- Approved/Rejected status
-- If rejected → Feedback for Agent 4 to iterate
-
-**Metrics to Track:**
-- % of CVs that pass first validation
+**Quality Metrics to Track:**
+- % of cover letters that pass first validation
 - Average naturalness score
 - Most common issues caught
+- Iteration distribution (1x, 2x, 3x)
 
----
-
-### AGENT 6: APPLICATION AUTOMATION (Apply Agent)
-**Responsibility:** Fill and submit application forms
-
-**Directive:** `directives/application_automation.md`
-
-**Modes:**
-1. **Easy Apply (LinkedIn):** One-click automation
-2. **Standard Forms:** Auto-fill common fields (name, email, phone)
-3. **Complex Forms:** Generate pre-filled data, require user review
-
-**Playwright Workflow:**
-```typescript
-1. Detect form type (Easy Apply vs. Standard)
-2. Fill fields from user profile
-3. Upload QA-approved CV (from Agent 5)
-4. Upload QA-approved cover letter (if required)
-5. Take screenshot for verification
-6. Submit (if confidence > 90%) OR flag for review
-```
-
-**Tracking:**
-- Log every application in `applications` table
-- Status: pending, sent, rejected, interview_scheduled
-- Store application timestamp, CV version used, QA score
-
-**Output:** Application submitted, log to Supabase
-
----
-
-### AGENT 7: FOLLOW-UP AUTOMATION (Email Agent)
-**Responsibility:** Send follow-up emails, schedule interviews
-
-**Directive:** `directives/email_follow_up.md`
-
-**Email Sequences:**
-1. **Day 3:** Polite follow-up ("Checking on my application status")
-2. **Day 7:** Value-add follow-up ("Additional portfolio link")
-3. **Day 14:** Final follow-up ("Still very interested")
-
-**Interview Scheduling:**
-- Parse interview invitation emails
-- Extract available time slots
-- Auto-respond with availability (from user's calendar)
-- Add to Supabase `interviews` table
-
-**Tech Stack:**
-- SMTP: Gmail API
-- Email parsing: Mailgun Inbound
-- Calendar: Google Calendar API
-
-**Output:** Emails sent, interviews scheduled
+**Output:** Approved cover letter, ready for user review.
 
 ---
 
 ## 3. THE 3-LAYER ARCHITECTURE
 
 ### LAYER 1: DIRECTIVES (SOPs)
+
 **Location:** `directives/`
 
-**Mandate:** Never attempt a complex task without reading the directive first.
+**Purpose:** Standard Operating Procedures for each agent.
+
+**Rule:** Never attempt a complex task without reading the directive first.
 
 **Critical Directives:**
-- `job_board_scraper.md` - How to scrape LinkedIn/Indeed/Xing
+- `job_discovery.md` - How to scrape job boards
 - `job_matching.md` - How to calculate match scores
-- `company_research.md` - How to research companies with Perplexity 🆕
-- `cv_optimization.md` - How to optimize CV with Claude
-- `quality_assurance.md` - How to validate generated content 🆕
-- `application_automation.md` - How to fill forms with Playwright
-- `email_follow_up.md` - How to write effective follow-ups
+- `company_research.md` - How to research companies with Perplexity
+- `cv_optimization.md` - How to optimize CVs with Claude
+- `cover_letter_generation.md` - How to generate cover letters (3-stage)
+
+**Directive Template:**
+```markdown
+# [AGENT NAME] DIRECTIVE
+
+## Purpose
+What this agent does and why it exists.
+
+## When to Execute
+Triggers that activate this agent.
+
+## Input Requirements
+What data this agent needs.
+
+## Process
+Step-by-step instructions.
+
+## Output Specification
+What this agent produces.
+
+## Error Handling
+What to do when things fail.
+
+## Success Criteria
+How to know if the agent succeeded.
+```
 
 ---
 
 ### LAYER 2: ORCHESTRATION (The Router)
-**Mode:** Plan -> **STOP & ASK USER** -> Execute
+
+**Mode:** Plan → **STOP & ASK USER** → Execute
+
+**Purpose:** Coordinate agents, manage workflow, handle errors.
+
+**Orchestration Rules:**
+
+1. **Sequential Execution** (for single job):
+   ```
+   Discovery → Matching → Research → CV → Cover Letter → User Review
+   ```
+
+2. **Parallel Execution** (for multiple jobs):
+   ```python
+   # Process multiple jobs in parallel
+   from concurrent.futures import ThreadPoolExecutor
+   
+   with ThreadPoolExecutor(max_workers=5) as executor:
+       futures = [executor.submit(process_job, job_id) 
+                  for job_id in matched_jobs]
+   ```
+
+3. **Error Propagation**:
+   - If Agent 1 fails → Retry 3x → Alert user
+   - If Agent 3 fails → Continue without company intel (flag as limited)
+   - If Agent 5 fails QA 3x → Flag for manual review
+
+4. **Status Transitions**:
+   ```
+   scraped → matched → researched → cv_optimized → 
+   cover_letter_generated → ready_for_review → ready_to_apply → submitted
+   ```
 
 **Example Workflow:**
-```
-1. User: "Apply to 10 Software Engineer jobs in Berlin"
-2. Agent: [PLAN MODE]
-   - Step 1: Scrape LinkedIn for "Software Engineer" + "Berlin"
-   - Step 2: Filter jobs with match_score > 70%
-   - Step 3: Research top 10 companies (Agent 3)
-   - Step 4: Generate optimized CVs with company intel (Agent 4)
-   - Step 5: QA validation (Agent 5) - iterate if needed
-   - Step 6: Auto-apply to "Easy Apply" jobs (Agent 6)
-   - Step 7: Flag complex forms for manual review
-3. Agent: "Here's the plan. Proceed? [Y/N]"
-4. User: "Y"
-5. Agent: [EXECUTION MODE] -> Run scripts
+
+```python
+# User: "Apply to this job: https://..."
+
+# PLAN MODE
+plan = [
+    "Step 1: Scrape job details from URL",
+    "Step 2: Research company with Perplexity",
+    "Step 3: Optimize CV for this job",
+    "Step 4: Generate cover letter (3-stage QA)",
+    "Step 5: Show to user for review"
+]
+
+# STOP & ASK USER
+user_approval = ask_user(f"Here's the plan:\n{plan}\n\nProceed? [Y/N]")
+
+if user_approval:
+    # EXECUTION MODE
+    job_data = agent_1_discover(url)
+    company_intel = agent_3_research(job_data.company)
+    optimized_cv = agent_4_optimize_cv(job_data, company_intel)
+    cover_letter = agent_5_generate_cover_letter(
+        job_data, company_intel, optimized_cv
+    )
+    
+    # Update status
+    update_job_status(job_id, "ready_for_review")
+    notify_user(f"Your application for {job_data.title} is ready!")
 ```
 
 **Motto:** "Edit the plan, not the code."
@@ -333,271 +746,493 @@ else:
 ---
 
 ### LAYER 3: EXECUTION (Deterministic Scripts)
+
 **Location:** `execution/`
 
-**Rule:** Every script must be:
-- ✅ Reproducible (same input = same output)
-- ✅ Wrapped in try/except (no crashes)
-- ✅ Have dry-run mode (`--dry-run` flag)
-- ✅ Log to Supabase (track every action)
+**Purpose:** Production-ready scripts that execute agent directives.
+
+**Rules for Execution Scripts:**
+
+1. ✅ **Reproducible:** Same input = same output
+2. ✅ **Wrapped in try/except:** No crashes
+3. ✅ **Dry-run mode:** `--dry-run` flag for testing
+4. ✅ **Logging:** Every action logged to Supabase
+5. ✅ **Idempotent:** Can run multiple times safely
 
 **Critical Scripts:**
-- `scrape_job_boards.py` - LinkedIn scraper
-- `research_companies.py` - Perplexity company research 🆕
-- `customize_cv_ai.py` - CV optimizer (Claude API)
-- `validate_content_qa.py` - QA validation (Haiku API) 🆕
-- `auto_apply_pipeline.py` - End-to-end application workflow
-- `send_follow_ups.py` - Email automation
-- `schedule_interviews.py` - Calendar integration
+- `scrape_job.py` - Execute Agent 1 (Job Discovery)
+- `match_job.py` - Execute Agent 2 (Job Matching)
+- `research_company.py` - Execute Agent 3 (Company Research)
+- `optimize_cv.py` - Execute Agent 4 (CV Optimization)
+- `generate_cover_letter.py` - Execute Agent 5 (Cover Letter Generation)
+- `process_job_pipeline.py` - Orchestrate all agents
 
-**Tech Stack Compliance:**
-- Database: Supabase (see `tech_stack.md`)
-- UI Framework: Next.js 14 + Tailwind CSS
-- AI: Claude 3.5 Sonnet (primary), Haiku (QA), GPT-4 (fallback)
+**Script Template:**
+
+```python
+#!/usr/bin/env python3
+"""
+Agent X Execution Script
+
+Usage:
+    python script_name.py --job-id <uuid> [--dry-run]
+"""
+
+import argparse
+import logging
+from datetime import datetime
+from supabase import create_client
+
+logger = logging.getLogger(__name__)
+
+def main(job_id: str, dry_run: bool = False):
+    """
+    Execute Agent X workflow.
+    
+    Args:
+        job_id: UUID of job to process
+        dry_run: If True, don't commit changes
+    """
+    
+    try:
+        # 1. Fetch input data
+        job = fetch_job_data(job_id)
+        
+        # 2. Execute agent logic
+        result = agent_x_process(job)
+        
+        # 3. Validate output
+        if not validate_output(result):
+            raise ValueError("Output validation failed")
+        
+        # 4. Store result (unless dry-run)
+        if not dry_run:
+            save_result(job_id, result)
+            log_success(job_id)
+        else:
+            logger.info(f"DRY RUN: Would save {result}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Agent X failed for job {job_id}: {e}")
+        log_failure(job_id, str(e))
+        raise
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--job-id", required=True)
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    
+    main(args.job_id, args.dry_run)
+```
 
 ---
 
 ### LAYER 4: SKILLS (Reusable Modules)
+
 **Location:** `skills/`
 
-**Definition:** Modular, reusable code blocks.
+**Purpose:** DRY (Don't Repeat Yourself) - Modular, reusable code.
 
-**Rule:** Before writing new code, check if a skill exists. If yes, IMPORT it. Do not rewrite it.
+**Rule:** Before writing new code, check if a skill exists. If yes, IMPORT it.
 
 **Critical Skills:**
-- `linkedin_scraper.py` - Reusable LinkedIn scraping logic
-- `perplexity_research.py` - Company research wrapper 🆕
-- `cv_optimizer.py` - CV optimization with caching
-- `qa_validator.py` - Content validation with Haiku 🆕
-- `email_sender.py` - SMTP wrapper with retry logic
-- `form_filler.py` - Playwright form automation
-- `pdf_generator.py` - Markdown to PDF conversion
+- `web_scraper.py` - Playwright + stealth wrapper
+- `perplexity_client.py` - Perplexity API wrapper with caching
+- `claude_client.py` - Anthropic API wrapper with retry logic
+- `pdf_generator.py` - Markdown to PDF converter
+- `email_sender.py` - SMTP wrapper with templates
+- `text_embeddings.py` - OpenAI embeddings with caching
 
 **Skill Creation Protocol:**
-If you write reusable code in `execution/`, ask the user:
-*"Should I save this as a permanent Skill in /skills?"*
+
+If you write reusable code in `execution/`, ask:
+> "Should I save this as a permanent Skill in /skills?"
+
+**Example Skill:**
+
+```python
+# skills/perplexity_client.py
+
+from perplexity import Client
+import os
+from functools import lru_cache
+
+class PerplexityClient:
+    def __init__(self):
+        self.client = Client(api_key=os.getenv('PERPLEXITY_API_KEY'))
+    
+    @lru_cache(maxsize=100)
+    def research_company(self, company_name: str) -> dict:
+        """
+        Research company with caching.
+        Cache is valid for 30 days.
+        """
+        response = self.client.chat.completions.create(
+            model="sonar-pro",
+            messages=[{
+                "role": "user",
+                "content": f"Research {company_name}..."
+            }],
+            return_citations=True
+        )
+        
+        return {
+            "company_name": company_name,
+            "intel": response.content,
+            "citations": response.citations
+        }
+```
 
 ---
 
-## 4. OPERATING PRINCIPLES
+## 4. CHROME EXTENSION (Form Filler)
 
-### A. Anti-Bot Defense
-**Challenge:** Job boards actively block scrapers.
+**Tech Stack:**
+- **Framework:** Plasmo (React-based)
+- **Manifest:** V3 (Chrome requirement)
+- **Language:** TypeScript
 
-**Countermeasures:**
-1. **User-Agent Rotation:** Cycle through 50+ real browser signatures
-2. **Random Delays:** 2-5 seconds between requests (human-like behavior)
-3. **Headless Stealth:** Playwright with `stealth` plugin (hides automation)
-4. **Proxy Rotation:** Residential proxies via Bright Data
-5. **CAPTCHA Handling:** 2Captcha API integration for manual solving
+**NOT an Agent** - It's a user interface tool.
 
-**Self-Healing:**
-- If scraper fails 3 times → Switch to Apify fallback
-- If Apify rate-limited → Wait 60 seconds, retry
-- If both fail → Alert user, log error to Supabase
+**Architecture:** See `/docs/ARCHITECTURE.md` for complete implementation.
+
+**Key Components:**
+
+1. **Background Service Worker**
+   - Checks for approved applications every 5 minutes
+   - Updates badge count
+
+2. **Content Script (Form Filler)**
+   - Detects platform (Greenhouse, Lever, Workday, LinkedIn)
+   - Fills form fields using saved selectors
+   - Uploads CV & cover letter
+   - Shows confirmation overlay
+
+3. **Popup (User Interface)**
+   - Lists pending applications
+   - Quick actions (open job, start application)
+
+**Flow:**
+```
+User approves application in Dashboard
+  ↓
+Status: ready_to_apply
+  ↓
+Chrome Extension detects
+  ↓
+User clicks "Start Application"
+  ↓
+Extension opens job URL
+  ↓
+Content script auto-fills form
+  ↓
+User reviews, clicks Submit
+  ↓
+Status: submitted
+```
 
 ---
 
-### B. DSGVO/NIS2 Compliance
-**Data Processing Rules:**
-1. **Consent First:** User must accept consent screen before any data is collected
-2. **Purpose Limitation:** Only scrape data explicitly needed for job applications
-3. **Data Minimization:** Do not store full job descriptions, only summaries
-4. **Right to Erasure:** User can delete all data with one click (`DELETE CASCADE`)
-5. **Audit Logging:** Every action logged in `audit_logs` table with timestamp
+## 5. OPERATING PRINCIPLES
 
-**Supabase RLS (Row Level Security):**
-- Every table has RLS enabled
-- Users can only access their own data
-- Admin role can access all data (for support)
+### A. DSGVO Compliance (Art. 22)
+
+**No Full Automation:**
+```
+Status Flow:
+pending → ready_for_review → ready_to_apply → submitted
+            ↑ AI generates     ↑ User approves  ↑ User submits
+```
+
+**User MUST approve before:**
+- ✅ CV is optimized
+- ✅ Cover letter is sent
+- ✅ Application is submitted
+
+**Data Protection:**
+- PII encrypted with Fernet
+- Row-Level Security (RLS) enabled
+- Audit logs for all AI operations
+- User consent tracked
+
+---
+
+### B. Writing Style Requirements
+
+**CRITICAL - Never Violate:**
+
+1. **Conjunctions:** Minimum 3 sentences starting with:
+   - "Daher", "Deshalb", "Gleichzeitig", "Während"
+
+2. **No Clichés:**
+   - ❌ "Hiermit bewerbe ich mich"
+   - ❌ "I am excited to apply"
+   - ❌ "Mit großem Interesse"
+
+3. **Sentence Variety:**
+   - Average: 15-25 words
+   - Mix long and short sentences
+
+4. **Company Integration:**
+   - Use ONLY facts from Agent 3 (Perplexity research)
+   - Subtle references (don't force)
+
+5. **User Voice:**
+   - Must sound like the user
+   - Use phrases from reference letters
 
 ---
 
 ### C. Self-Annealing Loop
-**Workflow:** Diagnose -> Fix -> Test -> **Harden (Update Directive)**
 
-**Limit:** Max 3 autonomous attempts before asking the user.
+**Workflow:** Diagnose → Fix → Test → **Harden (Update Directive)**
+
+**Limit:** Max 3 autonomous attempts before asking user.
 
 **Example:**
 ```
-1. LinkedIn changes HTML structure -> Scraper fails
+1. LinkedIn changes HTML → Scraper fails
 2. Agent: Diagnose (inspect new HTML)
-3. Agent: Fix (update CSS selectors)
+3. Agent: Fix (update selectors)
 4. Agent: Test (scrape 5 test jobs)
-5. Agent: Harden (update directives/job_board_scraper.md)
+5. Agent: Harden (update directives/job_discovery.md)
 ```
 
 ---
 
 ### D. Visual Standards (Browser-First Development)
+
 **Rule:** Always verify UI changes on `localhost:3000`.
 
 **Checklist:**
 - ✅ Page loads without console errors
-- ✅ Framer Motion animations are smooth (60 FPS)
-- ✅ Dark mode works correctly
-- ✅ Mobile responsive (test on iPhone 14 Pro viewport)
+- ✅ Framer Motion animations smooth (60 FPS)
+- ✅ Dark mode works
+- ✅ Mobile responsive (iPhone 14 Pro viewport)
 
 **Visual Truth:** Trust the pixel, not the code.
 
 ---
 
-### E. Cost Optimization
-**AI API Costs:**
-- Claude 3.5 Sonnet: $3 per 1M input tokens, $15 per 1M output tokens
-- Claude Haiku: $0.25 per 1M input tokens, $1.25 per 1M output tokens 🆕
-- Perplexity API: ~$5 per 1000 requests 🆕
-
-**New Cost Breakdown per Application:**
-- Company Research (Perplexity): €0.05
-- CV Generation (Sonnet): €0.003
-- QA Validation (Haiku): €0.0005
-- Cover Letter (Sonnet): €0.004
-- **Total: ~€0.06 per application** (88% cost reduction vs. Sonnet-only!)
-
-**Caching Strategy:**
-- Cache company intel for 30 days (reuse across applications)
-- Cache job descriptions (embeddings) for 7 days
-- Reuse CV versions for similar roles (same company + similar title)
-
-**Monthly Budget:**
-- 100 applications/week = 400/month
-- Cost: 400 × €0.06 = €24/month
-- Add 20% buffer = **€29/month target** (vs. €240 before optimization!)
-
----
-
-## 5. FILE ORGANIZATION
+## 6. FILE ORGANIZATION
 
 ```
-job-automation-saas/
-├── AGENTS.md              # This file
-├── mission.md             # North Star Goal
-├── actions.md             # Tactical Backlog
-├── stats.md               # Metrics Dashboard
-├── tech_stack.md          # Tech Stack Protocols
+pathly-v2/
+├── AGENTS.md                 # This file
+├── CLAUDE.md                 # AI assistant rules
+├── mission.md                # North Star
+├── actions.md                # Tactical backlog
+├── stats.md                  # Metrics
 │
-├── directives/            # SOPs
-│   ├── job_board_scraper.md
+├── docs/
+│   └── ARCHITECTURE.md       # Complete system design
+│
+├── directives/               # Agent SOPs
+│   ├── job_discovery.md
 │   ├── job_matching.md
-│   ├── company_research.md       # 🆕 Perplexity research protocol
+│   ├── company_research.md
 │   ├── cv_optimization.md
-│   ├── quality_assurance.md      # 🆕 3-stage validation process
-│   ├── application_automation.md
-│   └── email_follow_up.md
+│   └── cover_letter_generation.md
 │
-├── execution/             # Production Scripts
-│   ├── scrape_job_boards.py
-│   ├── research_companies.py     # 🆕
-│   ├── customize_cv_ai.py
-│   ├── validate_content_qa.py    # 🆕
-│   ├── auto_apply_pipeline.py
-│   ├── send_follow_ups.py
-│   └── schedule_interviews.py
+├── execution/                # Production scripts
+│   ├── scrape_job.py
+│   ├── match_job.py
+│   ├── research_company.py
+│   ├── optimize_cv.py
+│   ├── generate_cover_letter.py
+│   └── process_job_pipeline.py
 │
-├── skills/                # Reusable Modules
-│   ├── linkedin_scraper.py
-│   ├── perplexity_research.py    # 🆕
-│   ├── cv_optimizer.py
-│   ├── qa_validator.py           # 🆕
+├── skills/                   # Reusable modules
+│   ├── web_scraper.py
+│   ├── perplexity_client.py
+│   ├── claude_client.py
+│   ├── pdf_generator.py
 │   ├── email_sender.py
-│   ├── form_filler.py
-│   └── pdf_generator.py
+│   └── text_embeddings.py
 │
-├── tests/                 # Unit & Integration Tests
-│   ├── test_scraper_health.py
-│   ├── test_cv_generation.py
-│   ├── test_qa_validation.py     # 🆕
-│   └── test_application_flow.py
+├── app/                      # Next.js Frontend
+│   ├── (dashboard)/
+│   ├── (auth)/
+│   └── api/
 │
-├── app/                   # Next.js Frontend
-├── components/            # React Components
-├── lib/                   # Shared Utilities
-└── database/              # Supabase Migrations
+├── components/               # React Components
+│   ├── ApplicationTable.tsx
+│   ├── JobCard.tsx
+│   └── ReviewModal.tsx
+│
+├── database/                 # Supabase
+│   ├── schema.sql
+│   ├── migrations/
+│   └── seed.sql
+│
+└── chrome-extension/         # Plasmo Extension
+    ├── background/
+    ├── content/
+    └── popup/
 ```
 
 ---
 
-## 6. AGENT COORDINATION MATRIX
+## 7. AGENT COORDINATION MATRIX
 
-**Sequential Workflow (End-to-End Application):**
+**Pillar 1: Manual Application**
 ```
-Job Discovery → Job Matching → Company Research → CV Optimization → QA Validation → Application → Follow-up
-    ↓              ↓                 ↓                   ↓                 ↓              ↓            ↓
- Supabase       Supabase         Supabase           Supabase          Supabase      Supabase    Supabase
-  jobs          jobs           company_intel      cv_versions      qa_results   applications  emails
- (new rows)  (match_score)    (cached 30d)       (versioned)      (score>7)     (submitted)   (sent)
+User Submits Job URL
+   ↓
+Agent 1: Scrape job details
+   ↓
+Agent 3: Research company (Perplexity)
+   ↓
+Agent 4: Optimize CV
+   ↓
+Agent 5: Generate cover letter (3-stage QA)
+   ↓
+Status: ready_for_review
+   ↓
+User reviews & approves
+   ↓
+User applies manually OR Chrome Extension fills form
+   ↓
+Status: submitted
 ```
 
-**Critical Path Dependencies:**
-- Agent 4 (CV Optimization) **requires** Agent 3 (Company Research) output
-- Agent 6 (Application) **requires** Agent 5 (QA) approval
-- If QA fails → Loop back to Agent 4 (max 2 iterations)
+**Pillar 2: Automation**
+```
+Cron Job (8-10 AM daily)
+   ↓
+Agent 1: Scrape matching jobs from job boards
+   ↓
+Agent 2: Calculate match score for each job
+   ↓
+[Filter: only match_score >= 70%]
+   ↓
+Agent 3: Research companies (parallel)
+   ↓
+Agent 4: Optimize CVs (parallel)
+   ↓
+Agent 5: Generate cover letters (parallel, 3-stage QA)
+   ↓
+Status: ready_for_review (notify user)
+   ↓
+User reviews & approves selected applications
+   ↓
+Status: ready_to_apply
+   ↓
+Chrome Extension fills forms
+   ↓
+User clicks Submit
+   ↓
+Status: submitted
+```
 
-**Parallel Workflows:**
-- Job Discovery runs every 6 hours (cron job)
-- Email Follow-up runs daily at 9 AM
-- CV Optimization runs on-demand (user triggers)
-- Company Research runs on-demand (triggered by Agent 4)
+**Parallel Processing:**
+- Agent 3, 4, 5 can run in parallel for multiple jobs
+- Rate limits respected (Claude: 50/min, Perplexity: 20/min)
 
-**Conflict Resolution:**
-- If 2 agents try to apply to same job → First one wins (database constraint)
-- If scraper and manual upload conflict → Manual upload takes priority
-- If QA rejects 3 times → Flag for human review
+**Error Handling:**
+- If Agent fails → Retry 3x → Log error → Continue with next job
+- If QA fails 3x → Flag for human review
+- If no jobs match → Log, wait for next cron run
 
 ---
 
-## 7. INTERNAL CHECKLIST
+## 8. INTERNAL CHECKLIST
 
 Before marking any task DONE:
 
 1. ✅ Did I follow the Directive?
-2. ✅ Did I update `stats.md` with new metrics?
-3. ✅ Did I append to `past.md` if this was a milestone?
-4. ✅ Is the code in `execution/` deterministic (same input = same output)?
-5. ✅ Did I visually verify the UI on `localhost:3000`?
-6. ✅ Did I test with `--dry-run` flag first?
-7. ✅ Did I handle errors gracefully (try/except)?
-8. ✅ Did I log the action to Supabase?
-9. ✅ Is the data DSGVO compliant (consent, purpose limitation)?
-10. ✅ Did I check if a reusable Skill already exists in `/skills`?
-11. ✅ Did the QA Agent validate the output (for CV/cover letter generation)? 🆕
-12. ✅ Did I use cached company intel if available (check `company_intel` table)? 🆕
+2. ✅ Did I update `stats.md` with metrics?
+3. ✅ Did I append to `past.md` if milestone?
+4. ✅ Is the code in `execution/` deterministic?
+5. ✅ Did I visually verify UI on `localhost:3000`?
+6. ✅ Did I test with `--dry-run` first?
+7. ✅ Did I handle errors gracefully?
+8. ✅ Did I log actions to Supabase?
+9. ✅ Is data DSGVO compliant?
+10. ✅ Did I check if reusable Skill exists in `/skills`?
+11. ✅ Did Agent 5 QA validate the output (for cover letters)?
+12. ✅ Did I use cached company intel if available?
 
 ---
 
-## 8. EMERGENCY PROTOCOLS
+## 9. EMERGENCY PROTOCOLS
 
-### Scraper Blocked by LinkedIn
+### Scraper Blocked
 **Action:**
-1. Switch to Apify fallback immediately
-2. Alert user: "LinkedIn blocked, using Apify (costs €0.10/100 jobs)"
-3. Log incident to `system_alerts` table
+1. Switch to ScraperAPI immediately
+2. Alert user: "Scraper blocked, using fallback"
+3. Log to `system_alerts`
 4. Wait 24 hours before retrying direct scrape
 
-### AI API Rate Limit Hit
+### AI API Rate Limit
 **Action:**
-1. Queue requests in `pending_generations` table
-2. Switch to GPT-4 fallback (if Claude is rate-limited)
-3. Alert user: "Rate limited, processing queue (ETA: X minutes)"
+1. Queue requests in `pending_generations`
+2. Switch to GPT-4 fallback (if Claude rate-limited)
+3. Alert user: "Rate limited, processing queue"
 
-### QA Agent Rejects Content 3 Times
+### QA Rejects 3 Times
 **Action:**
 1. **STOP automated process**
-2. Alert user: "Quality issues detected, manual review required"
-3. Show user: original draft, QA feedback, and suggested fixes
-4. Ask: "Approve current version OR regenerate with feedback?"
+2. Alert user: "Quality issues, manual review required"
+3. Show: original draft + QA feedback + suggestions
+4. Ask: "Approve current OR regenerate with feedback?"
 
-### DSGVO Data Breach
+### DSGVO Incident
 **Action:**
 1. **CRITICAL:** Immediately notify user
-2. Log incident to `security_incidents` table
+2. Log to `security_incidents`
 3. Freeze all automated actions
 4. Require user approval to continue
 
 ---
 
-**System Status:** INITIALIZED. v2.0 ACTIVE.
-**Last Updated:** 2026-02-11
-**Next Review:** After 100 applications processed
-**Major Changes:** Added QA Agent (3-stage generation) + Research Agent (Perplexity integration)
+## 10. TECH STACK
+
+**Frontend:**
+- Next.js 15 (App Router)
+- Tailwind CSS + shadcn/ui
+- Zustand (state) + React Query (server)
+- Zod + React Hook Form (validation)
+- Framer Motion (animations)
+
+**Backend:**
+- Supabase (PostgreSQL + Auth + Storage)
+- pg_cron (scheduled jobs with jitter)
+- Row-Level Security (RLS)
+
+**AI:**
+- Claude Sonnet 4.5 (generation)
+- Claude Haiku 4 (QA/judging)
+- Perplexity Sonar Pro (research)
+- OpenAI text-embedding-3-small (embeddings)
+
+**Scraping:**
+- Playwright (primary)
+- ScraperAPI (fallback)
+- BeautifulSoup (parsing)
+
+**Chrome Extension:**
+- Plasmo Framework
+- Manifest V3
+- TypeScript
+
+---
+
+**System Status:** ACTIVE  
+**Version:** 2.0  
+**Last Updated:** 2026-02-11  
+**Next Review:** After 100 applications processed  
+
+---
+
+**Major Changes from v1.0:**
+- Unified project name (Pathly V2.0)
+- Two-pillar architecture (Manual + Automation)
+- 5 core agents (down from 7)
+- QA integrated into Cover Letter Agent
+- Chrome Extension for form filling (not a separate agent)
+- Directives/Execution/Orchestration framework
+- LEAN approach (no premature optimization)
