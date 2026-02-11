@@ -1,4 +1,4 @@
-# PATHLY V2.0 – MISSION
+# Pathly V2.0 – MISSION
 
 **Last updated:** 2026‑02‑11  
 **Owner:** Yannik (Founder)  
