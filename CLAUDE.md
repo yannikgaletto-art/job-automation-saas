@@ -48,7 +48,8 @@ See `AGENTS.md` for complete architecture and `mission.md` for product vision.
 - **Storage:** Supabase Storage (encrypted)
 - **Cron:** pg_cron (with jitter)
 - **Queue:** Inngest (background jobs + rate limiting)
-- **Cache:** Upstash Redis (rate limiting)
+- **Cache:** Upstash Redis (rate limiting + job deduplication)
+- **Post-Processing:** Jina Reader API (HTML → LLM-ready Markdown)
 
 ### AI
 - **Generation:** Claude Sonnet 4.5
@@ -57,25 +58,60 @@ See `AGENTS.md` for complete architecture and `mission.md` for product vision.
 - **Parsing:** GPT-4o-mini (HTML parsing, cost-optimized)
 - **Research:** Perplexity Sonar Pro
 - **Embeddings:** OpenAI text-embedding-3-small
+- **Post-Processing:** Jina Reader (HTML → Markdown, LLM-optimiert)
 
 ### Scraping
 
-**Strategy depends on use case:**
+**Philosophy:** Platform-intelligent routing - Use the right tool for each job board.
 
-**Pillar 1 (Manual - User-submitted URL):**
-- Platform-specific scrapers (see `directives/job_discovery.md`)
-- LinkedIn: ScraperAPI (primary)
-- ATS Systems: Firecrawl (Greenhouse, Lever, Workday)
-- Company Sites: Playwright (headless browser)
+**Strategy:** (see `directives/job_discovery.md` for complete implementation)
 
-**Pillar 2 (Automation - Job Board Search):**
-- **SerpAPI (primary)** - Aggregates all job boards
-- ScraperAPI (fallback)
-- Playwright (final fallback)
+| Platform | Method | Tool | Success Rate | Cost/1k | Priority |
+|----------|--------|------|--------------|---------|----------|
+| **LinkedIn** | API | Bright Data | 98% | $3-9 | 🔴 High |
+| **Greenhouse** | Direct API | Native JSON | 99% | $0.2 | 🟢 Easy |
+| **Lever** | Direct API | Native JSON | 99% | $0.2 | 🟢 Easy |
+| **Workday** | Direct API | Native JSON | 95% | $0.3 | 🟢 Easy |
+| **StepStone** | Self-Hosted | Patchright | 75-85% | $5-8 | 🟡 Medium |
+| **Indeed** | API (future) | ScraperAPI | 96% | $0.5-2 | ⏸️ Parked |
+| **Others** | API (future) | Firecrawl | 90% | $1-3 | ⏸️ Parked |
+
+**Core Tools:**
+
+**1. Patchright (Self-Hosted Primary)**
+- Playwright fork with deep anti-detection patches
+- Bypasses: `navigator.webdriver`, Canvas/WebGL fingerprinting, TLS/JA3
+- Use for: StepStone, Monster, Glassdoor, Xing
+- Requires: Residential proxies (Bright Data) + User-Agent rotation
+
+**2. Bright Data API (LinkedIn)**
+- Already available (user has API key)
+- 98% success rate, GDPR-compliant
+- Structured JSON output
+- Cost: $3-9/1k jobs
+
+**3. Direct JSON APIs (ATS Systems)**
+- Greenhouse: `https://boards-api.greenhouse.io/v1/boards/{company}/jobs`
+- Lever: `https://api.lever.co/v0/postings/{company}?mode=json`
+- Workday: GraphQL endpoint (reverse-engineered)
+- **Best ROI:** Free, 99% success rate, no anti-bot issues
+
+**4. Jina Reader (Post-Processing)**
+- Converts ALL scraped HTML → Clean Markdown
+- LLM-native output (no BeautifulSoup parsing needed)
+- API: `https://r.jina.ai/{url}`
+- Cost: 1M tokens free, then $0.20/1k requests
+- **Game Changer:** 10x faster preprocessing vs traditional HTML parsing
+
+**Future Options (Parked):**
+- ScraperAPI: For Indeed when scaling (96% Datadome bypass)
+- Firecrawl: For general boards (LLM-native scraping)
+- FlareSolverr: Docker-based Cloudflare solver (if needed)
 
 **Libraries:**
-- Playwright (headless browser + stealth)
-- BeautifulSoup (HTML parsing)
+- **Patchright** (Python) - Anti-detection browser automation
+- **Requests** - Direct API calls
+- **BeautifulSoup** - Fallback HTML parsing (use Jina Reader instead!)
 
 ### Chrome Extension
 - **Framework:** Plasmo
@@ -206,10 +242,12 @@ const { data } = await supabase
 ### Performance
 
 1. **Rate Limits:**
-   - SerpAPI: 5 req/sec
+   - Bright Data: 50 req/sec (LinkedIn scraper)
+   - Jina Reader: 200 req/min (free tier), 1000 req/min (paid)
    - Perplexity: 20 req/min
    - Claude: 50 req/min
    - GPT-4o-mini: 500 req/min
+   - Patchright: Limited by proxy bandwidth (~10-20 concurrent)
 
 2. **Jitter for Cron:**
    ```python
@@ -273,9 +311,10 @@ await supabase.from('application_history').insert({
    - Does the policy allow this operation?
 
 3. **Check API Rate Limits:**
+   - Bright Data: 50/sec
+   - Jina Reader: 200/min (free), 1000/min (paid)
    - Perplexity: 20/min
    - Claude: 50/min
-   - SerpAPI: 5/sec
 
 4. **Inspect Database:**
    ```sql
@@ -328,6 +367,7 @@ npm run build
 3. **Plan before execute** - Present plan, wait for "GENEHMIGT"
 4. **Visual verification** - Trust the pixel, not the code
 5. **Self-anneal** - Update directives when fixing bugs
+6. **Scraping strategy** - Right tool for each platform (see table above)
 
 ---
 
