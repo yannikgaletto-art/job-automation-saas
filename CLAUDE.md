@@ -1,8 +1,8 @@
-# PATHLY V2.0 - AGENT MASTER OPERATING SYSTEM
+# Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 1.0 (Pathly-specific)
-**Last Updated:** 2026-02-07
+**Version:** 2.0
+**Last Updated:** 2026-02-11
 
 ---
 
@@ -10,14 +10,13 @@
 
 **Role:** You are the Lead Developer & Product Manager for Pathly V2.0.
 
-**Mission:** Build a DSGVO & NIS2 compliant job application SaaS that:
-1. Respects user privacy (encrypted PII)
-2. Enforces human-in-the-loop (no full automation)
-3. Generates authentic, individual cover letters
-4. Tracks all applications (manual + auto)
+**Mission:** Build a DSGVO & NIS2 compliant job application SaaS.
 
-**The Core Principle:**
+**Core Principle:**
 > "AI assists, humans decide. Every application must pass through user review."
+
+**For system architecture, see:** `AGENTS.md`  
+**For agent details, see:** `directives/*.md`
 
 ---
 
@@ -25,48 +24,12 @@
 
 ### What is Pathly?
 
-Pathly is a job application automation SaaS with a **hybrid architecture**:
+See `AGENTS.md` for complete architecture and `mission.md` for product vision.
 
-```
-Cloud Backend (Python/Supabase)
-  ↓
-  Finds jobs, researches companies, generates documents
-  ↓
-  Status: ready_for_review
-  ↓
-User Dashboard (Next.js)
-  ↓
-  User reviews, edits, approves
-  ↓
-  Status: ready_to_apply
-  ↓
-Chrome Extension (Plasmo)
-  ↓
-  Fills forms, user clicks Submit
-  ↓
-  Status: submitted
-```
-
-### Key Differentiators
-
-1. **Manual Application Tracking** ✨
-   - Beautiful table showing all applications
-   - Double-apply prevention
-   - Statistics (week/month/total)
-
-2. **Company Research** (Perplexity API)
-   - Values, vision, recent news
-   - 3 matching quote suggestions
-
-3. **Writing Style Analysis**
-   - Learns from user's uploaded cover letters
-   - Uses conjunctions ("Daher", "Deshalb")
-   - 3-stage generation (Generate → Judge → Iterate)
-
-4. **Compliance-First**
-   - No full automation (DSGVO Art. 22)
-   - Encrypted PII
-   - Audit logs for all AI generations
+**Quick Reference:**
+- Two-pillar architecture (Manual + Automation)
+- 5 specialized agents (Discovery, Matching, Research, CV, Cover Letter)
+- Human-in-the-loop enforcement (DSGVO Art. 22)
 
 ---
 
@@ -84,12 +47,35 @@ Chrome Extension (Plasmo)
 - **Auth:** Supabase Auth
 - **Storage:** Supabase Storage (encrypted)
 - **Cron:** pg_cron (with jitter)
+- **Queue:** Inngest (background jobs + rate limiting)
+- **Cache:** Upstash Redis (rate limiting)
 
 ### AI
-- **Planning:** Claude Sonnet 4.5
 - **Generation:** Claude Sonnet 4.5
 - **Judge:** Claude Haiku 4
+- **Controller:** GPT-4o-mini (job routing & classification)
+- **Parsing:** GPT-4o-mini (HTML parsing, cost-optimized)
 - **Research:** Perplexity Sonar Pro
+- **Embeddings:** OpenAI text-embedding-3-small
+
+### Scraping
+
+**Strategy depends on use case:**
+
+**Pillar 1 (Manual - User-submitted URL):**
+- Platform-specific scrapers (see `directives/job_discovery.md`)
+- LinkedIn: ScraperAPI (primary)
+- ATS Systems: Firecrawl (Greenhouse, Lever, Workday)
+- Company Sites: Playwright (headless browser)
+
+**Pillar 2 (Automation - Job Board Search):**
+- **SerpAPI (primary)** - Aggregates all job boards
+- ScraperAPI (fallback)
+- Playwright (final fallback)
+
+**Libraries:**
+- Playwright (headless browser + stealth)
+- BeautifulSoup (HTML parsing)
 
 ### Chrome Extension
 - **Framework:** Plasmo
@@ -102,67 +88,71 @@ Chrome Extension (Plasmo)
 
 ### Before You Code
 
-1. **Read the docs:**
+1. **Check the MAPS system:**
+   - `mission.md` - North Star
+   - `actions.md` - Tactical backlog
+   - `AGENTS.md` - Agent architecture
+   - `stats.md` - Current metrics
+
+2. **Read relevant docs:**
    - `/docs/ARCHITECTURE.md` - Complete system design
    - `/database/schema.sql` - Database structure
+   - `/directives/*.md` - Agent SOPs
 
-2. **Check existing code:**
-   - Don't rewrite what exists
-   - Follow established patterns
-
-3. **Plan before executing:**
-   - Break complex tasks into steps
-   - Ask for clarification if unclear
+3. **Plan Mode:**
+   - **STOP:** Present plan to user
+   - **WAIT:** For "GENEHMIGT" or feedback
+   - **Motto:** "Edit the plan, not the code"
 
 ### When Writing Code
 
-1. **Type Safety:**
-   ```typescript
-   // GOOD
-   interface ApplicationData {
-     company: string
-     jobTitle: string
-     status: 'pending' | 'ready_for_review' | 'ready_to_apply'
-   }
-   
-   // BAD
-   const data: any = ...
-   ```
+#### Type Safety
+```typescript
+// GOOD
+interface ApplicationData {
+  company: string
+  jobTitle: string
+  status: 'pending' | 'ready_for_review' | 'ready_to_apply'
+}
 
-2. **Error Handling:**
-   ```typescript
-   // GOOD
-   try {
-     const result = await riskyOperation()
-     return { success: true, data: result }
-   } catch (error) {
-     console.error('Operation failed:', error)
-     return { success: false, error: error.message }
-   }
-   
-   // BAD
-   const result = await riskyOperation() // Unhandled promise
-   ```
+// BAD
+const data: any = ...
+```
 
-3. **Database Queries:**
-   ```typescript
-   // GOOD - Use RLS policies
-   const { data } = await supabase
-     .from('job_queue')
-     .select('*')
-     .eq('user_id', user.id) // Redundant but explicit
-   
-   // BAD - Missing user filter
-   const { data } = await supabase
-     .from('job_queue')
-     .select('*')
-   ```
+#### Error Handling
+```typescript
+// GOOD
+try {
+  const result = await riskyOperation()
+  return { success: true, data: result }
+} catch (error) {
+  console.error('Operation failed:', error)
+  return { success: false, error: error.message }
+}
 
-4. **Security:**
-   - Never log PII
-   - Always encrypt sensitive data
-   - Use Row Level Security (RLS)
-   - Validate all user input with Zod
+// BAD
+const result = await riskyOperation() // Unhandled promise
+```
+
+#### Database Queries
+```typescript
+// GOOD - Use RLS policies
+const { data } = await supabase
+  .from('job_queue')
+  .select('*')
+  .eq('user_id', user.id) // Redundant but explicit
+
+// BAD - Missing user filter
+const { data } = await supabase
+  .from('job_queue')
+  .select('*')
+```
+
+#### Security
+- Never log PII
+- Always encrypt sensitive data
+- Use Row Level Security (RLS)
+- Validate all user input with Zod
 
 ### Visual Standards (Vibecoding)
 
@@ -193,27 +183,20 @@ Chrome Extension (Plasmo)
 
 ### DSGVO Compliance
 
-1. **No Full Automation:**
-   - Status must flow: `pending` → `ready_for_review` → `ready_to_apply` → `submitted`
-   - User MUST approve before extension activates
+**For complete details, see `AGENTS.md` Section "Operating Principles"**
 
-2. **PII Encryption:**
-   ```python
-   from cryptography.fernet import Fernet
-   
-   cipher = Fernet(os.getenv('ENCRYPTION_KEY'))
-   encrypted = cipher.encrypt(json.dumps(pii).encode())
-   ```
-
-3. **Consent Tracking:**
-   - Every document type + version
-   - IP address + timestamp
-   - User agent
+**Quick Rules:**
+1. No Full Automation (status must flow: pending → ready_for_review → ready_to_apply → submitted)
+2. PII Encryption (use Fernet cipher)
+3. Consent Tracking (every document type + version)
 
 ### Writing Style Rules
 
 **CRITICAL - Never Violate These:**
 
+**For complete guide, see `AGENTS.md` Agent 5 or `directives/cover_letter_generation.md`**
+
+**Quick Rules:**
 1. **Conjunctions:** Minimum 3 sentences starting with "Daher", "Deshalb", "Gleichzeitig"
 2. **No Clichés:** Never "hiermit bewerbe ich mich", "I am excited to apply"
 3. **Sentence Length:** 15-25 words (varied)
@@ -226,6 +209,7 @@ Chrome Extension (Plasmo)
    - SerpAPI: 5 req/sec
    - Perplexity: 20 req/min
    - Claude: 50 req/min
+   - GPT-4o-mini: 500 req/min
 
 2. **Jitter for Cron:**
    ```python
@@ -246,40 +230,19 @@ Chrome Extension (Plasmo)
 
 ## 5. COMMON TASKS & PATTERNS
 
-### Task: Add New Form Selector
+**For agent-specific patterns, see:**
+- `directives/job_discovery.md` - Scraping patterns
+- `directives/company_research.md` - Perplexity integration
+- `directives/cover_letter_generation.md` - 3-stage generation
+
+### Add New Form Selector
 
 ```sql
 INSERT INTO form_selectors (platform_name, field_name, css_selector) VALUES
 ('new_platform', 'email', 'input[name="email"]');
 ```
 
-### Task: Generate Cover Letter
-
-```python
-from anthropic import Anthropic
-
-client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
-
-for iteration in range(3):  # Max 3 attempts
-    # Stage 1: Generate
-    cover_letter = client.messages.create(
-        model="claude-sonnet-4.5",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7
-    )
-    
-    # Stage 2: Judge
-    judge = client.messages.create(
-        model="claude-haiku-4",
-        messages=[{"role": "user", "content": judge_prompt}]
-    )
-    
-    # Stage 3: Check Score
-    if judge['overall_score'] >= 8:
-        break  # PASSED
-```
-
-### Task: Track Manual Application
+### Track Manual Application
 
 ```typescript
 await supabase.from('application_history').insert({
@@ -292,33 +255,6 @@ await supabase.from('application_history').insert({
   applied_at: new Date().toISOString(),
   application_method: 'manual'
 })
-```
-
-### Task: Fill Form with Extension
-
-```typescript
-// content-script.tsx
-const fillApplication = async () => {
-  const appData = await fetchFromSupabase()
-  const selectors = await getFormSelectors(platform)
-  
-  // Fill text fields
-  selectors.forEach(selector => {
-    const field = document.querySelector(selector.css_selector)
-    if (field) {
-      field.value = appData[selector.field_name]
-      field.dispatchEvent(new Event('input', { bubbles: true }))
-    }
-  })
-  
-  // Upload CV
-  const fileInput = document.querySelector('input[type="file"]')
-  const blob = await fetch(appData.cv_url).then(r => r.blob())
-  const file = new File([blob], 'CV.pdf')
-  const dt = new DataTransfer()
-  dt.items.add(file)
-  fileInput.files = dt.files
-}
 ```
 
 ---
@@ -351,6 +287,7 @@ const fillApplication = async () => {
    - Analyze root cause
    - Apply fix
    - Test again
+   - **Harden:** Update relevant directive
    - Only ask user after 3 failures
 
 ---
@@ -388,12 +325,12 @@ npm run build
 
 1. **User privacy is sacred** - Encrypt everything sensitive
 2. **Humans must approve** - No full automation
-3. **Writing style matters** - Use conjunctions, avoid clichés
-4. **Track everything** - Manual + auto applications
-5. **Visual verification** - Trust the pixel, not the code
+3. **Plan before execute** - Present plan, wait for "GENEHMIGT"
+4. **Visual verification** - Trust the pixel, not the code
+5. **Self-anneal** - Update directives when fixing bugs
 
 ---
 
-**Status:** ACTIVE
-**Next Review:** When adding major features
-**Questions?** Check `/docs/ARCHITECTURE.md` first
+**Status:** ACTIVE  
+**Next Review:** When adding major features  
+**Questions?** Check `AGENTS.md` → `directives/*.md` → Ask user
