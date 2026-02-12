@@ -1,8 +1,8 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 2.0  
-**Last Updated:** 2026-02-11  
+**Version:** 2.1  
+**Last Updated:** 2026-02-12  
 **Status:** Active Development  
 
 ---
@@ -98,73 +98,194 @@ Each agent has a **Directive** (SOP) that defines:
 
 ### AGENT 1: JOB DISCOVERY (Scraper Agent)
 
-**Responsibility:** Find and parse job postings from various sources.
+**Responsibility:** Find and parse job postings using platform-optimized scraping strategies.
 
-**Directive:** `directives/job_discovery.md`
+**Directive:** `directives/job_discovery.md` (Version 2.0)
 
-**Triggers:**
-- **Pillar 1:** User submits job URL
-- **Pillar 2:** Cron job (daily, 8-10 AM with jitter)
+**Architecture:** Platform-Intelligent Router
 
-**Tools:**
+**Core Philosophy:**
+> "Use the right tool for each job board. Don't over-engineer universal solutions."
 
-**Scraping Strategy (Pillar-Specific):**
+**Component Hierarchy:**
 
-*Pillar 1 (Manual - User-submitted URL):*
-- **ScraperAPI** - For LinkedIn, Indeed (primary)
-- **Firecrawl** - For ATS systems (Greenhouse, Lever, Workday)
-- **Playwright** - For company career pages (headless browser)
-
-*Pillar 2 (Automation - Job Board Search):*
-- **SerpAPI** - Primary (aggregates all job boards)
-- **ScraperAPI** - Fallback
-- **Playwright** - Final fallback
-
-*Parsing:*
-- **BeautifulSoup** - HTML to structured data
-
-**Anti-Bot Protocol:**
-- User-Agent rotation (50+ signatures)
-- Random delays (2-5 seconds, human-like)
-- Headless browser with stealth plugin
-- Residential proxies (Bright Data)
-- CAPTCHA handling (2Captcha API)
-
-**Process:**
-```python
-# Pillar 1: User-submitted URL (platform-specific)
-job_data = scrape_job_url(user_url, platform="linkedin")
-
-# Pillar 2: Automated search (SerpAPI aggregates all platforms)
-jobs = serp_api_search(
-    query="Software Engineer Berlin",
-    sources=["linkedin", "indeed", "xing"],
-    limit=50
-)
+```
+User/Scheduler
+      ↓
+[SCRAPING ROUTER] (skills/scraping_router.py)
+      ↓
+   Platform Detection
+      ↓
+    ┌─────────────────┬──────────────────┬────────────────────┐
+    │                 │                  │                    │
+[Bright Data]  [Direct APIs]    [Patchright]     [Future: ScraperAPI]
+ (LinkedIn)     (Greenhouse)    (StepStone)       (Indeed)
+    │                 │                  │                    │
+    └─────────────────┴──────────────────┴────────────────────┘
+                          ↓
+                   [Jina Reader]
+                 (HTML → Markdown)
+                          ↓
+                   [job_queue DB]
 ```
 
+**Triggers:**
+- **Pillar 1:** User submits job URL (immediate, < 5s latency)
+- **Pillar 2:** Cron job (daily, 8-10 AM with jitter)
+
+**Platform Routing Table:**
+
+| Platform | Strategy | Cost/1k | Success Rate | Status |
+|----------|----------|---------|--------------|--------|
+| **LinkedIn** | Bright Data API | $3-9 | 98% | ✅ Active |
+| **Greenhouse** | Direct JSON API | $0.2 | 99% | ✅ Active |
+| **Lever** | Direct JSON API | $0.2 | 99% | ✅ Active |
+| **Workday** | Direct API | $0.3 | 95% | ✅ Active |
+| **StepStone** | Patchright | $5-8 | 75-85% | ✅ Active |
+| **Monster** | Patchright | $3-5 | 80-85% | ✅ Active |
+| **Xing** | Patchright | $4-6 | 75-80% | ✅ Active |
+| **Indeed** | ScraperAPI | $0.5-2 | 96% | 🔜 Future |
+| **Unknown** | Patchright Fallback | $5 | 60-70% | ✅ Active |
+
+**Implementation:**
+
+```python
+from skills.scraping_router import ScrapeRouter
+
+# Initialize router (auto-loads all scrapers)
+router = ScrapeRouter()
+
+# Scrape job (automatic platform detection + routing)
+job_data = router.scrape(
+    url="https://www.linkedin.com/jobs/view/12345",
+    pillar="manual"  # or "automation"
+)
+
+# Output (standardized schema):
+# {
+#   'title': 'Senior Python Developer',
+#   'company': 'TechCorp GmbH',
+#   'description': '<div>Raw HTML...</div>',
+#   'description_markdown': '# Requirements\n- 5+ years...',
+#   'location': 'Berlin, Germany',
+#   'url': '...',
+#   'source': 'linkedin',
+#   'scraping_method': 'bright_data',
+#   'success': True,
+#   'scraped_at': '2026-02-12T17:30:00Z'
+# }
+```
+
+**Key Components:**
+
+**1. Scraping Router** (`skills/scraping_router.py`):
+- Platform detection via URL parsing
+- Automatic scraper selection
+- Cost optimization
+- Stats tracking
+
+**2. Bright Data Scraper** (LinkedIn):
+- 98% success rate (vs 60-70% with Playwright)
+- Built-in proxy rotation
+- GDPR-compliant
+- API endpoint: `https://api.brightdata.com/datasets/v3/trigger`
+
+**3. Direct API Scraper** (`skills/direct_api_scraper.py`):
+- Greenhouse: `https://boards-api.greenhouse.io/v1/boards/{company}/jobs/{job_id}`
+- Lever: `https://api.lever.co/v0/postings/{company}/{job_id}`
+- Workday: JSON-LD extraction (limited support)
+- **Best ROI:** 99% success, $0 API calls, 10x faster than HTML parsing
+
+**4. Patchright Scraper** (`skills/patchright_scraper.py`):
+- Patchright = Playwright fork with deep anti-detection patches
+- Bypasses: navigator.webdriver, Canvas/WebGL fingerprinting, TLS/JA3
+- Features:
+  - Residential proxy rotation (Bright Data)
+  - User-Agent rotation (50+ variations)
+  - Human behavior simulation (scrolling, delays)
+  - JavaScript challenge handling
+
+**5. Jina Reader** (`skills/jina_reader.py`):
+- Converts raw HTML → Clean Markdown
+- 10x faster than BeautifulSoup + Regex
+- LLM-ready output
+- Cost: FREE (1M tokens/month), then $0.20/1M tokens
+- Auto-applied by router after scraping
+
+**Cost Structure (100k jobs/month):**
+
+| Platform | Volume | Cost/1k | Monthly Cost |
+|----------|--------|---------|-------------|
+| LinkedIn | 20k | $6 | $120 |
+| Greenhouse/Lever | 15k | $0.2 | $3 |
+| StepStone | 30k | $6.5 | $195 |
+| Monster/Xing | 20k | $4 | $80 |
+| Others | 15k | $5 | $75 |
+| Jina Reader | 100k | $0.2 | $20 |
+| **Total** | **100k** | - | **$493** |
+
+**With Caching (-30%):** ~$345/month
+
+**Error Handling:**
+
+**Pillar 1 (Manual - User waiting):**
+```
+Primary Scraper (30s timeout)
+    ↓ [FAIL]
+Patchright Fallback (60s timeout)
+    ↓ [FAIL]
+Manual Review Notification
+```
+
+**Pillar 2 (Automation - Batch):**
+```
+Primary Scraper (30s timeout)
+    ↓ [FAIL]
+Patchright Fallback (60s timeout)
+    ↓ [FAIL]
+Skip Job (log to failed_scrapes)
+```
+
+**Retry Logic:**
+- Exponential backoff: 4s → 8s → 16s (max 30s)
+- Max 3 attempts per scraper
+- Store failures in `failed_scrapes` table
+
 **Output Schema:**
+
 ```json
 {
-  "title": "Senior Software Engineer",
+  "id": "uuid",
+  "user_id": "uuid",
+  "title": "Senior Python Developer",
   "company": "TechCorp GmbH",
   "location": "Berlin, Germany",
-  "description": "We are looking for...",
-  "requirements": ["5+ years Python", "AWS experience"],
-  "salary_range": "70k-90k EUR",
+  "description": "<div>Raw HTML...</div>",
+  "description_markdown": "# Requirements\n- 5+ years Python",
   "job_url": "https://...",
-  "application_url": "https://...",
-  "scraped_at": "2026-02-11T15:30:00Z"
+  "source": "linkedin",
+  "scraping_method": "bright_data",
+  "pillar": "manual",
+  "status": "scraped",
+  "scraped_at": "2026-02-12T17:30:00Z",
+  "scraping_duration_seconds": 12.5
 }
 ```
 
-**Database:** Store in `job_queue` table.
+**Success Criteria:**
+- ✅ All required fields extracted
+- ✅ Markdown description generated (Jina Reader)
+- ✅ Processing time < 30s (Pillar 1), < 60s (Pillar 2)
+- ✅ Platform success rate > threshold (LinkedIn: 95%, StepStone: 75%)
 
-**Error Handling:**
-- Retry 3 times with exponential backoff
-- Pillar 1: If platform scraper fails → Try ScraperAPI → Fallback to Playwright
-- Pillar 2: If SerpAPI fails → Try ScraperAPI → Fallback to Playwright
-- If all fail → Log to `failed_scrapes`, notify admin
+**Monitoring Metrics:**
+- Success rate per platform
+- Average scraping time (p50, p95)
+- Cost per successful scrape
+- Failure reasons distribution
+- Anti-bot block rate
+
+**See:** `directives/job_discovery.md` for complete implementation details.
 
 ---
 
@@ -655,7 +776,7 @@ return {
 **Rule:** Never attempt a complex task without reading the directive first.
 
 **Critical Directives:**
-- `job_discovery.md` - How to scrape job boards
+- `job_discovery.md` - How to scrape job boards (Version 2.0 - Platform Router)
 - `job_matching.md` - How to calculate match scores
 - `company_research.md` - How to research companies with Perplexity
 - `cv_optimization.md` - How to optimize CVs with Claude
@@ -852,7 +973,10 @@ if __name__ == "__main__":
 **Rule:** Before writing new code, check if a skill exists. If yes, IMPORT it.
 
 **Critical Skills:**
-- `web_scraper.py` - Playwright + stealth wrapper
+- `scraping_router.py` - Platform-intelligent router
+- `jina_reader.py` - HTML → Markdown converter
+- `direct_api_scraper.py` - Greenhouse/Lever/Workday scraper
+- `patchright_scraper.py` - StepStone/Monster/Xing scraper
 - `perplexity_client.py` - Perplexity API wrapper with caching
 - `claude_client.py` - Anthropic API wrapper with retry logic
 - `pdf_generator.py` - Markdown to PDF converter
@@ -1034,7 +1158,7 @@ pending → ready_for_review → ready_to_apply → submitted
 
 ```
 pathly-v2/
-├── AGENTS.md                 # This file
+├── AGENTS.md                 # This file (v2.1)
 ├── CLAUDE.md                 # AI assistant rules
 ├── mission.md                # North Star
 ├── actions.md                # Tactical backlog
@@ -1044,7 +1168,7 @@ pathly-v2/
 │   └── ARCHITECTURE.md       # Complete system design
 │
 ├── directives/               # Agent SOPs
-│   ├── job_discovery.md
+│   ├── job_discovery.md      # v2.0 - Platform Router Architecture
 │   ├── job_matching.md
 │   ├── company_research.md
 │   ├── cv_optimization.md
@@ -1059,7 +1183,10 @@ pathly-v2/
 │   └── process_job_pipeline.py
 │
 ├── skills/                   # Reusable modules
-│   ├── web_scraper.py
+│   ├── scraping_router.py    # NEW: Platform-intelligent router
+│   ├── jina_reader.py        # NEW: HTML → Markdown
+│   ├── direct_api_scraper.py # NEW: Greenhouse/Lever/Workday
+│   ├── patchright_scraper.py # NEW: StepStone/Monster/Xing
 │   ├── perplexity_client.py
 │   ├── claude_client.py
 │   ├── pdf_generator.py
@@ -1095,7 +1222,7 @@ pathly-v2/
 ```
 User Submits Job URL
    ↓
-Agent 1: Scrape job details
+Agent 1: Scrape job details (Platform Router)
    ↓
 Agent 3: Research company (Perplexity)
    ↓
@@ -1116,7 +1243,7 @@ Status: submitted
 ```
 Cron Job (8-10 AM daily)
    ↓
-Agent 1: Scrape matching jobs from job boards
+Agent 1: Scrape matching jobs (Platform Router)
    ↓
 Agent 2: Calculate match score for each job
    ↓
@@ -1175,10 +1302,10 @@ Before marking any task DONE:
 
 ### Scraper Blocked
 **Action:**
-1. Switch to ScraperAPI immediately
-2. Alert user: "Scraper blocked, using fallback"
-3. Log to `system_alerts`
-4. Wait 24 hours before retrying direct scrape
+1. Router automatically switches to fallback (Patchright)
+2. Log to `failed_scrapes` table
+3. Alert user if Pillar 1 (manual submission)
+4. Continue with next job if Pillar 2 (automation)
 
 ### AI API Rate Limit
 **Action:**
@@ -1223,11 +1350,12 @@ Before marking any task DONE:
 - OpenAI text-embedding-3-small (embeddings)
 
 **Scraping:**
-- SerpAPI (Pillar 2 primary)
-- ScraperAPI (Pillar 1 + fallback)
-- Firecrawl (ATS systems)
-- Playwright (company pages)
-- BeautifulSoup (parsing)
+- **Bright Data API** (LinkedIn)
+- **Direct JSON APIs** (Greenhouse/Lever/Workday)
+- **Patchright** (StepStone/Monster/Xing)
+- **Jina Reader** (HTML → Markdown post-processing)
+- ScraperAPI (future: Indeed)
+- Firecrawl (future: other platforms)
 
 **Chrome Extension:**
 - Plasmo Framework
@@ -1236,18 +1364,16 @@ Before marking any task DONE:
 
 ---
 
-**System Status:** ACTIVE  
-**Version:** 2.0  
-**Last Updated:** 2026-02-11  
-**Next Review:** After 100 applications processed  
+**System Status:** ✅ ACTIVE (Agent 1 Phase 1 Complete)  
+**Version:** 2.1  
+**Last Updated:** 2026-02-12  
+**Next Review:** After 500 scrapes with new architecture  
 
 ---
 
-**Major Changes from v1.0:**
-- Unified project name (Pathly V2.0)
-- Two-pillar architecture (Manual + Automation)
-- 5 core agents (down from 7)
-- QA integrated into Cover Letter Agent
-- Chrome Extension for form filling (not a separate agent)
-- Directives/Execution/Orchestration framework
-- LEAN approach (no premature optimization)
+**Major Changes from v2.0:**
+- Agent 1: Complete rewrite with Platform-Router Architecture
+- New Skills: scraping_router, jina_reader, direct_api_scraper, patchright_scraper
+- Scraping Strategy: Platform-specific optimizations (98% LinkedIn, 99% Greenhouse, 75-85% StepStone)
+- Cost Optimization: $345-493/month for 100k jobs (vs $800+ with ScraperAPI-only)
+- Directive v2.0: directives/job_discovery.md fully updated
