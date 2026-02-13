@@ -28,21 +28,18 @@
     --info: #2196F3;
   }
 
-  * {
-    @apply border-border;
-  }
-
   body {
-    @apply bg-bg-tertiary text-text-primary;
+    @apply bg-gray-50 text-gray-900;
   }
 }
 
 @layer utilities {
+
   /* Custom scrollbar */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-  
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -51,6 +48,7 @@
 
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

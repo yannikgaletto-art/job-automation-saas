@@ -3,8 +3,8 @@
 **Version:** 1.0  
 **Last Updated:** 2026-02-13  
 **Agent:** Company Research (Research Agent)  
-**Implementation:** `skills/company_research.py`  
-**Execution:** `execution/generate_cover_letter.py` (integrated)  
+**Implementation:** `lib/services/company-enrichment.ts`  
+**Execution:** `app/api/jobs/process/route.ts` (integrated)  
 
 ---
 

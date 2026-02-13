@@ -3,8 +3,8 @@
 **Version:** 1.0 (MVP)  
 **Last Updated:** 2026-02-13  
 **Agent:** Cover Letter Generation (Writer Agent)  
-**Implementation:** `skills/cover_letter_generator.py`  
-**Execution:** `execution/generate_cover_letter.py`  
+**Implementation:** `lib/services/cover-letter-generator.ts`  
+**Execution:** `app/api/cover-letter/generate/route.ts`  
 
 ---
 

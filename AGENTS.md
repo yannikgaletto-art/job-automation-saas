@@ -1,9 +1,9 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 2.2  
+**Version:** 2.3  
 **Last Updated:** 2026-02-13  
-**Status:** Active Development (Phase 3 Complete)  
+**Status:** Active Development (TypeScript Migration Complete)  
 
 ---
 
@@ -49,9 +49,20 @@ Pathly is a **DSGVO & NIS2 compliant** job application SaaS with a hybrid archit
 **DSGVO Compliance:**
 - ✅ No full automation (Art. 22 compliance)
 - ✅ Mandatory human approval before submission
-- ✅ PII encryption (Fernet)
+- ✅ PII encryption (Supabase pgcrypto + Storage)
 - ✅ Audit logging for all AI generations
 - ✅ User consent tracking
+
+> **⚠️ TypeScript Migration (2026-02-13):**
+> All implementations migrated from Python to TypeScript (Next.js API Routes).
+> Python code examples in this document show the LOGIC; actual code is in `lib/services/*.ts`.
+> 
+> **File Mapping:**
+> - `skills/company_research.py` → `lib/services/company-enrichment.ts`
+> - `skills/cover_letter_generator.py` → `lib/services/cover-letter-generator.ts`
+> - `execution/generate_cover_letter.py` → `app/api/cover-letter/generate/route.ts`
+> - `execution/scrape_job.py` → `app/api/jobs/process/route.ts`
+> - `skills/scraping_router.py` → `lib/scrapers/parser.ts`
 
 ---
 
@@ -65,9 +76,9 @@ Pathly is a **DSGVO & NIS2 compliant** job application SaaS with a hybrid archit
 
 **Directive:** `directives/company_research.md`
 
-**Implementation:** `skills/company_research.py` (Phase 3A)
+**Implementation:** `lib/services/company-enrichment.ts`
 
-**Execution:** `execution/generate_cover_letter.py` (integrated)
+**API Route:** `app/api/jobs/process/route.ts` (integrated)
 
 **Why Critical:**
 > LLMs hallucinate company facts. This agent fetches REAL data for authentic cover letters.
@@ -82,7 +93,7 @@ Pathly is a **DSGVO & NIS2 compliant** job application SaaS with a hybrid archit
 ```
 User/Agent 2
       ↓
-[Company Researcher] (skills/company_research.py)
+[Company Researcher] (lib/services/company-enrichment.ts)
       ↓
    Cache Check (Supabase)
       ↓
@@ -241,7 +252,7 @@ print(f"Recent News: {intel['intel_data']['recent_news']}")
 print(f"Cached: {intel.get('cached', False)}")
 ```
 
-**See:** `skills/company_research.py` for complete implementation.
+**See:** `lib/services/company-enrichment.ts` for complete implementation.
 
 ---
 
@@ -261,9 +272,9 @@ print(f"Cached: {intel.get('cached', False)}")
 
 **Directive:** `directives/cover_letter_generation.md`
 
-**Implementation:** `skills/cover_letter_generator.py` (Phase 3B)
+**Implementation:** `lib/services/cover-letter-generator.ts`
 
-**Execution:** `execution/generate_cover_letter.py` (Phase 3C)
+**API Route:** `app/api/cover-letter/generate/route.ts`
 
 **MVP Version:** Single generation (no Quality Judge loop yet)
 
@@ -278,7 +289,7 @@ print(f"Cached: {intel.get('cached', False)}")
 ```
 Job Data + User Profile + Company Intel
       ↓
-[Cover Letter Generator] (skills/cover_letter_generator.py)
+[Cover Letter Generator] (lib/services/cover-letter-generator.ts)
       ↓
 [Claude Sonnet 4] (temperature=0.7)
       ↓
@@ -495,9 +506,9 @@ python execution/generate_cover_letter.py \
 - **Multi-variant:** Generate 3 versions, user picks best
 
 **See:** 
-- `skills/cover_letter_generator.py` for generator implementation
-- `execution/generate_cover_letter.py` for orchestration
-- `database/migrations/003_cover_letter_schema.sql` for schema
+- `lib/services/cover-letter-generator.ts` for generator implementation
+- `app/api/cover-letter/generate/route.ts` for API route
+- `database/schema.sql` for schema
 
 ---
 
@@ -512,11 +523,11 @@ python execution/generate_cover_letter.py \
 
 ---
 
-**Major Changes from v2.1:**
-- **Phase 3 Complete:** Company Research + Cover Letter Generation MVP
-- **New Skills:** company_research.py, cover_letter_generator.py
-- **New Execution:** generate_cover_letter.py (5-step pipeline)
-- **Database:** Migration 003 (company_research + cover_letters tables)
+**Major Changes from v2.2:**
+- **TypeScript Migration Complete:** All Python skills → `lib/services/*.ts`
+- **API Routes:** `app/api/*` replaces `execution/*.py`
+- **Model Router:** `lib/ai/model-router.ts` for cost-optimized AI routing
+- **Inngest:** Background job queue replaces Python cron
 - **Caching:** 7-day company intel cache (70% hit rate projected)
 - **Cost:** ~$0.021/cover letter (with caching)
-- **Quality:** MVP single-generation (Quality Judge → Phase 4)
+- **Quality:** MVP single-generation (Quality Judge → Phase 2)

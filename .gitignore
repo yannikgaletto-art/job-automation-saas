@@ -34,3 +34,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# legacy test files
+test_apis.py
+test_env.py
+next.d.ts

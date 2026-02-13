@@ -15,6 +15,7 @@ interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Skeleton({ className, ...props }: SkeletonProps) {
   return (
     <motion.div
+      {...(props as any)}
       className={cn("rounded-md bg-[#E7E7E5]", className)}
       animate={{
         opacity: [0.5, 0.8, 0.5],
@@ -24,7 +25,6 @@ export function Skeleton({ className, ...props }: SkeletonProps) {
         repeat: Infinity,
         ease: "easeInOut",
       }}
-      {...props}
     />
   );
 }

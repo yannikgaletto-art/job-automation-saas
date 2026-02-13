@@ -49,7 +49,7 @@ export function JobCard({
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-15, 15]);
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
-  
+
   // Visual feedback overlays
   const approveOpacity = useTransform(x, [0, 100], [0, 1]);
   const rejectOpacity = useTransform(x, [-100, 0], [1, 0]);
@@ -62,7 +62,7 @@ export function JobCard({
 
   const handleDragEnd = (_: any, info: PanInfo) => {
     setIsDragging(false);
-    
+
     if (info.offset.x > 100) {
       // Approve animation before callback
       setTimeout(() => onReview(), 200);
@@ -160,20 +160,20 @@ export function JobCard({
       </div>
 
       {/* Job Details */}
-      <motion.div 
+      <motion.div
         className="flex items-center gap-4 text-sm text-[#73726E]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: index * 0.1 + 0.4 }}
       >
-        <motion.div 
+        <motion.div
           className="flex items-center gap-1"
           whileHover={{ scale: 1.05, color: "#37352F" }}
         >
           <MapPin className="w-4 h-4" />
           {location}
         </motion.div>
-        <motion.div 
+        <motion.div
           className="flex items-center gap-1"
           whileHover={{ scale: 1.05, color: "#37352F" }}
         >
@@ -189,7 +189,7 @@ export function JobCard({
 
       {/* AI Insight */}
       {aiInsight && (
-        <motion.div 
+        <motion.div
           className="p-3 rounded-lg bg-gradient-to-br from-[#F7F7F5] to-[#FAFAF9] border border-[#E7E7E5]"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -197,7 +197,7 @@ export function JobCard({
           whileHover={{ scale: 1.01, borderColor: "#0066FF" }}
         >
           <p className="text-sm text-[#37352F]">
-            <motion.span 
+            <motion.span
               className="font-semibold inline-flex items-center gap-1"
               animate={{ opacity: [1, 0.7, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
@@ -210,7 +210,7 @@ export function JobCard({
       )}
 
       {/* Skills */}
-      <motion.div 
+      <motion.div
         className="flex flex-wrap gap-2"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -236,7 +236,7 @@ export function JobCard({
       </motion.div>
 
       {/* Divider */}
-      <motion.div 
+      <motion.div
         className="h-px bg-gradient-to-r from-transparent via-[#E7E7E5] to-transparent"
         initial={{ scaleX: 0 }}
         animate={{ scaleX: 1 }}
@@ -244,7 +244,7 @@ export function JobCard({
       />
 
       {/* Actions */}
-      <motion.div 
+      <motion.div
         className="flex items-center gap-3"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -264,16 +264,13 @@ export function JobCard({
       </motion.div>
 
       {/* Swipe Hint */}
-      <motion.p 
-        className="text-xs text-center text-[#A8A29E]"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: index * 0.1 + 0.9 }}
+      <motion.div
+        className="absolute bottom-4 left-0 right-0 text-center text-sm text-gray-500"
         animate={{ opacity: [0.5, 1, 0.5] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
         ← Swipe Left = Skip | Swipe Right = Review →
-      </motion.p>
+      </motion.div>
     </motion.div>
   );
 }

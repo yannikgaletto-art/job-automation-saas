@@ -5,6 +5,11 @@ Last Updated: 2026-02-10
 
 # PATHLY V2.0 - COMPLETE SYSTEM ARCHITECTURE
 
+> [!IMPORTANT]
+> **Reduce Complexity!**
+> Schreibe das in jede Directive!
+> Ich will einen Lean-laufenden MVP haben; du hast die Tendenz alles zu viel zu machen; das ist nicht notwendig und provoziert viele Fehler. Lass uns bei den einfachen Grundstrukturen bleiben, die funktionieren. D.h. prüfe jedes mal, wenn du etwas neues machst, ob es wirklich notwendig ist, oder man auch später machen kann, um das Ziel zu erreichen.
+
 **Status:** Production-Ready Design  
 **Last Updated:** 2026-02-10  
 **Version:** 3.1.1 (Hybrid Client-Server Model)
