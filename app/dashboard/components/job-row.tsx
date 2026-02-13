@@ -18,17 +18,17 @@ interface JobRowProps {
 const getNextAction = (status: Job['status']) => {
   switch (status) {
     case 'NEW':
-      return { icon: FileText, label: 'View Job', variant: 'default' as const }
+      return { icon: FileText, label: 'View Job', variant: 'primary' as const }
     case 'JOB_REVIEWED':
-      return { icon: CheckCircle2, label: 'Check CV Match', variant: 'default' as const }
+      return { icon: CheckCircle2, label: 'Check CV Match', variant: 'primary' as const }
     case 'CV_CHECKED':
-      return { icon: Sparkles, label: 'Optimize CV', variant: 'default' as const }
+      return { icon: Sparkles, label: 'Optimize CV', variant: 'primary' as const }
     case 'CV_OPTIMIZED':
-      return { icon: Mail, label: 'Generate Cover Letter', variant: 'default' as const }
+      return { icon: Mail, label: 'Generate Cover Letter', variant: 'primary' as const }
     case 'CL_GENERATED':
-      return { icon: Eye, label: 'Review & Apply', variant: 'success' as const }
+      return { icon: Eye, label: 'Review & Apply', variant: 'primary' as const }
     default:
-      return { icon: FileText, label: 'View Job', variant: 'default' as const }
+      return { icon: FileText, label: 'View Job', variant: 'primary' as const }
   }
 }
 
