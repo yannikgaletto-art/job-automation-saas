@@ -28,25 +28,25 @@ Implementierung des kompletten Workflows: Von **Trainingsdaten-Upload** bis **Co
 - [ ] Writing Style Embedding Generation (Phase 5)
 - [x] Speicherung in `documents` table
 
-### [ ] 1.4 CV Template Selection (Frontend)
-- [ ] Template Gallery Komponente
-- [ ] Live Preview mit extrahierten Daten
-- [ ] Template Speicherung in `user_profiles`
+### [x] 1.4 CV Template Selection (Frontend)
+- [x] Template Gallery Komponente
+- [x] Live Preview mit extrahierten Daten
+- [x] Template Speicherung in `user_profiles`
 
-### [ ] 1.5 Profile Confirmation (Steckbrief)
-- [ ] Profile Display Komponente
-- [ ] Edit Mode für Korrekturen
-- [ ] Validation \u0026 Speicherung
+### [x] 1.5 Profile Confirmation (Steckbrief)
+- [x] Profile Display Komponente
+- [x] Edit Mode für Korrekturen
+- [x] Validation \u0026 Speicherung
 
 ---
 
 ## Phase 2: Job Discovery \u0026 Scraping
 
-### [ ] 2.1 Job URL Input System (Frontend)
-- [ ] Job URL Eingabefeld mit Validation
-- [ ] Platform Detection (LinkedIn, Indeed, etc.)
-- [ ] Manual Job Entry Formular
-- [ ] Job Queue Display
+### [x] 2.1 Job URL Input System (Frontend)
+- [x] Job URL Eingabefeld mit Validation
+- [x] Platform Detection (LinkedIn, Indeed, etc.)
+- [x] Manual Job Entry Formular
+- [x] Job Queue Display
 
 ### [ ] 2.2 Smart Scraping System (Backend)
 - [ ] API Route: `/api/jobs/scrape`
@@ -58,12 +58,12 @@ Implementierung des kompletten Workflows: Von **Trainingsdaten-Upload** bis **Co
 - [ ] Rate Limiting \u0026 Error Handling
 - [ ] Scraping Logs Table
 
-### [ ] 2.3 Job Data Extraction
-- [ ] Structured Data Parser
-- [ ] Requirements Extraction (JSONB)
-- [ ] Salary Range Parser
-- [ ] Location Normalization
-- [ ] Job Queue INSERT mit Status `pending`
+### [x] 2.3 Job Data Extraction
+- [x] Structured Data Parser
+- [x] Requirements Extraction (JSONB)
+- [x] Salary Range Parser
+- [x] Location Normalization
+- [x] Job Queue INSERT mit Status `pending`
 
 ### [x] 2.4 Double-Apply Prevention
 - [x] URL Hash Verification

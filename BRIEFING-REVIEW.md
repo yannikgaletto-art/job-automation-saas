@@ -14,7 +14,7 @@
 3. Auto-generating personalized cover letters using AI
 4. Tracking application history to prevent duplicates
 
-**Current Status:** Phases 1-3 are **complete and production-ready** (with 5 minor fixes pending). Phases 4-12 are **planned but not implemented**.
+**Current Status:** Phases 1-3 are **complete and production-ready** (with 5 minor fixes pending). Only Phase 2.2 (automated scraping) is missing - users can manually input job data. Phases 4-12 are **planned but not implemented**.
 
 ---
 
@@ -28,21 +28,21 @@
 | Document Upload | ✅ Complete | `components/onboarding/document-upload.tsx` |
 | Document Processing | ✅ Complete | `lib/services/document-processor.ts`, `text-extractor.ts` |
 | PII Encryption | ✅ Complete | AES-256-GCM in `document-processor.ts` |
-| CV Template Selection | ⚠️ Partial | Component exists but not integrated |
-| Profile Confirmation | ⚠️ Partial | Component exists but has bugs |
+| **CV Template Selection** | ✅ **Complete** | `components/onboarding/template-gallery.tsx` |
+| **Profile Confirmation** | ✅ **Complete** | `components/onboarding/profile-confirmation.tsx` |
 
-**Key Achievement:** Secure PII handling with encryption at rest.
+**Key Achievement:** Full onboarding flow implemented with secure PII handling.
 
 ### Phase 2: Job Discovery & Scraping
 
 | Component | Status | Files |
 |-----------|--------|-------|
-| Job URL Input | ❌ Not Implemented | Missing frontend form |
-| Smart Scraping | ❌ Not Implemented | No scraper logic |
-| Job Data Extraction | ❌ Not Implemented | No parser |
-| **Double-Apply Prevention** | ✅ **Complete** | `lib/services/application-history.ts`, `components/dashboard/add-job-dialog.tsx` |
+| **Job URL Input** | ✅ **Complete** | `components/dashboard/add-job-dialog.tsx` |
+| Smart Scraping | ❌ Not Implemented | No scraper logic (manual input only) |
+| **Job Data Extraction** | ✅ **Complete** | `api/jobs/process` with enrichment pipeline |
+| **Double-Apply Prevention** | ✅ **Complete** | `lib/services/application-history.ts` |
 
-**Note:** Only 2.4 (Double-Apply Prevention) is complete. The rest of Phase 2 needs implementation.
+**Note:** Phase 2 is **mostly complete** (3/4 tasks). Only automated scraping (2.2) is missing - users can manually input job data.
 
 ### Phase 3: Company Intelligence Enrichment
 
