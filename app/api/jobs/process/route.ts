@@ -11,7 +11,37 @@ const supabase = createClient(
 );
 
 export async function POST(request: Request) {
-    const { jobId, userId } = await request.json();
+    const { jobId, userId, jobUrl, company, jobTitle } = await request.json();
+
+    // Helper for slugify
+    const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+    // ========================================================================
+    // STEP 0: Check for duplicates (Phase 2.4)
+    // ========================================================================
+    try {
+        if (jobUrl) {
+            const { checkDuplicateApplication } = await import('@/lib/services/application-history');
+            const duplicateResult = await checkDuplicateApplication(
+                userId,
+                jobUrl,
+                company ? slugify(company) : undefined, // Helper needed or raw check
+                jobTitle
+            );
+
+            if (duplicateResult.isDuplicate) {
+                console.warn(`⚠️ Blocked duplicate application: ${duplicateResult.reason}`);
+                return Response.json({
+                    success: false,
+                    error: "DUPLICATE_APPLICATION",
+                    details: duplicateResult
+                }, { status: 409 });
+            }
+        }
+    } catch (dupError) {
+        console.error("Duplicate check failed (non-blocking):", dupError);
+    }
+
 
     try {
         // Fetch job

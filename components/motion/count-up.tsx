@@ -46,7 +46,7 @@ export function CountUp({
   }, [value, spring, duration, onComplete]);
 
   return (
-    <motion.span 
+    <motion.span
       className={className}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -69,8 +69,7 @@ interface MatchScoreProps {
 
 export function AnimatedMatchScore({ score, showIcon = true, className = "" }: MatchScoreProps) {
   const getGradientClass = (value: number) => {
-    if (value >= 90) return "from-[#00C853] to-[#0066FF]";
-    if (value >= 70) return "from-[#FFA000] to-[#FF6D00]";
+    if (value >= 70) return "from-[#00C853] to-[#0066FF]";
     return "from-[#D32F2F] to-[#C62828]";
   };
 
@@ -79,11 +78,11 @@ export function AnimatedMatchScore({ score, showIcon = true, className = "" }: M
       className={`px-3 py-1 rounded-full bg-gradient-to-r text-white font-semibold text-sm flex items-center gap-1 ${getGradientClass(score)} ${className}`}
       initial={{ opacity: 0, scale: 0.8, rotate: -10 }}
       animate={{ opacity: 1, scale: 1, rotate: 0 }}
-      transition={{ 
-        type: "spring", 
-        stiffness: 200, 
+      transition={{
+        type: "spring",
+        stiffness: 200,
         damping: 15,
-        delay: 0.2 
+        delay: 0.2
       }}
       whileHover={{ scale: 1.05, rotate: 2 }}
     >

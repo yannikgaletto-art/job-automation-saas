@@ -15,7 +15,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- For fuzzy search
 -- ============================================
 
 -- Consent History (DSGVO Art. 7)
-CREATE TABLE consent_history (
+CREATE TABLE IF NOT EXISTS consent_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   
@@ -33,10 +33,10 @@ CREATE TABLE consent_history (
   UNIQUE(user_id, document_type, document_version)
 );
 
-CREATE INDEX idx_consent_history_user ON consent_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_consent_history_user ON consent_history(user_id);
 
 -- User Profiles (Extended)
-CREATE TABLE user_profiles (
+CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   
   -- Encrypted PII (name, email, phone, address)
@@ -61,6 +61,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_user_profiles_updated_at ON user_profiles;
 CREATE TRIGGER trigger_user_profiles_updated_at
 BEFORE UPDATE ON user_profiles
 FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -76,7 +77,7 @@ CREATE POLICY "Users can only access their own profile"
 -- 2. DOCUMENT MANAGEMENT
 -- ============================================
 
-CREATE TABLE documents (
+CREATE TABLE IF NOT EXISTS documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   
@@ -97,8 +98,8 @@ CREATE TABLE documents (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_documents_user ON documents(user_id);
-CREATE INDEX idx_documents_type ON documents(document_type);
+CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(document_type);
 
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 
@@ -111,7 +112,7 @@ CREATE POLICY "Users can only access their own documents"
 -- ============================================
 
 -- Auto Search Configs
-CREATE TABLE auto_search_configs (
+CREATE TABLE IF NOT EXISTS auto_search_configs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   
@@ -133,7 +134,7 @@ CREATE TABLE auto_search_configs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_auto_search_configs_user ON auto_search_configs(user_id);
+CREATE INDEX IF NOT EXISTS idx_auto_search_configs_user ON auto_search_configs(user_id);
 
 ALTER TABLE auto_search_configs ENABLE ROW LEVEL SECURITY;
 
@@ -142,7 +143,7 @@ CREATE POLICY "Users can only access their own configs"
   USING (auth.uid() = user_id);
 
 -- Search Trigger Queue (Decoupled from Cron)
-CREATE TABLE search_trigger_queue (
+CREATE TABLE IF NOT EXISTS search_trigger_queue (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   config_id UUID REFERENCES auto_search_configs(id) ON DELETE CASCADE,
   
@@ -155,12 +156,12 @@ CREATE TABLE search_trigger_queue (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_search_trigger_queue_status ON search_trigger_queue(status);
-CREATE INDEX idx_search_trigger_queue_scheduled ON search_trigger_queue(scheduled_for) 
+CREATE INDEX IF NOT EXISTS idx_search_trigger_queue_status ON search_trigger_queue(status);
+CREATE INDEX IF NOT EXISTS idx_search_trigger_queue_scheduled ON search_trigger_queue(scheduled_for) 
   WHERE status = 'pending';
 
 -- Job Queue (Robust)
-CREATE TABLE job_queue (
+CREATE TABLE IF NOT EXISTS job_queue (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   search_config_id UUID REFERENCES auto_search_configs(id),
@@ -218,10 +219,10 @@ CREATE TABLE job_queue (
   processed_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_job_queue_status ON job_queue(status);
-CREATE INDEX idx_job_queue_user_pending ON job_queue(user_id, status) 
+CREATE INDEX IF NOT EXISTS idx_job_queue_status ON job_queue(status);
+CREATE INDEX IF NOT EXISTS idx_job_queue_user_pending ON job_queue(user_id, status) 
   WHERE status = 'ready_to_apply';
-CREATE INDEX idx_job_queue_url_hash ON job_queue USING hash(job_url);
+CREATE INDEX IF NOT EXISTS idx_job_queue_url_hash ON job_queue USING hash(job_url);
 
 ALTER TABLE job_queue ENABLE ROW LEVEL SECURITY;
 
@@ -233,7 +234,7 @@ CREATE POLICY "Users can only access their own jobs"
 -- 4. COMPANY RESEARCH (PERPLEXITY CACHE)
 -- ============================================
 
-CREATE TABLE company_research (
+CREATE TABLE IF NOT EXISTS company_research (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID REFERENCES job_queue(id) ON DELETE CASCADE,
   company_name TEXT NOT NULL,
@@ -254,7 +255,7 @@ CREATE TABLE company_research (
   UNIQUE(company_name)
 );
 
-CREATE INDEX idx_company_research_expires ON company_research(expires_at);
+CREATE INDEX IF NOT EXISTS idx_company_research_expires ON company_research(expires_at);
 
 -- Auto-cleanup expired research
 CREATE OR REPLACE FUNCTION cleanup_expired_research()
@@ -270,7 +271,7 @@ SELECT cron.schedule('cleanup-research', '0 2 * * *', 'SELECT cleanup_expired_re
 -- 5. APPLICATION HISTORY (MANUAL TRACKING)
 -- ============================================
 
-CREATE TABLE application_history (
+CREATE TABLE IF NOT EXISTS application_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   
@@ -296,11 +297,13 @@ CREATE TABLE application_history (
 );
 
 -- Indexes
-CREATE INDEX idx_application_history_user ON application_history(user_id);
-CREATE INDEX idx_application_history_method ON application_history(application_method);
-CREATE INDEX idx_application_history_week ON application_history(applied_at) 
-  WHERE applied_at > NOW() - INTERVAL '7 days';
-CREATE INDEX idx_application_history_company_slug ON application_history(company_slug);
+CREATE INDEX IF NOT EXISTS idx_application_history_user ON application_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_application_history_method ON application_history(application_method);
+
+-- Replaced partial time-based index (invalid due to NOW()) with a plain index:
+CREATE INDEX IF NOT EXISTS idx_application_history_applied_at ON application_history(applied_at);
+
+CREATE INDEX IF NOT EXISTS idx_application_history_company_slug ON application_history(company_slug);
 
 ALTER TABLE application_history ENABLE ROW LEVEL SECURITY;
 
@@ -339,6 +342,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_prevent_double_apply ON application_history;
 CREATE TRIGGER trigger_prevent_double_apply
 BEFORE INSERT ON application_history
 FOR EACH ROW EXECUTE FUNCTION prevent_double_apply();
@@ -347,7 +351,7 @@ FOR EACH ROW EXECUTE FUNCTION prevent_double_apply();
 -- 6. FORM SELECTORS (LEARNING SYSTEM)
 -- ============================================
 
-CREATE TABLE form_selectors (
+CREATE TABLE IF NOT EXISTS form_selectors (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   platform_name TEXT NOT NULL, -- 'greenhouse', 'workday'
   company_domain TEXT, -- 'jobs.techcorp.com' (optional)
@@ -367,8 +371,8 @@ CREATE TABLE form_selectors (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_form_selectors_platform ON form_selectors(platform_name);
-CREATE INDEX idx_form_selectors_trust ON form_selectors(trust_score DESC);
+CREATE INDEX IF NOT EXISTS idx_form_selectors_platform ON form_selectors(platform_name);
+CREATE INDEX IF NOT EXISTS idx_form_selectors_trust ON form_selectors(trust_score DESC);
 
 -- Update Selector Trust
 CREATE OR REPLACE FUNCTION update_selector_trust(selector_id UUID, success BOOLEAN)
@@ -393,7 +397,7 @@ $$ LANGUAGE plpgsql;
 -- 7. GENERATION LOGS (AI AUDIT)
 -- ============================================
 
-CREATE TABLE generation_logs (
+CREATE TABLE IF NOT EXISTS generation_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID REFERENCES job_queue(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -420,8 +424,8 @@ CREATE TABLE generation_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_generation_logs_job ON generation_logs(job_id);
-CREATE INDEX idx_generation_logs_created ON generation_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_generation_logs_job ON generation_logs(job_id);
+CREATE INDEX IF NOT EXISTS idx_generation_logs_created ON generation_logs(created_at DESC);
 
 ALTER TABLE generation_logs ENABLE ROW LEVEL SECURITY;
 
@@ -457,7 +461,8 @@ INSERT INTO form_selectors (platform_name, field_name, css_selector) VALUES
 ('greenhouse', 'email', 'input[id="email"]'),
 ('greenhouse', 'phone', 'input[id="phone"]'),
 ('greenhouse', 'resume', 'input[type="file"][name="resume"]'),
-('greenhouse', 'cover_letter', 'textarea[id="cover_letter_text"]');
+('greenhouse', 'cover_letter', 'textarea[id="cover_letter_text"]')
+ON CONFLICT DO NOTHING;
 
 -- Lever
 INSERT INTO form_selectors (platform_name, field_name, css_selector) VALUES
@@ -465,7 +470,8 @@ INSERT INTO form_selectors (platform_name, field_name, css_selector) VALUES
 ('lever', 'email', 'input[name="email"]'),
 ('lever', 'phone', 'input[name="phone"]'),
 ('lever', 'resume', 'input[type="file"][name="resume"]'),
-('lever', 'cover_letter', 'textarea[name="cards[additional-information]"]');
+('lever', 'cover_letter', 'textarea[name="cards[additional-information]"]')
+ON CONFLICT DO NOTHING;
 
 -- Workday
 INSERT INTO form_selectors (platform_name, field_name, css_selector) VALUES
@@ -473,12 +479,14 @@ INSERT INTO form_selectors (platform_name, field_name, css_selector) VALUES
 ('workday', 'last_name', 'input[data-automation-id="legalNameSection_lastName"]'),
 ('workday', 'email', 'input[data-automation-id="email"]'),
 ('workday', 'phone', 'input[data-automation-id="phone-device-landLine"]'),
-('workday', 'resume', 'input[type="file"][data-automation-id="file-upload-input"]');
+('workday', 'resume', 'input[type="file"][data-automation-id="file-upload-input"]')
+ON CONFLICT DO NOTHING;
 
 -- LinkedIn
 INSERT INTO form_selectors (platform_name, field_name, css_selector) VALUES
 ('linkedin', 'phone', 'input[id*="phoneNumber"]'),
-('linkedin', 'resume', 'input[type="file"][name="file"]');
+('linkedin', 'resume', 'input[type="file"][name="file"]')
+ON CONFLICT DO NOTHING;
 
 -- ============================================
 -- 10. UTILITY FUNCTIONS
@@ -509,9 +517,9 @@ $$ LANGUAGE plpgsql;
 -- SCHEMA VERSION
 -- ============================================
 
-CREATE TABLE schema_version (
+CREATE TABLE IF NOT EXISTS schema_version (
   version TEXT PRIMARY KEY,
   applied_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-INSERT INTO schema_version (version) VALUES ('3.0');
+INSERT INTO schema_version (version) VALUES ('3.0') ON CONFLICT (version) DO NOTHING;

@@ -1,20 +1,32 @@
-import { generateCoverLetter } from '@/lib/services/cover-letter-generator';
+import { generateCoverLetterWithQuality } from '@/lib/services/cover-letter-generator';
+import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-    const { userId, jobId } = await request.json();
-
     try {
-        const result = await generateCoverLetter(userId, jobId);
+        const { userId, jobId } = await request.json();
 
-        return Response.json({
+        if (!userId || !jobId) {
+            return NextResponse.json(
+                { error: 'Missing userId or jobId' },
+                { status: 400 }
+            );
+        }
+
+        // Use quality loop (max 3 iterations)
+        const result = await generateCoverLetterWithQuality(jobId, userId);
+
+        return NextResponse.json({
             success: true,
-            coverLetter: result.coverLetter,
-            cost: result.costCents / 100,
-            model: result.model,
+            cover_letter: result.coverLetter,
+            quality_scores: result.finalScores,
+            iterations: result.iterations,
+            iteration_log: result.iterationLog // Optional: useful for debugging/frontend details
         });
+
     } catch (error: any) {
-        return Response.json(
-            { success: false, error: error.message },
+        console.error("Cover letter generation failed:", error);
+        return NextResponse.json(
+            { error: error.message || "Generation failed" },
             { status: 500 }
         );
     }

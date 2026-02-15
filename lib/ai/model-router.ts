@@ -41,7 +41,8 @@ export type TaskType =
     // Premium tier (Claude Sonnet)
     | 'write_cover_letter'
     | 'personalize_intro'
-    | 'generate_motivation_text';
+    | 'generate_motivation_text'
+    | 'optimize_cv';
 
 // ============================================================================
 // ROUTING LOGIC
@@ -59,6 +60,7 @@ export function selectModel(taskType: TaskType) {
         write_cover_letter: 'CLAUDE_SONNET',
         personalize_intro: 'CLAUDE_SONNET',
         generate_motivation_text: 'CLAUDE_SONNET',
+        optimize_cv: 'CLAUDE_SONNET',
     };
 
     return MODELS[routingMap[taskType]];

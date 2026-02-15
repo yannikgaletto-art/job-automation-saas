@@ -1,0 +1,346 @@
+# Pathly V2.0 - Complete Workflow Implementation Tasks
+
+## 🎯 Goal
+Implementierung des kompletten Workflows: Von **Trainingsdaten-Upload** bis **Cover Letter Generation**, mit allen Frontend-, Backend- und API-Integrationen.
+
+---
+
+## Phase 1: Datenerfassung & User Onboarding
+
+### [x] 1.1 DSGVO Consent Screen (Frontend)
+- [x] Consent-Komponente mit Checkboxen erstellen
+- [x] Validation mit Zod Schema
+- [x] Integration in Onboarding-Flow
+- [x] API Route für Consent-Speicherung
+
+### [/] 1.2 Document Upload System (Frontend + Backend)
+- [x] File Upload Komponente (CV + 2-3 Cover Letters)
+- [x] Frontend Validation (max 5MB, PDF/DOCX)
+- [/] Supabase Storage Integration (encrypted buckets)
+- [x] Progress Indicator für Upload
+- [x] Design an Dashboard angepasst (Light Mode)
+
+### [x] 1.3 Document Processing Pipeline (Backend)
+- [x] PDF/DOCX Text Extraction Service
+- [x] PII Extraction (name, email, phone, address)
+- [x] PII Encryption with AES-256-GCM (node crypto)
+- [x] CV Metadata Extraction (skills, years_experience)
+- [ ] Writing Style Embedding Generation (Phase 5)
+- [x] Speicherung in `documents` table
+
+### [ ] 1.4 CV Template Selection (Frontend)
+- [ ] Template Gallery Komponente
+- [ ] Live Preview mit extrahierten Daten
+- [ ] Template Speicherung in `user_profiles`
+
+### [ ] 1.5 Profile Confirmation (Steckbrief)
+- [ ] Profile Display Komponente
+- [ ] Edit Mode für Korrekturen
+- [ ] Validation \u0026 Speicherung
+
+---
+
+## Phase 2: Job Discovery \u0026 Scraping
+
+### [ ] 2.1 Job URL Input System (Frontend)
+- [ ] Job URL Eingabefeld mit Validation
+- [ ] Platform Detection (LinkedIn, Indeed, etc.)
+- [ ] Manual Job Entry Formular
+- [ ] Job Queue Display
+
+### [ ] 2.2 Smart Scraping System (Backend)
+- [ ] API Route: `/api/jobs/scrape`
+- [ ] Scraper Selection Logic
+  - [ ] SerpAPI Integration (Job Boards)
+  - [ ] Firecrawl Integration (ATS Systems)
+  - [ ] Playwright Fallback
+- [ ] Fallback Chain Implementation
+- [ ] Rate Limiting \u0026 Error Handling
+- [ ] Scraping Logs Table
+
+### [ ] 2.3 Job Data Extraction
+- [ ] Structured Data Parser
+- [ ] Requirements Extraction (JSONB)
+- [ ] Salary Range Parser
+- [ ] Location Normalization
+- [ ] Job Queue INSERT mit Status `pending`
+
+### [x] 2.4 Double-Apply Prevention
+- [x] URL Hash Verification
+- [x] Company Slug Matching
+- [x] Fuzzy Title Matching (pg_trgm)
+- [x] User Notification bei Duplicate
+
+---
+
+## Phase 3: Company Intelligence Enrichment
+
+### [x] 3.1 Company Research Service (Backend)
+- [x] Service: `lib/services/company-enrichment.ts` (✅ EXISTS)
+- [x] Cache Check in `company_research` table
+- [x] Perplexity Sonar Pro Integration
+- [x] Research Prompt Engineering
+  - [x] Company values \u0026 mission
+  - [x] Recent news (last 3 months)
+  - [x] LinkedIn activity
+  - [x] Vision \u0026 strategic goals
+
+### [x] 3.2 Quote Suggestion System
+- [x] Quote Discovery via Perplexity
+- [x] Relevance Scoring (0-1) with OpenAI Embeddings
+- [x] Quote-Company Value Mapping
+- [x] Speicherung in `suggested_quotes` JSONB
+
+### [x] 3.3 Company Research Display (Frontend)
+- [x] Company Intel Card Komponente
+- [x] Quote Selection Interface
+- [x] Recent News Display
+- [x] Custom Quote Input Option
+
+### [x] 3.4 Cache Management
+- [x] 7-Day TTL Implementation
+- [x] Cache Hit Rate Monitoring (in-memory)
+- [x] Automatic Cleanup via pg_cron
+- [x] Exposed in Admin Cost Report API
+
+---
+
+## Phase 4: CV Optimization (Optional für MVP)
+
+### [ ] 4.1 CV Optimization Service
+- [ ] API Route: `/api/cv/optimize`
+- [ ] Claude Sonnet 4.5 Integration
+- [ ] ATS-Gap Analysis
+- [ ] Bullet Point Rewriting
+- [ ] Skills Section Optimization
+
+### [ ] 4.2 CV Optimization Display (Frontend)
+- [ ] Side-by-Side Comparison
+- [ ] Diff Highlighting
+- [ ] Accept/Reject Changes
+- [ ] Download Optimized CV
+
+---
+
+## Phase 5: Cover Letter Generation
+
+### [ ] 5.1 Cover Letter Generator (Backend)
+- [ ] Service: `lib/services/cover-letter-generator.ts` (✅ EXISTS)
+- [ ] API Route: `/api/cover-letter/generate` (✅ EXISTS)
+- [ ] System Prompt Engineering
+  - [ ] Writing Style Integration
+  - [ ] Conjunction Requirements ("Daher", "Deshalb")
+  - [ ] Company Intel Integration
+  - [ ] User Voice Matching
+
+### [ ] 5.2 3-Stage Generation Pipeline
+- [ ] Stage 1: Generation (Claude Sonnet 4.5)
+  - [ ] User Profile Integration
+  - [ ] Job Requirements Mapping
+  - [ ] Company Research Integration
+  - [ ] Selected Quote Integration
+- [ ] Stage 2: Judge (Claude Haiku 4) - **Phase 2**
+  - [ ] Naturalness Score (1-10)
+  - [ ] Style Match Score
+  - [ ] Company Relevance Score
+  - [ ] Individuality Score
+- [ ] Stage 3: Iteration Loop (max 3x) - **Phase 2**
+  - [ ] Score Threshold (≥8)
+  - [ ] Feedback Integration
+  - [ ] Generation Logs
+
+### [ ] 5.3 Cover Letter Validation
+- [ ] Word Count Check (250-350)
+- [ ] Generic Phrase Detection
+- [ ] Company Name Verification
+- [ ] Forbidden Phrases Check
+
+### [ ] 5.4 Cover Letter Display (Frontend)
+- [ ] Cover Letter Preview Komponente
+- [ ] Edit Mode mit Rich Text Editor
+- [ ] Quality Score Display (Phase 2)
+- [ ] Regenerate Option
+- [ ] Download als PDF
+
+### [ ] 5.5 Generation Logs \u0026 Audit
+- [ ] Speicherung in `generation_logs` table
+- [ ] Model \u0026 Token Tracking
+- [ ] Quality Scores Logging
+- [ ] Cost Calculation
+
+---
+
+## Phase 6: Manual Application Tracking
+
+### [ ] 6.1 Application History System (Backend)
+- [ ] Speicherung in `application_history` table
+- [ ] URL Hash Generation (md5)
+- [ ] Company Slug Normalization
+- [ ] Application Method Tracking
+
+### [ ] 6.2 Application History UI (Frontend)
+- [ ] Beautiful Table Komponente (shadcn/ui)
+- [ ] Company Logos via Clearbit API
+- [ ] Formatted Dates
+- [ ] Method Badges (Auto/Manual)
+- [ ] Quick Actions (Open URL, Download docs)
+
+### [ ] 6.3 Statistics Dashboard
+- [ ] Weekly Count
+- [ ] Monthly Count
+- [ ] Total Count
+- [ ] Success Rate (if tracking responses)
+
+---
+
+## Phase 7: API Routes \u0026 Integration
+
+### [ ] 7.1 Document Upload API
+- [ ] `POST /api/documents/upload`
+- [ ] File Validation
+- [ ] Text Extraction
+- [ ] Storage \u0026 Encryption
+- [ ] Response mit extracted data
+
+### [ ] 7.2 Job Processing API
+- [ ] `POST /api/jobs/scrape`
+- [ ] `POST /api/jobs/process`
+- [ ] Integration aller Services:
+  - [ ] Scraping
+  - [ ] Company Enrichment
+  - [ ] CV Optimization (optional)
+  - [ ] Cover Letter Generation
+
+### [ ] 7.3 User Profile API
+- [ ] `GET /api/user/profile`
+- [ ] `PATCH /api/user/profile`
+- [ ] PII Decryption für Edit Mode
+- [ ] Re-Encryption nach Update
+
+### [ ] 7.4 Application History API
+- [ ] `POST /api/applications/track`
+- [ ] `GET /api/applications/history`
+- [ ] `GET /api/applications/stats`
+
+---
+
+## Phase 8: Database Setup \u0026 Migration
+
+### [ ] 8.1 Schema Deployment
+- [ ] Run `database/schema.sql` (✅ EXISTS)
+- [ ] Verify alle Tables created
+- [ ] Verify RLS Policies active
+- [ ] Verify Indexes created
+
+### [ ] 8.2 Seed Data
+- [ ] Form Selectors (Greenhouse, Lever, Workday, LinkedIn)
+- [ ] Test User Profiles (optional)
+- [ ] Sample Jobs (optional)
+
+### [ ] 8.3 Cron Jobs Setup
+- [ ] `cleanup_expired_research()` - 02:00 täglich
+- [ ] `reset_daily_counts()` - 00:00 täglich
+- [ ] Verify pg_cron Extension
+
+---
+
+## Phase 9: Security \u0026 Compliance
+
+### [ ] 9.1 Encryption
+- [ ] PII Encryption (Fernet/pgcrypto)
+- [ ] Supabase Storage Encrypted Buckets
+- [ ] Environment Variables Security
+- [ ] API Key Rotation Strategy
+
+### [ ] 9.2 Row Level Security (RLS)
+- [ ] Verify `user_profiles` RLS
+- [ ] Verify `documents` RLS
+- [ ] Verify `job_queue` RLS
+- [ ] Verify `application_history` RLS
+- [ ] Verify `generation_logs` RLS
+
+### [ ] 9.3 Consent Management
+- [ ] `consent_history` Logging
+- [ ] IP Address \u0026 User Agent Tracking
+- [ ] Document Version Tracking
+- [ ] Consent Withdrawal Flow
+
+### [ ] 9.4 Audit Logging
+- [ ] AI Generation Logs
+- [ ] Scraping Logs
+- [ ] User Actions Logs
+- [ ] Cost Tracking Logs
+
+---
+
+## Phase 10: Testing \u0026 Verification
+
+### [ ] 10.1 Unit Tests
+- [ ] Document Processing Tests
+- [ ] Scraper Tests (mock APIs)
+- [ ] Company Enrichment Tests
+- [ ] Cover Letter Generator Tests
+- [ ] Validation Logic Tests
+
+### [ ] 10.2 Integration Tests
+- [ ] End-to-End Upload Flow
+- [ ] Job Processing Pipeline
+- [ ] Cover Letter Generation Flow
+- [ ] Application Tracking Flow
+
+### [ ] 10.3 Browser Tests
+- [ ] Manual Upload Flow
+- [ ] Job URL Input
+- [ ] Cover Letter Preview \u0026 Edit
+- [ ] Application History Display
+
+### [ ] 10.4 API Tests
+- [ ] All API Routes Response
+- [ ] Error Handling
+- [ ] Rate Limiting
+- [ ] Authentication
+
+---
+
+## Phase 11: Performance \u0026 Monitoring
+
+### [ ] 11.1 Performance Optimization
+- [ ] Database Query Optimization
+- [ ] Index Tuning
+- [ ] Caching Strategy
+- [ ] API Response Time
+
+### [ ] 11.2 Monitoring Setup
+- [ ] Cache Hit Rate Tracking
+- [ ] API Cost per Job Tracking
+- [ ] Generation Success Rate
+- [ ] Average Response Times
+- [ ] Error Rate Monitoring
+
+### [ ] 11.3 Cost Management
+- [ ] Model Router für Cost Tracking (✅ EXISTS in scripts)
+- [ ] Monthly Cost Projections
+- [ ] Per-User Cost Attribution
+- [ ] Budget Alerts
+
+---
+
+## Phase 12: User Experience \u0026 Polish
+
+### [ ] 12.1 Loading States
+- [ ] Upload Progress
+- [ ] Processing Spinner
+- [ ] Generation Indicator
+- [ ] Optimistic Updates
+
+### [ ] 12.2 Error Messages
+- [ ] User-Friendly Error Messages
+- [ ] Retry Mechanisms
+- [ ] Fallback Content
+- [ ] Help Documentation
+
+### [ ] 12.3 Notifications
+- [ ] Success Toasts
+- [ ] Error Alerts
+- [ ] Processing Updates
+- [ ] Email Notifications (optional)

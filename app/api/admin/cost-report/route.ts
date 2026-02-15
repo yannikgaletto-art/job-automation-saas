@@ -1,4 +1,5 @@
 import { getCostStats } from '@/lib/ai/model-router';
+import { getCacheStats } from '@/lib/services/cache-monitor';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -65,6 +66,7 @@ export async function GET() {
                     : '0.00',
             high_quality:
                 companies?.filter((c) => c.confidence_score > 0.7).length || 0,
+            monitor_stats: getCacheStats(),
         },
     };
 

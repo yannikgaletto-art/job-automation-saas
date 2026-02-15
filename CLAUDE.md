@@ -208,9 +208,14 @@ Chrome Extension (Plasmo)
    ```bash
    npm run dev
    # Open http://localhost:3000
-   # Click through the feature
    ```
-
+   - **Visual Style**:
+     - MUST match Dashboard design: Clean, Light Mode (`#FAFAF9`), Notion-like aesthetics.
+     - Primary Text: `#37352F`, Secondary Text: `#73726E`.
+     - Borders: `#E7E7E5`.
+     - NO dark mode by default unless specified.
+     - Use `lucide-react` for icons.
+     - Use `framer-motion` for subtle interactions.
 2. **UI Must Feel Fluid:**
    - Use Framer Motion for transitions
    - Loading states for all async operations
@@ -314,7 +319,7 @@ await supabase.from('application_history').insert({
   company_name: scrapedData.company,
   job_title: scrapedData.title,
   url_hash: md5(currentJobUrl),
-  company_slug: slugify(scrapedData.company),
+  // company_slug removed in Schema v3.0, using company_name as identifier
   applied_at: new Date().toISOString(),
   application_method: 'manual'
 })
