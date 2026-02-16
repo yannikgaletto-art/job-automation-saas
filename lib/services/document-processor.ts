@@ -1,6 +1,7 @@
 import { extractText } from './text-extractor';
 import { encrypt } from '@/lib/utils/encryption';
 import Anthropic from '@anthropic-ai/sdk';
+import { analyzeWritingStyle, StyleAnalysis, getDefaultStyleAnalysis } from './writing-style-analyzer';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -16,10 +17,16 @@ export interface ProcessedDocument {
         experienceYears: number;
         educationLevel?: string;
         languages?: string[];
+        content_snippet?: string; // First 500 chars for preview
+        style_analysis?: StyleAnalysis; // Writing style (cover letters only)
     };
 }
 
-export async function processDocument(fileBuffer: Buffer, mimeType: string): Promise<ProcessedDocument> {
+export async function processDocument(
+    fileBuffer: Buffer, 
+    mimeType: string,
+    documentType: 'cv' | 'cover_letter' = 'cv' // Default to CV for backwards compatibility
+): Promise<ProcessedDocument> {
     // 1. Extract Raw Text
     const rawText = await extractText(fileBuffer, mimeType);
 
@@ -69,7 +76,22 @@ export async function processDocument(fileBuffer: Buffer, mimeType: string): Pro
         analysisResult = mockExtraction(rawText); // Fallback to mock/regex
     }
 
-    // 3. Encrypt PII
+    // 3. Style Analysis (only for cover letters)
+    let styleAnalysis: StyleAnalysis | undefined;
+    
+    if (documentType === 'cover_letter') {
+        try {
+            console.log('📊 Analyzing writing style for cover letter...');
+            styleAnalysis = await analyzeWritingStyle(rawText);
+            console.log('✅ Style analysis complete:', styleAnalysis.tone, styleAnalysis.sentence_length);
+        } catch (error) {
+            console.error('⚠️ Style analysis failed, using default style:', error);
+            // Don't block upload if style analysis fails - use default
+            styleAnalysis = getDefaultStyleAnalysis();
+        }
+    }
+
+    // 4. Encrypt PII
     const encryptedPii: Record<string, string> = {};
     const pii = analysisResult.pii || {};
 
@@ -95,7 +117,11 @@ export async function processDocument(fileBuffer: Buffer, mimeType: string): Pro
         rawText,
         sanitizedText,
         encryptedPii,
-        metadata: analysisResult.metadata || { skills: [], experienceYears: 0 }
+        metadata: {
+            ...analysisResult.metadata || { skills: [], experienceYears: 0 },
+            content_snippet: rawText.slice(0, 500), // For preview in cover-letter-generator
+            style_analysis: styleAnalysis // Only present for cover letters
+        }
     };
 }
 
