@@ -1,6 +1,7 @@
 import { complete } from '@/lib/ai/model-router';
 import { createClient } from '@supabase/supabase-js';
 import { judgeQuality, QualityScores } from './quality-judge';
+import { validateCoverLetter, logValidation, ValidationResult } from './cover-letter-validator';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -170,7 +171,7 @@ export async function generateCoverLetter(userId: string, jobId: string) {
 }
 
 /**
- * Iterative generation with Quality Judge Loop (Max 3 iterations)
+ * Iterative generation with Validation + Quality Judge Loop (Max 3 iterations)
  */
 export async function generateCoverLetterWithQuality(
     jobId: string,
@@ -178,9 +179,11 @@ export async function generateCoverLetterWithQuality(
 ): Promise<{
     coverLetter: string;
     finalScores: QualityScores;
+    finalValidation: ValidationResult;
     iterations: number;
     iterationLog: Array<{
         iteration: number;
+        validation: ValidationResult;
         scores: QualityScores;
         letterVersion: string;
     }>;
@@ -193,40 +196,69 @@ export async function generateCoverLetterWithQuality(
 
     let coverLetter = "";
     let scores: QualityScores | null = null;
+    let validation: ValidationResult | null = null;
     let iterationLog: any[] = [];
 
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-        // STAGE 1: Generate
+        // STAGE 1: Build feedback prompt
         let feedbackPrompt = "";
+        
+        // Add validation feedback from previous iteration
+        if (iteration > 0 && validation && !validation.isValid) {
+            feedbackPrompt += `\n\n**VALIDATION ERRORS (KRITISCH - MUSS BEHOBEN WERDEN!):**\n${validation.errors.join('\n')}`;
+        }
+        
+        // Add quality feedback from previous iteration
         if (iteration > 0 && scores) {
-            feedbackPrompt = `
-**KRITIK VOM VORHERIGEN VERSUCH:**
-${scores.issues.slice(0, 3).join("\n")}
-
-**VERBESSERUNGSVORSCHLÄGE:**
-${scores.suggestions.slice(0, 3).join("\n")}
-
-Bitte korrigiere diese Punkte in der neuen Version.
-            `;
+            feedbackPrompt += `\n\n**QUALITY FEEDBACK:**\n${scores.issues.slice(0, 3).join('\n')}`;
+            feedbackPrompt += `\n\n**SUGGESTIONS:**\n${scores.suggestions.slice(0, 3).join('\n')}`;
         }
 
+        // STAGE 2: Generate
         const result = await generateCoverLetterCore(context, feedbackPrompt);
         coverLetter = result.text;
 
-        // STAGE 2: Judge
-        const companyValues = context.job.company_research?.company_values || [];
-        scores = await judgeQuality(
-            coverLetter,
-            context.styleExample,
-            companyValues,
-            context.job.description || ""
-        );
+        // STAGE 3: VALIDATE (before expensive Judge call)
+        validation = validateCoverLetter(coverLetter, context.job.company);
+        
+        // Log validation
+        await logValidation(jobId, userId, iteration + 1, validation);
+        
+        console.log(`\n✅ Iteration ${iteration + 1} Validation: ${validation.isValid ? 'PASSED' : 'FAILED'}`);
+        console.log(`   - Errors: ${validation.errors.length}`);
+        console.log(`   - Warnings: ${validation.warnings.length}`);
+        console.log(`   - Stats: ${validation.stats.wordCount} words, ${validation.stats.companyMentions}x company mention`);
 
-        // STAGE 3: Log
-        console.log(`📊 Iteration ${iteration + 1}: Score ${scores.overall_score}/10`);
+        // STAGE 4: JUDGE (only if validation passed)
+        if (validation.isValid) {
+            const companyValues = context.job.company_research?.company_values || [];
+            scores = await judgeQuality(
+                coverLetter,
+                context.styleExample,
+                companyValues,
+                context.job.description || ""
+            );
 
+            console.log(`📊 Iteration ${iteration + 1} Quality Score: ${scores.overall_score}/10`);
+        } else {
+            // Skip judge call if validation failed (saves API costs!)
+            scores = {
+                overall_score: 0,
+                naturalness_score: 0,
+                style_match_score: 0,
+                company_relevance_score: 0,
+                individuality_score: 0,
+                issues: ["Validation failed - skipped quality check"],
+                suggestions: ["Fix validation errors first"]
+            };
+            
+            console.log(`❌ Iteration ${iteration + 1}: Validation failed, skipping quality judge (cost saved!)`);
+        }
+
+        // STAGE 5: Log iteration
         iterationLog.push({
             iteration: iteration + 1,
+            validation: validation,
             scores: scores,
             letterVersion: coverLetter
         });
@@ -245,27 +277,39 @@ Bitte korrigiere diese Punkte in der neuen Version.
                 individuality_score: scores.individuality_score,
                 issues: scores.issues,
                 suggestions: scores.suggestions,
-                generated_text: coverLetter
+                generated_text: coverLetter,
+                validation_passed: validation.isValid,
+                word_count: validation.stats.wordCount
             });
         } catch (e) {
             console.error("Failed to log generation:", e);
         }
 
-        // STAGE 4: Check
-        if (scores.overall_score >= TARGET_SCORE) {
-            console.log(`✅ Quality target reached!`);
+        // STAGE 6: Check success condition
+        if (validation.isValid && scores.overall_score >= TARGET_SCORE) {
+            console.log(`✅ Quality target reached! (Validation: PASSED, Score: ${scores.overall_score}/10)`);
             break;
         }
 
-        // If last iteration, pick best
+        // STAGE 7: Pick best if max iterations reached
         if (iteration === MAX_ITERATIONS - 1) {
-            console.warn(`⚠️ Max iterations reached. Picking best version.`);
-            if (iterationLog.length > 0) {
-                const bestAttempt = iterationLog.reduce((best, current) =>
+            console.warn(`⚠️ Max iterations reached. Picking best valid version.`);
+            
+            // Pick best valid version (or best score if no valid version)
+            const validAttempts = iterationLog.filter(log => log.validation.isValid);
+            
+            if (validAttempts.length > 0) {
+                const bestAttempt = validAttempts.reduce((best, current) =>
                     current.scores.overall_score > best.scores.overall_score ? current : best
                 );
                 coverLetter = bestAttempt.letterVersion;
                 scores = bestAttempt.scores;
+                validation = bestAttempt.validation;
+                console.log(`✅ Picked best valid attempt: Iteration ${bestAttempt.iteration} (Score: ${scores.overall_score}/10)`);
+            } else {
+                // No valid version found - return last attempt with warning
+                console.error("❌ WARNING: No valid cover letter generated after 3 iterations!");
+                console.error("   Returning last attempt despite validation failure.");
             }
         }
     }
@@ -273,6 +317,7 @@ Bitte korrigiere diese Punkte in der neuen Version.
     return {
         coverLetter,
         finalScores: scores!,
+        finalValidation: validation!,
         iterations: iterationLog.length,
         iterationLog
     };
