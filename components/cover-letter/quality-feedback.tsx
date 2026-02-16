@@ -1,13 +1,15 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronUp, CheckCircle2, XCircle, AlertCircle } from "lucide-react"
-import type { QualityScores } from "@/lib/services/quality-judge"
+import { ChevronDown, ChevronUp, CheckCircle2, XCircle, AlertCircle, RefreshCw } from "lucide-react"
+import type { QualityScores } from "./types" // Use local types
 import type { ValidationResult } from "@/lib/services/cover-letter-validator"
 
 interface QualityFeedbackProps {
-    validation: ValidationResult
+    validation?: ValidationResult
     scores: QualityScores
+    iterations?: number
+    showDetails?: boolean
 }
 
 function ScoreCard({ label, score }: { label: string; score: number }) {
@@ -18,22 +20,22 @@ function ScoreCard({ label, score }: { label: string; score: number }) {
     }
 
     return (
-        <div className={`border rounded-lg p-3 ${getColor(score)}`}>
-            <div className="text-xs font-medium mb-1">{label}</div>
-            <div className="text-2xl font-bold">{score}/10</div>
+        <div className={`border rounded-lg p-2 ${getColor(score)}`}>
+            <div className="text-[10px] font-medium mb-0.5 uppercase tracking-wide">{label}</div>
+            <div className="text-lg font-bold">{score}<span className="text-xs font-normal">/10</span></div>
         </div>
     )
 }
 
-export function QualityFeedback({ validation, scores }: QualityFeedbackProps) {
-    const [isExpanded, setIsExpanded] = useState(false)
+export function QualityFeedback({ validation, scores, iterations, showDetails }: QualityFeedbackProps) {
+    const [isExpanded, setIsExpanded] = useState(showDetails || false)
 
     // Overall assessment
-    const isValidationPassed = validation.isValid
+    const isValidationPassed = validation?.isValid ?? true
     const isQualityGood = scores.overall_score >= 8
-    const overallStatus = isValidationPassed && isQualityGood ? "excellent" : 
-                          isValidationPassed && scores.overall_score >= 6 ? "good" : 
-                          isValidationPassed ? "needs_improvement" : "validation_failed"
+    const overallStatus = isValidationPassed && isQualityGood ? "excellent" :
+        isValidationPassed && scores.overall_score >= 6 ? "good" :
+            isValidationPassed ? "needs_improvement" : "validation_failed"
 
     return (
         <div className="space-y-4">
@@ -65,39 +67,53 @@ export function QualityFeedback({ validation, scores }: QualityFeedbackProps) {
                         </>
                     )}
                 </div>
-                <button
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="text-xs text-[#73726E] hover:text-[#37352F] flex items-center gap-1 transition-colors"
-                >
-                    {isExpanded ? (
-                        <><ChevronUp size={14} /> Hide Details</>
-                    ) : (
-                        <><ChevronDown size={14} /> Show Details</>
+
+                <div className="flex items-center gap-3">
+                    {iterations && (
+                        <div className="flex items-center text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                            Iteration {iterations}
+                        </div>
                     )}
-                </button>
+
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="text-xs text-[#73726E] hover:text-[#37352F] flex items-center gap-1 transition-colors"
+                    >
+                        {isExpanded ? (
+                            <><ChevronUp size={14} /> Hide Details</>
+                        ) : (
+                            <><ChevronDown size={14} /> Show Details</>
+                        )}
+                    </button>
+                </div>
             </div>
 
             {/* Validation Status */}
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex items-center gap-2">
-                    {isValidationPassed ? (
-                        <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    ) : (
-                        <XCircle className="w-4 h-4 text-red-600" />
+            {validation && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-2">
+                        {isValidationPassed ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        ) : (
+                            <XCircle className="w-4 h-4 text-red-600" />
+                        )}
+                        <span className="text-sm font-medium">
+                            {isValidationPassed ? 'Validation Passed' : 'Validation Failed'}
+                        </span>
+                    </div>
+                    {validation.stats && (
+                        <div className="flex items-center gap-4 text-xs text-[#73726E]">
+                            <span>{validation.stats.wordCount} words</span>
+                            <span>{validation.stats.companyMentions}x company</span>
+                            <span>{validation.stats.paragraphCount} paragraphs</span>
+                        </div>
                     )}
-                    <span className="text-sm font-medium">
-                        {isValidationPassed ? 'Validation Passed' : 'Validation Failed'}
-                    </span>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-[#73726E]">
-                    <span>{validation.stats.wordCount} words</span>
-                    <span>{validation.stats.companyMentions}x company</span>
-                    <span>{validation.stats.paragraphCount} paragraphs</span>
-                </div>
-            </div>
+            )}
 
             {/* Validation Errors (if any) */}
-            {validation.errors.length > 0 && (
+            {validation?.errors && validation.errors.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                         <XCircle className="w-4 h-4 text-red-600" />
@@ -112,7 +128,7 @@ export function QualityFeedback({ validation, scores }: QualityFeedbackProps) {
             )}
 
             {/* Validation Warnings (if any) */}
-            {validation.warnings.length > 0 && (
+            {validation?.warnings && validation.warnings.length > 0 && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                         <AlertCircle className="w-4 h-4 text-yellow-600" />
@@ -139,7 +155,7 @@ export function QualityFeedback({ validation, scores }: QualityFeedbackProps) {
                     </div>
 
                     {/* Issues (if any) */}
-                    {scores.issues.length > 0 && (
+                    {scores.issues && scores.issues.length > 0 && (
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <h5 className="text-sm font-semibold text-blue-900 mb-2">Issues Detected</h5>
                             <ul className="list-disc pl-5 space-y-1">
@@ -151,7 +167,7 @@ export function QualityFeedback({ validation, scores }: QualityFeedbackProps) {
                     )}
 
                     {/* Suggestions (if any) */}
-                    {scores.suggestions.length > 0 && (
+                    {scores.suggestions && scores.suggestions.length > 0 && (
                         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                             <h5 className="text-sm font-semibold text-purple-900 mb-2">Suggestions</h5>
                             <ul className="list-disc pl-5 space-y-1">

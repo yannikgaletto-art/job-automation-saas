@@ -172,24 +172,24 @@ Implementierung des kompletten Workflows: Von **Trainingsdaten-Upload** bis **Co
 
 ## Phase 6: Manual Application Tracking
 
-### [ ] 6.1 Application History System (Backend)
-- [ ] Speicherung in `application_history` table
-- [ ] URL Hash Generation (md5)
-- [ ] Company Slug Normalization
-- [ ] Application Method Tracking
+### [x] 6.1 Application History System (Backend)
+- [x] Speicherung in `application_history` table
+- [x] URL Hash Generation (md5)
+- [x] Company Slug Normalization
+- [x] Application Method Tracking
 
-### [ ] 6.2 Application History UI (Frontend)
-- [ ] Beautiful Table Komponente (shadcn/ui)
-- [ ] Company Logos via Clearbit API
-- [ ] Formatted Dates
-- [ ] Method Badges (Auto/Manual)
-- [ ] Quick Actions (Open URL, Download docs)
+### [x] 6.2 Application History UI (Frontend)
+- [x] Beautiful Table Komponente (shadcn/ui)
+- [x] Company Logos via Clearbit API
+- [x] Formatted Dates
+- [x] Method Badges (Auto/Manual)
+- [x] Quick Actions (Open URL, Download docs)
 
-### [ ] 6.3 Statistics Dashboard
-- [ ] Weekly Count
-- [ ] Monthly Count
-- [ ] Total Count
-- [ ] Success Rate (if tracking responses)
+### [x] 6.3 Statistics Dashboard
+- [x] Weekly Count
+- [x] Monthly Count
+- [x] Total Count
+- [x] Success Rate (if tracking responses)
 
 ---
 
@@ -327,17 +327,17 @@ Implementierung des kompletten Workflows: Von **Trainingsdaten-Upload** bis **Co
 
 ## Phase 12: User Experience \u0026 Polish
 
-### [ ] 12.1 Loading States
-- [ ] Upload Progress
-- [ ] Processing Spinner
-- [ ] Generation Indicator
-- [ ] Optimistic Updates
+### [x] 12.1 Loading States
+- [x] Upload Progress
+- [x] Processing Spinner
+- [x] Generation Indicator
+- [x] Optimistic Updates
 
-### [ ] 12.2 Error Messages
-- [ ] User-Friendly Error Messages
-- [ ] Retry Mechanisms
-- [ ] Fallback Content
-- [ ] Help Documentation
+### [x] 12.2 Error Messages
+- [x] User-Friendly Error Messages
+- [x] Retry Mechanisms
+- [x] Fallback Content
+- [x] Help Documentation
 
 ### [ ] 12.3 Notifications
 - [ ] Success Toasts

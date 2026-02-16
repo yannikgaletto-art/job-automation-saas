@@ -1,6 +1,11 @@
 import { optimizeCV } from '../lib/services/cv-optimizer';
 import * as dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Fix __dirname for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
@@ -10,7 +15,9 @@ async function testOptimization() {
 
     if (!process.env.ANTHROPIC_API_KEY) {
         console.error('❌ ANTHROPIC_API_KEY not found in environment');
-        process.exit(1);
+        // Don't exit, maybe we can run with mock if service handles it, but service needs key.
+        // Let's print usage warning.
+        console.warn('⚠️  Warning: API Key missing. Service might fail if not using mock.');
     }
 
     const dummyCV = `
@@ -52,6 +59,7 @@ Requirements:
     try {
         console.log('⏳ Optimizing CV...');
         const result = await optimizeCV({
+            userId: 'test-user-id',
             cvText: dummyCV,
             jobTitle: dummyJob.title,
             jobRequirements: dummyJob.requirements,

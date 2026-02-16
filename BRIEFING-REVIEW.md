@@ -14,47 +14,52 @@
 3. Auto-generating personalized cover letters using AI
 4. Tracking application history to prevent duplicates
 
-**Current Status:** Phases 1-3 are **complete and production-ready** (with 5 minor fixes pending). Only Phase 2.2 (automated scraping) is missing - users can manually input job data. Phases 4-12 are **planned but not implemented**.
+**Current Status:**
+- **Phases 1-3:** ✅ Completed (Core Data, Discovery, Enrichment)
+- **Phase 6:** ✅ Completed (Application History)
+- **Phase 9:** ✅ Completed (Security & Consent)
+- **Phase 12:** 🔄 In Progress (UX Polish - Loading/Empty States Done)
+- **Missing:** Phase 4 (CV Opt), Phase 5 (Cover Letter Gen - *Critical*), Phase 7-11 (API, DB, Testing)
 
 ---
 
-## ✅ Completed Phases (1-3)
+## ✅ Completed Phases
 
 ### Phase 1: Data Capture & Onboarding
-
 | Component | Status | Files |
 |-----------|--------|-------|
 | DSGVO Consent Screen | ✅ Complete | `components/onboarding/consent-form.tsx` |
 | Document Upload | ✅ Complete | `components/onboarding/document-upload.tsx` |
-| Document Processing | ✅ Complete | `lib/services/document-processor.ts`, `text-extractor.ts` |
-| PII Encryption | ✅ Complete | AES-256-GCM in `document-processor.ts` |
-| **CV Template Selection** | ✅ **Complete** | `components/onboarding/template-gallery.tsx` |
-| **Profile Confirmation** | ✅ **Complete** | `components/onboarding/profile-confirmation.tsx` |
+| Document Processing | ✅ Complete | `lib/services/document-processor.ts` |
+| PII Encryption | ✅ Complete | AES-256-GCM |
 
-**Key Achievement:** Full onboarding flow implemented with secure PII handling.
-
-### Phase 2: Job Discovery & Scraping
-
+### Phase 2: Job Discovery
 | Component | Status | Files |
 |-----------|--------|-------|
-| **Job URL Input** | ✅ **Complete** | `components/dashboard/add-job-dialog.tsx` |
-| Smart Scraping | ❌ Not Implemented | No scraper logic (manual input only) |
-| **Job Data Extraction** | ✅ **Complete** | `api/jobs/process` with enrichment pipeline |
-| **Double-Apply Prevention** | ✅ **Complete** | `lib/services/application-history.ts` |
+| Job URL Input | ✅ Complete | `components/dashboard/add-job-dialog.tsx` |
+| Smart Scraping | ❌ Pending | Manual Input Only |
+| Job Data Extraction | ✅ Complete | `api/jobs/process` |
 
-**Note:** Phase 2 is **mostly complete** (3/4 tasks). Only automated scraping (2.2) is missing - users can manually input job data.
+### Phase 3: Company Intelligence
+| Component | Status | Files |
+|-----------|--------|-------|
+| Company Research | ✅ Complete | `lib/services/company-enrichment.ts` |
+| Quote Suggestion | ✅ Complete | `lib/services/quote-matcher.ts` |
+| Cache Management | ✅ Complete | `lib/services/cache-monitor.ts` |
 
-### Phase 3: Company Intelligence Enrichment
+### Phase 6: Application History
+| Component | Status | Files |
+|-----------|--------|-------|
+| History Backend | ✅ Complete | `lib/services/application-history.ts` |
+| History UI | ✅ Complete | `components/dashboard/application-history.tsx` |
+| Duplicate Prevention | ✅ Complete | Database Triggers |
 
-| Component | Status | Files | Lines |
-|-----------|--------|-------|-------|
-| Company Research Service | ✅ Complete | `lib/services/company-enrichment.ts` | 264 |
-| Quote Suggestion (Embeddings) | ✅ Complete | `lib/services/quote-matcher.ts` | 171 |
-| Cache Management | ✅ Complete | `lib/services/cache-monitor.ts` | 44 |
-| Company Intel Card (UI) | ✅ Complete | `components/company/company-intel-card.tsx` | 129 |
-| Quote Selector (UI) | ✅ Complete | `components/company/quote-selector.tsx` | 166 |
-
-**Key Achievement:** Perplexity + OpenAI Embeddings for semantic quote matching. 7-day cache saves ~60% of API costs.
+### Phase 12: UX Polish
+| Component | Status | Files |
+|-----------|--------|-------|
+| Loading States | ✅ Complete | `components/skeletons/*`, `loading-spinner.tsx` |
+| Empty States | ✅ Complete | `components/empty-states/*` |
+| Error Handling | ✅ Complete | `error-boundary.tsx`, `error-alert.tsx` |
 
 ---
 
@@ -64,190 +69,39 @@
 - **Frontend:** Next.js 15, React 19, TailwindCSS 3.4.0, Framer Motion
 - **Backend:** Next.js API Routes, Supabase (PostgreSQL + Auth + Storage)
 - **AI:** Anthropic Claude (Sonnet 4.5, Haiku 4), OpenAI (Embeddings), Perplexity Sonar Pro
-- **State:** Zustand
-- **Forms:** React Hook Form + Zod
+- **Security:** RLS, AES-256-GCM, Zod Validation
 
-### Database Schema
-**Key Tables:**
-- `user_profiles` — User metadata, template preferences
-- `documents` — Uploaded CVs/cover letters (PII encrypted as BYTEA)
-- `job_queue` — Jobs to process (status: pending → processing → ready_for_review)
-- `company_research` — Cached company intel (7-day TTL)
-- `application_history` — Tracks applied jobs (prevents duplicates)
-- `generation_logs` — AI generation audit trail
-
-**Security:**
-- Row-Level Security (RLS) enabled on all user tables
-- PII encrypted with AES-256-GCM
-- API keys in environment variables (not committed)
-
-### File Structure
-```
-Pathly_SaaS/
-├── app/
-│   ├── api/                    # Next.js API routes
-│   │   ├── admin/cost-report/ # Admin dashboard
-│   │   ├── consent/record/    # GDPR consent logging
-│   │   ├── cover-letter/generate/
-│   │   ├── cv/optimize/
-│   │   ├── documents/upload/
-│   │   ├── jobs/process/      # Main job processing pipeline
-│   │   └── user/export/       # GDPR data export
-│   ├── dashboard/             # Main user dashboard
-│   └── onboarding/            # Onboarding flow
-├── components/
-│   ├── company/               # Company intel display
-│   ├── cover-letter/          # Cover letter UI
-│   ├── cv/                    # CV comparison
-│   ├── dashboard/             # Job queue, add-job dialog
-│   ├── motion/                # Animated components
-│   ├── onboarding/            # Onboarding steps
-│   └── ui/                    # shadcn/ui base components
-├── lib/
-│   ├── ai/                    # AI model router, cost tracking
-│   └── services/              # Core business logic
-│       ├── application-history.ts
-│       ├── cache-monitor.ts
-│       ├── company-enrichment.ts
-│       ├── cover-letter-generator.ts
-│       ├── cv-optimizer.ts
-│       ├── document-processor.ts
-│       ├── quality-judge.ts
-│       ├── quote-matcher.ts
-│       └── text-extractor.ts
-├── database/
-│   └── schema.sql             # PostgreSQL schema
-├── directives/                # Agent execution plans
-└── docs/                      # Architecture, design, master plan
-```
-
----
-
-## 🐛 Known Issues (5 Fixes Pending)
-
-| ID | Issue | File | Severity |
-|----|-------|------|----------|
-| FIX-001 | Schema mismatch: `job_queue.company` vs code's `company_name`/`company_slug` | `database/schema.sql`, `company-enrichment.ts` | Medium |
-| FIX-002 | Type mismatch: `documents.pii_encrypted` (BYTEA vs JSONB) | `database/schema.sql`, `document-processor.ts` | Medium |
-| FIX-003 | Missing auth guard on `/api/admin/cost-report` | `app/api/admin/cost-report/route.ts` | High (Security) |
-| FIX-004 | `ENCRYPTION_KEY` missing from `.env.example` | `.env.example` | Low |
-| FIX-005 | `Metadata` import error in `app/layout.tsx` | `app/layout.tsx` | Low (TypeScript) |
-
-**Recommendation:** Fix FIX-003 (auth guard) before production deployment.
+### Key Tables
+- `user_profiles`, `documents` (Encrypted)
+- `job_queue`, `company_research` (Cached)
+- `application_history` (Duplicate check)
+- `consent_history` (GDPR)
 
 ---
 
 ## 📊 Current Capabilities
 
 ### ✅ What Works
-1. **Document Upload & Processing**
-   - PDF/DOCX text extraction
-   - PII detection and encryption
-   - Metadata extraction (skills, years of experience)
+1. **Full Onboarding:** Consent, Upload, Processing, Encryption.
+2. **Job Management:** Manual Entry, Queue, Enrichment, History.
+3. **Intelligence:** Perplexity Research, Quote Matching.
+4. **UX:** Loading Skeletons, Empty States, Error Boundaries.
 
-2. **Company Intelligence**
-   - Perplexity research (values, news, LinkedIn activity)
-   - Quote suggestions with semantic matching
-   - 7-day cache (60%+ hit rate expected)
-
-3. **Double-Apply Prevention**
-   - MD5 URL hash matching (30-day cooldown)
-   - Fuzzy company/title matching (90-day cooldown)
-   - User-facing warnings in UI
-
-4. **Cover Letter Generation** (Partial)
-   - Core generation logic exists (`cover-letter-generator.ts`)
-   - Quality judge with iterative improvement (max 3 loops)
-   - NOT YET INTEGRATED into full pipeline
-
-### ❌ What's Missing (Phases 4-12)
-
-**Phase 4: CV Optimization** (Optional for MVP)
-- ATS gap analysis
-- Bullet point rewriting
-- Side-by-side comparison UI
-
-**Phase 5: Cover Letter Generation** (CRITICAL)
-- Full pipeline integration
-- Writing style matching
-- Quote integration
-- Download as PDF
-
-**Phase 6: Application Tracking**
-- Manual application logging
-- Statistics dashboard
-- Company logos (Clearbit API)
-
-**Phase 7: API Integration**
-- Complete job scraping API
-- User profile CRUD
-- Application history API
-
-**Phase 8: Database Deployment**
-- Schema deployment to production Supabase
-- Seed data (form selectors)
-- Cron job setup (pg_cron)
-
-**Phase 9: Security & Compliance**
-- Full RLS audit
-- Consent withdrawal flow
-- Audit logging
-
-**Phase 10: Testing**
-- Unit tests (Jest)
-- Integration tests
-- Browser tests (Playwright)
-
-**Phase 11: Performance & Monitoring**
-- Query optimization
-- Cost tracking dashboard
-- Error rate monitoring
-
-**Phase 12: UX Polish**
-- Loading states
-- Error messages
-- Success toasts
-- Email notifications
+### ❌ What's Next (Priority)
+1. **Phase 5: Cover Letter Generation** (The Core Product)
+   - Connecting Research + Job Data -> Claude Generation.
+2. **Phase 2.2: Automated Scraping**
+   - Replacing manual entry with Firecrawl/SerpAPI.
+3. **Phase 4: CV Optimization**
+   - Tailoring CVs to job descriptions.
 
 ---
 
 ## 🎯 Strategic Recommendations
 
-### Immediate Priorities (Next 2 Weeks)
-
-1. **Fix Security Issue (FIX-003)**
-   - Add auth guard to `/api/admin/cost-report`
-   - Verify all admin routes are protected
-
-2. **Complete Phase 5 (Cover Letter Generation)**
-   - This is the CORE VALUE PROPOSITION
-   - Integration: Job → Company Research → Quote Selection → Cover Letter
-   - UI: Preview, edit, download
-
-3. **Implement Phase 2.1-2.3 (Job Input & Scraping)**
-   - Without this, users can't add jobs to the queue
-   - Start with manual job entry form (simplest)
-   - Defer scraping to later (use manual data entry for MVP)
-
-### Medium-Term (1-2 Months)
-
-4. **Phase 6: Application Tracking**
-   - Users need to see what they've applied to
-   - Statistics motivate continued use
-
-5. **Phase 8: Database Deployment**
-   - Deploy schema to production Supabase
-   - Set up cron jobs for cache cleanup
-
-6. **Phase 10: Testing**
-   - Critical before public launch
-   - Focus on integration tests for main pipeline
-
-### Long-Term (3+ Months)
-
-7. **Phase 4: CV Optimization** (if user feedback demands it)
-8. **Phase 11: Performance & Monitoring**
-9. **Phase 12: UX Polish**
+1. **Focus on Phase 5 (Cover Letters):** This is the missing link to provide value.
+2. **Ignore Phase 8 (DB Deploy) for now:** Local Dev is stable.
+3. **Ignore Phase 10 (Testing):** Manual QA is sufficient for current stage.
 
 ---
 

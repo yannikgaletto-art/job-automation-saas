@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { EmptyResearch } from "@/components/empty-states/empty-research"
 
 interface Quote {
     quote: string
@@ -51,6 +52,26 @@ export function CompanyResearchCard({
         onQuoteSelect(value)
     }
 
+    const hasData = (quotes && quotes.length > 0) || (news && news.length > 0) || (values && values.length > 0)
+
+    if (!hasData) {
+        return (
+            <Card className="border border-[#E7E7E5] shadow-sm bg-[#FAFAF9] overflow-hidden">
+                <CardHeader className="pb-3 bg-white border-b border-[#E7E7E5]">
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg font-semibold text-[#37352F] flex items-center gap-2">
+                            <Building2 className="w-5 h-5 text-[#73726E]" />
+                            Running Research: {companyName}
+                        </CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                    <EmptyResearch />
+                </CardContent>
+            </Card>
+        )
+    }
+
     return (
         <Card className="border border-[#E7E7E5] shadow-sm bg-[#FAFAF9] overflow-hidden">
             <CardHeader className="pb-3 bg-white border-b border-[#E7E7E5]">
@@ -86,51 +107,53 @@ export function CompanyResearchCard({
                 </div>
 
                 {/* 2. Quote Selection */}
-                <div className="px-5 pb-5">
-                    <h4 className="text-sm font-medium text-[#37352F] mb-3 flex items-center gap-2">
-                        <Quote className="w-4 h-4" />
-                        Choose a Quote for your Intro
-                    </h4>
-                    <RadioGroup value={selectedQuote} onValueChange={handleQuoteChange} className="space-y-3">
-                        {quotes.map((quote, idx) => (
-                            <Label
-                                key={idx}
-                                className={cn(
-                                    "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
-                                    selectedQuote === quote.quote
-                                        ? "bg-blue-50 border-blue-200 ring-1 ring-blue-200"
-                                        : "bg-white border-[#E7E7E5] hover:bg-[#F5F5F4]"
-                                )}
-                            >
-                                <RadioGroupItem value={quote.quote} className="mt-1" />
-                                <div className="space-y-1">
-                                    <p className="text-sm text-[#37352F] italic">"{quote.quote}"</p>
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-xs text-[#73726E] font-medium">— {quote.author}</p>
-                                        <span className={cn(
-                                            "text-[10px] px-1.5 py-0.5 rounded font-medium",
-                                            (quote.match_score || 0) > 0.85
-                                                ? "bg-green-100 text-green-700"
-                                                : "bg-gray-100 text-gray-600"
-                                        )}>
-                                            {Math.round((quote.match_score || 0) * 100)}% Match
-                                        </span>
-                                    </div>
-                                    {selectedQuote === quote.quote && (
-                                        <motion.p
-                                            initial={{ opacity: 0, height: 0 }}
-                                            animate={{ opacity: 1, height: 'auto' }}
-                                            className="text-xs text-blue-600 pt-1"
-                                        >
-                                            <Check className="w-3 h-3 inline mr-1" />
-                                            Selected for introduction
-                                        </motion.p>
+                {quotes && quotes.length > 0 && (
+                    <div className="px-5 pb-5">
+                        <h4 className="text-sm font-medium text-[#37352F] mb-3 flex items-center gap-2">
+                            <Quote className="w-4 h-4" />
+                            Choose a Quote for your Intro
+                        </h4>
+                        <RadioGroup value={selectedQuote} onValueChange={handleQuoteChange} className="space-y-3">
+                            {quotes.map((quote, idx) => (
+                                <Label
+                                    key={idx}
+                                    className={cn(
+                                        "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                                        selectedQuote === quote.quote
+                                            ? "bg-blue-50 border-blue-200 ring-1 ring-blue-200"
+                                            : "bg-white border-[#E7E7E5] hover:bg-[#F5F5F4]"
                                     )}
-                                </div>
-                            </Label>
-                        ))}
-                    </RadioGroup>
-                </div>
+                                >
+                                    <RadioGroupItem value={quote.quote} className="mt-1" />
+                                    <div className="space-y-1">
+                                        <p className="text-sm text-[#37352F] italic">"{quote.quote}"</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-xs text-[#73726E] font-medium">— {quote.author}</p>
+                                            <span className={cn(
+                                                "text-[10px] px-1.5 py-0.5 rounded font-medium",
+                                                (quote.match_score || 0) > 0.85
+                                                    ? "bg-green-100 text-green-700"
+                                                    : "bg-gray-100 text-gray-600"
+                                            )}>
+                                                {Math.round((quote.match_score || 0) * 100)}% Match
+                                            </span>
+                                        </div>
+                                        {selectedQuote === quote.quote && (
+                                            <motion.p
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                className="text-xs text-blue-600 pt-1"
+                                            >
+                                                <Check className="w-3 h-3 inline mr-1" />
+                                                Selected for introduction
+                                            </motion.p>
+                                        )}
+                                    </div>
+                                </Label>
+                            ))}
+                        </RadioGroup>
+                    </div>
+                )}
 
                 {/* 3. Deep Dive (Collapsible) */}
                 <div className="border-t border-[#E7E7E5]">
@@ -174,20 +197,22 @@ export function CompanyResearchCard({
                                     )}
 
                                     {/* Recent News */}
-                                    <div>
-                                        <h5 className="text-xs font-semibold text-[#37352F] uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <Newspaper className="w-3 h-3" />
-                                            Recent News
-                                        </h5>
-                                        <ul className="space-y-2">
-                                            {news.map((item, idx) => (
-                                                <li key={idx} className="flex items-start gap-2 text-xs text-[#37352F]">
-                                                    <span className="text-[#A19F9D] mt-0.5">•</span>
-                                                    {item}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
+                                    {news && news.length > 0 && (
+                                        <div>
+                                            <h5 className="text-xs font-semibold text-[#37352F] uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                <Newspaper className="w-3 h-3" />
+                                                Recent News
+                                            </h5>
+                                            <ul className="space-y-2">
+                                                {news.map((item, idx) => (
+                                                    <li key={idx} className="flex items-start gap-2 text-xs text-[#37352F]">
+                                                        <span className="text-[#A19F9D] mt-0.5">•</span>
+                                                        {item}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         )}

@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronRight, FileText, Check, Sparkles, Mail, Eye, Trash2 } from 'lucide-react';
+import { ChevronRight, FileText, Check, Sparkles, Mail, Eye, Trash2 } from 'lucide-react';
 import { ProgressWorkflow } from './progress-workflow';
 import { Button } from '@/components/motion/button';
-import { Badge } from '@/components/motion/badge';
 import { AnimatedMatchScore } from '@/components/motion/count-up';
 import { cn } from '@/lib/utils';
+import { Step4CoverLetter } from './workflow-steps/step-4-cover-letter';
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export interface Job {
     id: string;
@@ -22,27 +23,34 @@ interface JobRowProps {
     job: Job;
     expanded: boolean;
     onToggle: () => void;
+    onOptimize?: (jobId: string) => void;
+    isOptimizing?: boolean;
 }
 
-export function JobRow({ job, expanded, onToggle }: JobRowProps) {
+export function JobRow({ job, expanded, onToggle, onOptimize, isOptimizing }: JobRowProps) {
     const [hovering, setHovering] = useState(false);
 
     // Status-based next action
     const getNextAction = () => {
         switch (job.status) {
             case 'NEW':
-                return { icon: <FileText className="w-4 h-4" />, label: 'View Job', variant: 'outline' as const };
+                return { icon: <FileText className="w-4 h-4" />, label: 'View Job', variant: 'outline' as const, action: undefined };
             case 'JOB_REVIEWED':
-                return { icon: <Check className="w-4 h-4" />, label: 'Check CV Match', variant: 'outline' as const };
+                return { icon: <Check className="w-4 h-4" />, label: 'Check CV Match', variant: 'outline' as const, action: undefined };
             case 'CV_CHECKED':
-                return { icon: <Sparkles className="w-4 h-4" />, label: 'Optimize CV', variant: 'outline' as const };
+                return {
+                    icon: <Sparkles className="w-4 h-4" />,
+                    label: 'Optimize CV',
+                    variant: 'primary' as const, // Highlighted
+                    action: () => onOptimize?.(job.id)
+                };
             case 'CV_OPTIMIZED':
-                return { icon: <Mail className="w-4 h-4" />, label: 'Generate Cover Letter', variant: 'outline' as const };
+                return { icon: <Mail className="w-4 h-4" />, label: 'Generate Cover Letter', variant: 'outline' as const, action: undefined };
             case 'CL_GENERATED':
             case 'READY':
-                return { icon: <Check className="w-4 h-4" />, label: 'Review & Apply', variant: 'primary' as const };
+                return { icon: <Check className="w-4 h-4" />, label: 'Review & Apply', variant: 'primary' as const, action: undefined };
             default:
-                return { icon: <FileText className="w-4 h-4" />, label: 'View Job', variant: 'outline' as const };
+                return { icon: <FileText className="w-4 h-4" />, label: 'View Job', variant: 'outline' as const, action: undefined };
         }
     };
 
@@ -57,7 +65,11 @@ export function JobRow({ job, expanded, onToggle }: JobRowProps) {
             {/* Compact View */}
             <div
                 className="flex items-center gap-2 px-6 py-4 cursor-pointer hover:bg-[#d4e3fe] transition-colors"
-                onClick={onToggle}
+                onClick={(e) => {
+                    // Prevent toggle if clicking button
+                    if ((e.target as HTMLElement).closest('button')) return;
+                    onToggle();
+                }}
             >
                 {/* Expand Icon */}
                 <motion.div
@@ -98,9 +110,21 @@ export function JobRow({ job, expanded, onToggle }: JobRowProps) {
 
                 {/* Next Action */}
                 <div className="w-48 md:w-56">
-                    <Button variant={nextAction.variant} className="w-full text-sm">
-                        {nextAction.icon}
-                        <span className="ml-2">{nextAction.label}</span>
+                    <Button
+                        variant={nextAction.variant}
+                        className="w-full text-sm"
+                        disabled={isOptimizing}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            nextAction.action?.();
+                        }}
+                    >
+                        {isOptimizing ? (
+                            <LoadingSpinner size="sm" className="mr-2" />
+                        ) : (
+                            nextAction.icon
+                        )}
+                        <span className="ml-2">{isOptimizing ? "Optimizing..." : nextAction.label}</span>
                     </Button>
                 </div>
             </div>
@@ -120,7 +144,14 @@ export function JobRow({ job, expanded, onToggle }: JobRowProps) {
                         <Button variant="ghost" className="text-xs px-3 py-1">
                             <Check className="w-3 h-3 mr-1" /> CV
                         </Button>
-                        <Button variant="ghost" className="text-xs px-3 py-1">
+                        <Button
+                            variant="ghost"
+                            className="text-xs px-3 py-1"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOptimize?.(job.id);
+                            }}
+                        >
                             <Sparkles className="w-3 h-3 mr-1" /> Opt.
                         </Button>
                         <Button variant="ghost" className="text-xs px-3 py-1">
@@ -146,11 +177,23 @@ export function JobRow({ job, expanded, onToggle }: JobRowProps) {
                         transition={{ duration: 0.3 }}
                         className="overflow-hidden bg-[#d4e3fe] border-t border-[#d6d6d6]"
                     >
-                        <div className="px-6 py-6 space-y-4">
-                            <div className="text-sm text-[#002e7a] opacity-80">
-                                Workflow Details coming soon... (Step 1: About Job, Step 2: CV Match, etc.)
+                        {job.workflowStep === 4 && (job.status === 'CL_GENERATED' || job.status === 'READY') ? (
+                            <Step4CoverLetter
+                                jobId={job.id}
+                                companyName={job.company}
+                                jobTitle={job.jobTitle}
+                                onComplete={() => {
+                                    // In a real app, this would trigger a refetch or state update
+                                    console.log('✅ Cover letter flow complete')
+                                }}
+                            />
+                        ) : (
+                            <div className="px-6 py-6 space-y-4">
+                                <div className="text-sm text-[#002e7a] opacity-80">
+                                    Workflow Details coming soon... (Step {job.workflowStep})
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>

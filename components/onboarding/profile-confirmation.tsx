@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { saveUserProfile, type ProfileData } from "@/app/actions/onboarding"
+import { FormSkeleton } from "@/components/skeletons/form-skeleton"
 
 // Schema
 const profileSchema = z.object({
@@ -48,18 +49,26 @@ export function ProfileConfirmation({ userId, onComplete }: ProfileConfirmationP
         },
     })
 
+    const [isLoading, setIsLoading] = useState(true)
+
     // Mock Data Retrieval
     useEffect(() => {
-        const mockData = {
-            firstName: "Alex",
-            lastName: "Moran",
-            email: "alex.moran@example.com",
-            phone: "+1 (555) 123-4567",
-            address: "San Francisco, CA",
-            skills: "React, Next.js, TypeScript, Node.js",
-            experienceYears: 5,
-        }
-        form.reset(mockData)
+        // Simulate network delay
+        const timer = setTimeout(() => {
+            const mockData = {
+                firstName: "Alex",
+                lastName: "Moran",
+                email: "alex.moran@example.com",
+                phone: "+1 (555) 123-4567",
+                address: "San Francisco, CA",
+                skills: "React, Next.js, TypeScript, Node.js",
+                experienceYears: 5,
+            }
+            form.reset(mockData)
+            setIsLoading(false)
+        }, 1000)
+
+        return () => clearTimeout(timer)
     }, [form])
 
     // Submit handler
@@ -104,81 +113,85 @@ export function ProfileConfirmation({ userId, onComplete }: ProfileConfirmationP
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        {isLoading ? (
+                            <FormSkeleton fields={6} />
+                        ) : (
+                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                                {/* ... form fields ... */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="firstName">First Name</Label>
+                                        <Input id="firstName" {...form.register("firstName")} />
+                                        {form.formState.errors.firstName && (
+                                            <p className="text-sm text-red-500">{form.formState.errors.firstName.message}</p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="lastName">Last Name</Label>
+                                        <Input id="lastName" {...form.register("lastName")} />
+                                        {form.formState.errors.lastName && (
+                                            <p className="text-sm text-red-500">{form.formState.errors.lastName.message}</p>
+                                        )}
+                                    </div>
+                                </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email">Email</Label>
+                                        <Input id="email" type="email" {...form.register("email")} />
+                                        {form.formState.errors.email && (
+                                            <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phone">Phone</Label>
+                                        <Input id="phone" type="tel" {...form.register("phone")} />
+                                        {form.formState.errors.phone && (
+                                            <p className="text-sm text-red-500">{form.formState.errors.phone.message}</p>
+                                        )}
+                                    </div>
+                                </div>
+
                                 <div className="space-y-2">
-                                    <Label htmlFor="firstName">First Name</Label>
-                                    <Input id="firstName" {...form.register("firstName")} />
-                                    {form.formState.errors.firstName && (
-                                        <p className="text-sm text-red-500">{form.formState.errors.firstName.message}</p>
+                                    <Label htmlFor="address">Address (Optional)</Label>
+                                    <Input id="address" {...form.register("address")} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="skills">Top Skills (Comma separated)</Label>
+                                    <Input id="skills" {...form.register("skills")} />
+                                    {form.formState.errors.skills && (
+                                        <p className="text-sm text-red-500">{form.formState.errors.skills.message}</p>
                                     )}
                                 </div>
+
                                 <div className="space-y-2">
-                                    <Label htmlFor="lastName">Last Name</Label>
-                                    <Input id="lastName" {...form.register("lastName")} />
-                                    {form.formState.errors.lastName && (
-                                        <p className="text-sm text-red-500">{form.formState.errors.lastName.message}</p>
+                                    <Label htmlFor="experienceYears">Years of Experience</Label>
+                                    <Input id="experienceYears" type="number" min="0" {...form.register("experienceYears")} />
+                                    {form.formState.errors.experienceYears && (
+                                        <p className="text-sm text-red-500">{form.formState.errors.experienceYears.message}</p>
                                     )}
                                 </div>
-                            </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Email</Label>
-                                    <Input id="email" type="email" {...form.register("email")} />
-                                    {form.formState.errors.email && (
-                                        <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="phone">Phone</Label>
-                                    <Input id="phone" type="tel" {...form.register("phone")} />
-                                    {form.formState.errors.phone && (
-                                        <p className="text-sm text-red-500">{form.formState.errors.phone.message}</p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="address">Address (Optional)</Label>
-                                <Input id="address" {...form.register("address")} />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="skills">Top Skills (Comma separated)</Label>
-                                <Input id="skills" {...form.register("skills")} />
-                                {form.formState.errors.skills && (
-                                    <p className="text-sm text-red-500">{form.formState.errors.skills.message}</p>
+                                {error && (
+                                    <div className="p-3 bg-red-100 text-red-700 rounded-md text-sm">
+                                        {error}
+                                    </div>
                                 )}
-                            </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="experienceYears">Years of Experience</Label>
-                                <Input id="experienceYears" type="number" min="0" {...form.register("experienceYears")} />
-                                {form.formState.errors.experienceYears && (
-                                    <p className="text-sm text-red-500">{form.formState.errors.experienceYears.message}</p>
-                                )}
-                            </div>
+                                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                                    {isSubmitting ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        "Save & Continue"
+                                    )}
+                                </Button>
 
-                            {error && (
-                                <div className="p-3 bg-red-100 text-red-700 rounded-md text-sm">
-                                    {error}
-                                </div>
-                            )}
-
-                            <Button type="submit" className="w-full" disabled={isSubmitting}>
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    "Save & Continue"
-                                )}
-                            </Button>
-
-                        </form>
+                            </form>
+                        )}
                     </CardContent>
                 </Card>
             </motion.div>

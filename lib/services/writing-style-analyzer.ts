@@ -13,7 +13,7 @@ export interface StyleAnalysis {
 
 /**
  * Analyze writing style from cover letter text
- * Uses Claude Haiku for fast, cheap extraction (~$0.0004 per analysis)
+ * Uses Claude Haiku for fast, cheap extraction
  */
 export async function analyzeWritingStyle(
     coverLetterText: string
@@ -21,13 +21,18 @@ export async function analyzeWritingStyle(
     // Edge case: Text too short
     if (coverLetterText.length < 100) {
         console.warn('⚠️ Cover letter too short for style analysis (<100 chars)');
-        return getDefaultStyle();
+        return getDefaultStyleAnalysis();
     }
 
     // Only analyze first 2000 chars (cover letters are ~250-350 words = ~1500 chars)
     const textToAnalyze = coverLetterText.slice(0, 2000);
 
     try {
+        if (!process.env.ANTHROPIC_API_KEY) {
+            console.warn('⚠️ No Anthropic API Key found. Using default style.');
+            return getDefaultStyleAnalysis();
+        }
+
         const message = await anthropic.messages.create({
             model: 'claude-3-haiku-20240307',
             max_tokens: 512,
@@ -36,33 +41,30 @@ export async function analyzeWritingStyle(
 Return ONLY valid JSON with these 4 keys:
 - tone: "professional" | "enthusiastic" | "technical" | "conversational"
 - sentence_length: "short" | "medium" | "long"
-- conjunctions: array of top 5 conjunctions/transition words used (German: Daher, Deshalb, Zudem, etc. or English: Therefore, Thus, Moreover, etc.)
-- greeting: the exact greeting used (e.g., "Sehr geehrte Damen und Herren" or "Dear Hiring Manager")
-
-Analyze the natural writing patterns, not what would be ideal.`,
+- conjunctions: array of top 5 conjunctions used (German: Daher, Deshalb, etc.)
+- greeting: the exact greeting used (e.g., "Sehr geehrte Damen und Herren")`,
             messages: [{
                 role: 'user',
-                content: `Analyze the writing style of this cover letter and return only JSON:
+                content: `Analyze the writing style of this cover letter:
 
 ${textToAnalyze}
 
-Return JSON with exactly these keys: tone, sentence_length, conjunctions (array), greeting`
+Return JSON with: tone, sentence_length, conjunctions, greeting`
             }]
         });
 
-        // Parse JSON response
+        // Parse JSON response safely
         const contentBlock = message.content[0];
         if (contentBlock.type === 'text') {
-            // Try to extract JSON from response
             const jsonMatch = contentBlock.text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 const analysis = JSON.parse(jsonMatch[0]);
-                
-                // Validate structure
-                if (analysis.tone && analysis.sentence_length && 
+
+                // Validate structure (basic check)
+                if (analysis.tone && analysis.sentence_length &&
                     Array.isArray(analysis.conjunctions) && analysis.greeting) {
-                    
-                    console.log(`📊 Style analysis: ${analysis.tone}, ${analysis.sentence_length} sentences, ${analysis.conjunctions.length} conjunctions`);
+
+                    console.log(`📊 Style analysis: ${analysis.tone}, ${analysis.sentence_length} sentences`);
                     return analysis as StyleAnalysis;
                 }
             }
@@ -72,25 +74,18 @@ Return JSON with exactly these keys: tone, sentence_length, conjunctions (array)
 
     } catch (error) {
         console.error('❌ Style analysis failed:', error);
-        return getDefaultStyle();
+        return getDefaultStyleAnalysis();
     }
 }
 
 /**
- * Fallback style if analysis fails or API is unavailable
+ * Fallback style if analysis fails
  */
-function getDefaultStyle(): StyleAnalysis {
+export function getDefaultStyleAnalysis(): StyleAnalysis {
     return {
         tone: 'professional',
         sentence_length: 'medium',
         conjunctions: ['Daher', 'Deshalb', 'Zudem', 'Außerdem', 'Gleichzeitig'],
         greeting: 'Sehr geehrte Damen und Herren'
     };
-}
-
-/**
- * Get default style (exported for use in other services)
- */
-export function getDefaultStyleAnalysis(): StyleAnalysis {
-    return getDefaultStyle();
 }

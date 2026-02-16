@@ -20,6 +20,19 @@ export interface DuplicateCheckResult {
     }
 }
 
+export interface TrackApplicationParams {
+    userId: string
+    jobUrl: string
+    companyName: string
+    companySlug?: string
+    jobTitle: string
+    applicationMethod: "auto" | "manual" | "extension"
+    generatedDocuments?: {
+        cv_url?: string
+        cover_letter_url?: string
+    }
+}
+
 /**
  * Checks if a user has already applied to a job.
  * 
@@ -124,4 +137,64 @@ export async function checkDuplicateApplication(
     }
 
     return { isDuplicate: false }
+}
+
+/**
+ * Tracks a new job application in the history.
+ * Handles MD5 hashing and duplicate errors.
+ */
+export async function trackApplication(
+    params: TrackApplicationParams
+): Promise<{ success: boolean; error?: string; duplicate?: DuplicateCheckResult }> {
+    const { userId, jobUrl, companyName, companySlug, jobTitle, applicationMethod, generatedDocuments } = params
+
+    try {
+        console.log(`💾 Tracking application for ${companyName} (${jobTitle})...`)
+
+        // 1. Generate clean/normalized data
+        // MD5 hash matches schema generation (though schema has GENERATED ALWAYS, we assume we might need it for checks? 
+        // Actually schema handles url_hash generation, so we just insert job_url. 
+        // But for unique constraint violation check we trust the DB.)
+
+        // 2. Insert into DB
+        const { data, error } = await supabase
+            .from("application_history")
+            .insert({
+                user_id: userId,
+                job_url: jobUrl,
+                company_name: companyName,
+                company_slug: companySlug || companyName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+                job_title: jobTitle,
+                application_method: applicationMethod,
+                cv_url: generatedDocuments?.cv_url,
+                cover_letter_url: generatedDocuments?.cover_letter_url
+            })
+            .select()
+            .single()
+
+        if (error) {
+            // Handle unique constraint (Duplicate) OR Trigger Exception (P0001)
+            if (error.code === '23505' || error.code === 'P0001') {
+                console.warn(`⚠️ Duplicate application prevented: ${companyName}`)
+                return {
+                    success: false,
+                    error: "Duplicate application",
+                    duplicate: {
+                        isDuplicate: true,
+                        reason: "exact_url",
+                        lastAppliedAt: new Date(), // We don't have the old date here easily without query
+                        cooldownDaysRemaining: 30
+                    }
+                }
+            }
+            throw error
+        }
+
+        console.log("✅ Application tracked successfully.")
+        return { success: true }
+
+    } catch (err: any) {
+        console.error("❌ Error tracking application:", err)
+        return { success: false, error: err.message || "Failed to track application" }
+    }
 }

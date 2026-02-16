@@ -1,265 +1,167 @@
-<<<<<<< HEAD
 "use client";
 
-import { useState } from 'react';
-import { Shield, Lock, Eye, Download } from 'lucide-react';
+import { Shield, Lock, Eye, Download, FileText, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/motion/badge';
 import { Button } from '@/components/motion/button';
-
-export default function SecurityPage() {
-    return (
-        <div className="space-y-8">
-            {/* Header */}
-            <div>
-                <h1 className="text-3xl font-semibold text-[#37352F] flex items-center gap-3">
-                    <Shield className="w-8 h-8 text-[#0066FF]" />
-                    Security & Privacy
-                </h1>
-                <p className="text-[#73726E] mt-1">DSGVO & NIS2 compliant data management</p>
-            </div>
-
-            {/* Compliance Status */}
-            <div className="bg-white rounded-lg border border-[#E7E7E5] p-6">
-                <h2 className="text-xl font-semibold text-[#37352F] mb-4">Compliance Status</h2>
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[#37352F]">DSGVO (GDPR)</span>
-                        <Badge variant="success">✓ Compliant</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <span className="text-[#37352F]">NIS2</span>
-                        <Badge variant="success">✓ Compliant</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <span className="text-[#37352F]">Data Encryption</span>
-                        <Badge variant="success">✓ Active</Badge>
-                    </div>
-                </div>
-            </div>
-
-            {/* Data Rights */}
-            <div className="bg-white rounded-lg border border-[#E7E7E5] p-6">
-                <h2 className="text-xl font-semibold text-[#37352F] mb-4">Your Data Rights</h2>
-                <div className="space-y-4">
-                    <div className="flex items-start gap-4">
-                        <Eye className="w-5 h-5 text-[#0066FF] mt-1" />
-                        <div className="flex-1">
-                            <h3 className="font-medium text-[#37352F]">Right to Access</h3>
-                            <p className="text-sm text-[#73726E] mt-1">View all your stored data</p>
-                            <Button variant="outline" className="mt-2">
-                                <Download className="w-4 h-4 mr-2" />
-                                Export My Data
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div className="flex items-start gap-4">
-                        <Lock className="w-5 h-5 text-[#0066FF] mt-1" />
-                        <div className="flex-1">
-                            <h3 className="font-medium text-[#37352F]">Data Retention</h3>
-                            <p className="text-sm text-[#73726E] mt-1">
-                                Your data is automatically deleted 90 days after account closure.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Consent History */}
-            <div className="bg-white rounded-lg border border-[#E7E7E5] p-6">
-                <h2 className="text-xl font-semibold text-[#37352F] mb-4">Consent History</h2>
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between py-2">
-                        <span className="text-[#37352F]">Privacy Policy (v1.0)</span>
-                        <span className="text-sm text-[#73726E]">Accepted</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                        <span className="text-[#37352F]">Terms of Service (v1.0)</span>
-                        <span className="text-sm text-[#73726E]">Accepted</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                        <span className="text-[#37352F]">AI Processing</span>
-                        <span className="text-sm text-[#73726E]">Accepted</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-=======
-'use client'
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Shield, Lock, FileText, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function SecurityPage() {
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <Shield className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">Data Security & Compliance</h1>
+    <div className="space-y-8 max-w-5xl mx-auto">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-semibold text-[#37352F] flex items-center gap-3">
+          <Shield className="w-8 h-8 text-[#0066FF]" />
+          Security & Privacy
+        </h1>
+        <p className="text-[#73726E] mt-1">DSGVO & NIS2 compliant data management. Your privacy is our top priority.</p>
+      </div>
+
+      {/* Compliance Status Grid */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* DSGVO Compliance */}
+        <div className="bg-white rounded-lg border border-[#E7E7E5] p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-[#37352F]" />
+              <h2 className="text-xl font-semibold text-[#37352F]">DSGVO Compliance</h2>
+            </div>
+            <Badge variant="success">✓ Compliant</Badge>
           </div>
-          <p className="text-muted-foreground">
-            Your data privacy and security is our top priority. We comply with DSGVO and NIS2 regulations.
-          </p>
+
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="font-medium text-[#37352F]">Data Encryption at Rest</div>
+                <div className="text-sm text-[#73726E]">All data encrypted using AES-256</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="font-medium text-[#37352F]">PII Pseudonymization</div>
+                <div className="text-sm text-[#73726E]">Personal data is separated and secured</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="font-medium text-[#37352F]">Right to Deletion</div>
+                <div className="text-sm text-[#73726E]">Request full data wipe anytime</div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* DSGVO Compliance */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="h-5 w-5" />
-                  DSGVO Compliance
-                </CardTitle>
-                <CardDescription>
-                  General Data Protection Regulation (EU)
-                </CardDescription>
-              </div>
-              <Badge variant="success" className="bg-green-100 text-green-800 border-green-200">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Compliant
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="font-medium">Data Encryption at Rest</div>
-                <div className="text-sm text-muted-foreground">
-                  All data is encrypted using AES-256 encryption
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="font-medium">PII Pseudonymization</div>
-                <div className="text-sm text-muted-foreground">
-                  Personal identifiable information is pseudonymized
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="font-medium">Right to Deletion</div>
-                <div className="text-sm text-muted-foreground">
-                  You can request deletion of your data at any time
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="font-medium">Data Processing Agreement</div>
-                <div className="text-sm text-muted-foreground">
-                  Available for review and download
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* NIS2 Directive */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  NIS2 Directive
-                </CardTitle>
-                <CardDescription>
-                  Network and Information Security Directive (EU)
-                </CardDescription>
-              </div>
-              <Badge variant="success" className="bg-green-100 text-green-800 border-green-200">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Compliant
-              </Badge>
+        <div className="bg-white rounded-lg border border-[#E7E7E5] p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-[#37352F]" />
+              <h2 className="text-xl font-semibold text-[#37352F]">NIS2 Directive</h2>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="font-medium">Incident Reporting</div>
-                <div className="text-sm text-muted-foreground">
-                  Security incidents reported within 24 hours
-                </div>
-              </div>
-            </div>
+            <Badge variant="success">✓ Compliant</Badge>
+          </div>
 
+          <div className="space-y-4">
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
               <div>
-                <div className="font-medium">Security Measures Documentation</div>
-                <div className="text-sm text-muted-foreground">
-                  All security measures are documented and auditable
-                </div>
+                <div className="font-medium text-[#37352F]">Incident Reporting</div>
+                <div className="text-sm text-[#73726E]">Security incidents reported within 24h</div>
               </div>
             </div>
-
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
               <div>
-                <div className="font-medium">Supply Chain Risk Assessment</div>
-                <div className="text-sm text-muted-foreground">
-                  Regular assessment of third-party service providers
-                </div>
+                <div className="font-medium text-[#37352F]">Audit Trails</div>
+                <div className="text-sm text-[#73726E]">All security actions are logged</div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="font-medium text-[#37352F]">Supply Chain Security</div>
+                <div className="text-sm text-[#73726E]">Regular 3rd-party vendor assessments</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        {/* Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Data Rights</CardTitle>
-            <CardDescription>
-              Manage your data and privacy settings
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button variant="outline" className="w-full justify-start">
+      {/* Data Rights & Consent */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Your Data Rights */}
+        <div className="bg-white rounded-lg border border-[#E7E7E5] p-6 flex flex-col">
+          <h2 className="text-xl font-semibold text-[#37352F] mb-4">Your Data Rights</h2>
+          <div className="space-y-3 flex-1">
+            <Button variant="outline" className="w-full justify-start h-auto py-3">
               <FileText className="h-4 w-4 mr-2" />
-              View Privacy Policy
+              <div className="text-left">
+                <span className="block font-medium">View Privacy Policy</span>
+                <span className="text-xs text-[#73726E]">Read full terms (v1.0)</span>
+              </div>
             </Button>
-            <Button variant="outline" className="w-full justify-start">
-              <FileText className="h-4 w-4 mr-2" />
-              Download Data Processing Agreement
+            <Button variant="outline" className="w-full justify-start h-auto py-3">
+              <Download className="h-4 w-4 mr-2" />
+              <div className="text-left">
+                <span className="block font-medium">Export My Data</span>
+                <span className="text-xs text-[#73726E]">Download all stored information</span>
+              </div>
             </Button>
-            <Button variant="outline" className="w-full justify-start text-destructive hover:text-destructive">
+            <Button variant="outline" className="w-full justify-start h-auto py-3 text-red-600 hover:text-red-700 hover:bg-red-50">
               <Trash2 className="h-4 w-4 mr-2" />
-              Request Data Deletion
+              <div className="text-left">
+                <span className="block font-medium">Delete Account</span>
+                <span className="text-xs opacity-80">Permanent removal of all data</span>
+              </div>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Contact */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground text-center">
-              Questions about data security? Contact our Data Protection Officer at{' '}
-              <a href="mailto:dpo@job-automation-saas.com" className="text-primary hover:underline">
-                dpo@job-automation-saas.com
-              </a>
+        {/* Consent History */}
+        <div className="bg-white rounded-lg border border-[#E7E7E5] p-6">
+          <h2 className="text-xl font-semibold text-[#37352F] mb-4">Consent History</h2>
+          <div className="space-y-0 divide-y divide-[#E7E7E5]">
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <span className="block text-[#37352F] font-medium">Privacy Policy</span>
+                <span className="text-xs text-[#73726E]">Version 1.0</span>
+              </div>
+              <span className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded">Accepted</span>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <span className="block text-[#37352F] font-medium">Terms of Service</span>
+                <span className="text-xs text-[#73726E]">Version 1.0</span>
+              </div>
+              <span className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded">Accepted</span>
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <span className="block text-[#37352F] font-medium">AI Processing Processing</span>
+                <span className="text-xs text-[#73726E]">Clause 4.2</span>
+              </div>
+              <span className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded">Accepted</span>
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <span className="block text-[#37352F] font-medium">Cookie Consent</span>
+                <span className="text-xs text-[#73726E]">Essential only</span>
+              </div>
+              <span className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded">Accepted</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-center text-sm text-[#73726E] pt-4">
+        Questions about data security? Contact our Data Protection Officer at{' '}
+        <a href="mailto:dpo@job-automation-saas.com" className="text-[#0066FF] hover:underline">
+          dpo@job-automation-saas.com
+        </a>
       </div>
     </div>
-  )
+  );
 }
->>>>>>> f23849bea9b2b6e55c04635c07d74784a1ebff92

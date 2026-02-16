@@ -34,7 +34,7 @@ export function CoverLetterPreview({
                 </div>
                 <button
                     onClick={() => setIsFormatted(!isFormatted)}
-                    className="text-xs text-[#73726E] hover:text-[#37352F] flex items-center gap-1 transition-colors"
+                    className="text-xs text-[#73726E] hover:text-[#37352F] flex items-center gap-1"
                 >
                     {isFormatted ? (
                         <><Eye size={14} /> Formatted</>
@@ -47,7 +47,7 @@ export function CoverLetterPreview({
             {/* Content */}
             <div className="bg-white rounded-lg border border-[#E7E7E5] p-6 shadow-sm">
                 {isFormatted ? (
-                    <div className="space-y-4 text-sm text-[#37352F] leading-relaxed">
+                    <div className="space-y-4 text-sm text-[#37352F] leading-relaxed font-serif">
                         {paragraphs.map((paragraph, idx) => (
                             <p key={idx} className="text-justify">
                                 {paragraph}
@@ -55,7 +55,7 @@ export function CoverLetterPreview({
                         ))}
                     </div>
                 ) : (
-                    <pre className="text-xs text-[#73726E] whitespace-pre-wrap font-mono">
+                    <pre className="text-xs text-[#73726E] whitespace-pre-wrap font-mono overflow-x-auto">
                         {coverLetter}
                     </pre>
                 )}

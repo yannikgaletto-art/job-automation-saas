@@ -41,7 +41,7 @@ export function CoverLetterActions({
     }
 
     return (
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
             {/* Regenerate */}
             <Button
                 variant="outline"
@@ -63,7 +63,7 @@ export function CoverLetterActions({
                 className="text-sm"
             >
                 {copied ? (
-                    <><Check className="w-4 h-4 text-green-600" /> <span className="ml-2">Copied!</span></>
+                    <><Check className="w-4 h-4 text-green-600" /> <span className="ml-2 text-green-600">Copied!</span></>
                 ) : (
                     <><Copy className="w-4 h-4" /> <span className="ml-2">Copy</span></>
                 )}

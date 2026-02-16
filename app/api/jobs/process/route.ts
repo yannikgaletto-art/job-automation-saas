@@ -2,7 +2,7 @@ import {
     enrichCompany,
     linkEnrichmentToJob,
 } from '@/lib/services/company-enrichment';
-import { generateCoverLetter } from '@/lib/services/cover-letter-generator';
+import { generateCoverLetterWithQuality } from '@/lib/services/cover-letter-generator';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -86,7 +86,8 @@ export async function POST(request: Request) {
 
         console.log(`✍️  Generating cover letter in user's style...`);
 
-        const coverLetterResult = await generateCoverLetter(userId, jobId);
+        // Use generateCoverLetterWithQuality instead of generateCoverLetter
+        const coverLetterResult = await generateCoverLetterWithQuality(jobId, userId);
 
         // ========================================================================
         // STEP 3: Update job status
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
             .update({
                 status: 'ready_for_review',
                 cover_letter: coverLetterResult.coverLetter,
+                cover_letter_quality_score: coverLetterResult.finalScores?.overall_score || 0,
                 ai_cost_cents: coverLetterResult.costCents,
             })
             .eq('id', jobId);

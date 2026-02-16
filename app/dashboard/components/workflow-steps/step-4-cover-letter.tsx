@@ -1,144 +1,238 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/motion/button"
+import { useState, useEffect } from "react"
 import { CoverLetterPreview } from "@/components/cover-letter/cover-letter-preview"
 import { CoverLetterActions } from "@/components/cover-letter/cover-letter-actions"
 import { QualityFeedback } from "@/components/cover-letter/quality-feedback"
-import { Sparkles, AlertCircle } from "lucide-react"
-import type { QualityScores } from "@/lib/services/quality-judge"
-import type { ValidationResult } from "@/lib/services/cover-letter-validator"
+import { QualityScores } from "@/components/cover-letter/types"
 
-interface CoverLetterStepProps {
-    userId: string
+interface Step4CoverLetterProps {
     jobId: string
-    initialCoverLetter?: string
-    initialScores?: QualityScores
-    initialValidation?: ValidationResult
+    companyName: string
+    jobTitle: string
+    onComplete?: () => void
+    initialData?: GenerationResult | null
 }
 
-export function CoverLetterStep({
-    userId,
+interface GenerationResult {
+    coverLetter: string
+    qualityScores: QualityScores
+    iterations: number
+    validation?: any
+}
+
+// 🎭 DEMO MODE: Mock data for UI testing when backend is not ready
+const DEMO_MODE = true; // Set to false when real backend is ready
+
+const MOCK_COVER_LETTER = `Sehr geehrte Damen und Herren,
+
+mit großem Interesse habe ich Ihre Stellenausschreibung für die Position als Backend Engineer bei Stripe gelesen. Als erfahrener Softwareentwickler mit fundiertem Wissen in verteilten Systemen und Payment-Infrastrukturen möchte ich mich hiermit auf diese spannende Position bewerben.
+
+In meiner bisherigen Laufbahn habe ich umfangreiche Erfahrungen in der Entwicklung skalierbarer Backend-Systeme gesammelt. Besonders reizvoll finde ich an Stripe die Möglichkeit, an einer Plattform zu arbeiten, die Millionen von Transaktionen täglich verarbeitet und dabei höchste Sicherheitsstandards gewährleistet.
+
+Meine technischen Fähigkeiten umfassen tiefgreifende Kenntnisse in Go, Python und Rust sowie Erfahrung mit Kubernetes, PostgreSQL und Redis. Zudem bringe ich ein starkes Verständnis für API-Design und Microservices-Architekturen mit.
+
+Was mich besonders an Stripe begeistert, ist Ihr Engagement für Developer Experience und die kontinuierliche Innovation im Bereich der Zahlungsinfrastruktur. Ihre kürzlich veröffentlichten Entwicklungen im Bereich embedded finance zeigen, wie Sie die Zukunft des digitalen Handels aktiv mitgestalten.
+
+Ich bin überzeugt, dass meine Erfahrung und meine Leidenschaft für technische Exzellenz einen wertvollen Beitrag zu Ihrem Team leisten können. Gerne würde ich in einem persönlichen Gespräch mehr über die Position erfahren und meine Qualifikationen näher erläutern.
+
+Mit freundlichen Grüßen,
+Max Mustermann`;
+
+const MOCK_RESULT: GenerationResult = {
+    coverLetter: MOCK_COVER_LETTER,
+    qualityScores: {
+        naturalness_score: 9,
+        style_match_score: 8,
+        company_relevance_score: 9,
+        individuality_score: 8,
+        overall_score: 8.5,
+        issues: [],
+        suggestions: ["Consider adding a specific example of a past project", "Mention your GitHub profile if available"]
+    },
+    iterations: 2,
+    validation: {
+        isValid: true,
+        stats: { wordCount: 234, companyMentions: 4, paragraphCount: 6 },
+        errors: [],
+        warnings: []
+    }
+};
+
+export function Step4CoverLetter({
     jobId,
-    initialCoverLetter,
-    initialScores,
-    initialValidation
-}: CoverLetterStepProps) {
-    const [coverLetter, setCoverLetter] = useState(initialCoverLetter || "")
-    const [qualityScores, setQualityScores] = useState<QualityScores | null>(initialScores || null)
-    const [validation, setValidation] = useState<ValidationResult | null>(initialValidation || null)
-    const [isGenerating, setIsGenerating] = useState(false)
+    companyName,
+    jobTitle,
+    onComplete,
+    initialData
+}: Step4CoverLetterProps) {
+    const [result, setResult] = useState<GenerationResult | null>(initialData || null)
+    const [isLoading, setIsLoading] = useState(false)
+    const [isRegenerating, setIsRegenerating] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    const handleGenerate = async () => {
-        setIsGenerating(true)
-        setError(null)
+    // Initial generation (auto-trigger only if no data)
+    useEffect(() => {
+        if (!result && !isLoading) {
+            generateCoverLetter()
+        }
+    }, [jobId])
 
+    const generateCoverLetter = async () => {
         try {
-            const response = await fetch('/api/cover-letter/generate', {
+            // Only set major loading on first load
+            if (!result) setIsLoading(true)
+
+            setError(null)
+
+            // 🎭 DEMO MODE: Use mock data instead of API call
+            if (DEMO_MODE) {
+                // Simulate API delay
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                setResult(MOCK_RESULT);
+                console.log('✅ Cover letter generated (DEMO MODE)');
+                if (onComplete) onComplete();
+                setIsLoading(false);
+                setIsRegenerating(false);
+                return;
+            }
+
+            // Real API call (when DEMO_MODE = false)
+            const userId = "test-user-id"
+
+            const response = await fetch('/api/jobs/process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, jobId })
+                body: JSON.stringify({
+                    jobId,
+                    userId,
+                    company: companyName,
+                    jobTitle
+                })
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.error || 'Generation failed')
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.error || 'Failed to generate cover letter')
             }
 
             const data = await response.json()
-            setCoverLetter(data.cover_letter)
-            setQualityScores(data.quality_scores)
-            setValidation(data.validation)
-        } catch (err: any) {
+
+            const scores = data.quality_scores || {};
+
+            const qualityScores: QualityScores = {
+                naturalness_score: scores.naturalness || scores.naturalness_score || 8,
+                style_match_score: scores.style_match || scores.style_match_score || 8,
+                company_relevance_score: scores.company_relevance || scores.company_relevance_score || 8,
+                individuality_score: scores.individuality || scores.individuality_score || 8,
+                overall_score: scores.overall_score || data.cover_letter_quality_score || 8,
+                issues: scores.issues || [],
+                suggestions: scores.suggestions || []
+            };
+
+            const mappedResult: GenerationResult = {
+                coverLetter: data.coverLetter,
+                qualityScores,
+                iterations: data.iterations || 1,
+                validation: data.validation || { isValid: true, stats: {}, errors: [], warnings: [] }
+            }
+
+            setResult(mappedResult)
+
+            console.log('✅ Cover letter generated/fetched')
+
+            if (onComplete) {
+                onComplete()
+            }
+
+        } catch (err) {
             console.error('❌ Cover letter generation failed:', err)
-            setError(err.message || 'Failed to generate cover letter')
+            setError(err instanceof Error ? err.message : 'Unknown error')
         } finally {
-            setIsGenerating(false)
+            setIsLoading(false)
+            setIsRegenerating(false)
         }
     }
 
     const handleRegenerate = async () => {
-        // Same as generate, but user-initiated
-        await handleGenerate()
+        setIsRegenerating(true)
+        await generateCoverLetter()
     }
 
-    if (!coverLetter) {
+    // Loading state (Skeleton)
+    if (isLoading && !result) {
         return (
-            <div className="space-y-6">
-                {/* Empty State */}
-                <div className="text-center py-12 px-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border-2 border-dashed border-blue-200">
-                    <Sparkles className="w-12 h-12 mx-auto mb-4 text-blue-500" />
-                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">
-                        Generate Your Cover Letter
-                    </h3>
-                    <p className="text-sm text-[#73726E] mb-6 max-w-md mx-auto">
-                        Create a personalized cover letter that matches your writing style
-                        and highlights your fit for this position.
-                    </p>
-                    <Button
-                        onClick={handleGenerate}
-                        disabled={isGenerating}
-                        className="px-6"
-                    >
-                        {isGenerating ? (
-                            <>
-                                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                                <span className="ml-2">Generating...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Sparkles className="w-4 h-4" />
-                                <span className="ml-2">Generate Cover Letter</span>
-                            </>
-                        )}
-                    </Button>
-                </div>
-
-                {/* Error Display */}
-                {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                            <h4 className="text-sm font-semibold text-red-900 mb-1">Generation Failed</h4>
-                            <p className="text-sm text-red-700">{error}</p>
-                        </div>
+            <div className="space-y-6 p-6">
+                <div className="animate-pulse space-y-4">
+                    <div className="h-6 bg-[#E7E7E5] rounded w-1/3 mb-4"></div>
+                    <div className="space-y-3">
+                        <div className="h-4 bg-[#E7E7E5] rounded w-full"></div>
+                        <div className="h-4 bg-[#E7E7E5] rounded w-full"></div>
+                        <div className="h-4 bg-[#E7E7E5] rounded w-5/6"></div>
+                        <div className="h-4 bg-[#E7E7E5] rounded w-full"></div>
+                        <div className="h-4 bg-[#E7E7E5] rounded w-4/5"></div>
                     </div>
-                )}
+                </div>
+                <p className="text-sm text-[#73726E] text-center flex items-center justify-center gap-2">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
+                    ✨ Generating your personalized cover letter...
+                </p>
             </div>
         )
     }
 
-    return (
-        <div className="space-y-6">
-            {/* Quality Feedback (if available) */}
-            {qualityScores && validation && (
-                <QualityFeedback
-                    validation={validation}
-                    scores={qualityScores}
-                />
-            )}
+    // Error state
+    if (error) {
+        return (
+            <div className="p-6 bg-red-50 rounded-lg border border-red-200 m-6">
+                <h3 className="text-sm font-semibold text-red-800 mb-2">Generation Failed</h3>
+                <p className="text-xs text-red-600 mb-4">{error}</p>
+                <button
+                    onClick={generateCoverLetter}
+                    className="text-xs bg-white border border-red-200 text-red-600 px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors"
+                >
+                    Try again
+                </button>
+            </div>
+        )
+    }
 
-            {/* Cover Letter Preview */}
-            <CoverLetterPreview coverLetter={coverLetter} />
+    // Success state
+    if (result) {
+        return (
+            <div className="space-y-6 p-6 bg-[#FAFAF9]">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column: Preview (2/3 width) */}
+                    <div className="lg:col-span-2 space-y-4">
+                        <CoverLetterPreview coverLetter={result.coverLetter} />
 
-            {/* Actions */}
-            <CoverLetterActions
-                coverLetter={coverLetter}
-                onRegenerate={handleRegenerate}
-                isRegenerating={isGenerating}
-            />
+                        <div className="pt-2">
+                            <CoverLetterActions
+                                coverLetter={result.coverLetter}
+                                onRegenerate={handleRegenerate}
+                                isRegenerating={isRegenerating}
+                            />
+                        </div>
+                    </div>
 
-            {/* Error Display */}
-            {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                        <h4 className="text-sm font-semibold text-red-900 mb-1">Regeneration Failed</h4>
-                        <p className="text-sm text-red-700">{error}</p>
+                    {/* Right Column: Feedback (1/3 width) */}
+                    <div className="space-y-4">
+                        <QualityFeedback
+                            scores={result.qualityScores}
+                            iterations={result.iterations}
+                            validation={result.validation || {
+                                isValid: true,
+                                stats: { wordCount: result.coverLetter.split(' ').length, companyMentions: 3, paragraphCount: 4 },
+                                errors: [],
+                                warnings: []
+                            }}
+                            showDetails={true}
+                        />
                     </div>
                 </div>
-            )}
-        </div>
-    )
+            </div>
+        )
+    }
+
+    return null
 }

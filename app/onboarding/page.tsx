@@ -33,18 +33,14 @@ export default function OnboardingPage() {
             // Generate proper UUID for user_id
             const tempUserId = crypto.randomUUID()
 
-            const response = await fetch('/api/consent/record', {
+            const response = await fetch('/api/consent/track', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     user_id: tempUserId,
-                    consents: consents.map(c => ({
-                        document_type: c.document_type,
-                        document_version: c.document_version,
-                        consent_given: true
-                    }))
+                    consents: consents
                 })
             })
 

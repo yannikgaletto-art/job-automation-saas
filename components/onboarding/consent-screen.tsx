@@ -1,221 +1,135 @@
+
 "use client"
 
 import { useState } from "react"
-import { motion } from "framer-motion"
-import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CheckCircle2, AlertCircle } from "lucide-react"
+import { Button } from "@/components/motion/button"
+import { ExternalLink } from "lucide-react"
 
 interface ConsentItem {
-    id: string
-    document_type: "privacy_policy" | "terms_of_service" | "ai_processing" | "cookies"
-    document_version: string
+    type: "privacy_policy" | "terms_of_service" | "ai_processing" | "cookies"
     label: string
     description: string
     required: boolean
+    documentUrl: string
 }
 
-const CONSENT_ITEMS: ConsentItem[] = [
-    {
-        id: "privacy",
-        document_type: "privacy_policy",
-        document_version: "v1.2",
-        label: "Datenschutzerklärung (Privacy Policy)",
-        description: "Ich habe die Datenschutzerklärung gelesen und akzeptiere die Verarbeitung meiner Daten gemäß DSGVO.",
-        required: true
-    },
-    {
-        id: "terms",
-        document_type: "terms_of_service",
-        document_version: "v1.2",
-        label: "Nutzungsbedingungen (Terms of Service)",
-        description: "Ich akzeptiere die Nutzungsbedingungen und verpflichte mich, den Service verantwortungsvoll zu nutzen.",
-        required: true
-    },
-    {
-        id: "ai",
-        document_type: "ai_processing",
-        document_version: "v1.0",
-        label: "KI-Verarbeitung meiner Texte",
-        description: "Ich stimme zu, dass meine hochgeladenen Dokumente (CV, Anschreiben) zur Erstellung personalisierter Bewerbungen mit KI verarbeitet werden.",
-        required: true
-    },
-    {
-        id: "cookies",
-        document_type: "cookies",
-        document_version: "v1.1",
-        label: "Cookie-Richtlinien",
-        description: "Ich akzeptiere die Verwendung von Cookies zur Verbesserung der Nutzererfahrung.",
-        required: true
-    }
-]
-
 interface ConsentScreenProps {
-    onComplete: (consents: ConsentItem[]) => Promise<void>
+    onComplete: (consents: { document_type: string; document_version: string }[]) => void
     onSkip?: () => void
 }
 
 export function ConsentScreen({ onComplete, onSkip }: ConsentScreenProps) {
-    const [consents, setConsents] = useState<Record<string, boolean>>({})
+    const [consents, setConsents] = useState<Record<string, boolean>>({
+        privacy_policy: false,
+        terms_of_service: false,
+        ai_processing: false,
+        cookies: false
+    })
+
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [error, setError] = useState<string | null>(null)
 
-    const handleToggle = (id: string) => {
-        setConsents(prev => ({
-            ...prev,
-            [id]: !prev[id]
-        }))
-    }
+    const consentItems: ConsentItem[] = [
+        {
+            type: "privacy_policy",
+            label: "Privacy Policy",
+            description: "I agree to the collection and processing of my personal data as described.",
+            required: true,
+            documentUrl: "/legal/privacy-policy"
+        },
+        {
+            type: "terms_of_service",
+            label: "Terms of Service",
+            description: "I accept the terms and conditions of using this service.",
+            required: true,
+            documentUrl: "/legal/terms-of-service"
+        },
+        {
+            type: "ai_processing",
+            label: "AI Processing",
+            description: "I consent to my data being processed by AI models (Claude API) for document generation.",
+            required: true,
+            documentUrl: "/legal/ai-processing"
+        },
+        {
+            type: "cookies",
+            label: "Cookie Policy",
+            description: "I accept the use of essential cookies for authentication.",
+            required: true,
+            documentUrl: "/legal/cookie-policy"
+        }
+    ]
 
-    const allRequiredSelected = CONSENT_ITEMS
+    const allRequiredConsentsGiven = consentItems
         .filter(item => item.required)
-        .every(item => consents[item.id])
+        .every(item => consents[item.type])
 
     const handleSubmit = async () => {
-        if (!allRequiredSelected) return
-
         setIsSubmitting(true)
-        setError(null)
 
-        try {
-            const selectedConsents = CONSENT_ITEMS.filter(item => consents[item.id])
-            await onComplete(selectedConsents)
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten")
-        } finally {
-            setIsSubmitting(false)
-        }
+        // Prepare data for callback
+        const consentData = Object.entries(consents)
+            .filter(([_, given]) => given)
+            .map(([type]) => ({
+                document_type: type,
+                document_version: "v1.0" // Hardcoded version for now
+            }))
+
+        await onComplete(consentData)
+        setIsSubmitting(false)
     }
 
     return (
-        <div className="flex items-center justify-center p-4">
-            <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="w-full max-w-2xl"
-            >
-                <Card className="bg-white border-[#E7E7E5] shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="text-center pt-8 pb-2">
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ delay: 0.1 }}
-                            className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#f0f7ff] text-[#0066FF] mx-auto"
-                        >
-                            <CheckCircle2 className="w-6 h-6" />
-                        </motion.div>
+        <div className="max-w-2xl mx-auto p-8 bg-white/50 backdrop-blur-sm rounded-xl border border-gray-200 shadow-sm">
+            <h1 className="text-3xl font-bold mb-2 text-[#37352F]">Before We Start</h1>
+            <p className="text-gray-600 mb-8">
+                To use Pathly, we need your consent for the following:
+            </p>
 
-                        <CardTitle className="text-2xl font-semibold text-[#37352F]">
-                            Willkommen bei Pathly
-                        </CardTitle>
-
-                        <CardDescription className="text-[#73726E] text-base mt-2">
-                            Bevor wir beginnen, benötigen wir Ihre Zustimmung
-                        </CardDescription>
-                    </CardHeader>
-
-                    <CardContent className="space-y-6 pt-6 px-8">
-                        {error && (
-                            <Alert variant="destructive" className="bg-red-50 text-red-900 border-red-200">
-                                <AlertCircle className="h-4 w-4 text-red-600" />
-                                <AlertDescription>{error}</AlertDescription>
-                            </Alert>
-                        )}
-
-                        <div className="space-y-3">
-                            {CONSENT_ITEMS.map((item, index) => (
-                                <motion.div
-                                    key={item.id}
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.1 * (index + 1) }}
-                                    className={`
-                                        flex items-start space-x-4 p-4 rounded-lg border transition-all duration-200
-                                        ${consents[item.id]
-                                            ? 'bg-[#F0F7FF] border-[#0066FF]/20'
-                                            : 'bg-white border-[#E7E7E5] hover:bg-[#FAFAF9]'}
-                                    `}
-                                    onClick={() => handleToggle(item.id)}
+            <div className="space-y-4 mb-8">
+                {consentItems.map(item => (
+                    <div key={item.type} className="flex items-start gap-4 p-4 border border-gray-100 bg-white rounded-lg hover:border-gray-300 transition-colors">
+                        <Checkbox
+                            checked={consents[item.type]}
+                            onCheckedChange={(checked) =>
+                                setConsents(prev => ({ ...prev, [item.type]: checked === true }))
+                            }
+                            className="mt-1"
+                        />
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <label className="font-medium text-[#37352F]">{item.label}</label>
+                                {item.required && (
+                                    <span className="text-xs text-red-500 font-medium">*Required</span>
+                                )}
+                                <a
+                                    href={item.documentUrl}
+                                    target="_blank"
+                                    className="text-blue-600 hover:text-blue-800 transition-colors"
                                 >
-                                    <Checkbox
-                                        id={item.id}
-                                        checked={consents[item.id] || false}
-                                        onCheckedChange={() => handleToggle(item.id)}
-                                        className={`mt-1 data-[state=checked]:bg-[#0066FF] data-[state=checked]:border-[#0066FF] border-[#D6D6D3]`}
-                                    />
-                                    <div className="flex-1 cursor-pointer">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium text-[#37352F]">
-                                                {item.label}
-                                            </span>
-                                            {item.required && (
-                                                <span className="text-[10px] font-medium text-[#0066FF] bg-[#0066FF]/10 px-1.5 py-0.5 rounded">
-                                                    REQUIRED
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-sm text-[#73726E] mt-1 leading-relaxed">
-                                            {item.description}
-                                        </p>
-                                        <p className="text-xs text-[#A8A29E] mt-1.5 font-mono">
-                                            {item.document_version}
-                                        </p>
-                                    </div>
-                                </motion.div>
-                            ))}
+                                    <ExternalLink className="h-3 w-3" />
+                                </a>
+                            </div>
+                            <p className="text-sm text-gray-500 mt-1">{item.description}</p>
                         </div>
+                    </div>
+                ))}
+            </div>
 
-                        <div className="bg-[#F7F7F5] border border-[#E7E7E5] rounded-lg p-4 flex gap-3 text-sm text-[#73726E]">
-                            <div className="shrink-0 pt-0.5">ℹ️</div>
-                            <p>
-                                <strong>DSGVO-Hinweis:</strong> Ihre Daten werden verschlüsselt gespeichert und ausschließlich für Ihre Bewerbungen genutzt.
-                            </p>
-                        </div>
-                    </CardContent>
+            <div className="flex flex-col gap-4">
+                <Button
+                    onClick={handleSubmit}
+                    disabled={!allRequiredConsentsGiven || isSubmitting}
+                    className="w-full"
+                    size="lg"
+                >
+                    {isSubmitting ? "Saving..." : "Continue"}
+                </Button>
+            </div>
 
-                    <CardFooter className="flex flex-col sm:flex-row gap-3 px-8 pb-8 pt-2">
-                        {onSkip && (
-                            <Button
-                                variant="ghost"
-                                onClick={onSkip}
-                                className="w-full sm:w-auto text-[#73726E] hover:text-[#37352F] hover:bg-[#F7F7F5]"
-                            >
-                                Überspringen
-                            </Button>
-                        )}
-
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={!allRequiredSelected || isSubmitting}
-                            className={`
-                                w-full sm:flex-1 text-white shadow-sm transition-all
-                                ${!allRequiredSelected || isSubmitting
-                                    ? 'bg-[#E7E7E5] text-[#A8A29E]'
-                                    : 'bg-[#0066FF] hover:bg-[#0052CC] hover:shadow-md'}
-                            `}
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Wird verarbeitet...
-                                </>
-                            ) : (
-                                <>Zustimmen und fortfahren</>
-                            )}
-                        </Button>
-                    </CardFooter>
-                </Card>
-
-                <p className="text-center text-[#A8A29E] text-xs mt-6">
-                    Mit dem Klick akzeptieren Sie unsere Richtlinien.
-                </p>
-            </motion.div>
+            <p className="text-xs text-gray-400 mt-6 text-center">
+                You can withdraw your consent at any time in your account settings.
+            </p>
         </div>
     )
 }
