@@ -12,13 +12,14 @@ export async function POST(request: Request) {
             );
         }
 
-        // Use quality loop (max 3 iterations)
+        // Use quality loop with validation (max 3 iterations)
         const result = await generateCoverLetterWithQuality(jobId, userId);
 
         return NextResponse.json({
             success: true,
             cover_letter: result.coverLetter,
             quality_scores: result.finalScores,
+            validation: result.finalValidation, // NEW: Validation results for frontend
             iterations: result.iterations,
             iteration_log: result.iterationLog // Optional: useful for debugging/frontend details
         });
