@@ -50,7 +50,13 @@ interface SidebarProps {
 // NAV ITEM - Full Framer Motion
 // ============================================================================
 
-export function NavItem({ icon: Icon, label, href, badge, isActive, shortcut }: NavItemProps) {
+export function NavItem({ icon: Icon, label, href, badge, isActive: isActiveProp, shortcut }: NavItemProps) {
+  const pathname = usePathname()
+  // Auto-detect active state if not explicitly provided
+  const isActive = isActiveProp !== undefined
+    ? isActiveProp
+    : pathname === href || pathname.startsWith(href + '/')
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
@@ -65,8 +71,8 @@ export function NavItem({ icon: Icon, label, href, badge, isActive, shortcut }: 
               ? "bg-[#F7F7F5] text-[#37352F] font-semibold"
               : "text-[#73726E] hover:text-[#37352F]"
           )}
-          whileHover={{ 
-            scale: 1.02, 
+          whileHover={{
+            scale: 1.02,
             y: -2,
             backgroundColor: isActive ? "#F7F7F5" : "#F5F5F4",
             boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.07)"
@@ -81,9 +87,9 @@ export function NavItem({ icon: Icon, label, href, badge, isActive, shortcut }: 
             <Icon className="h-5 w-5" />
           </motion.div>
           <span className="flex-1">{label}</span>
-          
+
           {shortcut && (
-            <motion.span 
+            <motion.span
               className="text-xs text-[#A8A29E] font-mono"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -92,7 +98,7 @@ export function NavItem({ icon: Icon, label, href, badge, isActive, shortcut }: 
               {shortcut}
             </motion.span>
           )}
-          
+
           {badge && badge > 0 && (
             <Badge variant="primary" interactive>
               {badge}
@@ -121,14 +127,14 @@ export function NavItem({ icon: Icon, label, href, badge, isActive, shortcut }: 
 
 export function NavSection({ title, children, className }: NavSectionProps) {
   return (
-    <motion.div 
+    <motion.div
       className={cn("space-y-1", className)}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
     >
       {title && (
-        <motion.h3 
+        <motion.h3
           className="px-3 mb-2 text-xs font-semibold text-[#A8A29E] uppercase tracking-wider"
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
@@ -150,12 +156,12 @@ export function ProgressCard({ title, value, total, className }: ProgressCardPro
   const percentage = Math.round((value / total) * 100);
 
   return (
-    <motion.div 
+    <motion.div
       className={cn("px-3 py-3 rounded-lg bg-[#FAFAF9] border border-[#E7E7E5]", className)}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ 
-        scale: 1.02, 
+      whileHover={{
+        scale: 1.02,
         y: -2,
         boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.07)"
       }}
@@ -163,7 +169,7 @@ export function ProgressCard({ title, value, total, className }: ProgressCardPro
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium text-[#37352F]">{title}</span>
-        <motion.span 
+        <motion.span
           className="text-xs text-[#73726E]"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -183,12 +189,12 @@ export function ProgressCard({ title, value, total, className }: ProgressCardPro
 
 export function CreditsCard({ remaining, className }: CreditsCardProps) {
   return (
-    <motion.div 
+    <motion.div
       className={cn("px-3 py-3 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#3385FF]/10 border border-[#0066FF]/20", className)}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ 
-        scale: 1.02, 
+      whileHover={{
+        scale: 1.02,
         y: -2,
         boxShadow: "0 4px 6px -1px rgba(0, 102, 255, 0.1)"
       }}
@@ -204,7 +210,7 @@ export function CreditsCard({ remaining, className }: CreditsCardProps) {
           </motion.span>
           Credits
         </span>
-        <motion.span 
+        <motion.span
           className="text-sm font-semibold text-[#0066FF]"
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -234,13 +240,13 @@ export function Sidebar({ children, className }: SidebarProps) {
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
       {/* Logo */}
-      <motion.div 
+      <motion.div
         className="flex items-center gap-2 px-2"
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
       >
-        <motion.div 
+        <motion.div
           className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0066FF] to-[#3385FF] flex items-center justify-center"
           whileHover={{ rotate: 360, scale: 1.1 }}
           transition={{ duration: 0.6, ease: "easeInOut" }}

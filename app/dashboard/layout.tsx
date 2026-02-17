@@ -3,19 +3,26 @@
 import { Sidebar, NavSection, NavItem } from '@/components/motion/sidebar';
 import { Home, Inbox, BarChart3, Shield, Settings } from 'lucide-react';
 import { PomodoroCard } from './components/pomodoro-card';
+import { usePathname } from 'next/navigation';
 
 export default function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const pathname = usePathname();
     return (
         <div className="min-h-screen bg-[#FAFAF9] flex">
             {/* Sidebar */}
             <Sidebar>
                 <NavSection title="Main">
-                    <NavItem icon={Home} label="Dashboard" href="/dashboard" isActive />
-                    <NavItem icon={Inbox} label="Job Queue" href="/dashboard" badge={3} />
+                    <NavItem
+                        icon={Home}
+                        label="Dashboard"
+                        href="/dashboard"
+                        isActive={pathname === '/dashboard'}
+                    />
+                    <NavItem icon={Inbox} label="Job Queue" href="/dashboard/job-queue" badge={3} />
                     <NavItem icon={BarChart3} label="Analytics" href="/dashboard/analytics" />
                 </NavSection>
 
