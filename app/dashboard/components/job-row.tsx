@@ -177,7 +177,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, isOptimizing }: Jo
                         transition={{ duration: 0.3 }}
                         className="overflow-hidden bg-[#d4e3fe] border-t border-[#d6d6d6]"
                     >
-                        {job.workflowStep === 4 && (job.status === 'CL_GENERATED' || job.status === 'READY') ? (
+                        {job.workflowStep === 4 && (job.status === 'CL_GENERATED' || job.status === 'READY') && (
                             <Step4CoverLetter
                                 jobId={job.id}
                                 companyName={job.company}
@@ -187,12 +187,6 @@ export function JobRow({ job, expanded, onToggle, onOptimize, isOptimizing }: Jo
                                     console.log('✅ Cover letter flow complete')
                                 }}
                             />
-                        ) : (
-                            <div className="px-6 py-6 space-y-4">
-                                <div className="text-sm text-[#002e7a] opacity-80">
-                                    Workflow Details coming soon... (Step {job.workflowStep})
-                                </div>
-                            </div>
                         )}
                     </motion.div>
                 )}

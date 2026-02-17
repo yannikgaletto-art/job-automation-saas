@@ -49,6 +49,22 @@ export function ApplicationHistory() {
         setError(null)
         try {
             const res = await fetch(`/api/applications/history?page=${pageNum}&limit=10`)
+
+            // Handle unauthenticated users gracefully (show empty state instead of error)
+            if (res.status === 401) {
+                setData({
+                    applications: [],
+                    pagination: {
+                        page: 1,
+                        limit: 10,
+                        total: 0,
+                        hasMore: false
+                    }
+                })
+                setLoading(false)
+                return
+            }
+
             if (!res.ok) throw new Error("Failed to fetch history")
 
             const json = await res.json()

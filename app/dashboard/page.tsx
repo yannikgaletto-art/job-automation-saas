@@ -15,6 +15,7 @@ import { CVComparison } from '@/components/cv/cv-comparison';
 import type { CVOptimizationResult } from '@/lib/services/cv-optimizer';
 import { CardSkeletonGrid } from "@/components/skeletons/card-skeleton";
 import { ApplicationHistory } from '@/app/dashboard/components/application-history';
+import { toast } from "sonner";
 
 export default function DashboardPage() {
     // Demo data with different workflow states
@@ -68,6 +69,9 @@ export default function DashboardPage() {
         return () => clearTimeout(timer);
     }, []);
 
+
+    // ...
+
     const handleOptimizeCV = async (jobId: string) => {
         setIsOptimizing(true);
         setCurrentJobId(jobId);
@@ -84,9 +88,15 @@ export default function DashboardPage() {
             });
 
             if (!response.ok) {
-                // If 500 or 429, show error (alert only for MVP)
+                // If 500 or 429, show error
                 const err = await response.json();
-                alert(`Error: ${err.error || 'Optimization failed'}`);
+                toast.error("Optimization failed", {
+                    description: err.error || "Please try again",
+                    action: {
+                        label: "Retry",
+                        onClick: () => handleOptimizeCV(jobId)
+                    }
+                });
                 return;
             }
 
@@ -96,10 +106,13 @@ export default function DashboardPage() {
 
             // Update local job status to reflect optimization done
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'CV_OPTIMIZED', workflowStep: 3 } : j));
+            toast.success("CV Optimized");
 
         } catch (error) {
             console.error('❌ Optimization failed:', error);
-            alert('Optimization request failed');
+            toast.error("Optimization request failed", {
+                description: "Network error or server unavailable."
+            });
         } finally {
             setIsOptimizing(false);
         }
@@ -109,13 +122,14 @@ export default function DashboardPage() {
         // Logic to persist final choice or move to next step
         console.log('✅ Accepted all changes for job', currentJobId);
         setShowOptimization(false);
+        toast.success("Changes applied");
     };
 
     const handleDownload = async () => {
         console.log('📥 Download requested');
         // Simulate delay
         await new Promise(resolve => setTimeout(resolve, 1000));
-        alert('PDF Download not implemented in demo yet');
+        toast.info("PDF Download not implemented in demo yet");
     };
 
     return (
