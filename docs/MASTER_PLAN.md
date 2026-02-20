@@ -42,21 +42,14 @@ Implementierung des kompletten Workflows: Von **Trainingsdaten-Upload** bis **Co
 
 ## Phase 2: Job Discovery \u0026 Scraping
 
-### [x] 2.1 Job URL Input System (Frontend)
-- [x] Job URL Eingabefeld mit Validation
-- [x] Platform Detection (LinkedIn, Indeed, etc.)
-- [x] Manual Job Entry Formular
+### [x] 2.1 Phase 2 — Job Input (Paste Description)
+- [x] Job URL Eingabefeld mit Validation (Deprecated)
+- [x] Manual Job Entry Formular (Paste Tab)
 - [x] Job Queue Display
 
-### [ ] 2.2 Smart Scraping System (Backend)
-- [ ] API Route: `/api/jobs/scrape`
-- [ ] Scraper Selection Logic
-  - [ ] SerpAPI Integration (Job Boards)
-  - [ ] Firecrawl Integration (ATS Systems)
-  - [ ] Playwright Fallback
-- [ ] Fallback Chain Implementation
-- [ ] Rate Limiting \u0026 Error Handling
-- [ ] Scraping Logs Table
+### [x] 2.2 Automated Scraping
+- Status: ❌ Discontinued (MVP)
+- Begründung: "Replaced by Paste-first input. Scraping complexity outweighs MVP value. Revisit in V3."
 
 ### [x] 2.3 Job Data Extraction
 - [x] Structured Data Parser

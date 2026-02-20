@@ -39,3 +39,12 @@ next-env.d.ts
 test_apis.py
 test_env.py
 next.d.ts
+
+# MCP / Claude local config (contains secrets)
+.mcp.json
+.claude/
+
+# Temp directories
+.temp/
+supabase/.temp/
+

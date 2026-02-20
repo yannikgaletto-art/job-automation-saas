@@ -14,61 +14,46 @@ interface AddJobDialogProps {
 }
 
 export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps) {
-    const [url, setUrl] = useState('');
-    const [company, setCompany] = useState(''); // Optional, for fuzzy check
-    const [title, setTitle] = useState('');     // Optional, for fuzzy check
+    const [company, setCompany] = useState('');
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
 
     const [isLoading, setIsLoading] = useState(false);
-    const [loadingStatus, setLoadingStatus] = useState('Scraping...');
+    const [loadingStatus, setLoadingStatus] = useState('');
     const [error, setError] = useState<string | null>(null);
-    const [duplicateWarning, setDuplicateWarning] = useState<any | null>(null);
-    const [scrapeInfo, setScrapeInfo] = useState<{ method: string; duration: number } | null>(null);
+    const [errorRequestId, setErrorRequestId] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setError(null);
-        setDuplicateWarning(null);
-        setScrapeInfo(null);
-        setLoadingStatus('Plattform wird erkannt...');
+        setErrorRequestId(null);
+        setLoadingStatus('AI parst Beschreibung...');
 
         try {
-            setLoadingStatus('Job wird gescraped...');
-            const res = await fetch('/api/jobs/scrape', {
+            const res = await fetch('/api/jobs/ingest', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    jobUrl: url,
-                    company: company || undefined,
-                    jobTitle: title || undefined
+                    company,
+                    jobTitle: title,
+                    jobDescription: description
                 }),
             });
 
             const data = await res.json();
 
             if (!res.ok) {
-                if (res.status === 409) {
-                    // DUPLICATE DETECTED
-                    setDuplicateWarning(data.details);
-                    setIsLoading(false);
-                    return;
-                }
+                if (data.requestId) setErrorRequestId(data.requestId);
                 throw new Error(data.error || 'Failed to add job');
             }
 
-            // Show success info briefly
-            if (data.scraping) {
-                setScrapeInfo({ method: data.scraping.method, duration: data.scraping.duration });
-            }
             setLoadingStatus('Erfolgreich!');
             // Reset and close after brief delay
             setTimeout(() => {
-                setUrl('');
                 setCompany('');
                 setTitle('');
-                setScrapeInfo(null);
+                setDescription('');
                 onJobAdded();
                 onClose();
             }, 800);
@@ -111,102 +96,88 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
 
                         {/* Body */}
                         <div className="p-6">
-                            {duplicateWarning ? (
-                                // DUPLICATE WARNING STATE
-                                <div className="space-y-4">
-                                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex gap-3">
-                                        <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                                        <div>
-                                            <h3 className="text-sm font-semibold text-orange-800">
-                                                {duplicateWarning.reason === 'exact_url'
-                                                    ? 'You already applied to this job!'
-                                                    : 'Similar application detected!'}
-                                            </h3>
-                                            <p className="text-xs text-orange-700 mt-1">
-                                                {duplicateWarning.reason === 'exact_url'
-                                                    ? `You applied to this exact link roughly ${duplicateWarning.cooldownDaysRemaining} days ago.`
-                                                    : `You applied to a similar role "${duplicateWarning.matchDetails?.jobTitle}" at ${duplicateWarning.matchDetails?.companyName}.`}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-end gap-2 pt-2">
-                                        <Button variant="outline" onClick={() => setDuplicateWarning(null)}>
-                                            Cancel
-                                        </Button>
-                                        <Button variant="primary" onClick={onClose}>
-                                            Okay, I'll check my history
-                                        </Button>
-                                    </div>
+                            {/* FORM STATE */}
+                            <div className="space-y-6">
+                                <div className="text-center space-y-2 pb-2">
+                                    <h3 className="text-sm font-medium text-[#73726E]">Paste Job Description</h3>
+                                    <p className="text-xs text-[#a1a1aa]">Our AI will extract the requirements automatically.</p>
                                 </div>
-                            ) : (
-                                // FORM STATE
-                                <form onSubmit={handleSubmit} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="url">Job URL <span className="text-red-500">*</span></Label>
-                                        <Input
-                                            id="url"
-                                            placeholder="https://linkedin.com/jobs/..."
-                                            value={url}
-                                            onChange={(e) => setUrl(e.target.value)}
-                                            required
-                                        />
-                                    </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                <form onSubmit={handleSubmit} className="space-y-5">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <Label htmlFor="company">Company (Optional)</Label>
+                                            <Label htmlFor="company">Company <span className="text-red-500">*</span></Label>
                                             <Input
                                                 id="company"
                                                 placeholder="e.g. Acme Corp"
                                                 value={company}
                                                 onChange={(e) => setCompany(e.target.value)}
-                                            // Optional, but helps testing "Similar Role" check without scraping
+                                                required
+                                                minLength={2}
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="title">Job Title (Optional)</Label>
+                                            <Label htmlFor="title">Job Title <span className="text-red-500">*</span></Label>
                                             <Input
                                                 id="title"
-                                                placeholder="e.g. Engineer"
+                                                placeholder="e.g. Software Engineer"
                                                 value={title}
                                                 onChange={(e) => setTitle(e.target.value)}
+                                                required
+                                                minLength={2}
                                             />
                                         </div>
                                     </div>
 
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <Label htmlFor="description">Job Description <span className="text-red-500">*</span></Label>
+                                            <span className={`text-xs ${description.length < 500 ? 'text-[#a1a1aa]' : 'text-green-600'}`}>
+                                                {description.length} / 500 char min
+                                            </span>
+                                        </div>
+                                        <textarea
+                                            id="description"
+                                            placeholder="Paste the full job description here..."
+                                            value={description}
+                                            onChange={(e) => setDescription(e.target.value)}
+                                            required
+                                            minLength={500}
+                                            className="w-full min-h-[160px] rounded-md border border-[#EBEBEA] bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-[#a1a1aa] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#2383e2] disabled:cursor-not-allowed disabled:opacity-50"
+                                        />
+                                    </div>
+
                                     {error && (
-                                        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600 flex items-center gap-2">
-                                            <AlertTriangle className="w-4 h-4" />
-                                            {error}
+                                        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600 flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                                                <span>{error}</span>
+                                            </div>
+                                            {errorRequestId && (
+                                                <span className="text-xs text-red-400 pl-6">
+                                                    Support-ID: {errorRequestId}
+                                                </span>
+                                            )}
                                         </div>
                                     )}
 
-                                    <div className="flex justify-end gap-2 pt-4">
-                                        <Button type="button" variant="outline" onClick={onClose}>
-                                            Cancel
-                                        </Button>
-                                        <Button type="submit" variant="primary" disabled={isLoading}>
+                                    <div className="pt-2">
+                                        <Button type="submit" variant="primary" className="w-full flex justify-center py-2" disabled={isLoading || description.length < 500}>
                                             {isLoading ? (
                                                 <>
                                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                                     {loadingStatus}
                                                 </>
-                                            ) : scrapeInfo ? (
-                                                <>
-                                                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                                                    Gescraped via {scrapeInfo.method} ({Math.round(scrapeInfo.duration / 1000)}s)
-                                                </>
                                             ) : (
                                                 <>
                                                     <Zap className="w-4 h-4 mr-2" />
-                                                    Job scrapen & hinzufügen
+                                                    Job hinzufügen
                                                 </>
                                             )}
                                         </Button>
                                     </div>
                                 </form>
-                            )}
+                            </div>
                         </div>
 
                     </motion.div>

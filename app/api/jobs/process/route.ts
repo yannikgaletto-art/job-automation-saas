@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import {
     enrichCompany,
     linkEnrichmentToJob,
@@ -11,7 +12,10 @@ const supabase = createClient(
 );
 
 export async function POST(request: Request) {
+    const requestId = crypto.randomUUID();
     const { jobId, userId, jobUrl, company, jobTitle } = await request.json();
+
+    console.log(`[${requestId}] route=jobs/process step=start userId=${userId ?? 'anon'} jobId=${jobId ?? 'none'}`);
 
     // Helper for slugify
     const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -25,52 +29,52 @@ export async function POST(request: Request) {
             const duplicateResult = await checkDuplicateApplication(
                 userId,
                 jobUrl,
-                company ? slugify(company) : undefined, // Helper needed or raw check
+                company ? slugify(company) : undefined,
                 jobTitle
             );
 
             if (duplicateResult.isDuplicate) {
-                console.warn(`⚠️ Blocked duplicate application: ${duplicateResult.reason}`);
+                console.warn(`[${requestId}] route=jobs/process step=duplicate_check blocked reason=${duplicateResult.reason}`);
                 return Response.json({
                     success: false,
                     error: "DUPLICATE_APPLICATION",
-                    details: duplicateResult
+                    details: duplicateResult,
+                    requestId,
                 }, { status: 409 });
             }
         }
     } catch (dupError) {
-        console.error("Duplicate check failed (non-blocking):", dupError);
+        console.error(`[${requestId}] route=jobs/process step=duplicate_check_error error=${dupError instanceof Error ? dupError.message : String(dupError)}`);
     }
 
 
     try {
         // Fetch job
-        const { data: job } = await supabase
+        console.log(`[${requestId}] route=jobs/process step=db_fetch_job`);
+        const { data: job, error: jobFetchError } = await supabase
             .from('job_queue')
             .select('*')
             .eq('id', jobId)
             .single();
 
-        if (!job) {
-            return Response.json({ error: 'Job not found' }, { status: 404 });
+        if (jobFetchError || !job) {
+            console.error(`[${requestId}] route=jobs/process step=db_fetch_job supabase_error=${jobFetchError?.message} code=${jobFetchError?.code}`);
+            return Response.json({ error: 'Job not found', requestId }, { status: 404 });
         }
 
         // ========================================================================
         // STEP 1: Enrich company data (with cache check)
         // ========================================================================
 
-        console.log(`🔍 Enriching company: ${job.company_name}...`);
+        console.log(`[${requestId}] route=jobs/process step=enrich_company`);
 
         const intel = await enrichCompany(job.company_slug, job.company_name);
 
         if (intel.id) {
             await linkEnrichmentToJob(jobId, intel.id);
-            console.log(
-                `✅ Enrichment complete (confidence: ${intel.confidence_score})`
-            );
+            console.log(`[${requestId}] route=jobs/process step=enrichment_complete confidence=${intel.confidence_score}`);
         } else {
-            console.log(`⚠️  No enrichment data found (stealth startup?)`);
-            // Mark as skipped
+            console.log(`[${requestId}] route=jobs/process step=enrichment_skipped reason=no_public_data`);
             await supabase
                 .from('job_queue')
                 .update({
@@ -84,16 +88,16 @@ export async function POST(request: Request) {
         // STEP 2: Generate cover letter (with enriched data)
         // ========================================================================
 
-        console.log(`✍️  Generating cover letter in user's style...`);
+        console.log(`[${requestId}] route=jobs/process step=generate_cover_letter`);
 
-        // Use generateCoverLetterWithQuality instead of generateCoverLetter
         const coverLetterResult = await generateCoverLetterWithQuality(jobId, userId);
 
         // ========================================================================
         // STEP 3: Update job status
         // ========================================================================
+        console.log(`[${requestId}] route=jobs/process step=db_update_job`);
 
-        await supabase
+        const { error: updateError } = await supabase
             .from('job_queue')
             .update({
                 status: 'ready_for_review',
@@ -103,25 +107,32 @@ export async function POST(request: Request) {
             })
             .eq('id', jobId);
 
+        if (updateError) {
+            console.error(`[${requestId}] route=jobs/process step=db_update_job supabase_error=${updateError.message} code=${updateError.code}`);
+        }
+
+        const recentNews = intel?.recent_news ?? [];
+
         return Response.json({
             success: true,
+            requestId,
             coverLetter: coverLetterResult.coverLetter,
             enrichment: {
                 confidence: intel.confidence_score,
-                hasNews: intel.recent_news.length > 0,
+                hasNews: recentNews.length > 0,
             },
             cost: {
                 coverLetter: coverLetterResult.costCents / 100,
-                enrichment: intel.id ? 0.02 : 0, // €0.02 per Perplexity call
-                total:
-                    (coverLetterResult.costCents + (intel.id ? 2 : 0)) / 100,
+                enrichment: intel.id ? 0.02 : 0,
+                total: (coverLetterResult.costCents + (intel.id ? 2 : 0)) / 100,
             },
         });
-    } catch (error: any) {
-        console.error('Job processing error:', error);
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error(`[${requestId}] route=jobs/process step=unhandled_error error=${errMsg}`);
 
         return Response.json(
-            { success: false, error: error.message },
+            { success: false, error: errMsg, requestId },
             { status: 500 }
         );
     }

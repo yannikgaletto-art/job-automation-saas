@@ -80,7 +80,7 @@ export default function DashboardPage() {
             if (data.success && data.jobs) {
                 const dbJobs: Job[] = data.jobs.map((j: Record<string, unknown>) => ({
                     id: j.id as string,
-                    company: (j.company as string) || 'Unknown',
+                    company: (j.company_name as string) || 'Unknown',
                     jobTitle: (j.job_title as string) || 'Unknown Position',
                     matchScore: 0, // No match score yet
                     workflowStep: mapDbStatusToStep(j.status as string),

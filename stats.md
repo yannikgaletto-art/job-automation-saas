@@ -77,7 +77,6 @@ Diese Tabelle wird später von einem Script befüllt (z.B. tägliche Aggregation
 | Metric                       | Target             | Current | Notes           |
 |------------------------------|--------------------|---------|-----------------|
 | Daily scrape runtime         | < 10 Minuten       |         |                 |
-| Scraper block rate / LinkedIn| < 15%              |         |                 |
 | API‑Costs / Bewerbung       | < 0.20 €           |         | grobe Schätzung |
 | System uptime (dashboard)    | > 99% (Monatsbasis)|         |                 |
 

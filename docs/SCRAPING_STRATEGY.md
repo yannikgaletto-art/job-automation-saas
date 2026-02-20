@@ -1,5 +1,10 @@
 # PATHLY V2.0 - INTELLIGENT SCRAPING STRATEGY
 
+> ⚠️ DEPRECATED — 2026-02-20
+> Scraping strategy has been discontinued for V2.0 MVP.
+> This document is kept for historical reference only.
+> See MASTER_PLAN.md Phase 2 for current approach.
+
 **Status:** Production-Ready
 **Version:** 1.1 (Corrected)
 **Last Updated:** 2026-02-07

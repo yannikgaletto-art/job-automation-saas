@@ -90,10 +90,9 @@
 ### ❌ What's Next (Priority)
 1. **Phase 5: Cover Letter Generation** (The Core Product)
    - Connecting Research + Job Data -> Claude Generation.
-2. **Phase 2.2: Automated Scraping**
-   - Replacing manual entry with Firecrawl/SerpAPI.
-3. **Phase 4: CV Optimization**
+2. **Phase 4: CV Optimization**
    - Tailoring CVs to job descriptions.
+3. **Scraping discontinued.** Focus: Phase 4 (CV Opt) + Phase 5 (Cover Letter Gen) end-to-end polish.
 
 ---
 

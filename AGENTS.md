@@ -17,7 +17,7 @@
 
 | Agent | Responsibility | Implementation | Status |
 |-------|----------------|----------------|--------|
-| **Agent 1** | Job Discovery | PENDING | 🚧 Planned |
+| **Agent 1** | Job Input Parser | `api/jobs/ingest/route.ts` | ✅ Implementation Complete |
 | **Agent 2** | Job Filtering | PENDING | 🚧 Planned |
 | **Agent 3** | Company Research | `lib/services/company-enrichment.ts` | ✅ Implementation Complete |
 | **Agent 4** | CV Optimization | PENDING | 🚧 Planned |

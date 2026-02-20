@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { optimizeCV } from '@/lib/services/cv-optimizer';
 import { createClient } from '@supabase/supabase-js';
@@ -20,13 +21,17 @@ const ratelimit = process.env.UPSTASH_REDIS_REST_URL
     : null;
 
 export async function POST(req: NextRequest) {
+    const requestId = crypto.randomUUID();
+
     try {
         const body = await req.json();
         const { userId, jobId } = body;
 
+        console.log(`[${requestId}] route=cv/optimize step=start userId=${userId ?? 'anon'} jobId=${jobId ?? 'none'}`);
+
         if (!userId || !jobId) {
             return NextResponse.json(
-                { error: 'Missing userId or jobId' },
+                { error: 'Missing userId or jobId', requestId },
                 { status: 400 }
             );
         }
@@ -35,18 +40,19 @@ export async function POST(req: NextRequest) {
         if (ratelimit) {
             const { success, remaining } = await ratelimit.limit(`cv_optimize:${userId}`);
             if (!success) {
-                console.warn(`🛑 Rate limit exceeded for user ${userId}`);
+                console.warn(`[${requestId}] route=cv/optimize step=rate_limit_exceeded`);
                 return NextResponse.json(
-                    { error: 'Rate limit exceeded. Try again in 1 hour.' },
+                    { error: 'Rate limit exceeded. Try again in 1 hour.', requestId },
                     { status: 429 }
                 );
             }
-            console.log(`💾 Rate limit: ${remaining} optimizations remaining for user ${userId}`);
+            console.log(`[${requestId}] route=cv/optimize step=rate_limit_ok remaining=${remaining}`);
         } else {
-            console.warn('⚠️ No Rate Limiter configured (Dev Mode)');
+            console.warn(`[${requestId}] route=cv/optimize step=rate_limit_skipped reason=dev_mode`);
         }
 
         // 1. Fetch user's CV
+        console.log(`[${requestId}] route=cv/optimize step=db_fetch_cv`);
         const { data: cvDoc, error: cvError } = await supabase
             .from('documents')
             .select('id, metadata')
@@ -57,26 +63,25 @@ export async function POST(req: NextRequest) {
             .single();
 
         if (cvError || !cvDoc) {
-            console.error('CV fetch error:', cvError);
+            console.error(`[${requestId}] route=cv/optimize step=db_fetch_cv supabase_error=${cvError?.message} code=${cvError?.code}`);
             return NextResponse.json(
-                { error: 'CV not found for user. Please upload a CV first.' },
+                { error: 'CV not found for user. Please upload a CV first.', requestId },
                 { status: 404 }
             );
         }
 
         // 2. Extract CV Text
-        // Strategy: Try `metadata.extracted_text` first (fastest/cheapest)
-        // If missing (legacy docs), we might need to re-process (omitted for MVP speed)
         const cvText = cvDoc.metadata?.extracted_text || '';
 
         if (!cvText || cvText.length < 50) {
             return NextResponse.json(
-                { error: 'CV content is empty or unreadable. Please re-upload your CV.' },
+                { error: 'CV content is empty or unreadable. Please re-upload your CV.', requestId },
                 { status: 400 }
             );
         }
 
         // 3. Fetch job details
+        console.log(`[${requestId}] route=cv/optimize step=db_fetch_job`);
         const { data: job, error: jobError } = await supabase
             .from('job_queue')
             .select('*')
@@ -84,13 +89,15 @@ export async function POST(req: NextRequest) {
             .single();
 
         if (jobError || !job) {
+            console.error(`[${requestId}] route=cv/optimize step=db_fetch_job supabase_error=${jobError?.message} code=${jobError?.code}`);
             return NextResponse.json(
-                { error: 'Job not found' },
+                { error: 'Job not found', requestId },
                 { status: 404 }
             );
         }
 
         // 4. Optimize CV
+        console.log(`[${requestId}] route=cv/optimize step=optimize`);
         const result = await optimizeCV({
             userId,
             jobId,
@@ -103,7 +110,7 @@ export async function POST(req: NextRequest) {
         });
 
         // 5. Store Result in Document Metadata
-        // Append to history or update 'last_optimization'
+        console.log(`[${requestId}] route=cv/optimize step=db_update_cv_metadata`);
         const updatedMetadata = {
             ...cvDoc.metadata,
             last_optimization: {
@@ -111,12 +118,6 @@ export async function POST(req: NextRequest) {
                 job_id: jobId,
                 ats_score: result.atsScore,
                 changes_summary: result.changesLog,
-                // We DON'T store the full optimized markup here to keep metadata light?
-                // Actually, storing it allows "Show last optimization" feature without re-gen.
-                // Let's store it.
-                optimized_cv_preview: result.optimizedCV.substring(0, 1000) + '...', // Store preview?
-                // Or store full? Metadata limit is 100MB+ usually. Text is small (5KB).
-                // Let's store full it's fine.
                 optimized_cv_full: result.optimizedCV
             }
         };
@@ -127,19 +128,19 @@ export async function POST(req: NextRequest) {
             .eq('id', cvDoc.id);
 
         if (updateError) {
-            console.error('Failed to save optimization result:', updateError);
+            console.error(`[${requestId}] route=cv/optimize step=db_update_cv_metadata supabase_error=${updateError.message} code=${updateError.code}`);
             // Non-blocking error, still return result to UI
         }
 
-        return NextResponse.json(result);
+        console.log(`[${requestId}] route=cv/optimize step=complete ats_score=${result.atsScore}`);
+        return NextResponse.json({ ...result, requestId });
 
-    } catch (error: any) {
-        console.error('CV Optimization Route Error:', error);
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error(`[${requestId}] route=cv/optimize step=unhandled_error error=${errMsg}`);
 
-        // Return partial result if possible (Graceful degradation)
-        // For now, simple error
         return NextResponse.json(
-            { error: 'Optimization failed', details: error.message },
+            { error: 'Optimization failed', details: errMsg, requestId },
             { status: 500 }
         );
     }

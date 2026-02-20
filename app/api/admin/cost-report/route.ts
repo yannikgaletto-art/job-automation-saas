@@ -1,5 +1,6 @@
 import { getCostStats } from '@/lib/ai/model-router';
 import { getCacheStats } from '@/lib/services/cache-monitor';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -7,7 +8,12 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    const adminSecret = req.headers.get('x-admin-secret');
+    if (adminSecret !== process.env.ADMIN_SECRET) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // AI Costs (in-memory for current session)
     const aiStats = getCostStats();
 
@@ -70,5 +76,5 @@ export async function GET() {
         },
     };
 
-    return Response.json(report);
+    return NextResponse.json(report);
 }

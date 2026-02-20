@@ -147,7 +147,7 @@ export async function generateCoverLetter(params: CoverLetterGenerationParams): 
         }
 
         // 2. VALIDATE FIRST (Hard Checks - Fast & Cheap)
-        const validationResult = validateCoverLetter(generatedText, jobData?.company || 'Company');
+        const validationResult = validateCoverLetter(generatedText, jobData?.company_name || 'Company');
 
         // Log validation to database
         await logValidation(jobId, userId, iteration + 1, validationResult);
@@ -250,7 +250,7 @@ export async function generateCoverLetter(params: CoverLetterGenerationParams): 
 function buildSystemPrompt(profile: any, job: any, company: any, style: any, quote: any, feedback: string[]) {
     // Construct a rich prompt based on all inputs
     return `
-    Write a cover letter for ${job?.job_title || 'Application'} at ${job?.company || 'Company'}.
+    Write a cover letter for ${job?.job_title || 'Application'} at ${job?.company_name || 'Company'}.
     
     CANDIDATE:
     ${JSON.stringify(profile)}

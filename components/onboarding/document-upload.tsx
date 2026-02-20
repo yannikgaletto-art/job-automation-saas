@@ -109,6 +109,13 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
         setUploadProgress(0)
         setError(null)
 
+        console.log("Upload state clicked:", {
+            state: "started",
+            cvPresent: !!cvFile,
+            coverLetterCount: coverLetterFiles.length,
+            hasError: !!error
+        });
+
         try {
             // Simulate upload progress
             const progressInterval = setInterval(() => {
@@ -123,8 +130,15 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
             clearInterval(progressInterval)
             setUploadProgress(100)
 
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Upload fehlgeschlagen")
+            console.log("Upload state:", { state: "success" });
+
+        } catch (err: any) {
+            console.log("Upload state:", {
+                state: "error",
+                message: err.message,
+                requestId: err.requestId
+            });
+            setError(err.message || "Upload fehlgeschlagen")
             setUploadProgress(0)
         } finally {
             setIsUploading(false)
