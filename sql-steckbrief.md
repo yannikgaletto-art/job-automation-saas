@@ -1,0 +1,9 @@
+Bitte führe folgenden SQL-Befehl im **Supabase SQL Editor** aus:
+
+```sql
+ALTER TABLE job_queue
+  ADD COLUMN IF NOT EXISTS responsibilities JSONB DEFAULT '[]',
+  ADD COLUMN IF NOT EXISTS summary TEXT,
+  ADD COLUMN IF NOT EXISTS seniority TEXT,
+  ADD COLUMN IF NOT EXISTS benefits JSONB DEFAULT '[]';
+```

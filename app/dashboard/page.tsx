@@ -18,35 +18,7 @@ import { ApplicationHistory } from '@/app/dashboard/components/application-histo
 import { toast } from "sonner";
 
 export default function DashboardPage() {
-    // Demo data with different workflow states
-    const demoJobs: Job[] = [
-        {
-            id: 'demo-1',
-            company: 'Stripe',
-            jobTitle: 'Backend Eng.',
-            matchScore: 95,
-            workflowStep: 4,
-            status: 'CL_GENERATED',
-        },
-        {
-            id: 'demo-2',
-            company: 'Tesla',
-            jobTitle: 'Full-Stack',
-            matchScore: 88,
-            workflowStep: 2,
-            status: 'CV_CHECKED',
-        },
-        {
-            id: 'demo-3',
-            company: 'N26',
-            jobTitle: 'Platform',
-            matchScore: 82,
-            workflowStep: 1,
-            status: 'JOB_REVIEWED',
-        },
-    ];
-
-    const [jobs, setJobs] = useState<Job[]>(demoJobs);
+    const [jobs, setJobs] = useState<Job[]>([]);
 
     // Map job_queue status → UI status
     const mapDbStatusToUi = (dbStatus: string): Job['status'] => {
@@ -82,14 +54,17 @@ export default function DashboardPage() {
                     id: j.id as string,
                     company: (j.company_name as string) || 'Unknown',
                     jobTitle: (j.job_title as string) || 'Unknown Position',
-                    matchScore: 0, // No match score yet
+                    location: (j.location as string) || null,
+                    summary: (j.summary as string) || null,
+                    responsibilities: (j.responsibilities as string[]) || null,
+                    qualifications: (j.requirements as string[]) || null,
+                    benefits: (j.benefits as string[]) || null,
+                    seniority: (j.seniority as string) || 'unknown',
+                    matchScore: 0,
                     workflowStep: mapDbStatusToStep(j.status as string),
                     status: mapDbStatusToUi(j.status as string),
                 }));
-                // Merge: demo jobs + real DB jobs (dedup by id)
-                const existingIds = new Set(demoJobs.map(j => j.id));
-                const uniqueDbJobs = dbJobs.filter(j => !existingIds.has(j.id));
-                setJobs([...demoJobs, ...uniqueDbJobs]);
+                setJobs(dbJobs);
             }
         } catch (err) {
             console.warn('⚠️ Could not fetch jobs from API:', err);

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { validateCoverLetter, logValidation, type ValidationResult } from './cover-letter-validator';
+import { enrichCompany, linkEnrichmentToJob } from './company-enrichment';
 
 // Initialize clients
 const anthropic = new Anthropic({
@@ -92,13 +93,38 @@ export async function generateCoverLetterWithQuality(jobId: string, userId: stri
 
     const styleAnalysis = docs?.[0]?.metadata?.style_analysis;
 
+    let research = jobData.company_research?.[0]?.intel_data;
+    let selectedQuote = jobData.company_research?.[0]?.suggested_quotes?.[0];
+
+    // Inline enrichment fallback if company research was skipped (e.g., from paste flow)
+    if (!research || Object.keys(research).length === 0) {
+        console.log(`[CoverLetterGen] No company research found for ${jobData.company_name}. Triggering inline enrichment...`);
+        try {
+            const enrichment = await enrichCompany(
+                jobData.company_slug || jobData.company_name,
+                jobData.company_name,
+                false
+            );
+            await linkEnrichmentToJob(jobId, enrichment.id);
+
+            research = {
+                company_values: enrichment.company_values,
+                tech_stack: enrichment.tech_stack,
+            };
+            selectedQuote = enrichment.suggested_quotes?.[0];
+            console.log(`[CoverLetterGen] Inline enrichment successful.`);
+        } catch (enrichErr) {
+            console.warn(`[CoverLetterGen] Inline enrichment failed. Proceeding without.`, enrichErr);
+        }
+    }
+
     return generateCoverLetter({
         userId,
         jobId,
         userProfile: profileData,
         jobData: jobData,
-        companyResearch: jobData.company_research?.[0]?.intel_data, // Adjust based on relation structure
-        selectedQuote: jobData.company_research?.[0]?.suggested_quotes?.[0], // Pick first quote for now
+        companyResearch: research,
+        selectedQuote: selectedQuote,
         styleAnalysis
     });
 }

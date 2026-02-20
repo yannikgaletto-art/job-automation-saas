@@ -42,12 +42,11 @@ export async function POST(req: NextRequest) {
 
         let userId = user?.id
 
-        if (!userId) {
+        if (!userId && process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEV_UPLOAD_BYPASS === 'true') {
             // MVP / Dev Mode Fallback for unauthenticated onboarding flow
             console.log(`[${requestId}] route=documents/upload Auth missing, attempting dev fallback...`);
-            const { data: fallbackUsers } = await supabaseAdmin.from('user_profiles').select('id').limit(1);
-            if (fallbackUsers && fallbackUsers.length > 0) {
-                userId = fallbackUsers[0].id;
+            if (process.env.DEV_BYPASS_USER_ID) {
+                userId = process.env.DEV_BYPASS_USER_ID;
                 console.log(`[${requestId}] route=documents/upload using fallback user: ${userId}`);
             }
         }
@@ -123,8 +122,6 @@ export async function POST(req: NextRequest) {
             const cvBuffer = Buffer.from(cvBytes)
             processedCv = await processDocument(cvBuffer, cvFile.type)
 
-            // Save CV to documents table
-            console.log(`[${requestId}] route=documents/upload step=db_insert_cv`)
             const { data: cvDoc, error: cvDbError } = await supabaseAdmin
                 .from('documents')
                 .insert({
@@ -150,6 +147,10 @@ export async function POST(req: NextRequest) {
         } catch (procError) {
             const errMsg = procError instanceof Error ? procError.message : String(procError)
             console.error(`[${requestId}] route=documents/upload step=process_cv error=${errMsg}`)
+            return NextResponse.json(
+                { error: errMsg, requestId },
+                { status: 400 }
+            )
         }
 
         // 2. Upload cover letters

@@ -34,8 +34,8 @@ export function QualityFeedback({ validation, scores, iterations, showDetails }:
     const isValidationPassed = validation?.isValid ?? true
     const isQualityGood = scores.overall_score >= 8
     const overallStatus = isValidationPassed && isQualityGood ? "excellent" :
-        isValidationPassed && scores.overall_score >= 6 ? "good" :
-            isValidationPassed ? "needs_improvement" : "validation_failed"
+        isValidationPassed && scores.overall_score >= 7 ? "good" :
+            isValidationPassed ? "needs_review" : "validation_failed"
 
     return (
         <div className="space-y-4">
@@ -54,10 +54,10 @@ export function QualityFeedback({ validation, scores, iterations, showDetails }:
                             <span className="text-sm font-semibold text-blue-700">Good Quality</span>
                         </>
                     )}
-                    {overallStatus === "needs_improvement" && (
+                    {overallStatus === "needs_review" && (
                         <>
                             <AlertCircle className="w-5 h-5 text-yellow-600" />
-                            <span className="text-sm font-semibold text-yellow-700">Needs Improvement</span>
+                            <span className="text-sm font-semibold text-yellow-700">Needs Review</span>
                         </>
                     )}
                     {overallStatus === "validation_failed" && (

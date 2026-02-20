@@ -23,12 +23,15 @@ export interface ProcessedDocument {
 }
 
 export async function processDocument(
-    fileBuffer: Buffer, 
+    fileBuffer: Buffer,
     mimeType: string,
     documentType: 'cv' | 'cover_letter' = 'cv' // Default to CV for backwards compatibility
 ): Promise<ProcessedDocument> {
-    // 1. Extract Raw Text
     const rawText = await extractText(fileBuffer, mimeType);
+
+    if (rawText.trim().length < 50) {
+        throw new Error('PDF konnte nicht gelesen werden. Bitte als Text-PDF exportieren.');
+    }
 
     // 2. Intelligent Analysis (PII & Metadata) via Claude
     // We send a portion of text (first 4k chars usually enough for PII/Skills header) to save tokens/cost
@@ -73,12 +76,12 @@ export async function processDocument(
         }
     } catch (error) {
         console.error('AI Extraction failed:', error);
-        analysisResult = mockExtraction(rawText); // Fallback to mock/regex
+        throw new Error('Fehler bei der Dokumentenanalyse.');
     }
 
     // 3. Style Analysis (only for cover letters)
     let styleAnalysis: StyleAnalysis | undefined;
-    
+
     if (documentType === 'cover_letter') {
         try {
             console.log('📊 Analyzing writing style for cover letter...');

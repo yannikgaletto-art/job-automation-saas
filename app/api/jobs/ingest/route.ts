@@ -18,7 +18,7 @@ const anthropic = new Anthropic({
 const IngestRequestSchema = z.object({
     company: z.string().min(2, 'Company name must be at least 2 characters'),
     jobTitle: z.string().min(2, 'Job title must be at least 2 characters'),
-    jobDescription: z.string().min(500, 'Job description must be at least 500 characters'),
+    jobDescription: z.string().min(500, 'Mindestens 500 Zeichen').max(5000, 'Maximal 5.000 Zeichen'),
 });
 
 export async function POST(request: NextRequest) {
@@ -68,29 +68,37 @@ export async function POST(request: NextRequest) {
         // ================================================================
         // STEP 2: Extract requirements with LLM (with timeout)
         // ================================================================
-        let requirements: string[] = [];
+        let extractedData: any = {};
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // Increased timeout for deeper extraction
 
         try {
             console.log(`[${requestId}] route=jobs/ingest step=ai_parse_requirements`);
 
             if (process.env.ANTHROPIC_API_KEY) {
+                const extractionSchema = {
+                    company: "string — Unternehmensname",
+                    jobTitle: "string — exakter Stellentitel",
+                    location: "string | null — Ort/Remote/Hybrid falls erkennbar",
+                    summary: "string — 2-3 Sätze Zusammenfassung der Rolle",
+                    responsibilities: "string[] — Aufgaben als Stichpunkte (max 8)",
+                    qualifications: "string[] — Anforderungen/Qualifikationen (max 8)",
+                    benefits: "string[] — Benefits (max 5, kann leer sein)",
+                    seniority: "'junior' | 'mid' | 'senior' | 'lead' | 'unknown'"
+                };
+
                 const message = await anthropic.messages.create({
                     model: 'claude-3-haiku-20240307',
-                    max_tokens: 1000,
+                    max_tokens: 1500,
                     temperature: 0,
-                    system: "Extract a concise JSON array of strings representing the key job requirements/skills from the provided job description. Return ONLY the JSON array (e.g. [\"React\", \"TypeScript\", \"5+ years experience\"]). No markdown blocks, no other text.",
+                    system: `Extrahiere aus der folgenden Stellenbeschreibung die Informationen als JSON. Alle Felder auf Deutsch. Wenn ein Feld nicht erkennbar ist, nutze null oder leeres Array. Gib NUR valides JSON zurück, kein Markdown. Schema: ${JSON.stringify(extractionSchema)}`,
                     messages: [{ role: 'user', content: jobDescription }]
                 }, { signal: controller.signal });
 
                 if (message.content[0].type === 'text') {
                     const text = message.content[0].text.trim();
                     try {
-                        let parsed = JSON.parse(text);
-                        if (Array.isArray(parsed)) {
-                            requirements = parsed.map(String);
-                        }
+                        extractedData = JSON.parse(text);
                     } catch (parseError) {
                         console.warn(`[${requestId}] route=jobs/ingest step=ai_parse JSON parse failed, text=${text.substring(0, 50)}...`);
                     }
@@ -100,11 +108,11 @@ export async function POST(request: NextRequest) {
             }
         } catch (aiError: any) {
             if (aiError.name === 'AbortError') {
-                console.warn(`[${requestId}] route=jobs/ingest step=ai_parse timeout=8000ms`);
+                console.warn(`[${requestId}] route=jobs/ingest step=ai_parse timeout=12000ms`);
             } else {
                 console.warn(`[${requestId}] route=jobs/ingest step=ai_parse error=${aiError.message}`);
             }
-            // Proceed with empty requirements rather than failing the ingest
+            // Proceed with empty extraction rather than failing the ingest
         } finally {
             clearTimeout(timeoutId);
         }
@@ -142,7 +150,12 @@ export async function POST(request: NextRequest) {
                 job_title: jobTitle,
                 company_name: company,
                 description: jobDescription,
-                requirements: requirements.length > 0 ? requirements : null,
+                location: extractedData.location || null,
+                requirements: extractedData.qualifications?.length > 0 ? extractedData.qualifications : null,
+                responsibilities: extractedData.responsibilities?.length > 0 ? extractedData.responsibilities : null,
+                summary: extractedData.summary || null,
+                seniority: extractedData.seniority || 'unknown',
+                benefits: extractedData.benefits || [],
                 platform: 'unknown',
                 snapshot_at: new Date().toISOString(),
                 status: 'pending',

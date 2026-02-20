@@ -22,7 +22,7 @@ export async function GET() {
         // Fetch jobs from job_queue for this user
         const { data: jobs, error } = await supabaseAdmin
             .from('job_queue')
-            .select('id, job_url, job_title, company, location, salary_range, platform, status, created_at, description, requirements')
+            .select('id, job_url, job_title, company_name, location, salary_range, platform, status, created_at, description, requirements, summary, seniority, benefits, responsibilities')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(50);

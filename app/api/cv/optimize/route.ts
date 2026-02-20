@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         if (cvError || !cvDoc) {
             console.error(`[${requestId}] route=cv/optimize step=db_fetch_cv supabase_error=${cvError?.message} code=${cvError?.code}`);
             return NextResponse.json(
-                { error: 'CV not found for user. Please upload a CV first.', requestId },
+                { error: 'Kein Lebenslauf gefunden. Bitte zuerst Dokumente hochladen.', requestId },
                 { status: 404 }
             );
         }
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         if (jobError || !job) {
             console.error(`[${requestId}] route=cv/optimize step=db_fetch_job supabase_error=${jobError?.message} code=${jobError?.code}`);
             return NextResponse.json(
-                { error: 'Job not found', requestId },
+                { error: 'Job nicht gefunden.', requestId },
                 { status: 404 }
             );
         }
