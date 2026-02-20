@@ -100,7 +100,7 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
         setError(null)
     }
 
-    const canSubmit = cvFile && coverLetterFiles.length >= 2
+    const canSubmit = cvFile && coverLetterFiles.length >= 1
 
     const handleSubmit = async () => {
         if (!canSubmit) return
@@ -237,7 +237,7 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
                         {/* Cover Letters Upload */}
                         <div>
                             <label className="block text-sm font-semibold text-[#37352F] mb-2">
-                                Anschreiben (2-3 Stück) <span className="text-red-500">*</span>
+                                Anschreiben (1-3 Stück) <span className="text-red-500">*</span>
                             </label>
 
                             <div

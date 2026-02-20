@@ -1,54 +1,19 @@
-"use client"
-
-import { DocumentUpload } from "@/components/onboarding/document-upload"
+import { SettingsDocumentUpload } from "./settings-document-upload"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CheckCircle2, FileText, Settings as SettingsIcon } from "lucide-react"
-import { useState } from "react"
-import { toast } from "sonner"
+import { FileText, Settings as SettingsIcon } from "lucide-react"
+import { createClient } from "@/lib/supabase/server"
+import { redirect } from "next/navigation"
 
-export default function SettingsPage() {
-    const [isSubmitting, setIsSubmitting] = useState(false)
-    const [uploadSuccess, setUploadSuccess] = useState(false)
+export default async function SettingsPage() {
+    // Server-side auth check - fixes blank screen issue
+    const supabase = await createClient()
+    const { data: { session } } = await supabase.auth.getSession()
 
-    const handleUploadComplete = async (files: { cv: File; coverLetters: File[] }) => {
-        setIsSubmitting(true)
-        try {
-            const formData = new FormData()
-            // TODO: Get actual user ID from auth context
-            formData.append('user_id', 'temp-user-id')
-            formData.append('cv', files.cv)
-            files.coverLetters.forEach((file, index) => {
-                formData.append(`coverLetter_${index}`, file)
-            })
-
-            const response = await fetch('/api/documents/upload', {
-                method: 'POST',
-                body: formData
-            })
-
-            if (!response.ok) {
-                throw new Error('Failed to upload documents')
-            }
-
-            setUploadSuccess(true)
-            toast.success("Documents uploaded successfully!", {
-                description: "Your CV and cover letters have been processed."
-            })
-        } catch (error) {
-            console.error('Upload error:', error)
-            toast.error("Upload failed", {
-                description: error instanceof Error ? error.message : "Please try again later",
-                action: {
-                    label: "Retry",
-                    onClick: () => handleUploadComplete(files)
-                }
-            })
-            throw error
-        } finally {
-            setIsSubmitting(false)
-        }
+    if (!session) {
+        redirect("/login")
     }
+
+    const userId = session.user.id
 
     return (
         <div className="p-8 max-w-5xl mx-auto">
@@ -63,16 +28,6 @@ export default function SettingsPage() {
                 </p>
             </div>
 
-            {/* Success Message */}
-            {uploadSuccess && (
-                <Alert className="mb-6 bg-green-50 text-green-900 border-green-200">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <AlertDescription>
-                        Your documents have been successfully uploaded and processed!
-                    </AlertDescription>
-                </Alert>
-            )}
-
             {/* Document Upload Section */}
             <Card className="bg-white border-[#E7E7E5] shadow-sm mb-8">
                 <CardHeader>
@@ -85,9 +40,7 @@ export default function SettingsPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <DocumentUpload
-                        onComplete={handleUploadComplete}
-                    />
+                    <SettingsDocumentUpload />
                 </CardContent>
             </Card>
 

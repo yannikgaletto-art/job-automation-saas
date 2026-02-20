@@ -1,10 +1,11 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon, LogOut } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { Badge } from './badge';
 import { Progress } from './progress';
@@ -260,6 +261,46 @@ export function Sidebar({ children, className }: SidebarProps) {
       <div className="flex-1 flex flex-col space-y-6 overflow-y-auto scrollbar-hide">
         {children}
       </div>
+
+      {/* Logout Button */}
+      <div className="mt-auto pt-4 border-t border-[#E7E7E5]">
+        <LogoutButton />
+      </div>
     </motion.aside>
+  );
+}
+
+// ============================================================================
+// LOGOUT BUTTON
+// ============================================================================
+
+function LogoutButton() {
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      console.log("✅ Logged out");
+      router.push("/login");
+      router.refresh();
+    } catch (error) {
+      console.error("❌ Logout failed:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleLogout}
+      disabled={isLoggingOut}
+      className="flex items-center gap-3 w-full px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+    >
+      <LogOut className="h-5 w-5" />
+      <span className="font-medium">{isLoggingOut ? "Logging out..." : "Logout"}</span>
+    </button>
   );
 }

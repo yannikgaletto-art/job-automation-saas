@@ -1,11 +1,20 @@
+
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server' // Auth client
+import { createClient as createAdminClient } from '@supabase/supabase-js' // Admin client
 import { processDocument } from '@/lib/services/document-processor'
 import { z } from 'zod'
 
-const supabase = createClient(
+// Admin client for bypassing RLS
+const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        }
+    }
 )
 
 // Validation schema for file uploads
@@ -17,18 +26,31 @@ const uploadSchema = z.object({
         (f) => ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'].includes(f.type),
         'CV must be PDF, DOC, or DOCX'
     ),
-    coverLetters: z.array(z.instanceof(File)).min(2, 'At least 2 cover letters required').max(3, 'Maximum 3 cover letters allowed')
+    coverLetters: z.array(z.instanceof(File)).min(1, 'At least 1 cover letter required').max(3, 'Maximum 3 cover letters allowed')
 })
 
 export async function POST(req: NextRequest) {
     try {
+        const supabase = await createClient()
+
+        // Get authenticated user
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+        if (userError || !user) {
+            return NextResponse.json(
+                { error: 'Unauthorized', details: userError?.message },
+                { status: 401 }
+            )
+        }
+
+        const userId = user.id
         const formData = await req.formData()
 
         // Extract files from FormData
         const cvFile = formData.get('cv') as File | null
         const coverLetterFiles: File[] = []
 
-        // Get cover letter files (submitted with keys like coverLetter_0, coverLetter_1, etc)
+        // Get cover letter files
         let i = 0
         while (formData.has(`coverLetter_${i}`)) {
             const file = formData.get(`coverLetter_${i}`) as File
@@ -36,11 +58,9 @@ export async function POST(req: NextRequest) {
             i++
         }
 
-        const userId = formData.get('user_id') as string
-
-        if (!cvFile || !userId) {
+        if (!cvFile) {
             return NextResponse.json(
-                { error: 'Missing required files or user_id' },
+                { error: 'Missing CV file' },
                 { status: 400 }
             )
         }
@@ -64,7 +84,7 @@ export async function POST(req: NextRequest) {
         const cvFileName = `${userId}/cv-${Date.now()}.${cvFile.name.split('.').pop()}`
         const cvBytes = await cvFile.arrayBuffer()
 
-        const { data: cvUploadData, error: cvUploadError } = await supabase.storage
+        const { data: cvUploadData, error: cvUploadError } = await supabaseAdmin.storage
             .from('cvs')
             .upload(cvFileName, cvBytes, {
                 contentType: cvFile.type,
@@ -79,41 +99,6 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // Upload cover letters
-        const coverLetterUrls: string[] = []
-        for (let i = 0; i < coverLetterFiles.length; i++) {
-            const file = coverLetterFiles[i]
-            const fileName = `${userId}/cover-letter-${i}-${Date.now()}.${file.name.split('.').pop()}`
-            const bytes = await file.arrayBuffer()
-
-            const { data, error } = await supabase.storage
-                .from('cover-letters')
-                .upload(fileName, bytes, {
-                    contentType: file.type,
-                    upsert: false
-                })
-
-            if (error) {
-                console.error(`Cover letter ${i} upload error:`, error)
-                // Clean up previously uploaded files
-                await supabase.storage.from('cvs').remove([cvFileName])
-                coverLetterUrls.forEach(async (url) => {
-                    await supabase.storage.from('cover-letters').remove([url])
-                })
-
-                return NextResponse.json(
-                    { error: `Failed to upload cover letter ${i + 1}`, details: error.message },
-                    { status: 500 }
-                )
-            }
-
-            if (data) {
-                coverLetterUrls.push(data.path)
-            }
-        }
-
-        // ... existing upload code ...
-
         // 1. Process CV immediately (Sync) to get Metadata/PII
         console.log('Processing CV...')
         let processedCv: any = null
@@ -125,20 +110,16 @@ export async function POST(req: NextRequest) {
             processedCv = await processDocument(cvBuffer, cvFile.type)
 
             // Save CV to documents table
-            const { data: cvDoc, error: cvDbError } = await supabase
+            const { data: cvDoc, error: cvDbError } = await supabaseAdmin
                 .from('documents')
                 .insert({
                     user_id: userId,
                     document_type: 'cv',
-                    file_url_encrypted: cvUploadData.path, // In a real app, encrypt this path too
+                    file_url_encrypted: cvUploadData.path,
                     metadata: {
                         ...processedCv.metadata,
                         extracted_text: processedCv.sanitizedText
                     },
-                    // Store PII as JSONB (stringified if column is bytea, or direct json if jsonb)
-                    // We updated schema to JSONB in theory (via script), but if it failed, we might need a fallback.
-                    // Let's assume JSONB migration worked or we use a compatible format.
-                    // To be safe with Supabase/Postgres casting, usually passing the object works for JSONB columns.
                     pii_encrypted: processedCv.encryptedPii
                 })
                 .select()
@@ -146,34 +127,38 @@ export async function POST(req: NextRequest) {
 
             if (cvDbError) {
                 console.error('CV DB Insert Error:', cvDbError)
-                // Don't fail the whole request, just log it
             } else {
                 cvDocId = cvDoc.id
             }
 
         } catch (procError) {
             console.error('CV Processing Failed:', procError)
-            // Continue without metadata
         }
 
-        // 2. Upload cover letters (Async/Parallel if possible, but sequential for safety)
+        // 2. Upload cover letters
         const coverLetterIds: string[] = []
+        const coverLetterUrls: string[] = []
 
         for (let i = 0; i < coverLetterFiles.length; i++) {
             const file = coverLetterFiles[i]
             const fileName = `${userId}/cover-letter-${i}-${Date.now()}.${file.name.split('.').pop()}`
             const bytes = await file.arrayBuffer()
 
-            const { data, error } = await supabase.storage
+            const { data, error } = await supabaseAdmin.storage
                 .from('cover-letters')
                 .upload(fileName, bytes, {
                     contentType: file.type,
                     upsert: false
                 })
 
-            if (!error && data) {
-                // Save to DB (Metadata is empty for now)
-                const { data: clDoc } = await supabase
+            if (error) {
+                console.error(`Cover letter ${i} upload error:`, error)
+                // Continue with other files or fail? For now, log and continue.
+            } else if (data) {
+                coverLetterUrls.push(data.path)
+
+                // Save to DB
+                const { data: clDoc } = await supabaseAdmin
                     .from('documents')
                     .insert({
                         user_id: userId,
@@ -196,20 +181,7 @@ export async function POST(req: NextRequest) {
             data: {
                 cv_url: cvUploadData.path,
                 extracted: processedCv ? {
-                    pii: processedCv.encryptedPii, // Return encrypted or null? Frontend shouldn't see raw PII unless we decrypt. 
-                    // Actually, for Phase 1.5 (Profile Confirmation), we need the raw values to pre-fill the form!
-                    // BUT we only have encrypted values here.
-                    // Wait, `processDocument` has `rawText` but `encryptedPii`.
-                    // We should return the decrypted PII to the frontend solely for the immediate confirmation step (Phase 1.5).
-                    // Or, we decrypt it on the fly. 
-                    // Let's assume we return "masked" or "encrypted" and the frontend asks cleanly.
-                    // Actually, looking at `processDocument`, it returns `encryptedPii`.
-                    // We can't use encrypted PII in the frontend form directly.
-                    // We need to return the UNENCRYPTED extracted PII for the confirmation screen.
-                    // Security risk? Yes, but it's over HTTPS and necessary for the UX "Check your data".
-                    // I'll update `processDocument` to return extracted PII (plain) as well?
-                    // No, I'll allow `processDocument` to return it or I'll parse it here.
-                    // For now, I'll just return the metadata.
+                    pii: processedCv.encryptedPii,
                     metadata: processedCv.metadata
                 } : null,
                 document_ids: {

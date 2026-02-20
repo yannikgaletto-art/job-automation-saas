@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
+import { X, Loader2, AlertTriangle, CheckCircle, Zap } from 'lucide-react';
 import { Button } from '@/components/motion/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,23 +19,27 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
     const [title, setTitle] = useState('');     // Optional, for fuzzy check
 
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingStatus, setLoadingStatus] = useState('Scraping...');
     const [error, setError] = useState<string | null>(null);
     const [duplicateWarning, setDuplicateWarning] = useState<any | null>(null);
+    const [scrapeInfo, setScrapeInfo] = useState<{ method: string; duration: number } | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setError(null);
         setDuplicateWarning(null);
+        setScrapeInfo(null);
+        setLoadingStatus('Plattform wird erkannt...');
 
         try {
-            const res = await fetch('/api/jobs/process', {
+            setLoadingStatus('Job wird gescraped...');
+            const res = await fetch('/api/jobs/scrape', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    userId: '00000000-0000-0000-0000-000000000000', // Mock User ID for demo/localhost
                     jobUrl: url,
                     company: company || undefined,
                     jobTitle: title || undefined
@@ -54,12 +58,20 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                 throw new Error(data.error || 'Failed to add job');
             }
 
-            // Success
-            setUrl('');
-            setCompany('');
-            setTitle('');
-            onJobAdded();
-            onClose();
+            // Show success info briefly
+            if (data.scraping) {
+                setScrapeInfo({ method: data.scraping.method, duration: data.scraping.duration });
+            }
+            setLoadingStatus('Erfolgreich!');
+            // Reset and close after brief delay
+            setTimeout(() => {
+                setUrl('');
+                setCompany('');
+                setTitle('');
+                setScrapeInfo(null);
+                onJobAdded();
+                onClose();
+            }, 800);
 
         } catch (err: any) {
             console.error(err);
@@ -178,10 +190,18 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                                             {isLoading ? (
                                                 <>
                                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                    Processing...
+                                                    {loadingStatus}
+                                                </>
+                                            ) : scrapeInfo ? (
+                                                <>
+                                                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                                                    Gescraped via {scrapeInfo.method} ({Math.round(scrapeInfo.duration / 1000)}s)
                                                 </>
                                             ) : (
-                                                'Add to Queue'
+                                                <>
+                                                    <Zap className="w-4 h-4 mr-2" />
+                                                    Job scrapen & hinzufügen
+                                                </>
                                             )}
                                         </Button>
                                     </div>

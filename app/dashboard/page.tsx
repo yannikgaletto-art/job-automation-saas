@@ -19,9 +19,9 @@ import { toast } from "sonner";
 
 export default function DashboardPage() {
     // Demo data with different workflow states
-    const [jobs, setJobs] = useState<Job[]>([
+    const demoJobs: Job[] = [
         {
-            id: '1',
+            id: 'demo-1',
             company: 'Stripe',
             jobTitle: 'Backend Eng.',
             matchScore: 95,
@@ -29,27 +29,72 @@ export default function DashboardPage() {
             status: 'CL_GENERATED',
         },
         {
-            id: '2',
+            id: 'demo-2',
             company: 'Tesla',
             jobTitle: 'Full-Stack',
             matchScore: 88,
             workflowStep: 2,
-            status: 'CV_CHECKED', // Ready for optimization
+            status: 'CV_CHECKED',
         },
         {
-            id: '3',
+            id: 'demo-3',
             company: 'N26',
             jobTitle: 'Platform',
             matchScore: 82,
             workflowStep: 1,
             status: 'JOB_REVIEWED',
         },
-    ]);
+    ];
 
-    // Calculate stats
-    const totalJobs = jobs.length;
-    const readyToApply = jobs.filter(j => j.status === 'READY' || j.status === 'CL_GENERATED').length;
-    const inProgress = jobs.filter(j => j.workflowStep > 0 && j.workflowStep < 5).length;
+    const [jobs, setJobs] = useState<Job[]>(demoJobs);
+
+    // Map job_queue status → UI status
+    const mapDbStatusToUi = (dbStatus: string): Job['status'] => {
+        switch (dbStatus) {
+            case 'pending': return 'NEW';
+            case 'processing': return 'JOB_REVIEWED';
+            case 'ready_for_review': return 'CV_OPTIMIZED';
+            case 'ready_to_apply': return 'CL_GENERATED';
+            case 'submitted': return 'READY';
+            default: return 'NEW';
+        }
+    };
+
+    const mapDbStatusToStep = (dbStatus: string): number => {
+        switch (dbStatus) {
+            case 'pending': return 0;
+            case 'processing': return 1;
+            case 'ready_for_review': return 2;
+            case 'ready_to_apply': return 4;
+            case 'submitted': return 4;
+            default: return 0;
+        }
+    };
+
+    // Fetch real jobs from DB
+    const fetchJobs = async () => {
+        try {
+            const res = await fetch('/api/jobs/list');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.success && data.jobs) {
+                const dbJobs: Job[] = data.jobs.map((j: Record<string, unknown>) => ({
+                    id: j.id as string,
+                    company: (j.company as string) || 'Unknown',
+                    jobTitle: (j.job_title as string) || 'Unknown Position',
+                    matchScore: 0, // No match score yet
+                    workflowStep: mapDbStatusToStep(j.status as string),
+                    status: mapDbStatusToUi(j.status as string),
+                }));
+                // Merge: demo jobs + real DB jobs (dedup by id)
+                const existingIds = new Set(demoJobs.map(j => j.id));
+                const uniqueDbJobs = dbJobs.filter(j => !existingIds.has(j.id));
+                setJobs([...demoJobs, ...uniqueDbJobs]);
+            }
+        } catch (err) {
+            console.warn('⚠️ Could not fetch jobs from API:', err);
+        }
+    };
 
     const [isAddJobOpen, setIsAddJobOpen] = useState(false);
 
@@ -59,15 +104,21 @@ export default function DashboardPage() {
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
-    // Simulate initial loading (for demonstration)
+    // Loading state
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
+        // Fetch real jobs, then finish loading
+        fetchJobs().finally(() => {
             setIsLoading(false);
-        }, 1500); // 1.5s simulated load time
-        return () => clearTimeout(timer);
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Calculate stats
+    const totalJobs = jobs.length;
+    const readyToApply = jobs.filter(j => j.status === 'READY' || j.status === 'CL_GENERATED').length;
+    const inProgress = jobs.filter(j => j.workflowStep > 0 && j.workflowStep < 5).length;
 
 
     // ...
@@ -139,6 +190,7 @@ export default function DashboardPage() {
                 onClose={() => setIsAddJobOpen(false)}
                 onJobAdded={() => {
                     console.log("Job added, refreshing list...");
+                    fetchJobs();
                 }}
             />
 

@@ -11,7 +11,7 @@ const navItems = [
     title: 'Main',
     items: [
       { icon: Home, label: 'Dashboard', href: '/dashboard', badge: null },
-      { icon: Inbox, label: 'Job Queue', href: '/dashboard', badge: 12 },
+      { icon: Inbox, label: 'Job Queue', href: '/job-queue', badge: 12 },
       { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics', badge: null },
     ],
   },
@@ -45,7 +45,7 @@ export function Sidebar() {
             <div className="space-y-1">
               {section.items.map((item) => {
                 const Icon = item.icon
-                const isActive = pathname === item.href
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
                 return (
                   <Link
