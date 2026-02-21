@@ -25,6 +25,12 @@ export const MODELS = {
         cost_per_1m_tokens: 0.15,
         strengths: ['parsing', 'classification', 'summarization'],
     },
+    CLAUDE_HAIKU: {
+        id: 'claude-3-haiku-20240307',
+        provider: 'anthropic' as const,
+        cost_per_1m_tokens: 0.25,
+        strengths: ['parsing', 'classification', 'fast_execution'],
+    },
 } as const;
 
 // ============================================================================
@@ -42,7 +48,9 @@ export type TaskType =
     | 'write_cover_letter'
     | 'personalize_intro'
     | 'generate_motivation_text'
-    | 'optimize_cv';
+    | 'optimize_cv'
+    | 'cv_match'
+    | 'cv_parse';
 
 // ============================================================================
 // ROUTING LOGIC
@@ -61,6 +69,8 @@ export function selectModel(taskType: TaskType) {
         personalize_intro: 'CLAUDE_SONNET',
         generate_motivation_text: 'CLAUDE_SONNET',
         optimize_cv: 'CLAUDE_SONNET',
+        cv_match: 'CLAUDE_HAIKU',
+        cv_parse: 'CLAUDE_HAIKU',
     };
 
     return MODELS[routingMap[taskType]];

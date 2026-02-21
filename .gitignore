@@ -18,6 +18,9 @@
 # misc
 .DS_Store
 *.pem
+.next_dev_log.txt
+test-ingest.js
+delete_dummies.ts
 
 # debug
 npm-debug.log*

@@ -2,13 +2,15 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, FileText, Check, Sparkles, Mail, Eye, Info, PenTool, ClipboardCheck } from 'lucide-react';
+import { ChevronRight, FileText, Check, Sparkles, Mail, Eye, Info, PenTool, ClipboardCheck, Trash2, ChevronDown } from 'lucide-react';
 import { ProgressWorkflow } from './progress-workflow';
 import { Button } from '@/components/motion/button';
 import { AnimatedMatchScore } from '@/components/motion/count-up';
 import { cn } from '@/lib/utils';
 import { Step4CoverLetter } from './workflow-steps/step-4-cover-letter';
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { CustomDialog } from "@/components/ui/custom-dialog";
+import { CVMatchTab } from './cv-match/cv-match-tab';
 
 export interface Job {
     id: string;
@@ -20,6 +22,8 @@ export interface Job {
     qualifications?: string[] | null;
     benefits?: string[] | null;
     seniority?: string | null;
+    buzzwords?: string[] | null;
+    metadata?: any;
     matchScore: number;
     workflowStep: number; // 0-4
     status: 'NEW' | 'JOB_REVIEWED' | 'CV_CHECKED' | 'CV_OPTIMIZED' | 'CL_GENERATED' | 'READY';
@@ -30,15 +34,120 @@ interface JobRowProps {
     expanded: boolean;
     onToggle: () => void;
     onOptimize?: (jobId: string) => void;
+    onReanalyze?: (jobId: string) => void;
+    onConfirm?: (jobId: string) => void;
+    onDelete?: (jobId: string) => void;
     isOptimizing?: boolean;
 }
 
-export function JobRow({ job, expanded, onToggle, onOptimize, isOptimizing }: JobRowProps) {
+// --- Helpers for Steckbrief UI Refactoring ---
+const shouldShowLocation = (location?: string | null): boolean => {
+    if (!location) return false;
+    const lowerLoc = location.toLowerCase();
+    const genericRegions = [
+        'europa', 'europe', 'dach', 'deutschland', 'germany', 'remote',
+        'home office', 'home-office', 'anywhere', 'weltweit', 'worldwide',
+        'schweiz', 'switzerland', 'österreich', 'austria', 'emea'
+    ];
+    // Basic heuristic: check if it exactly matches or is very generic
+    const isGeneric = genericRegions.some(region =>
+        lowerLoc === region || lowerLoc === `remote - ${region}` || lowerLoc === `${region} - remote` || lowerLoc === `remote (${region})`
+    );
+    return !isGeneric;
+};
+
+const formatLevel = (level?: string | null): string | null => {
+    if (!level || level.toLowerCase() === 'unknown') return null;
+    return `Level: ${level.charAt(0).toUpperCase() + level.slice(1).toLowerCase()}`;
+};
+
+const categorizeChips = (benefits: string[]): Record<string, string[]> => {
+    const categories: Record<string, string[]> = {
+        'Arbeitsmodell': [],
+        'Kultur': [],
+        'Weiterbildung': [],
+        'Ausstattung': [],
+        'Sonstiges': []
+    };
+
+    benefits.forEach(b => {
+        const lowerB = b.toLowerCase();
+        if (lowerB.includes('remote') || lowerB.includes('hybrid') || lowerB.includes('home office') || lowerB.includes('home-office') || lowerB.includes('mobil') || lowerB.includes('büro') || lowerB.includes('workation') || lowerB.includes('flexibel')) {
+            categories['Arbeitsmodell'].push(b);
+        } else if (lowerB.includes('team') || lowerB.includes('kollegial') || lowerB.includes('miteinander') || lowerB.includes('mindset') || lowerB.includes('feedback') || lowerB.includes('kultur') || lowerB.includes('event') || lowerB.includes('feier')) {
+            categories['Kultur'].push(b);
+        } else if (lowerB.includes('academy') || lowerB.includes('weiterbildung') || lowerB.includes('learning') || lowerB.includes('training') || lowerB.includes('entwickl') || lowerB.includes('budget') || lowerB.includes('zertifikat')) {
+            categories['Weiterbildung'].push(b);
+        } else if (lowerB.includes('equipment') || lowerB.includes('mac') || lowerB.includes('hardware') || lowerB.includes('setup') || lowerB.includes('laptop') || lowerB.includes('iphone')) {
+            categories['Ausstattung'].push(b);
+        } else {
+            categories['Sonstiges'].push(b);
+        }
+    });
+
+    return categories;
+};
+
+/** Inline collapsible list — shows `limit` items, rest behind toggle */
+function CollapsibleList({ items, limit = 3, icon }: { items: string[]; limit?: number; icon?: React.ReactNode }) {
+    const [expanded, setExpanded] = useState(false);
+    const shown = expanded ? items : items.slice(0, limit);
+    const rest = items.length - limit;
+    return (
+        <>
+            <ul className="space-y-1">
+                {shown.map((item, i) => (
+                    <li key={i} className="text-xs text-[#37352F] flex gap-2 items-start leading-snug">
+                        <span className="text-[#aeb1b5] mt-px shrink-0">{icon ?? '›'}</span>
+                        <span>{item}</span>
+                    </li>
+                ))}
+            </ul>
+            {rest > 0 && !expanded && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
+                    className="mt-1.5 text-[10px] text-[#002e7a] hover:underline flex items-center gap-0.5"
+                >
+                    <ChevronDown className="w-3 h-3" /> +{rest} mehr
+                </button>
+            )}
+        </>
+    );
+}
+
+function SummaryBlock({ summary }: { summary: string }) {
+    const [expanded, setExpanded] = useState(false);
+    const showToggle = summary.split('\n').length > 2 || summary.length > 200; // Heuristic for long summary
+
+    return (
+        <div className="bg-white/60 border border-[#e7e7e5] rounded-md px-3 py-2">
+            <p className={cn(
+                "text-xs text-[#37352F] leading-relaxed max-w-4xl",
+                !expanded && "line-clamp-2"
+            )}>
+                {summary}
+            </p>
+            {showToggle && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+                    className="mt-1 text-[10px] text-[#002e7a] hover:underline flex items-center gap-0.5"
+                >
+                    {expanded ? 'Weniger anzeigen' : 'Mehr anzeigen'}
+                    {expanded ? <ChevronDown className="w-3 h-3 rotate-180" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+            )}
+        </div>
+    );
+}
+// ----------------------------------------------
+
+export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onConfirm, onDelete, isOptimizing }: JobRowProps) {
     // Falls kein Tab aktiv geklickt wurde, nehmen wir null (oder default den aktuellen Workflow Step)
     const [activeTab, setActiveTab] = useState<number | null>(null);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-    // Determines which content to show in the expanded area
-    const displayTab = activeTab !== null ? activeTab : (job.workflowStep === 4 ? 3 : 0);
+    // NEW: always default to tab 0 (Steckbrief), never auto-jump
+    const displayTab = activeTab ?? 0;
 
     const handleStepClick = (index: number) => {
         setActiveTab(index);
@@ -130,11 +239,11 @@ export function JobRow({ job, expanded, onToggle, onOptimize, isOptimizing }: Jo
                     />
                 </div>
 
-                {/* Next Action */}
-                <div className="w-48 md:w-56">
+                {/* Next Action & Delete */}
+                <div className="w-56 md:w-64 flex items-center justify-end gap-2 pr-2">
                     <Button
                         variant={nextAction.variant}
-                        className="w-full text-sm"
+                        className="flex-1 text-sm"
                         disabled={isOptimizing}
                         onClick={(e) => {
                             e.stopPropagation();
@@ -148,6 +257,16 @@ export function JobRow({ job, expanded, onToggle, onOptimize, isOptimizing }: Jo
                         )}
                         <span className="ml-2">{isOptimizing ? "Optimizing..." : nextAction.label}</span>
                     </Button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDeleteDialog(true);
+                        }}
+                        className="p-2 text-[#73726E] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                        title="Delete Job"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
                 </div>
             </div>
 
@@ -164,87 +283,126 @@ export function JobRow({ job, expanded, onToggle, onOptimize, isOptimizing }: Jo
                         className="overflow-hidden bg-[#d4e3fe] border-t border-[#d6d6d6]"
                     >
                         {/* ---------------- TABS CONTENT RENDERER ---------------- */}
-                        {displayTab === 0 && (
-                            <div className="px-6 py-4 space-y-4">
-                                {/* Header */}
-                                <div className="flex gap-4 flex-wrap">
-                                    <span className="text-sm text-gray-500">🏢 {job.company}</span>
-                                    {job.location && (
-                                        <span className="text-sm text-gray-500">📍 {job.location}</span>
+                        {/* Visible tab bar — place at top of expanded section */}
+                        <div className="flex items-center gap-1 px-6 pt-4 pb-0 border-b border-[#d6d6d6]">
+                            {[
+                                { index: 0, label: 'Steckbrief', icon: <FileText className="w-3.5 h-3.5" /> },
+                                { index: 1, label: 'CV Match', icon: <Check className="w-3.5 h-3.5" /> },
+                                { index: 2, label: 'CV Opt.', icon: <Sparkles className="w-3.5 h-3.5" /> },
+                                { index: 3, label: 'Cover Letter', icon: <Mail className="w-3.5 h-3.5" /> },
+                                { index: 4, label: 'Review', icon: <Eye className="w-3.5 h-3.5" /> },
+                            ].map((tab) => (
+                                <button
+                                    key={tab.index}
+                                    onClick={() => setActiveTab(tab.index)}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-md transition-colors",
+                                        displayTab === tab.index
+                                            ? "bg-white text-[#002e7a] border-t border-x border-[#d6d6d6] -mb-px"
+                                            : "text-[#73726E] hover:text-[#37352F] hover:bg-white/50"
                                     )}
-                                    {job.seniority && job.seniority !== 'unknown' && (
-                                        <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full capitalize">
-                                            {job.seniority}
+                                >
+                                    {tab.icon}
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {displayTab === 0 && (
+                            <div className="px-5 py-3 space-y-3">
+                                {/* Header Block — single compact line */}
+                                <div className="flex items-center gap-2 flex-wrap text-xs text-[#73726E]">
+                                    {shouldShowLocation(job.location) && (
+                                        <span className="flex items-center gap-1">
+                                            <span>📍</span> {job.location}
+                                        </span>
+                                    )}
+                                    {formatLevel(job.seniority) && (
+                                        <span className="bg-[#f1f1ef] text-[#37352F] px-1.5 py-0.5 rounded border border-[#e7e7e5] font-medium">
+                                            {formatLevel(job.seniority)}
                                         </span>
                                     )}
                                 </div>
 
-                                {/* Summary */}
+                                {/* Summary (2-line truncated, toggle for full) */}
                                 {job.summary && (
-                                    <p className="text-sm text-gray-600 leading-relaxed">{job.summary}</p>
+                                    <SummaryBlock summary={job.summary} />
                                 )}
 
-                                {/* Aufgaben + Qualifikationen nebeneinander (2-col auf Desktop) */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {job.responsibilities && job.responsibilities.length > 0 && (
-                                        <div>
-                                            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                                                Aufgaben
-                                            </h4>
-                                            <ul className="space-y-1">
-                                                {job.responsibilities.map((r, i) => (
-                                                    <li key={i} className="text-sm text-gray-600 flex gap-2">
-                                                        <span className="text-gray-300 mt-0.5">›</span>
-                                                        <span>{r}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
+                                {/* Content Grid (2 columns on md) */}
+                                {(job.responsibilities?.length || job.qualifications?.length) ? (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {job.responsibilities && job.responsibilities.length > 0 && (
+                                            <div>
+                                                <h4 className="text-[10px] font-semibold text-[#73726E] uppercase tracking-wider mb-1.5">Aufgaben</h4>
+                                                <CollapsibleList items={job.responsibilities} limit={3} />
+                                            </div>
+                                        )}
+                                        {job.qualifications && job.qualifications.length > 0 && (
+                                            <div>
+                                                <h4 className="text-[10px] font-semibold text-[#73726E] uppercase tracking-wider mb-1.5">Qualifikationen</h4>
+                                                <CollapsibleList items={job.qualifications} limit={3} icon="✓" />
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : null}
 
-                                    {job.qualifications && job.qualifications.length > 0 && (
-                                        <div>
-                                            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                                                Qualifikationen
-                                            </h4>
-                                            <ul className="space-y-1">
-                                                {job.qualifications.map((q, i) => (
-                                                    <li key={i} className="text-sm text-gray-600 flex gap-2">
-                                                        <span className="text-green-400 mt-0.5">✓</span>
-                                                        <span>{q}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Benefits (falls vorhanden) */}
+                                {/* Benefits — compact single row of chips grouped inline */}
                                 {job.benefits && job.benefits.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 pt-2">
+                                    <div className="flex flex-wrap gap-1.5">
                                         {job.benefits.map((b, i) => (
-                                            <span key={i} className="text-xs bg-gray-50 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full">
-                                                {b}
-                                            </span>
+                                            <span key={i} className="text-[10px] bg-[#f1f1ef] text-[#37352F] border border-[#e7e7e5] px-2 py-0.5 rounded">{b}</span>
                                         ))}
                                     </div>
                                 )}
-                                {(!job.responsibilities || job.responsibilities.length === 0) && (!job.qualifications || job.qualifications.length === 0) && (
-                                    <div className="text-center py-6 text-sm text-gray-500 bg-white/50 rounded-lg border border-dashed border-gray-300">
-                                        <Info className="w-5 h-5 mx-auto mb-2 text-gray-400" />
-                                        Keine tiefgehenden strukturierten Daten für diesen Job vorhanden.<br />
-                                        <span className="text-xs text-gray-400">Extraktion erfolgt beim nächsten Resume Match Checker Lauf.</span>
+
+                                {/* Buzzwords inline */}
+                                {job.buzzwords && job.buzzwords.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <span className="text-[10px] font-semibold text-[#73726E] uppercase tracking-wider self-center mr-1">ATS:</span>
+                                        {job.buzzwords.map((bw, i) => (
+                                            <span key={i} className="text-[10px] font-medium bg-[#f0f4ff] text-[#002e7a] px-2 py-0.5 rounded border border-[#d6e0ff]">{bw}</span>
+                                        ))}
                                     </div>
                                 )}
+
+                                {/* Confirm or Analyse */}
+                                {job.responsibilities && job.responsibilities.length > 0 && (
+                                    <div className="flex justify-end">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onConfirm?.(job.id); }}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#002e7a] text-white text-xs font-medium rounded-md hover:bg-[#002e7a]/90 transition-colors"
+                                        >
+                                            <Check className="w-3.5 h-3.5" />
+                                            Steckbrief bestätigen →
+                                        </button>
+                                    </div>
+                                )}
+                                {(!job.responsibilities || job.responsibilities.length === 0) &&
+                                    (!job.qualifications || job.qualifications.length === 0) && (
+                                        <div className="text-center py-6 space-y-3 bg-white/50 rounded-lg border border-dashed border-[#d6d6d6]">
+                                            <Info className="w-5 h-5 mx-auto text-[#73726E]" />
+                                            <p className="text-sm text-[#73726E]">Keine strukturierten Daten vorhanden.</p>
+                                            {job.summary && <p className="text-sm text-[#37352F] max-w-lg mx-auto">{job.summary}</p>}
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onReanalyze?.(job.id); }}
+                                                className="text-xs text-[#002e7a] underline hover:no-underline"
+                                            >
+                                                Jetzt analysieren
+                                            </button>
+                                        </div>
+                                    )}
                             </div>
                         )}
 
                         {displayTab === 1 && (
-                            <PlaceholderStep
-                                icon={<FileText className="w-8 h-8 text-[#0066FF]" />}
-                                title="CV Match Checker"
-                                description="Vergleiche deinen Lebenslauf mit den Anforderungen dieses Jobs. Die KI zeigt dir exakt auf, wo Stärken und Lücken liegen."
-                                status="Coming in Phase 2"
+                            <CVMatchTab
+                                jobId={job.id}
+                                cachedMatch={job.metadata?.cv_match}
+                                onMatchStart={() => console.log('CV Match started')}
+                                onMatchComplete={() => {
+                                    // Optionally trigger a refresh of the job state or just let the component handle its own display
+                                }}
                             />
                         )}
 
@@ -285,6 +443,35 @@ export function JobRow({ job, expanded, onToggle, onOptimize, isOptimizing }: Jo
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            <CustomDialog
+                isOpen={showDeleteDialog}
+                onClose={() => setShowDeleteDialog(false)}
+                title="Bewerbung löschen"
+            >
+                <div className="p-6">
+                    <p className="text-[#73726E] mb-6">
+                        Bist du sicher, dass du die Bewerbung bei <strong>{job.company}</strong> für die Position <strong>{job.jobTitle}</strong> endgültig löschen möchtest?
+                    </p>
+                    <div className="flex justify-end gap-3 mt-6">
+                        <Button variant="outline" onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(false); }}>
+                            Abbrechen
+                        </Button>
+                        <Button
+                            variant="primary"
+                            className="bg-red-600 hover:bg-red-700 text-white border-transparent shadow-sm"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDeleteDialog(false);
+                                onDelete?.(job.id);
+                            }}
+                        >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Löschen
+                        </Button>
+                    </div>
+                </div>
+            </CustomDialog>
         </motion.div>
     );
 }

@@ -46,7 +46,7 @@ export default function DashboardPage() {
     // Fetch real jobs from DB
     const fetchJobs = async () => {
         try {
-            const res = await fetch('/api/jobs/list');
+            const res = await fetch('/api/jobs/list', { cache: 'no-store' });
             if (!res.ok) return;
             const data = await res.json();
             if (data.success && data.jobs) {
@@ -60,7 +60,8 @@ export default function DashboardPage() {
                     qualifications: (j.requirements as string[]) || null,
                     benefits: (j.benefits as string[]) || null,
                     seniority: (j.seniority as string) || 'unknown',
-                    matchScore: 0,
+                    buzzwords: (j.buzzwords as string[]) || null,
+                    matchScore: (j.match_score as number) || ((j.status !== 'pending' || (j.responsibilities && (j.responsibilities as string[]).length > 0)) ? 10 : 0),
                     workflowStep: mapDbStatusToStep(j.status as string),
                     status: mapDbStatusToUi(j.status as string),
                 }));
@@ -141,6 +142,57 @@ export default function DashboardPage() {
             });
         } finally {
             setIsOptimizing(false);
+        }
+    };
+
+    const handleReanalyze = async (jobId: string) => {
+        toast.info('Analysiere Job-Beschreibung...');
+        try {
+            const res = await fetch('/api/jobs/extract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId }),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+            await fetchJobs();
+            toast.success('Steckbrief erfolgreich extrahiert ✓');
+        } catch (err) {
+            toast.error('Extraktion fehlgeschlagen', { description: String(err) });
+        }
+    };
+
+    const handleConfirm = async (jobId: string) => {
+        try {
+            await fetch('/api/jobs/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId }),
+            });
+            // Lokalen State sofort updaten — kein Reload nötig
+            setJobs(prev => prev.map(j =>
+                j.id === jobId ? { ...j, status: 'JOB_REVIEWED', workflowStep: 1 } : j
+            ));
+            toast.success('Steckbrief bestätigt → CV Match freigeschaltet');
+        } catch {
+            toast.error('Bestätigung fehlgeschlagen');
+        }
+    };
+
+    const handleDelete = async (jobId: string) => {
+        toast.info("Lösche Bewerbung...");
+        try {
+            const res = await fetch('/api/jobs/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId }),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+            setJobs(prev => prev.filter(j => j.id !== jobId));
+            toast.success("Bewerbung gelöscht");
+        } catch (err) {
+            toast.error("Löschen fehlgeschlagen", { description: String(err) });
         }
     };
 
@@ -234,6 +286,9 @@ export default function DashboardPage() {
                 <JobQueueTable
                     jobs={jobs}
                     onOptimize={handleOptimizeCV}
+                    onReanalyze={handleReanalyze}
+                    onConfirm={handleConfirm}
+                    onDelete={handleDelete}
                     loading={isLoading}
                     optimizingJobId={isOptimizing ? currentJobId : null}
                 />

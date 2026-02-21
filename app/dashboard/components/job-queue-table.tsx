@@ -11,11 +11,14 @@ interface JobQueueTableProps {
     jobs: Job[];
     className?: string;
     onOptimize?: (jobId: string) => void;
+    onReanalyze?: (jobId: string) => void;
+    onConfirm?: (jobId: string) => void;
+    onDelete?: (jobId: string) => void;
     loading?: boolean;
     optimizingJobId?: string | null;
 }
 
-export function JobQueueTable({ jobs, className, onOptimize, loading, optimizingJobId }: JobQueueTableProps) {
+export function JobQueueTable({ jobs, className, onOptimize, onReanalyze, onConfirm, onDelete, loading, optimizingJobId }: JobQueueTableProps) {
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     const handleToggle = (jobId: string) => {
@@ -46,6 +49,9 @@ export function JobQueueTable({ jobs, className, onOptimize, loading, optimizing
                         expanded={expandedId === job.id}
                         onToggle={() => handleToggle(job.id)}
                         onOptimize={onOptimize}
+                        onReanalyze={onReanalyze}
+                        onConfirm={onConfirm}
+                        onDelete={onDelete}
                         isOptimizing={optimizingJobId === job.id}
                     />
                 ))}

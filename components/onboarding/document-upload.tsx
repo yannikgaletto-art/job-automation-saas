@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { motion } from "framer-motion"
+import { useState, useCallback, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -31,6 +31,26 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
     const [isUploading, setIsUploading] = useState(false)
     const [uploadProgress, setUploadProgress] = useState(0)
     const [error, setError] = useState<string | null>(null)
+    const [uploadSuccess, setUploadSuccess] = useState(false)
+    const [existingDocs, setExistingDocs] = useState<any[]>([])
+    const [isLoadingDocs, setIsLoadingDocs] = useState(true)
+
+    useEffect(() => {
+        async function fetchDocs() {
+            try {
+                const res = await fetch('/api/documents/list');
+                const data = await res.json();
+                if (data.success) {
+                    setExistingDocs(data.documents);
+                }
+            } catch (err) {
+                console.error("Failed to load documents", err)
+            } finally {
+                setIsLoadingDocs(false)
+            }
+        }
+        fetchDocs()
+    }, [])
 
     const validateFile = (file: File): string | null => {
         if (file.size > MAX_FILE_SIZE) {
@@ -129,6 +149,8 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
 
             clearInterval(progressInterval)
             setUploadProgress(100)
+            setUploadSuccess(true)
+            setTimeout(() => setUploadSuccess(false), 5000);
 
             console.log("Upload state:", { state: "success" });
 
@@ -174,6 +196,40 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
                     </CardHeader>
 
                     <CardContent className="space-y-6 px-8">
+                        {/* Existing Documents Section */}
+                        {!isLoadingDocs && existingDocs.length > 0 && (
+                            <div className="mb-6 p-4 bg-[#F7F7F5] rounded-lg border border-[#E7E7E5]">
+                                <h3 className="text-sm font-semibold text-[#37352F] mb-3">Bereits hochgeladen:</h3>
+                                <ul className="space-y-2">
+                                    {existingDocs.map((doc: any) => (
+                                        <li key={doc.id} className="flex items-center gap-3 text-sm text-[#5A5955] bg-white p-2 rounded-md border border-[#E7E7E5]">
+                                            <FileText className="w-4 h-4 text-[#0066FF]" />
+                                            <span className="flex-1 truncate">{doc.name}</span>
+                                            <span className="text-xs text-[#A8A29E] uppercase">{doc.type}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Success Banner */}
+                        <AnimatePresence>
+                            {uploadSuccess && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="bg-green-50 border border-green-200 text-green-800 rounded-lg p-4 flex items-center gap-3"
+                                >
+                                    <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                                    <div>
+                                        <p className="font-semibold">Erfolgreich hochgeladen! ✓</p>
+                                        <p className="text-sm text-green-700">Dein Lebenslauf und Anschreiben wurden gespeichert.</p>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
                         {error && (
                             <Alert variant="destructive" className="bg-red-50 text-red-900 border-red-200">
                                 <AlertCircle className="h-4 w-4 text-red-600" />

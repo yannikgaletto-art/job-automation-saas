@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { JobQueueTable } from '../components/job-queue-table';
 import { Job } from '../components/job-row';
 import { Button } from '@/components/motion/button';
@@ -11,37 +10,10 @@ import { CustomDialog } from '@/components/ui/custom-dialog';
 import { CVComparison } from '@/components/cv/cv-comparison';
 import type { CVOptimizationResult } from '@/lib/services/cv-optimizer';
 import { toast } from "sonner";
-import { ErrorAlert } from '@/components/ui/error-alert';
 
 export default function JobQueuePage() {
-    // Demo data with different workflow states
-    const [jobs, setJobs] = useState<Job[]>([
-        {
-            id: '1',
-            company: 'Stripe',
-            jobTitle: 'Backend Eng.',
-            matchScore: 95,
-            workflowStep: 4,
-            status: 'CL_GENERATED',
-        },
-        {
-            id: '2',
-            company: 'Tesla',
-            jobTitle: 'Full-Stack',
-            matchScore: 88,
-            workflowStep: 2,
-            status: 'CV_CHECKED', // Ready for optimization
-        },
-        {
-            id: '3',
-            company: 'N26',
-            jobTitle: 'Platform',
-            matchScore: 82,
-            workflowStep: 1,
-            status: 'JOB_REVIEWED',
-        },
-    ]);
-
+    const [jobs, setJobs] = useState<Job[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isAddJobOpen, setIsAddJobOpen] = useState(false);
 
     // Optimization State
@@ -49,96 +21,138 @@ export default function JobQueuePage() {
     const [optimizationResult, setOptimizationResult] = useState<CVOptimizationResult | null>(null);
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
 
-    // Simulate initial loading (for demonstration)
-    const [isLoading, setIsLoading] = useState(true);
+    const mapDbStatusToUi = (dbStatus: string): Job['status'] => {
+        switch (dbStatus) {
+            case 'pending': return 'NEW';
+            case 'processing': return 'JOB_REVIEWED';
+            case 'ready_for_review': return 'CV_OPTIMIZED';
+            case 'ready_to_apply': return 'CL_GENERATED';
+            case 'submitted': return 'READY';
+            default: return 'NEW';
+        }
+    };
+
+    const mapDbStatusToStep = (dbStatus: string): number => {
+        switch (dbStatus) {
+            case 'pending': return 0;
+            case 'processing': return 1;
+            case 'ready_for_review': return 2;
+            case 'ready_to_apply': return 4;
+            case 'submitted': return 4;
+            default: return 0;
+        }
+    };
+
+    const fetchJobs = async () => {
+        try {
+            const res = await fetch('/api/jobs/list', { cache: 'no-store' });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.success && data.jobs) {
+                const dbJobs: Job[] = data.jobs.map((j: Record<string, unknown>) => ({
+                    id: j.id as string,
+                    company: (j.company_name as string) || 'Unknown',
+                    jobTitle: (j.job_title as string) || 'Unknown Position',
+                    location: (j.location as string) || null,
+                    summary: (j.summary as string) || null,
+                    responsibilities: (j.responsibilities as string[]) || null,
+                    qualifications: (j.requirements as string[]) || null,
+                    benefits: (j.benefits as string[]) || null,
+                    seniority: (j.seniority as string) || 'unknown',
+                    buzzwords: (j.buzzwords as string[]) || null,
+                    matchScore: (j.match_score as number) || ((j.status !== 'pending' || (j.responsibilities && (j.responsibilities as string[]).length > 0)) ? 10 : 0),
+                    workflowStep: mapDbStatusToStep(j.status as string),
+                    status: mapDbStatusToUi(j.status as string),
+                }));
+                setJobs(dbJobs);
+            }
+        } catch (err) {
+            console.warn('⚠️ Could not fetch jobs:', err);
+        }
+    };
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsLoading(false);
-        }, 1000);
-        return () => clearTimeout(timer);
+        fetchJobs().finally(() => setIsLoading(false));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const handleReanalyze = async (jobId: string) => {
+        toast.info('Analysiere Job-Beschreibung...');
+        try {
+            const res = await fetch('/api/jobs/extract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId }),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+            await fetchJobs();
+            toast.success('Steckbrief erfolgreich extrahiert ✓');
+        } catch (err) {
+            toast.error('Extraktion fehlgeschlagen', { description: String(err) });
+        }
+    };
+
+    const handleConfirm = async (jobId: string) => {
+        try {
+            await fetch('/api/jobs/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId }),
+            });
+            setJobs(prev => prev.map(j =>
+                j.id === jobId ? { ...j, status: 'JOB_REVIEWED', workflowStep: 1 } : j
+            ));
+            toast.success('Steckbrief bestätigt → CV Match freigeschaltet');
+        } catch {
+            toast.error('Bestätigung fehlgeschlagen');
+        }
+    };
+
+    const handleDelete = async (jobId: string) => {
+        toast.info("Lösche Bewerbung...");
+        try {
+            const res = await fetch('/api/jobs/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId }),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+            setJobs(prev => prev.filter(j => j.id !== jobId));
+            toast.success("Bewerbung gelöscht");
+        } catch (err) {
+            toast.error("Löschen fehlgeschlagen", { description: String(err) });
+        }
+    };
 
     const handleOptimizeCV = async (jobId: string) => {
         setIsOptimizing(true);
         setCurrentJobId(jobId);
-        setError(null);
-
         try {
-            // In a real app, we'd get userId from session
-            const userId = "test-user-id";
-
-            // Call API
             const response = await fetch('/api/cv/optimize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, jobId })
+                body: JSON.stringify({ jobId })
             });
-
             if (!response.ok) {
                 const err = await response.json();
                 throw new Error(err.error || 'Optimization failed');
             }
-
             const result = await response.json();
             setOptimizationResult(result);
             setShowOptimization(true);
-
-            // Update local job status to reflect optimization done
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'CV_OPTIMIZED', workflowStep: 3 } : j));
-            toast.success("CV Optimization Complete", {
-                description: "Review the suggested changes below."
-            });
-
+            toast.success("CV optimiert");
         } catch (error) {
-            console.error('❌ Optimization failed:', error);
-            const message = error instanceof Error ? error.message : "Optimization request failed";
-            toast.error("Optimization Failed", {
-                description: message,
-                action: {
-                    label: "Retry",
-                    onClick: () => handleOptimizeCV(jobId)
-                }
+            toast.error("Optimierung fehlgeschlagen", {
+                description: error instanceof Error ? error.message : "Bitte erneut versuchen"
             });
         } finally {
             setIsOptimizing(false);
         }
     };
-
-    const handleAcceptAll = async () => {
-        // Logic to persist final choice or move to next step
-        console.log('✅ Accepted all changes for job', currentJobId);
-        toast.success("Changes Applied", {
-            description: "Your CV has been updated."
-        });
-        setShowOptimization(false);
-    };
-
-    const handleDownload = async () => {
-        console.log('📥 Download requested');
-        toast.info("Download Started", {
-            description: "Your PDF is being generated..."
-        });
-        // Simulate delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        toast.error("Not Implemented", {
-            description: "PDF Download is not available in this demo."
-        });
-    };
-
-    if (error) {
-        return (
-            <div className="p-8">
-                <ErrorAlert
-                    title="Error Loading Job Queue"
-                    message={error}
-                    onRetry={() => window.location.reload()}
-                />
-            </div>
-        );
-    }
 
     return (
         <div className="space-y-8 max-w-7xl mx-auto">
@@ -146,7 +160,8 @@ export default function JobQueuePage() {
                 isOpen={isAddJobOpen}
                 onClose={() => setIsAddJobOpen(false)}
                 onJobAdded={() => {
-                    toast.success("Job Added", { description: "The new job has been added to your queue." });
+                    fetchJobs();
+                    toast.success("Job hinzugefügt");
                 }}
             />
 
@@ -164,15 +179,16 @@ export default function JobQueuePage() {
 
             {/* Job Queue Table */}
             <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        {isOptimizing && <span className="text-sm text-blue-600 animate-pulse">✨ Optimizing CV...</span>}
-                    </div>
+                <div className="flex items-center gap-2">
+                    {isOptimizing && <span className="text-sm text-blue-600 animate-pulse">✨ Optimizing CV...</span>}
                 </div>
 
                 <JobQueueTable
                     jobs={jobs}
                     onOptimize={handleOptimizeCV}
+                    onReanalyze={handleReanalyze}
+                    onConfirm={handleConfirm}
+                    onDelete={handleDelete}
                     loading={isLoading}
                     optimizingJobId={isOptimizing ? currentJobId : null}
                 />
@@ -190,9 +206,9 @@ export default function JobQueuePage() {
                     {optimizationResult && (
                         <CVComparison
                             optimizationResult={optimizationResult}
-                            onAcceptAll={handleAcceptAll}
+                            onAcceptAll={async () => { setShowOptimization(false); toast.success("Änderungen übernommen"); }}
                             onRejectAll={() => setShowOptimization(false)}
-                            onDownload={handleDownload}
+                            onDownload={async () => { toast.info("PDF Download noch nicht implementiert"); }}
                         />
                     )}
                 </div>

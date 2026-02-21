@@ -42,17 +42,16 @@ export function PageTransition({ children }: PageTransitionProps) {
   const pathname = usePathname();
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={pathname}
-        variants={pageVariants}
-        initial="initial"
-        animate="enter"
-        exit="exit"
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <motion.div
+      key={pathname}
+      variants={pageVariants}
+      initial="initial"
+      animate="enter"
+    // Exit animations don't work reliably with template.tsx in App Router without hacks,
+    // and AnimatePresence causes the entering component to get stuck at opacity 0
+    >
+      {children}
+    </motion.div>
   );
 }
 

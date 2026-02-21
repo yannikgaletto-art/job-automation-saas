@@ -146,11 +146,23 @@ export async function POST(req: NextRequest) {
 
         } catch (procError) {
             const errMsg = procError instanceof Error ? procError.message : String(procError)
-            console.error(`[${requestId}] route=documents/upload step=process_cv error=${errMsg}`)
-            return NextResponse.json(
-                { error: errMsg, requestId },
-                { status: 400 }
-            )
+            console.error(`[${requestId}] route=documents/upload step=process_cv extraction_failed_non_blocking error=${errMsg}`)
+            // Non-blocking: save the file without extracted text rather than failing the whole upload
+            const { data: cvDoc, error: cvDbError } = await supabaseAdmin
+                .from('documents')
+                .insert({
+                    user_id: userId,
+                    document_type: 'cv',
+                    file_url_encrypted: cvUploadData.path,
+                    metadata: { extracted_text: null, extraction_error: errMsg },
+                    pii_encrypted: {}
+                })
+                .select()
+                .single()
+            if (!cvDbError && cvDoc) {
+                cvDocId = cvDoc.id
+                console.log(`[${requestId}] route=documents/upload step=db_insert_cv_fallback success`)
+            }
         }
 
         // 2. Upload cover letters

@@ -12,44 +12,7 @@ import { useState } from 'react';
 // ============================================================================
 
 export default function DemoPage() {
-  const [jobs, setJobs] = useState([
-    {
-      id: 1,
-      company: 'Stripe',
-      logo: 'https://logo.clearbit.com/stripe.com',
-      jobTitle: 'Senior Backend Engineer',
-      location: 'Berlin',
-      salary: '€90-120k',
-      remote: 'Full Remote',
-      matchScore: 95,
-      aiInsight: 'Perfect match - your Python experience aligns with their payment infrastructure needs.',
-      skills: ['Python', 'Kubernetes', 'gRPC', 'PostgreSQL', 'Redis'],
-    },
-    {
-      id: 2,
-      company: 'Tesla',
-      logo: 'https://logo.clearbit.com/tesla.com',
-      jobTitle: 'Full-Stack Developer',
-      location: 'Berlin',
-      salary: '€80-100k',
-      remote: 'Hybrid (60%)',
-      matchScore: 88,
-      aiInsight: 'Great fit - your React and Node.js skills match their requirements. Tesla is expanding Gigafactory Berlin.',
-      skills: ['React', 'Node.js', 'TypeScript', 'AWS', 'Docker'],
-    },
-    {
-      id: 3,
-      company: 'N26',
-      logo: 'https://logo.clearbit.com/n26.com',
-      jobTitle: 'Platform Engineer',
-      location: 'Berlin',
-      salary: '€75-95k',
-      remote: 'Full Remote',
-      matchScore: 82,
-      aiInsight: 'Good match - your DevOps background fits their platform team needs.',
-      skills: ['Kubernetes', 'Terraform', 'AWS', 'Python', 'Go'],
-    },
-  ]);
+  const [jobs, setJobs] = useState<any[]>([]);
 
   const handleReview = (jobId: number) => {
     console.log('Review job:', jobId);
@@ -98,7 +61,7 @@ export default function DemoPage() {
               <h1 className="text-3xl font-semibold text-[#37352F] mb-2">
                 Auto-Apply Inbox
               </h1>
-              <motion.p 
+              <motion.p
                 className="text-[#73726E]"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -133,19 +96,19 @@ export default function DemoPage() {
                 ))}
               </div>
             ) : (
-              <motion.div 
+              <motion.div
                 className="text-center py-24"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: "spring", stiffness: 200 }}
               >
                 <motion.div
-                  animate={{ 
+                  animate={{
                     y: [0, -10, 0],
                     rotate: [0, 5, -5, 0]
                   }}
-                  transition={{ 
-                    duration: 2, 
+                  transition={{
+                    duration: 2,
                     repeat: Infinity,
                     ease: "easeInOut"
                   }}

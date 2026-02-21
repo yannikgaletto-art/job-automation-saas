@@ -11,7 +11,7 @@ const navItems = [
     title: 'Main',
     items: [
       { icon: Home, label: 'Dashboard', href: '/dashboard', badge: null },
-      { icon: Inbox, label: 'Job Queue', href: '/job-queue', badge: 12 },
+      { icon: Inbox, label: 'Job Queue', href: '/dashboard/job-queue', badge: null },
       { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics', badge: null },
     ],
   },

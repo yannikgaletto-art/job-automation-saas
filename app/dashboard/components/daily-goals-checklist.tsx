@@ -15,11 +15,7 @@ interface Goal {
     completed: boolean
 }
 
-const DEFAULT_GOALS: Goal[] = [
-    { id: '1', text: 'N26 to Review-Ready', progress: 75, completed: false },
-    { id: '2', text: 'Stripe: Generate Cover Letter', progress: 40, completed: false },
-    { id: '3', text: 'Tesla: Optimize CV', progress: 20, completed: false },
-]
+const DEFAULT_GOALS: Goal[] = []
 
 export function DailyGoalsChecklist() {
     const [goals, setGoals] = useState<Goal[]>(DEFAULT_GOALS)

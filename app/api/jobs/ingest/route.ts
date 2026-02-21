@@ -84,7 +84,8 @@ export async function POST(request: NextRequest) {
                     responsibilities: "string[] — Aufgaben als Stichpunkte (max 8)",
                     qualifications: "string[] — Anforderungen/Qualifikationen (max 8)",
                     benefits: "string[] — Benefits (max 5, kann leer sein)",
-                    seniority: "'junior' | 'mid' | 'senior' | 'lead' | 'unknown'"
+                    seniority: "'junior' | 'mid' | 'senior' | 'lead' | 'unknown'",
+                    buzzwords: "string[] — ATS/Robot-Keywords: Tools, Methoden, Frameworks (max 12)"
                 };
 
                 const message = await anthropic.messages.create({
@@ -100,7 +101,16 @@ export async function POST(request: NextRequest) {
                     try {
                         extractedData = JSON.parse(text);
                     } catch (parseError) {
-                        console.warn(`[${requestId}] route=jobs/ingest step=ai_parse JSON parse failed, text=${text.substring(0, 50)}...`);
+                        const jsonMatch = text.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) {
+                            try {
+                                extractedData = JSON.parse(jsonMatch[0]);
+                            } catch (e) {
+                                console.warn(`[${requestId}] route=jobs/ingest step=ai_parse JSON fallback parse failed`);
+                            }
+                        } else {
+                            console.warn(`[${requestId}] route=jobs/ingest step=ai_parse JSON parse failed, text=${text.substring(0, 50)}...`);
+                        }
                     }
                 }
             } else {
@@ -156,6 +166,7 @@ export async function POST(request: NextRequest) {
                 summary: extractedData.summary || null,
                 seniority: extractedData.seniority || 'unknown',
                 benefits: extractedData.benefits || [],
+                buzzwords: extractedData.buzzwords || null,
                 platform: 'unknown',
                 snapshot_at: new Date().toISOString(),
                 status: 'pending',

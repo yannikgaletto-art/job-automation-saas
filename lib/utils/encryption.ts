@@ -17,10 +17,20 @@ function getKey(): Buffer {
     if (key.length === 64) {
         return Buffer.from(key, 'hex');
     }
-    // If key is 32 chars (raw bytes represented as string) - risky but possible
+    // If key is 32 chars (raw bytes represented as string)
     if (key.length === 32) {
         return Buffer.from(key, 'utf-8');
     }
+    // If key is Base64-encoded (44 chars = 32 bytes)
+    if (key.length === 44 && key.endsWith('=')) {
+        const buf = Buffer.from(key, 'base64');
+        if (buf.length === 32) return buf;
+    }
+    // Final fallback: try base64 regardless of length and check decoded length
+    try {
+        const buf = Buffer.from(key, 'base64');
+        if (buf.length === 32) return buf;
+    } catch { }
 
     throw new Error(ERR_MISSING_KEY);
 }

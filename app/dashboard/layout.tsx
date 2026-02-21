@@ -4,6 +4,7 @@ import { Sidebar, NavSection, NavItem } from '@/components/motion/sidebar';
 import { Home, Inbox, BarChart3, Shield, Settings } from 'lucide-react';
 import { PomodoroCard } from './components/pomodoro-card';
 import { usePathname } from 'next/navigation';
+import { Toaster } from 'sonner';
 
 export default function DashboardLayout({
     children,
@@ -12,34 +13,37 @@ export default function DashboardLayout({
 }) {
     const pathname = usePathname();
     return (
-        <div className="min-h-screen bg-[#FAFAF9] flex">
-            {/* Sidebar */}
-            <Sidebar>
-                <NavSection title="Main">
-                    <NavItem
-                        icon={Home}
-                        label="Dashboard"
-                        href="/dashboard"
-                        isActive={pathname === '/dashboard'}
-                    />
-                    <NavItem icon={Inbox} label="Job Queue" href="/dashboard/job-queue" badge={3} />
-                    <NavItem icon={BarChart3} label="Analytics" href="/dashboard/analytics" />
-                </NavSection>
+        <>
+            <div className="min-h-screen bg-[#FAFAF9] flex">
+                {/* Sidebar */}
+                <Sidebar>
+                    <NavSection title="Main">
+                        <NavItem
+                            icon={Home}
+                            label="Dashboard"
+                            href="/dashboard"
+                            isActive={pathname === '/dashboard'}
+                        />
+                        <NavItem icon={Inbox} label="Job Queue" href="/dashboard/job-queue" />
+                        <NavItem icon={BarChart3} label="Analytics" href="/dashboard/analytics" />
+                    </NavSection>
 
-                <NavSection title="Tools">
-                    <NavItem icon={Shield} label="Data Security" href="/dashboard/security" />
-                    <NavItem icon={Settings} label="Settings" href="/dashboard/settings" />
-                </NavSection>
+                    <NavSection title="Tools">
+                        <NavItem icon={Shield} label="Data Security" href="/dashboard/security" />
+                        <NavItem icon={Settings} label="Settings" href="/dashboard/settings" />
+                    </NavSection>
 
-                <NavSection title="Focus" className="mt-auto">
-                    <PomodoroCard />
-                </NavSection>
-            </Sidebar>
+                    <NavSection title="Focus" className="mt-auto">
+                        <PomodoroCard />
+                    </NavSection>
+                </Sidebar>
 
-            {/* Main Content */}
-            <main className="flex-1 ml-64 p-8">
-                {children}
-            </main>
-        </div>
+                {/* Main Content */}
+                <main className="flex-1 ml-64 p-8">
+                    {children}
+                </main>
+            </div>
+            <Toaster richColors position="top-right" />
+        </>
     );
 }

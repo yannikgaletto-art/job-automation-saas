@@ -9,9 +9,9 @@ export default function CompanyDisplayDemo() {
 
     const mockCompanyValues = ["Innovation", "User-Centricity", "Transparency", "Move Fast"]
     const mockNews = [
-        "Stripe launches new payment processing features for platforms",
-        "Stripe expands into new markets in Southeast Asia",
-        "Stripe valued at $65B in latest funding round"
+        "Example Corp launches new software features for platforms",
+        "Example Corp expands into new markets in Europe",
+        "Example Corp valued at $1B in latest funding round"
     ]
     const mockLinkedinActivity = [
         {
@@ -61,7 +61,7 @@ export default function CompanyDisplayDemo() {
                     <div className="space-y-4">
                         <h2 className="text-lg font-semibold text-[#37352F]">Company Intel Card</h2>
                         <CompanyIntelCard
-                            companyName="Stripe"
+                            companyName="Example Corp"
                             companyValues={mockCompanyValues}
                             recentNews={mockNews}
                             linkedinActivity={mockLinkedinActivity}

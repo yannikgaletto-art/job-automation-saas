@@ -212,6 +212,9 @@ CREATE TABLE IF NOT EXISTS job_queue (
   cover_letter TEXT,
   cover_letter_quality_score FLOAT,
   
+  -- Metadata for extensions (like CV Match)
+  metadata JSONB DEFAULT '{}'::jsonb,
+  
   -- PII Reference (DSGVO compliant - no unencrypted PII!)
   user_profile_id UUID REFERENCES user_profiles(id) NOT NULL,
   
@@ -415,6 +418,7 @@ CREATE TABLE IF NOT EXISTS generation_logs (
   company_relevance_score FLOAT,
   individuality_score FLOAT,
   overall_score FLOAT,
+  realism_score FLOAT,
   
   issues JSONB,
   suggestions JSONB,

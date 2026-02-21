@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { CoverLetterPreview } from "@/components/cover-letter/cover-letter-preview"
 import { CoverLetterActions } from "@/components/cover-letter/cover-letter-actions"
 import { QualityFeedback } from "@/components/cover-letter/quality-feedback"
+import { Mail, Sparkles } from "lucide-react"
+import { Button } from "@/components/motion/button"
 import { QualityScores } from "@/components/cover-letter/types"
 
 interface Step4CoverLetterProps {
@@ -26,13 +28,13 @@ const DEMO_MODE = true; // Set to false when real backend is ready
 
 const MOCK_COVER_LETTER = `Sehr geehrte Damen und Herren,
 
-mit großem Interesse habe ich Ihre Stellenausschreibung für die Position als Backend Engineer bei Stripe gelesen. Als erfahrener Softwareentwickler mit fundiertem Wissen in verteilten Systemen und Payment-Infrastrukturen möchte ich mich hiermit auf diese spannende Position bewerben.
+mit großem Interesse habe ich Ihre Stellenausschreibung für die offene Position gelesen. Als erfahrener Profi mit fundiertem Wissen in diesem Bereich möchte ich mich hiermit auf diese spannende Rolle bewerben.
 
-In meiner bisherigen Laufbahn habe ich umfangreiche Erfahrungen in der Entwicklung skalierbarer Backend-Systeme gesammelt. Besonders reizvoll finde ich an Stripe die Möglichkeit, an einer Plattform zu arbeiten, die Millionen von Transaktionen täglich verarbeitet und dabei höchste Sicherheitsstandards gewährleistet.
+In meiner bisherigen Laufbahn habe ich umfangreiche Erfahrungen gesammelt. Besonders reizvoll finde ich an Ihrem Unternehmen die Möglichkeit, an innovativen Lösungen zu arbeiten und dabei höchste Standards zu gewährleisten.
 
-Meine technischen Fähigkeiten umfassen tiefgreifende Kenntnisse in Go, Python und Rust sowie Erfahrung mit Kubernetes, PostgreSQL und Redis. Zudem bringe ich ein starkes Verständnis für API-Design und Microservices-Architekturen mit.
+Meine technischen Fähigkeiten umfassen tiefgreifende Kenntnisse in verschiedenen Technologien und Erfahrung mit relevanten Tools. Zudem bringe ich ein starkes Verständnis für moderne Architekturen mit.
 
-Was mich besonders an Stripe begeistert, ist Ihr Engagement für Developer Experience und die kontinuierliche Innovation im Bereich der Zahlungsinfrastruktur. Ihre kürzlich veröffentlichten Entwicklungen im Bereich embedded finance zeigen, wie Sie die Zukunft des digitalen Handels aktiv mitgestalten.
+Was mich besonders begeistert, ist Ihr Engagement für Qualität und die kontinuierliche Entwicklung. Ihre kürzlich veröffentlichten Erfolge zeigen, wie Sie die Zukunft aktiv mitgestalten.
 
 Ich bin überzeugt, dass meine Erfahrung und meine Leidenschaft für technische Exzellenz einen wertvollen Beitrag zu Ihrem Team leisten können. Gerne würde ich in einem persönlichen Gespräch mehr über die Position erfahren und meine Qualifikationen näher erläutern.
 
@@ -70,13 +72,14 @@ export function Step4CoverLetter({
     const [isLoading, setIsLoading] = useState(false)
     const [isRegenerating, setIsRegenerating] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [started, setStarted] = useState(false)
 
     // Initial generation (auto-trigger only if no data)
     useEffect(() => {
-        if (!result && !isLoading) {
+        if (started && !result && !isLoading) {
             generateCoverLetter()
         }
-    }, [jobId])
+    }, [jobId, started])
 
     const generateCoverLetter = async () => {
         try {
@@ -157,6 +160,23 @@ export function Step4CoverLetter({
     const handleRegenerate = async () => {
         setIsRegenerating(true)
         await generateCoverLetter()
+    }
+
+    if (!started && !result) {
+        return (
+            <div className="px-6 py-12 flex flex-col items-center gap-4 text-center">
+                <Mail className="w-10 h-10 text-[#002e7a]" />
+                <h3 className="text-lg font-semibold text-[#37352F]">Cover Letter generieren</h3>
+                <p className="text-sm text-[#73726E] max-w-sm">
+                    KI analysiert die Stelle und deinen Schreibstil, um ein
+                    individuelles Anschreiben in deiner Stimme zu erstellen.
+                </p>
+                <Button variant="primary" onClick={() => setStarted(true)}>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Jetzt generieren
+                </Button>
+            </div>
+        )
     }
 
     // Loading state (Skeleton)
