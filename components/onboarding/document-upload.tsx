@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { Upload, FileText, X, CheckCircle2, AlertCircle } from "lucide-react"
+import { Upload, FileText, X, CheckCircle2, AlertCircle, Trash2 } from "lucide-react"
 import { useDropzone } from "react-dropzone"
 
 interface FileWithPreview extends File {
@@ -34,6 +34,7 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
     const [uploadSuccess, setUploadSuccess] = useState(false)
     const [existingDocs, setExistingDocs] = useState<any[]>([])
     const [isLoadingDocs, setIsLoadingDocs] = useState(true)
+    const [deleteError, setDeleteError] = useState<string | null>(null)
 
     useEffect(() => {
         async function fetchDocs() {
@@ -51,6 +52,22 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
         }
         fetchDocs()
     }, [])
+
+    const handleDeleteDoc = async (id: string) => {
+        setDeleteError(null);
+        try {
+            const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || 'Failed to delete document');
+            }
+            // Remove from UI
+            setExistingDocs(prev => prev.filter(doc => doc.id !== id));
+        } catch (error: any) {
+            console.error("Delete error:", error);
+            setDeleteError(error.message || "Dokument konnte nicht gelöscht werden");
+        }
+    };
 
     const validateFile = (file: File): string | null => {
         if (file.size > MAX_FILE_SIZE) {
@@ -137,10 +154,10 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
         });
 
         try {
-            // Simulate upload progress
+            // Animate progress up to 90% while uploading
             const progressInterval = setInterval(() => {
                 setUploadProgress(prev => Math.min(prev + 10, 90))
-            }, 200)
+            }, 300)
 
             await onComplete({
                 cv: cvFile,
@@ -150,7 +167,16 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
             clearInterval(progressInterval)
             setUploadProgress(100)
             setUploadSuccess(true)
-            setTimeout(() => setUploadSuccess(false), 5000);
+            setCvFile(null)
+            setCoverLetterFiles([])
+            // Reload existing docs list
+            const res = await fetch('/api/documents/list');
+            const data = await res.json();
+            if (data.success) setExistingDocs(data.documents);
+            setTimeout(() => {
+                setUploadSuccess(false);
+                setUploadProgress(0);
+            }, 4000);
 
             console.log("Upload state:", { state: "success" });
 
@@ -200,12 +226,25 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
                         {!isLoadingDocs && existingDocs.length > 0 && (
                             <div className="mb-6 p-4 bg-[#F7F7F5] rounded-lg border border-[#E7E7E5]">
                                 <h3 className="text-sm font-semibold text-[#37352F] mb-3">Bereits hochgeladen:</h3>
+                                {deleteError && (
+                                    <p className="text-red-600 text-xs mb-2 bg-red-50 p-2 rounded">{deleteError}</p>
+                                )}
                                 <ul className="space-y-2">
                                     {existingDocs.map((doc: any) => (
                                         <li key={doc.id} className="flex items-center gap-3 text-sm text-[#5A5955] bg-white p-2 rounded-md border border-[#E7E7E5]">
                                             <FileText className="w-4 h-4 text-[#0066FF]" />
                                             <span className="flex-1 truncate">{doc.name}</span>
                                             <span className="text-xs text-[#A8A29E] uppercase">{doc.type}</span>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 text-[#73726E] hover:text-red-600 hover:bg-red-50"
+                                                onClick={() => handleDeleteDoc(doc.id)}
+                                                disabled={isUploading}
+                                                type="button"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
                                         </li>
                                     ))}
                                 </ul>

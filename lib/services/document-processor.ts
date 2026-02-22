@@ -109,9 +109,10 @@ export async function processDocument(
             // Sanitize (Simple string replacement - robust version would use regex escaping)
             // We only replace if the value is somewhat unique (len > 2) to avoid replacing common syllables
             if (value.length > 2) {
+                // To display correct names in PDF, we disable physical redaction of the text for now
                 // Global replace, case insensitive
-                const regex = new RegExp(escapeRegExp(value), 'gi');
-                sanitizedText = sanitizedText.replace(regex, `[${key.toUpperCase()}]`);
+                // const regex = new RegExp(escapeRegExp(value), 'gi');
+                // sanitizedText = sanitizedText.replace(regex, `[${key.toUpperCase()}]`);
             }
         }
     }

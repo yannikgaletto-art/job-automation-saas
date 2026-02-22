@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   
   -- Non-sensitive metadata
   preferred_cv_template TEXT DEFAULT 'notion_modern',
+  cv_original_file_path TEXT,
   onboarding_completed BOOLEAN DEFAULT FALSE,
   subscription_tier TEXT DEFAULT 'free' CHECK (subscription_tier IN ('free', 'starter', 'pro')),
   

@@ -1,6 +1,31 @@
 import { complete } from '@/lib/ai/model-router';
 import { createClient } from '@/lib/supabase/server';
 
+/**
+ * Attempts to parse JSON, with a fallback that truncates the string at the
+ * last complete object/array boundary if the raw parse fails.
+ */
+function safeParseJson(raw: string): any {
+    // First attempt: raw parse
+    try {
+        return JSON.parse(raw);
+    } catch {
+        // Second attempt: find last valid closing brace
+        let truncated = raw;
+        for (let i = raw.length - 1; i >= 0; i--) {
+            if (raw[i] === '}') {
+                truncated = raw.slice(0, i + 1);
+                try {
+                    return JSON.parse(truncated);
+                } catch {
+                    continue;
+                }
+            }
+        }
+        throw new Error('Could not parse AI JSON response: ' + raw.slice(-200));
+    }
+}
+
 export interface CVMatchRequest {
     userId: string;
     jobId: string;
@@ -26,11 +51,11 @@ export interface CVMatchResult {
     overallScore: number; // 0–100
     realismScore?: number;
     scoreBreakdown: {
-        technicalSkills: number;
-        softSkills: number;
-        experienceLevel: number;
-        domainKnowledge: number;
-        languageMatch: number;
+        technicalSkills: { score: number; reasons: string[] } | number;
+        softSkills: { score: number; reasons: string[] } | number;
+        experienceLevel: { score: number; reasons: string[] } | number;
+        domainKnowledge: { score: number; reasons: string[] } | number;
+        languageMatch: { score: number; reasons: string[] } | number;
     };
     requirementRows: RequirementRow[];  // → Renders as Notion 3-column table
     strengths: string[];
@@ -45,6 +70,7 @@ const CV_MATCH_PROMPT = (req: CVMatchRequest) => `
 Du bist ein erfahrener HR-Consultant und ATS-Experte mit hohem Anspruch
 an Realismus. Du bist bekannt dafür, ehrlich zu sein — weder zu hart noch
 zu wohlwollend.
+WICHTIGSTE REGEL: Sprich den Nutzer IMMER direkt mit "Du" an! (Niemals in der dritten Person reden).
 
 **LEBENSLAUF DES KANDIDATEN:**
 ${req.cvText}
@@ -80,16 +106,17 @@ SPALTE 1 — Anforderung:
 Die konsolidierte Anforderungsformulierung.
 
 SPALTE 2 — CV Ist-Zustand (REALISTISCH, nicht wohlwollend):
-- Benenne KONKRET was vorhanden ist: Arbeitgeber, Projektnamen, Zeiträume
-- Benenne EHRLICH was fehlt oder nur peripher vorhanden ist
+- Benenne KONKRET was vorhanden ist (z.B. "Du hast als Co-Founder und Product Owner von...").
+- Sprich den Kandidaten mit "Du" an!
+- Benenne EHRLICH was fehlt oder nur peripher vorhanden ist.
 - Kein Marketing. Kein Schönreden.
-- Format: "[Was vorhanden ist]. [Was fehlt oder begrenzt ist]."
 
 SPALTE 3 — Veränderungsvorschlag (ethisch korrekt):
-- Nur auf Basis echter CV-Fakten
-- Konkrete Formulierungsvorschläge für vorhandene, aber schwach beschriebene Erfahrungen
-- Bei Lücken: ehrlicher Hinweis + was der Kandidat realistisch tun kann
-- KEINE Erfindungen
+- Nur auf Basis echter CV-Fakten.
+- Sprich den Kandidaten mit "Du" an (z.B. "Gehe auf diese Erfahrungen ein und bringe 1-2 Beispiele...").
+- Konkrete Formulierungsvorschläge für vorhandene, aber schwach beschriebene Erfahrungen.
+- Bei Lücken: ehrlicher Hinweis + was man tun kann.
+- KEINE Erfindungen.
 
 STATUS-VERGABE (streng):
 - "met": Direkte Erfahrung, nachweisbar, > 6 Monate oder klarer Erfolg
@@ -101,40 +128,50 @@ STATUS-VERGABE (streng):
 **SCHRITT 3 — SCORE:**
 Berechne einen realistischen Gesamtscore (0–100).
 Sei ehrlich: ein "partial" bei einer ZWINGEND erforderlichen Anforderung zieht den Score deutlich.
+Für jede der 5 Unterkategorien (technicalSkills, softSkills, experienceLevel, domainKnowledge, languageMatch) generierst du den Score UND 2-3 konkrete, kurze Stichpunkte als Begründung, warum dieser Score vergeben wurde (direkt an den Nutzer gerichtet, z.B. "Du bringst 3 Jahre Erfahrung mit").
+
+***
+
+**SCHRITT 4 — ATS KEYWORDS:**
+Reduziere die erkannten und fehlenden ATS-Keywords auf die absolut wichtigsten 5-6 Begriffe insgesamt.
 
 ***
 
 **REGELN:**
 - Sprache: DEUTSCH
-- Keine vagen Formulierungen wie "hat Erfahrung in..."
+- Immer im "Du" schreiben!
+- Keine vagen Formulierungen wie "hat Erfahrung in..." -> "Du hast Erfahrung in..."
 - Konkret: Was genau, wo, wie lange
 - Positiver Bias ist verboten. Ehrlichkeit ist Respekt.
 - Output: Strikt JSON, kein Markdown drumherum
+- **WICHTIG: requirementRows MAXIMAL 6 Einträge** — fasse ähnliche Anforderungen zusammen!
+- **WICHTIG: reasons-Arrays MAXIMAL 2 Einträge** — kurz und präzise!
+- **WICHTIG: Gib NUR vollständiges, gültiges JSON aus. Kürze Texte wenn nötig, aber beende immer das JSON korrekt.**
 
 **OUTPUT FORMAT:**
 {
   "overallScore": <0-100>,
   "scoreBreakdown": {
-    "technicalSkills": <0-100>,
-    "softSkills": <0-100>,
-    "experienceLevel": <0-100>,
-    "domainKnowledge": <0-100>,
-    "languageMatch": <0-100>
+    "technicalSkills": { "score": <0-100>, "reasons": ["<Grund 1>", "<Grund 2>"] },
+    "softSkills": { "score": <0-100>, "reasons": ["<Grund 1>", "<Grund 2>"] },
+    "experienceLevel": { "score": <0-100>, "reasons": ["<Grund 1>", "<Grund 2>"] },
+    "domainKnowledge": { "score": <0-100>, "reasons": ["<Grund 1>", "<Grund 2>"] },
+    "languageMatch": { "score": <0-100>, "reasons": ["<Grund 1>", "<Grund 2>"] }
   },
   "requirementRows": [
     {
       "requirement": "<konsolidierte Anforderung>",
       "status": "met|partial|missing",
-      "currentState": "<konkreter Ist-Zustand — ehrlich, mit Belegen>",
-      "suggestion": "<ethisch korrekter Verbesserungsvorschlag>"
+      "currentState": "<konkreter Ist-Zustand — ehrlich, du-Form, mit Belegen>",
+      "suggestion": "<ethisch korrekter Verbesserungsvorschlag, du-Form>"
     }
   ],
-  "strengths": ["<Stärke 1>", "<Stärke 2>", "<Stärke 3>"],
-  "gaps": ["<Lücke 1>", "<Lücke 2>", "<Lücke 3>"],
-  "potentialHighlights": ["<hidden gem 1>", "<hidden gem 2>"],
-  "overallRecommendation": "<1–2 ehrliche deutsche Sätze>",
-  "keywordsFound": ["keyword1"],
-  "keywordsMissing": ["keyword2"]
+  "strengths": ["<Deine Stärke 1>", "<Deine Stärke 2>"],
+  "gaps": ["<Deine Lücke 1>", "<Deine Lücke 2>"],
+  "potentialHighlights": ["<Dein Potenzial 1>"],
+  "overallRecommendation": "<1–2 ehrliche deutsche Sätze im Du>",
+  "keywordsFound": ["keyword1", "keyword2"],
+  "keywordsMissing": ["keyword3"]
 }
 `;
 
@@ -242,13 +279,13 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
             taskType: 'cv_match',
             prompt: CV_MATCH_PROMPT(req),
             temperature: 0.1,
-            maxTokens: 3000,
+            maxTokens: 4096,
         });
 
         const jsonMatch = result.text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error('Claude returned no valid JSON');
 
-        const firstResult: CVMatchResult = JSON.parse(jsonMatch[0]);
+        const firstResult: CVMatchResult = safeParseJson(jsonMatch[0]);
 
         // Stage 2: Prüf-Agent (Realism Check)
         const finalResult = await runRealismCheck(firstResult, req.cvText);

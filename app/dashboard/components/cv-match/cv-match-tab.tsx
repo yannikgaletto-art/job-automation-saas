@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CVMatchResult } from '@/lib/services/cv-match-analyzer';
 import { Button } from '@/components/motion/button';
 import { Loader2, Download, CheckCircle2, AlertCircle, FileText, Sparkles } from 'lucide-react';
@@ -11,29 +11,60 @@ interface CVMatchTabProps {
     jobId: string;
     cachedMatch?: any;
     onMatchStart?: () => void;
-    onMatchComplete?: () => void;
+    onMatchComplete?: (result: any) => void;
+    onNextStep?: () => void;
 }
 
-export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete }: CVMatchTabProps) {
+export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, onNextStep }: CVMatchTabProps) {
     const [state, setState] = useState<'idle' | 'loading' | 'complete' | 'error'>('idle');
     const [matchData, setMatchData] = useState<CVMatchResult | null>(null);
     const [loadingStep, setLoadingStep] = useState(0); // 0: Start, 1: CV lesen, 2: Analysieren, 3: Bericht erstellen
+    const [progressText, setProgressText] = useState("Profil wird mit Stellenausschreibung abgeglichen...");
 
     useEffect(() => {
-        // Check cache freshness (24h)
-        if (cachedMatch && cachedMatch.analyzed_at) {
-            const analyzedAt = new Date(cachedMatch.analyzed_at).getTime();
-            const now = Date.now();
-            const hoursDiff = (now - analyzedAt) / (1000 * 60 * 60);
-
-            if (hoursDiff < 24) {
-                setMatchData(cachedMatch as CVMatchResult);
-                setState('complete');
-                return;
-            }
+        if (state === 'loading' && loadingStep === 2) {
+            const messages = [
+                "Profil wird mit Stellenausschreibung abgeglichen...",
+                "Analysiere fachliche Anforderungen...",
+                "Prüfe relevante Erfahrungen...",
+                "Berechne Match-Score...",
+                "Identifiziere fehlende Keywords...",
+                "Fasse Kompetenzen zusammen..."
+            ];
+            let index = 1;
+            const interval = setInterval(() => {
+                setProgressText(messages[index]);
+                index = (index + 1) % messages.length;
+            }, 3000);
+            return () => clearInterval(interval);
+        } else {
+            setProgressText("Profil wird mit Stellenausschreibung abgeglichen...");
         }
-        setState('idle');
-    }, [cachedMatch]);
+    }, [state, loadingStep]);
+
+    useEffect(() => {
+        // On mount: always fetch from DB directly. This is the single source of truth.
+        // We do NOT depend on cachedMatch prop to avoid re-render flashing.
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(`/api/cv/match/cached?jobId=${jobId}`);
+                const data = await res.json();
+                if (cancelled) return;
+                if (data.success && data.cached && data.cached.analyzed_at) {
+                    console.log('✅ CVMatchTab: loaded from DB', jobId);
+                    setMatchData(data.cached as CVMatchResult);
+                    setState('complete');
+                } else {
+                    setState('idle');
+                }
+            } catch {
+                if (!cancelled) setState('idle');
+            }
+        })();
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [jobId]);
 
     const runAnalysis = async () => {
         setState('loading');
@@ -60,7 +91,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete }
 
             setMatchData(data.data);
             setState('complete');
-            onMatchComplete?.();
+            onMatchComplete?.(data.data);
             toast.success('CV Analyse erfolgreich');
         } catch (error: any) {
             console.error(error);
@@ -128,9 +159,20 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete }
             <div className="px-6 py-16 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-[#d6d6d6]">
                 <Loader2 className="w-10 h-10 text-[#002e7a] animate-spin mb-6" />
                 <h3 className="text-lg font-medium text-[#37352F] mb-4">
-                    {loadingStep === 1 && "Lebenslauf wird gelesen..."}
-                    {loadingStep === 2 && "Profil wird mit Stellenausschreibung abgeglichen..."}
-                    {loadingStep === 3 && "Match-Bericht wird erstellt..."}
+                    <AnimatePresence mode="popLayout">
+                        <motion.span
+                            key={loadingStep === 2 ? progressText : loadingStep}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.4 }}
+                            className="inline-block"
+                        >
+                            {loadingStep === 1 && "Lebenslauf wird gelesen..."}
+                            {loadingStep === 2 && progressText}
+                            {loadingStep === 3 && "Match-Bericht wird erstellt..."}
+                        </motion.span>
+                    </AnimatePresence>
                 </h3>
 
                 <div className="w-64 h-1.5 bg-[#e7e7e5] rounded-full overflow-hidden">
@@ -174,20 +216,34 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete }
                                 { label: 'Soft Skills', value: matchData.scoreBreakdown.softSkills },
                                 { label: 'Erfahrungslevel', value: matchData.scoreBreakdown.experienceLevel },
                                 { label: 'Domain-Wissen', value: matchData.scoreBreakdown.domainKnowledge },
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-center text-sm">
-                                    <div className="w-32 text-[#73726E]">{item.label}</div>
-                                    <div className="flex-1 h-2 bg-[#F1F1EF] rounded-full overflow-hidden mx-3">
-                                        <motion.div
-                                            initial={{ width: 0 }}
-                                            animate={{ width: item.value + '%' }}
-                                            transition={{ duration: 1, delay: i * 0.1 }}
-                                            className="h-full bg-[#002e7a]"
-                                        />
+                            ].map((item, i) => {
+                                const score = typeof item.value === 'number' ? item.value : item.value?.score || 0;
+                                const reasons = typeof item.value === 'number' ? [] : item.value?.reasons || [];
+
+                                return (
+                                    <div key={i} className="mb-4 last:mb-0">
+                                        <div className="flex items-center text-sm mb-1.5">
+                                            <div className="w-32 text-[#73726E] font-medium">{item.label}</div>
+                                            <div className="flex-1 h-2 bg-[#F1F1EF] rounded-full overflow-hidden mx-3">
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: score + '%' }}
+                                                    transition={{ duration: 1, delay: i * 0.1 }}
+                                                    className="h-full bg-[#002e7a]"
+                                                />
+                                            </div>
+                                            <div className="w-8 text-right font-medium text-[#37352F]">{score}%</div>
+                                        </div>
+                                        {reasons.length > 0 && (
+                                            <ul className="pl-[140px] pr-8 space-y-1 mt-1">
+                                                {reasons.map((r, idx) => (
+                                                    <li key={idx} className="text-xs text-[#9B9B9B] list-disc ml-4 leading-relaxed">{r}</li>
+                                                ))}
+                                            </ul>
+                                        )}
                                     </div>
-                                    <div className="w-8 text-right font-medium text-[#37352F]">{item.value}%</div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     </div>
                 </div>
@@ -292,7 +348,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete }
 
                 {/* ATS Keywords */}
                 <div className="bg-white border border-[#E8E8E6] rounded-lg p-5 shadow-sm">
-                    <h4 className="text-sm font-semibold text-[#37352F] mb-3">🏷️ ATS Keywords</h4>
+                    <h4 className="text-sm font-semibold text-[#37352F] mb-3">🏷️ ATS Keywords <span className="text-xs text-[#9B9B9B] font-normal ml-1">(ATS = Applicant Tracking System)</span></h4>
                     <div className="flex flex-wrap gap-2">
                         {matchData.keywordsFound.map(kw => (
                             <span key={kw} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">
@@ -310,18 +366,15 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete }
                     </div>
                 </div>
 
-                {/* Download Actions */}
+                {/* Next Step Action */}
                 <div className="bg-[#e9f0fe] rounded-lg p-5 flex flex-col sm:flex-row items-center justify-between border border-[#c6d7fa]">
                     <div>
-                        <h4 className="font-semibold text-[#002e7a]">Optimierter Lebenslauf generieren</h4>
-                        <p className="text-sm text-[#002e7a]/80 mt-1">Wir erzeugen einen editierbaren DOCX-Lebenslauf, in dem die Vorschläge aus der Analyse berücksichtigt sind.</p>
+                        <h4 className="font-semibold text-[#002e7a]">Zur Erstellung deines Lebenslaufs</h4>
+                        <p className="text-sm text-[#002e7a]/80 mt-1">Gehe zum nächsten Schritt, um deinen Lebenslauf basierend auf dieser Analyse zu aktualisieren.</p>
                     </div>
                     <div className="flex gap-3 mt-4 sm:mt-0">
-                        <Button variant="primary" onClick={() => handleDownload('docx')} className="shadow-sm">
-                            <Download className="w-4 h-4 mr-2" /> DOCX
-                        </Button>
-                        <Button variant="outline" onClick={() => handleDownload('pdf')} className="bg-white hover:bg-white/80">
-                            PDF
+                        <Button variant="primary" onClick={() => onNextStep?.()} className="shadow-sm">
+                            Weiter zur Erstellung
                         </Button>
                     </div>
                 </div>

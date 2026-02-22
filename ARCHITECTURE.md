@@ -39,6 +39,7 @@ Last Updated: 2026-02-10
 | **Email** | Resend | Transactional Emails |
 | **Extension** | Plasmo Framework | Chrome Extension |
 | **Deploy** | Vercel | Hosting |
+| **CV Rendering** | @react-pdf/renderer | PDF Preview & Download (replaced DOCX generator) |
 
 ### Smart Scraping System (CORRECTED)
 

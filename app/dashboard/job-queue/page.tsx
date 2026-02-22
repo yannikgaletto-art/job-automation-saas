@@ -23,7 +23,7 @@ export default function JobQueuePage() {
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
     const mapDbStatusToUi = (dbStatus: string): Job['status'] => {
-        switch (dbStatus) {
+        switch (dbStatus.toLowerCase()) {
             case 'pending': return 'NEW';
             case 'processing': return 'JOB_REVIEWED';
             case 'ready_for_review': return 'CV_OPTIMIZED';
@@ -34,7 +34,7 @@ export default function JobQueuePage() {
     };
 
     const mapDbStatusToStep = (dbStatus: string): number => {
-        switch (dbStatus) {
+        switch (dbStatus.toLowerCase()) {
             case 'pending': return 0;
             case 'processing': return 1;
             case 'ready_for_review': return 2;
@@ -64,6 +64,8 @@ export default function JobQueuePage() {
                     matchScore: (j.match_score as number) || ((j.status !== 'pending' || (j.responsibilities && (j.responsibilities as string[]).length > 0)) ? 10 : 0),
                     workflowStep: mapDbStatusToStep(j.status as string),
                     status: mapDbStatusToUi(j.status as string),
+                    // ✅ Pass through metadata so cv_match cache is available in CVMatchTab
+                    metadata: (j.metadata as Record<string, unknown>) || null,
                 }));
                 setJobs(dbJobs);
             }

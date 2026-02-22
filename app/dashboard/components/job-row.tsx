@@ -11,6 +11,7 @@ import { Step4CoverLetter } from './workflow-steps/step-4-cover-letter';
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { CustomDialog } from "@/components/ui/custom-dialog";
 import { CVMatchTab } from './cv-match/cv-match-tab';
+import { OptimizerWizard } from '@/components/cv-optimizer/OptimizerWizard';
 
 export interface Job {
     id: string;
@@ -145,6 +146,8 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
     // Falls kein Tab aktiv geklickt wurde, nehmen wir null (oder default den aktuellen Workflow Step)
     const [activeTab, setActiveTab] = useState<number | null>(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    // Live match result: updated when CVMatchTab completes — passed to OptimizerWizard to avoid stale-data race condition
+    const [liveMatchResult, setLiveMatchResult] = useState<any | null>(null);
 
     // NEW: always default to tab 0 (Steckbrief), never auto-jump
     const displayTab = activeTab ?? 0;
@@ -368,13 +371,38 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
 
                                 {/* Confirm or Analyse */}
                                 {job.responsibilities && job.responsibilities.length > 0 && (
-                                    <div className="flex justify-end">
+                                    <div className="flex justify-end gap-3 mt-4 border-t border-[#d6d6d6] pt-4">
+                                        {job.workflowStep < 1 ? (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onConfirm?.(job.id); }}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#002e7a] text-white text-xs font-medium rounded-md hover:bg-[#002e7a]/90 transition-colors"
+                                            >
+                                                <Check className="w-3.5 h-3.5" />
+                                                Steckbrief bestätigen
+                                            </button>
+                                        ) : (
+                                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#e8f5e9] text-[#2e7d32] text-xs font-medium rounded-md">
+                                                <Check className="w-3.5 h-3.5" />
+                                                Steckbrief bestätigt
+                                            </div>
+                                        )}
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); onConfirm?.(job.id); }}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#002e7a] text-white text-xs font-medium rounded-md hover:bg-[#002e7a]/90 transition-colors"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (job.workflowStep >= 1) {
+                                                    setActiveTab(1);
+                                                }
+                                            }}
+                                            disabled={job.workflowStep < 1}
+                                            className={cn(
+                                                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                                                job.workflowStep >= 1
+                                                    ? "bg-[#002e7a] text-white hover:bg-[#002e7a]/90"
+                                                    : "bg-[#f1f1ef] text-[#a4a096] cursor-not-allowed"
+                                            )}
                                         >
-                                            <Check className="w-3.5 h-3.5" />
-                                            Steckbrief bestätigen →
+                                            <Sparkles className="w-3.5 h-3.5" />
+                                            Zur CV Match Analyse →
                                         </button>
                                     </div>
                                 )}
@@ -398,26 +426,23 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                         {displayTab === 1 && (
                             <CVMatchTab
                                 jobId={job.id}
-                                cachedMatch={job.metadata?.cv_match}
+                                cachedMatch={liveMatchResult ?? job.metadata?.cv_match}
                                 onMatchStart={() => console.log('CV Match started')}
-                                onMatchComplete={() => {
-                                    // Optionally trigger a refresh of the job state or just let the component handle its own display
+                                onMatchComplete={(result) => {
+                                    // Store the fresh match result in local state so OptimizerWizard can use it
+                                    setLiveMatchResult(result);
                                 }}
+                                onNextStep={() => setActiveTab(2)}
                             />
                         )}
 
                         {displayTab === 2 && (
-                            <PlaceholderStep
-                                icon={<Sparkles className="w-8 h-8 text-[#00C853]" />}
-                                title="CV Optimization Engine"
-                                description="Lass deinen Lebenslauf maßgeschneidert auf diesen Job anpassen. Schlüsselwörter werden hinzugefügt und Bullet-Points neu priorisiert, ohne zu halluzinieren."
-                                status="Coming in Phase 2"
-                                action={
-                                    <Button variant="primary" onClick={() => onOptimize?.(job.id)} disabled={isOptimizing}>
-                                        {isOptimizing ? <><LoadingSpinner size="sm" className="mr-2" /> Optimizing...</> : <><Sparkles className="w-4 h-4 mr-2" /> Run Optimizer</>}
-                                    </Button>
-                                }
-                            />
+                            <div className="bg-white border-t border-[#d6d6d6]">
+                                <OptimizerWizard
+                                    jobId={job.id}
+                                    liveMatchResult={liveMatchResult ?? job.metadata?.cv_match ?? null}
+                                />
+                            </div>
                         )}
 
                         {displayTab === 3 && (

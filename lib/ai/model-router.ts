@@ -14,7 +14,7 @@ import OpenAI from 'openai';
 
 export const MODELS = {
     CLAUDE_SONNET: {
-        id: 'claude-3-5-sonnet-latest',
+        id: 'claude-sonnet-4-5',
         provider: 'anthropic' as const,
         cost_per_1m_tokens: 3.0,
         strengths: ['creative_writing', 'complex_reasoning'],
@@ -26,7 +26,7 @@ export const MODELS = {
         strengths: ['parsing', 'classification', 'summarization'],
     },
     CLAUDE_HAIKU: {
-        id: 'claude-3-haiku-20240307',
+        id: 'claude-haiku-4-5',
         provider: 'anthropic' as const,
         cost_per_1m_tokens: 0.25,
         strengths: ['parsing', 'classification', 'fast_execution'],
@@ -70,7 +70,7 @@ export function selectModel(taskType: TaskType) {
         generate_motivation_text: 'CLAUDE_SONNET',
         optimize_cv: 'CLAUDE_SONNET',
         cv_match: 'CLAUDE_HAIKU',
-        cv_parse: 'CLAUDE_HAIKU',
+        cv_parse: 'CLAUDE_SONNET',
     };
 
     return MODELS[routingMap[taskType]];

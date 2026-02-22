@@ -274,12 +274,21 @@ export async function generateCoverLetter(params: CoverLetterGenerationParams): 
 // --- HELPER FUNCTIONS ---
 
 function buildSystemPrompt(profile: any, job: any, company: any, style: any, quote: any, feedback: string[]) {
+    // Input priority for Cover Letter Context
+    const cvInput = job?.cv_optimization_user_decisions?.appliedChanges
+        ? `THE USER SELECTED THE FOLLOWING RESUME CHANGES FOR THIS SPECIFIC JOB WHICH YOU MUST INCORPORATE:
+${JSON.stringify(job.cv_optimization_user_decisions.appliedChanges.map((c: any) => ({ section: c.target.section, before: c.before, after: c.after })), null, 2)}
+
+ORIGINAL CV FOR CONTEXT:
+${JSON.stringify(profile?.cv_structured_data || profile, null, 2)}`
+        : `CANDIDATE CV:
+${JSON.stringify(profile?.cv_structured_data || profile, null, 2)}`;
+
     // Construct a rich prompt based on all inputs
     return `
     Write a cover letter for ${job?.job_title || 'Application'} at ${job?.company_name || 'Company'}.
     
-    CANDIDATE:
-    ${JSON.stringify(profile)}
+    ${cvInput}
     
     JOB REQUIREMENTS:
     ${JSON.stringify(job?.requirements)}

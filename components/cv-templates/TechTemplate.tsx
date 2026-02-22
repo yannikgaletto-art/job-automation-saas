@@ -1,0 +1,294 @@
+import React from 'react';
+import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
+import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
+import { CvStructuredData } from '@/types/cv';
+
+registerPdfFonts();
+
+const ACCENT = '#0E7490'; // Cyan-700
+const DARK = '#0F172A';   // Slate-900
+const GRAY = '#475569';   // Slate-600
+const LIGHT = '#F1F5F9';  // Slate-100
+
+const s = StyleSheet.create({
+    page: {
+        fontFamily: 'Inter',
+        fontSize: 9,
+        color: DARK,
+        paddingTop: 36,
+        paddingBottom: 36,
+        paddingHorizontal: 40,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        borderBottomWidth: 2,
+        borderBottomColor: DARK,
+        paddingBottom: 16,
+        marginBottom: 20,
+    },
+    headerLeft: {
+        flex: 1,
+    },
+    name: {
+        fontSize: 28,
+        fontWeight: 700,
+        color: DARK,
+        letterSpacing: -0.5,
+    },
+    roleTitle: {
+        fontSize: 12,
+        color: ACCENT,
+        fontWeight: 600,
+        marginTop: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    headerRight: {
+        alignItems: 'flex-end',
+        justifyContent: 'flex-end',
+        gap: 4,
+    },
+    contactTag: {
+        backgroundColor: LIGHT,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 4,
+        fontSize: 8,
+        color: GRAY,
+        fontWeight: 600,
+    },
+    columns: {
+        flexDirection: 'row',
+        gap: 24,
+    },
+    mainCol: {
+        flex: 2,
+    },
+    sideCol: {
+        flex: 1,
+    },
+    sectionTitle: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: DARK,
+        marginBottom: 12,
+        paddingBottom: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: LIGHT,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    // Experience
+    expBlock: {
+        marginBottom: 16,
+    },
+    expHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    expRole: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: DARK,
+    },
+    expDateTag: {
+        fontSize: 8,
+        fontWeight: 600,
+        color: ACCENT,
+        backgroundColor: '#CFFAFE', // cyan-100
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    expCompany: {
+        fontSize: 9,
+        color: GRAY,
+        fontWeight: 600,
+        marginBottom: 6,
+    },
+    bulletRow: {
+        flexDirection: 'row',
+        marginBottom: 4,
+    },
+    bulletDot: {
+        width: 10,
+        color: ACCENT,
+        fontSize: 9,
+    },
+    bulletText: {
+        flex: 1,
+        fontSize: 9,
+        color: GRAY,
+        lineHeight: 1.4,
+    },
+    // Sidebar items
+    sideBlock: {
+        marginBottom: 12,
+    },
+    sideLabel: {
+        fontSize: 8,
+        fontWeight: 700,
+        color: DARK,
+        marginBottom: 2,
+    },
+    sideText: {
+        fontSize: 8,
+        color: GRAY,
+        lineHeight: 1.4,
+    },
+    skillTagContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 4,
+        marginTop: 4,
+    },
+    skillTag: {
+        backgroundColor: LIGHT,
+        color: DARK,
+        fontSize: 7.5,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 4,
+        fontWeight: 600,
+    }
+});
+
+const RenderBullet = ({ text }: { text: string }) => {
+    const parts = text.split(':');
+    if (parts.length > 1) {
+        const before = parts[0];
+        const after = parts.slice(1).join(':');
+        return (
+            <Text style={s.bulletText}>
+                <Text style={{ fontWeight: 700, color: DARK }}>{before}:</Text>
+                {after}
+            </Text>
+        );
+    }
+    return <Text style={s.bulletText}>{text}</Text>;
+};
+
+export function TechTemplate({ data }: { data: CvStructuredData }) {
+    const pi = data.personalInfo;
+
+    return (
+        <Document>
+            <Page size="A4" style={s.page}>
+                {/* Header */}
+                <View style={s.header}>
+                    <View style={s.headerLeft}>
+                        <Text style={s.name}>{pi.name || ''}</Text>
+                        <Text style={s.roleTitle}>{pi.summary ? 'Software Engineer / Tech Lead' : ''}</Text>
+                    </View>
+                    <View style={s.headerRight}>
+                        {pi.email && <Text style={s.contactTag}>{pi.email}</Text>}
+                        {pi.phone && <Text style={s.contactTag}>{pi.phone}</Text>}
+                        {pi.linkedin && <Text style={s.contactTag}>{pi.linkedin}</Text>}
+                        {pi.location && <Text style={s.contactTag}>{pi.location}</Text>}
+                    </View>
+                </View>
+
+                {/* 2/3 and 1/3 Columns */}
+                <View style={s.columns}>
+
+                    {/* Main Column */}
+                    <View style={s.mainCol}>
+                        {pi.summary && (
+                            <View style={{ marginBottom: 20 }}>
+                                <Text style={s.sectionTitle}>Summary</Text>
+                                <Text style={{ fontSize: 9, color: GRAY, lineHeight: 1.5 }}>{pi.summary}</Text>
+                            </View>
+                        )}
+
+                        {data.experience.length > 0 && (
+                            <View>
+                                <Text style={s.sectionTitle}>Experience</Text>
+                                {data.experience.map(exp => (
+                                    <View key={exp.id} style={s.expBlock} wrap={false}>
+                                        <View style={s.expHeader}>
+                                            <Text style={s.expRole}>{exp.role || ''}</Text>
+                                            <Text style={s.expDateTag}>{exp.dateRangeText || ''}</Text>
+                                        </View>
+                                        <Text style={s.expCompany}>{exp.company || ''} {exp.location ? `// ${exp.location}` : ''}</Text>
+
+                                        {exp.description?.map(bullet => (
+                                            <View key={bullet.id} style={s.bulletRow}>
+                                                <Text style={s.bulletDot}>›</Text>
+                                                <RenderBullet text={bullet.text} />
+                                            </View>
+                                        ))}
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Sidebar Column */}
+                    <View style={s.sideCol}>
+                        {/* Skills */}
+                        {data.skills.length > 0 && (
+                            <View style={{ marginBottom: 20 }}>
+                                <Text style={s.sectionTitle}>Tech Stack</Text>
+                                {data.skills.map(group => (
+                                    <View key={group.id} style={s.sideBlock}>
+                                        <Text style={s.sideLabel}>{group.category || 'Core'}</Text>
+                                        <View style={s.skillTagContainer}>
+                                            {group.items.map((item, i) => (
+                                                <Text key={i} style={s.skillTag}>{item}</Text>
+                                            ))}
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Education */}
+                        {data.education.length > 0 && (
+                            <View style={{ marginBottom: 20 }}>
+                                <Text style={s.sectionTitle}>Education</Text>
+                                {data.education.map(edu => (
+                                    <View key={edu.id} style={s.sideBlock} wrap={false}>
+                                        <Text style={s.sideLabel}>{edu.degree || ''}</Text>
+                                        <Text style={s.sideText}>{edu.institution || ''}</Text>
+                                        <Text style={[s.sideText, { color: ACCENT, marginTop: 2 }]}>{edu.dateRangeText || ''}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Certifications */}
+                        {data.certifications && data.certifications.length > 0 && (
+                            <View style={{ marginBottom: 20 }}>
+                                <Text style={s.sectionTitle}>Certifications</Text>
+                                {data.certifications.map(cert => (
+                                    <View key={cert.id} style={s.sideBlock} wrap={false}>
+                                        <Text style={s.sideLabel}>{cert.name || ''}</Text>
+                                        <Text style={s.sideText}>{cert.issuer || ''}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Languages */}
+                        {data.languages.length > 0 && (
+                            <View>
+                                <Text style={s.sectionTitle}>Languages</Text>
+                                {data.languages.map(lang => (
+                                    <View key={lang.id} style={s.sideBlock} wrap={false}>
+                                        <Text style={s.sideLabel}>{lang.language || ''}</Text>
+                                        <Text style={s.sideText}>{lang.proficiency || ''}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+
+                </View>
+            </Page>
+        </Document>
+    );
+}

@@ -142,6 +142,31 @@ export async function POST(req: NextRequest) {
             } else {
                 cvDocId = cvDoc.id
                 console.log(`[${requestId}] route=documents/upload step=db_insert_cv success`)
+
+                // 1.5 Parse the unstructured text to strict JSON SSoT immediately
+                if (processedCv.sanitizedText) {
+                    try {
+                        console.log(`[${requestId}] route=documents/upload step=parse_cv_json...`);
+                        const { parseCvTextToJson } = await import('@/lib/services/cv-parser');
+                        const structuredCv = await parseCvTextToJson(processedCv.sanitizedText);
+
+                        const { error: profileErr } = await supabaseAdmin
+                            .from('user_profiles')
+                            .update({
+                                cv_structured_data: structuredCv,
+                                cv_original_file_path: cvUploadData.path
+                            })
+                            .eq('id', userId);
+
+                        if (profileErr) {
+                            console.error(`[${requestId}] route=documents/upload step=save_profile supabase_error=${profileErr.message}`);
+                        } else {
+                            console.log(`[${requestId}] route=documents/upload step=save_profile success`);
+                        }
+                    } catch (parseError: any) {
+                        console.error(`[${requestId}] route=documents/upload step=parse_cv_json error=${parseError.message}`);
+                    }
+                }
             }
 
         } catch (procError) {
