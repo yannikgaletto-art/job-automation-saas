@@ -65,7 +65,6 @@ const s = StyleSheet.create({
     },
     expCompany: {
         fontSize: 10,
-        fontStyle: 'italic',
         color: GRAY,
     },
     expDate: {
