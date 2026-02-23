@@ -28,6 +28,7 @@ export interface Job {
     matchScore: number;
     workflowStep: number; // 0-4
     status: 'NEW' | 'JOB_REVIEWED' | 'CV_CHECKED' | 'CV_OPTIMIZED' | 'CL_GENERATED' | 'READY';
+    company_research?: any[];
 }
 
 interface JobRowProps {
@@ -406,6 +407,8 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                         </button>
                                     </div>
                                 )}
+
+
                                 {(!job.responsibilities || job.responsibilities.length === 0) &&
                                     (!job.qualifications || job.qualifications.length === 0) && (
                                         <div className="text-center py-6 space-y-3 bg-white/50 rounded-lg border border-dashed border-[#d6d6d6]">

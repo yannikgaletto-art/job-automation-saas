@@ -2,35 +2,41 @@ import crypto from 'crypto';
 import { generateCoverLetterWithQuality } from '@/lib/services/cover-letter-generator';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 
 export async function POST(request: NextRequest) {
     const requestId = crypto.randomUUID();
 
     try {
-        const { userId, jobId } = await request.json();
+        const { userId, jobId, setupContext, fixMode, targetFix, currentLetter } = await request.json() as {
+            userId: string;
+            jobId: string;
+            setupContext?: CoverLetterSetupContext;
+            fixMode?: 'full' | 'targeted';
+            targetFix?: string;
+            currentLetter?: string;
+        };
 
-        console.log(`[${requestId}] route=cover-letter/generate step=start userId=${userId ?? 'anon'} jobId=${jobId ?? 'none'}`);
+        console.log(`[${requestId}] route=cover-letter/generate step=start userId=${userId ?? 'anon'} jobId=${jobId ?? 'none'} fixMode=${fixMode || 'full'}`);
 
         if (!userId || !jobId) {
-            return NextResponse.json(
-                { error: 'Missing userId or jobId', requestId },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'Missing userId or jobId', requestId }, { status: 400 });
         }
 
-        console.log(`[${requestId}] route=cover-letter/generate step=generate_with_quality`);
+        if (!setupContext && fixMode !== 'targeted') {
+            console.warn(`[${requestId}] ⚠️ No setupContext provided — generation quality will be reduced`);
+        }
 
-        // Use quality loop with validation (max 3 iterations)
-        const result = await generateCoverLetterWithQuality(jobId, userId);
+        const result = await generateCoverLetterWithQuality(jobId, userId, setupContext, fixMode, targetFix, currentLetter);
 
-        console.log(`[${requestId}] route=cover-letter/generate step=complete iterations=${result.iterations} score=${result.finalScores?.overall_score ?? 'N/A'}`);
+        console.log(`[${requestId}] step=complete iterations=${result.iterations} score=${result.finalScores?.overall_score ?? 'N/A'} cost=${result.costCents}¢`);
 
-        // Store the result in the database
-        console.log(`[${requestId}] route=cover-letter/generate step=db_store_letter`);
+        // Store result + setup_context as audit trail
         const supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
+
         const { error: insertError } = await supabase.from('documents').insert({
             user_id: userId,
             document_type: 'cover_letter',
@@ -39,13 +45,15 @@ export async function POST(request: NextRequest) {
                 generated_content: result.coverLetter,
                 quality_scores: result.finalScores,
                 validation: result.finalValidation,
-                iterations: result.iterations
+                iterations: result.iterations,
+                setup_context: setupContext ?? null,
+                cost_cents: result.costCents,
             },
             pii_encrypted: {}
         });
 
         if (insertError) {
-            console.error(`[${requestId}] Failed to save cover letter to DB: supabase_error=${insertError.message}`);
+            console.error(`[${requestId}] ❌ Failed to save cover letter: ${insertError.message}`);
         }
 
         return NextResponse.json({
@@ -60,10 +68,7 @@ export async function POST(request: NextRequest) {
 
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
-        console.error(`[${requestId}] route=cover-letter/generate step=unhandled_error error=${errMsg}`);
-        return NextResponse.json(
-            { error: errMsg || 'Generation failed', requestId },
-            { status: 500 }
-        );
+        console.error(`[${requestId}] ❌ route=cover-letter/generate error=${errMsg}`);
+        return NextResponse.json({ error: errMsg || 'Generation failed', requestId }, { status: 500 });
     }
 }

@@ -117,49 +117,56 @@ Implementierung des kompletten Workflows: Von **Trainingsdaten-Upload** bis **Co
 
 ## Phase 5: Cover Letter Generation
 
-### [ ] 5.1 Cover Letter Generator (Backend)
-- [ ] Service: `lib/services/cover-letter-generator.ts` (✅ EXISTS)
-- [ ] API Route: `/api/cover-letter/generate` (✅ EXISTS)
-- [ ] System Prompt Engineering
-  - [ ] Writing Style Integration
-  - [ ] Conjunction Requirements ("Daher", "Deshalb")
-  - [ ] Company Intel Integration
-  - [ ] User Voice Matching
+### [x] 5.1 Cover Letter Generator (Backend)
+- [x] Service: `lib/services/cover-letter-generator.ts` (✅ EXISTS)
+- [x] API Route: `/api/cover-letter/generate` (✅ EXISTS)
+- [x] API Route: `/api/cover-letter/setup-data` (✅ Phase 1)
+- [x] System Prompt Engineering
+  - [x] Writing Style Integration
+  - [x] Conjunction Requirements ("Daher", "Deshalb")
+  - [x] Company Intel Integration
+  - [x] User Voice Matching
 
-### [ ] 5.2 3-Stage Generation Pipeline
-- [ ] Stage 1: Generation (Claude Sonnet 4.5)
-  - [ ] User Profile Integration
-  - [ ] Job Requirements Mapping
-  - [ ] Company Research Integration
-  - [ ] Selected Quote Integration
-- [ ] Stage 2: Judge (Claude Haiku 4) - **Phase 2**
-  - [ ] Naturalness Score (1-10)
-  - [ ] Style Match Score
-  - [ ] Company Relevance Score
-  - [ ] Individuality Score
-- [ ] Stage 3: Iteration Loop (max 3x) - **Phase 2**
-  - [ ] Score Threshold (≥8)
-  - [ ] Feedback Integration
-  - [ ] Generation Logs
+### [x] 5.2 3-Stage Generation Pipeline (Phase 1 — Wizard Context)
+- [x] `CoverLetterSetupContext` Interface (`types/cover-letter-setup.ts`)
+- [x] `useCoverLetterSetupStore` Zustand Store (`store/useCoverLetterSetupStore.ts`)
+- [x] Setup Wizard — 3 Steps (Hook, Station, Tone)
+  - [x] StepHookSelection — Perplexity News, Values, Quotes
+  - [x] StepStationMapping — CV Erfahrung ↔ Job Requirements
+  - [x] StepToneConfig — Preset + Language + Anti-GPT Callout
+- [x] Auto-Fill Magic Button
+- [x] Wizard State persisted in localStorage
+- [x] Stage 2: Judge (Claude Haiku 4) - **Phase 2 ✅**
+  - [x] Naturalness Score (1-10)
+  - [x] Style Match Score
+  - [x] Company Relevance Score
+  - [x] Individuality Score
+- [x] Stage 3: Iteration Loop (max 3x) - **Phase 2 ✅**
+  - [x] Score Threshold (≥8)
+  - [x] Feedback Integration (weaknesses[] in next prompt)
+  - [x] Generation Logs
 
-### [ ] 5.3 Cover Letter Validation
-- [ ] Word Count Check (250-350)
-- [ ] Generic Phrase Detection
-- [ ] Company Name Verification
-- [ ] Forbidden Phrases Check
+### [x] 5.3 Cover Letter Validation
+- [x] Word Count Check (250-350)
+- [x] Generic Phrase Detection
+- [x] Company Name Verification
+- [x] Forbidden Phrases Check
 
-### [ ] 5.4 Cover Letter Display (Frontend)
-- [ ] Cover Letter Preview Komponente
-- [ ] Edit Mode mit Rich Text Editor
-- [ ] Quality Score Display (Phase 2)
-- [ ] Regenerate Option
-- [ ] Download als PDF
+### [x] 5.4 Cover Letter Display (Frontend) **(Phase 3 ✅)**
+- [x] Cover Letter Preview Komponente
+- [x] DEMO_MODE entfernt
+- [x] Wizard als Pre-Generation Gate integriert
+- [x] Quality Score Display
+- [x] Regenerate Option
+- [x] Inline Editing & Targeted Paragraph Fixes
+- [x] Download als PDF
+- [x] Pipeline Close (Als beworben markieren)
 
-### [ ] 5.5 Generation Logs \u0026 Audit
-- [ ] Speicherung in `generation_logs` table
-- [ ] Model \u0026 Token Tracking
-- [ ] Quality Scores Logging
-- [ ] Cost Calculation
+### [x] 5.5 Generation Logs & Audit
+- [x] Speicherung in `generation_logs` / `documents` API
+- [x] Model & Token Tracking
+- [x] Quality Scores Logging
+- [x] Cost Calculation
 
 ---
 

@@ -24,7 +24,31 @@ export async function GET() {
         // Fetch jobs from job_queue for this user
         const { data: jobs, error } = await supabaseAdmin
             .from('job_queue')
-            .select('id, job_url, job_title, company_name, location, salary_range, platform, status, created_at, description, requirements, summary, seniority, benefits, responsibilities, buzzwords, metadata')
+            .select(`
+                id, 
+                job_url, 
+                job_title, 
+                company_name, 
+                location, 
+                salary_range, 
+                platform, 
+                status, 
+                created_at, 
+                description, 
+                requirements, 
+                summary, 
+                seniority, 
+                benefits, 
+                responsibilities, 
+                buzzwords, 
+                metadata,
+                company_research (
+                    intel_data,
+                    suggested_quotes,
+                    recent_news,
+                    perplexity_citations
+                )
+            `)
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(50);

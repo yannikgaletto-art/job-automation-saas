@@ -64,6 +64,7 @@ export default function DashboardPage() {
                     matchScore: (j.match_score as number) || ((j.status !== 'pending' || (j.responsibilities && (j.responsibilities as string[]).length > 0)) ? 10 : 0),
                     workflowStep: mapDbStatusToStep(j.status as string),
                     status: mapDbStatusToUi(j.status as string),
+                    company_research: (j.company_research as any[]) || null,
                 }));
                 setJobs(dbJobs);
             }

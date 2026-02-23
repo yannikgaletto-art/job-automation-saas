@@ -1,0 +1,82 @@
+// Cover Letter Phase 1 – Daten-Vertrag für den Setup-Wizard
+// Dieser Typ-Vertrag verbindet UI-Wizard mit buildSystemPrompt() in Phase 2.
+
+export type HookType = 'news' | 'value' | 'quote' | 'linkedin' | 'manual' | 'vision' | 'project' | 'funding';
+export type TonePreset = 'data-driven' | 'storytelling' | 'formal';
+export type TargetLanguage = 'de' | 'en';
+
+// ─── Step A Output ────────────────────────────────────────────────
+export interface SelectedHook {
+    id: string;             // Eindeutige ID für Wiederherstellung nach Reload
+    type: HookType;
+    label: string;          // Kurztitel (z.B. "Aktuelles Wachstum")
+    content: string;        // Der Aufhänger-Text selbst
+    sourceName: string;     // z.B. "Handelsblatt" | "Enpal.de"
+    sourceUrl: string;      // Direkt aus perplexity_citations[] — echter Link
+    sourceAge: string;      // z.B. "vor 5 Tagen" | "aktuell"
+    relevanceScore: number; // 0-1, aus QuoteSuggestion.relevance_score
+}
+
+// ─── Step B Output ────────────────────────────────────────────────
+export interface SelectedCVStation {
+    stationIndex: 1 | 2 | 3;        // Reihenfolge der User-Auswahl
+    company: string;                  // z.B. "Fraunhofer FOKUS"
+    role: string;                     // z.B. "Innovation Consultant"
+    period: string;                   // z.B. "11.2023 - Heute"
+    keyBullet: string;                // Wichtigster Bullet-Point dieser Station
+
+    // CRITICAL für Phase 2 Prompt-Qualität:
+    matchedRequirement: string;       // z.B. "5-7 Jahre Partnerships"
+    intent: string;                   // z.B. "Beweis für strategische Kooperationen"
+}
+
+// ─── Step C Output ────────────────────────────────────────────────
+export interface ToneConfig {
+    preset: TonePreset;
+    targetLanguage: TargetLanguage;      // Sprache des Anschreibens
+    hasStyleSample: boolean;             // Wurde altes Anschreiben hochgeladen?
+    styleWarningAcknowledged: boolean;   // User hat Anti-GPT-Callout gelesen
+    contactPerson?: string;              // Optionaler Ansprechpartner für die Anrede
+}
+
+// ─── Quote Selection (Phase B, optional) ──────────────────────────
+export interface SelectedQuote {
+    quote: string;
+    author: string;
+    source: string;         // Book, speech, etc.
+    matchedValue: string;   // Company value this quote supports
+    relevanceScore: number; // 0-1
+}
+
+// ─── Gesamt-Vertrag (wird an buildSystemPrompt() übergeben) ───────
+export interface CoverLetterSetupContext {
+    jobId: string;
+    companyName: string;
+    selectedHook: SelectedHook;
+    selectedQuote?: SelectedQuote;     // Optional quote from Phase B
+    cvStations: SelectedCVStation[];   // Min 1, Max 3
+    tone: ToneConfig;
+    autoFilled: boolean;               // Wurde Auto-Fill verwendet?
+    completedAt: string;               // ISO Timestamp
+}
+
+// ─── API Response Shape ───────────────────────────────────────────
+export interface SetupDataResponse {
+    // Step A
+    hooks: SelectedHook[];
+    hasPerplexityData: boolean;
+
+    // Step B
+    cvStations: Array<{
+        company: string;
+        role: string;
+        period: string;
+        bullets: string[];
+    }>;
+    jobRequirements: string[];      // Top 3 aus job_queue.requirements
+
+    // Step C
+    hasStyleSample: boolean;
+    styleAnalysisSummary: string;   // z.B. "Formal, Ø 20 Wörter/Satz"
+    detectedJobLanguage: TargetLanguage;
+}

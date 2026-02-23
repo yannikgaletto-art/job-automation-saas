@@ -23,7 +23,7 @@ async function testQuoteMatcher() {
     // Test Case 1: English Tech Company
     console.log("\n--- Test Case 1: Tech Company (English) ---");
     const techValues = ["Innovation", "Customer Obsession", "Move Fast"];
-    const techQuotes = await suggestRelevantQuotes(techValues, "Technology");
+    const techQuotes = await suggestRelevantQuotes("Tesla", techValues);
 
     console.log(`Received ${techQuotes.length} quotes.`);
     if (techQuotes.length > 0) {
@@ -49,7 +49,7 @@ async function testQuoteMatcher() {
     // Test Case 2: German Traditional Company
     console.log("\n--- Test Case 2: Traditional Company (German Values) ---");
     const germanValues = ["Zuverlässigkeit", "Qualität", "Nachhaltigkeit"];
-    const germanQuotes = await suggestRelevantQuotes(germanValues, "Engineering");
+    const germanQuotes = await suggestRelevantQuotes("Siemens", germanValues);
 
     console.log(`Received ${germanQuotes.length} quotes.`);
     if (germanQuotes.length > 0) {

@@ -132,10 +132,11 @@ async function fetchCompanyIntel(
                             content: `Find PUBLIC information about ${companyName}.
                             
                             Required information:
-                            1. Recent news (last 3 months) - Max 3 headlines
-                            2. Company values (from official website)
-                            3. Tech stack (if tech company)
-                            4. Last 5-7 LinkedIn posts from ${companyName} official page.
+                            1. Recent news (last 3 months) - specifically look for recent funding, valuation, seed rounds, or major growth.
+                            2. Company Vision & Mission (what is their ultimate goal?).
+                            3. Key Projects or Core Products.
+                            4. Company values (from official website).
+                            5. Last 5-7 LinkedIn posts from ${companyName} official page.
                             
                             For LinkedIn posts, extract:
                             - Post content (first 200 chars)
@@ -146,8 +147,10 @@ async function fetchCompanyIntel(
                             Output as JSON:
                             {
                               "recent_news": ["headline1", "headline2"],
+                              "vision_and_mission": "...",
+                              "key_projects": ["project1", "project2"],
+                              "funding_status": "...",
                               "company_values": ["value1", "value2"],
-                              "tech_stack": ["tech1", "tech2"],
                               "linkedin_activity": [
                                 {
                                   "content": "...",
@@ -210,9 +213,10 @@ async function fetchCompanyIntel(
             }
 
             let confidence = 0.0;
-            if (parsed.recent_news?.length > 0) confidence += 0.3;
-            if (parsed.company_values?.length > 0) confidence += 0.3;
-            if (parsed.tech_stack?.length > 0) confidence += 0.2;
+            if (parsed.recent_news?.length > 0) confidence += 0.2;
+            if (parsed.vision_and_mission) confidence += 0.2;
+            if (parsed.key_projects?.length > 0) confidence += 0.2;
+            if (parsed.company_values?.length > 0) confidence += 0.2;
             if (parsed.linkedin_activity?.length > 0) confidence += 0.2;
 
             console.log(`✅ Enrichment Success (Confidence: ${confidence})`);
@@ -220,12 +224,16 @@ async function fetchCompanyIntel(
             return {
                 recent_news: parsed.recent_news || [],
                 company_values: parsed.company_values || [],
-                tech_stack: parsed.tech_stack || [],
+                tech_stack: [], // Deprecated in favor of vision/projects but kept for interface back-compat
                 linkedin_activity: parsed.linkedin_activity || [],
                 suggested_quotes: [], // Filled in main function
                 perplexity_citations: citations,
                 confidence_score: confidence,
-            };
+                // Add the new fields dynamically, they'll be saved via the intel_data obj
+                vision_and_mission: parsed.vision_and_mission || "",
+                key_projects: parsed.key_projects || [],
+                funding_status: parsed.funding_status || ""
+            } as any;
 
         } catch (error: any) {
             clearTimeout(timeoutId);
@@ -265,7 +273,9 @@ async function saveToCache(
         // Store values and tech stack in generic intel_data jsonb
         intel_data: {
             company_values: intel.company_values || [],
-            tech_stack: intel.tech_stack || [],
+            vision_and_mission: (intel as any).vision_and_mission || "",
+            key_projects: (intel as any).key_projects || [],
+            funding_status: (intel as any).funding_status || "",
             source: 'perplexity'
         },
         // We removed company_slug from schema v3.0, using company_name as unique
@@ -314,7 +324,7 @@ export async function enrichCompany(
     // Step 2.5: Generate Quotes if we have values
     if (intel.company_values && intel.company_values.length > 0) {
         console.log(`💡 Generating quotes for ${companyName}...`);
-        const quotes = await suggestRelevantQuotes(intel.company_values);
+        const quotes = await suggestRelevantQuotes(companyName, intel.company_values, (intel as any).vision_and_mission || "");
         intel.suggested_quotes = quotes;
     }
 

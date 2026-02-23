@@ -81,13 +81,40 @@ async function scoreQuoteRelevance(
 }
 
 /**
- * STEP 1: Find quotes via Perplexity
+ * STEP 1: Find quotes via Perplexity (with OpenAI fallback)
  */
 export async function suggestRelevantQuotes(
+    companyName: string,
     companyValues: string[],
-    jobField: string = "Technology", // Default
     companyVision: string = ""
 ): Promise<QuoteSuggestion[]> {
+    const promptText = `Find exactly 5 high-quality, visionary quotes that thematically match the company "${companyName}".
+
+Focus the quotes on their core values: ${JSON.stringify(companyValues)}
+${companyVision ? `and their vision: ${companyVision}` : ''}
+
+CRITICAL INSTRUCTIONS ON QUOTE SELECTION:
+1. You may include MAXIMUM ONE (1) quote from the CEO/Founder of ${companyName}.
+2. The remaining 4 quotes MUST be from diverse external sources (renowned authors, historical innovators, philosophers, industry thought leaders) whose profound ideas logically align with the company's mission/values.
+3. Example: If the company focuses on green energy or sustainability, find a profound quote from an environmentalist or author about system change or the planet. The goal is to show deep thematic alignment, not just name-drop the company.
+4. DO NOT select quotes about specific recent news events, stock prices, or funding rounds. Focus on timeless values and overarching visions.
+5. Support German language if the company values are in German, otherwise English.
+
+Return a strict JSON array matching this exact structure:
+[
+  {
+    "quote": "The actual quote text",
+    "author": "Author Name (Role/Company)",
+    "source": "Source context (e.g. 'Letter to Shareholders')",
+    "relevance_score": 0.95,
+    "matched_value": "Customer Obsession",
+    "value_connection": "This quote emphasizes putting the customer first...",
+    "language": "en"
+  }
+]`;
+
+    let quotes: QuoteSuggestion[] = [];
+
     try {
         const response = await fetch('https://api.perplexity.ai/chat/completions', {
             method: 'POST',
@@ -100,34 +127,7 @@ export async function suggestRelevantQuotes(
                 messages: [
                     {
                         role: 'user',
-                        content: `Based on these company values: ${JSON.stringify(companyValues)}
-         ${companyVision ? `and vision: ${companyVision}` : ''}
-         and industry/field: ${jobField}
-         
-         Find exactly 5 high-quality matching quotes from:
-         - CEOs/Founders in ${jobField}
-         - Renowned thought leaders
-         - Historical innovators
-         
-         Requirements:
-         1. Quotes must be DIRECTLY relevant to one of the provided company values.
-         2. Map each quote to the specific company value it supports.
-         3. Assign a relevance score (0.0 - 1.0) based on how well it fits the value.
-         4. Avoid overused clichés (e.g., "Stay hungry, stay foolish" unless it's a perfect match for a specific value).
-         5. Support German language if the company values are in German, otherwise English.
-         
-         Return a strict JSON array:
-         [
-           {
-             "quote": "The actual quote text",
-             "author": "Author Name (Role/Company)",
-             "source": "Source context (e.g. 'Letter to Shareholders 1997')",
-             "relevance_score": 0.95,
-             "matched_value": "Customer Obsession",
-             "value_connection": "This quote emphasizes putting the customer first...",
-             "language": "en"
-           }
-         ]`
+                        content: promptText
                     }
                 ],
                 temperature: 0.2
@@ -136,35 +136,69 @@ export async function suggestRelevantQuotes(
 
         if (!response.ok) {
             console.warn(`Perplexity Quote API error: ${response.status}`);
-            return [];
+            // Let the fallback handle it
+        } else {
+            const data = await response.json();
+            const content = data.choices[0]?.message?.content;
+
+            const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/) || [null, content];
+
+            try {
+                quotes = JSON.parse(jsonMatch[1] ? jsonMatch[1].trim() : content.trim());
+            } catch (e) {
+                console.warn('Failed to parse Perplexity Quote JSON', e);
+            }
         }
-
-        const data = await response.json();
-        const content = data.choices[0]?.message?.content;
-
-        const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/) || [null, content];
-        let quotes: QuoteSuggestion[] = [];
-
-        try {
-            quotes = JSON.parse(jsonMatch[1] ? jsonMatch[1].trim() : content.trim());
-        } catch (e) {
-            console.warn('Failed to parse Quote JSON', e);
-            return [];
-        }
-
-        if (!Array.isArray(quotes)) return [];
-
-        // Validate structure briefly
-        quotes = quotes.filter(q => q.quote && q.matched_value);
-
-        // Step 2: Score them with embeddings for double-verification
-        const scored = await scoreQuoteRelevance(quotes, companyValues);
-
-        // Return top 5
-        return scored.slice(0, 5);
-
     } catch (error) {
-        console.error('Suggest Quotes Error:', error);
+        console.error('Suggest Quotes Perplexity Error:', error);
+    }
+
+    // FALLBACK to OpenAI if Perplexity failed or returned no quotes
+    if (!Array.isArray(quotes) || quotes.length === 0) {
+        console.log("⚠️ Perplexity returned no quotes. Falling back to OpenAI API.");
+        try {
+            const openai = getOpenAI();
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: "You are a specialized quote discovery assistant. Output extremely high-quality, visionary quotes strictly matching the required JSON format." },
+                    { role: "user", content: promptText }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.6,
+            });
+
+            const content = response.choices[0].message.content || '{"quotes":[]}';
+            const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/) || [null, content];
+            const parsed = JSON.parse(jsonMatch[1] ? jsonMatch[1].trim() : content.trim());
+
+            // Handle both wrapped inside "quotes" key and direct array formats
+            if (Array.isArray(parsed)) {
+                quotes = parsed;
+            } else if (parsed.quotes && Array.isArray(parsed.quotes)) {
+                quotes = parsed.quotes;
+            } else {
+                // If it returned an object that looks like a single quote, wrap it
+                if (parsed.quote && parsed.author) {
+                    quotes = [parsed as QuoteSuggestion];
+                }
+            }
+        } catch (error) {
+            console.error('OpenAI Fallback Error:', error);
+        }
+    }
+
+    if (!Array.isArray(quotes) || quotes.length === 0) {
+        console.warn("❌ Both AI engines failed to return quotes.");
         return [];
     }
+
+    // Validate structure briefly
+    quotes = quotes.filter(q => q.quote && q.matched_value);
+
+    // Step 2: Score them with embeddings for double-verification
+    const scored = await scoreQuoteRelevance(quotes, companyValues);
+
+    // Return top 5
+    return scored.slice(0, 5);
 }
