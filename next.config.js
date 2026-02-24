@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const { withSentryConfig } = require('@sentry/nextjs');
+
 const nextConfig = {
   webpack: (config) => {
     config.resolve.alias.canvas = false;
@@ -9,7 +11,6 @@ const nextConfig = {
     domains: ['logo.clearbit.com'],
   },
   experimental: {
-    // Enable Server Actions (for future)
     serverActions: {
       allowedOrigins: ['localhost:3000'],
     },
@@ -22,4 +23,12 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withSentryConfig(nextConfig, {
+  org: 'pathly',               // ← Sentry Org Name (bitte prüfen)
+  project: 'pathly-v2',        // ← Sentry Project Name (bitte prüfen)
+  silent: true,                // Kein Sentry-Output im Build-Log
+  widenClientFileUpload: true,
+  hideSourceMaps: true,        // Source Maps nicht im Browser sichtbar
+  disableLogger: true,
+  automaticVercelMonitors: false,
+});

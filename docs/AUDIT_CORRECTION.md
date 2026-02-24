@@ -54,4 +54,11 @@
 - Veraltete Abschnitte entfernt: Python-Code, Playwright, ScraperAPI, company_slug
 - Route-Struktur auf aktuellen app/ Stand gebracht
 - Migrations-Klarstellung: supabase/migrations/ ist autoritativ
+
+## 2026-02-24 — Sentry Error Monitoring eingerichtet
+- @sentry/nextjs installiert
+- sentry.client.config.ts, sentry.server.config.ts, sentry.edge.config.ts erstellt
+- next.config.js mit withSentryConfig gewrappt
+- global-error.tsx als Fallback-UI erstellt
+- PII-Filterung in beforeSend aktiviert (DSGVO-konform)
 ---
