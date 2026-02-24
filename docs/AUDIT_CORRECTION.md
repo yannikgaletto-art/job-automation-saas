@@ -40,8 +40,13 @@
 
 ---
 ## Offen — Noch nicht umgesetzt (Warten auf Prompt 2+3)
-- [ ] ARCHITECTURE.md auf aktuellen Stand reduzieren
+- [x] ARCHITECTURE.md auf aktuellen Stand reduzieren
 - [ ] supabase/migrations/ als autoritatives Migrationsverzeichnis festlegen
 - [ ] Alle /dashboard/applications Links fixen (Route wurde umbenannt)
 - [ ] CLAUDE.md aktualisieren (Motion Principles, Migrations-Pfad)
+
+## 2026-02-24 — ARCHITECTURE.md Aktualisierung
+- Veraltete Abschnitte entfernt: Python-Code, Playwright, ScraperAPI, company_slug
+- Route-Struktur auf aktuellen app/ Stand gebracht
+- Migrations-Klarstellung: supabase/migrations/ ist autoritativ
 ---
