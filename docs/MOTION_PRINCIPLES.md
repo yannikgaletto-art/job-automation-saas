@@ -1,3 +1,8 @@
+# Motion Principles — Pathly V2.0
+> Diese Datei ist die Referenz für alle Animationen im Projekt.
+> Kein Agent darf Framer Motion Code schreiben ohne diese Datei 
+> gelesen zu haben. Verschoben aus Root am 2026-02-24.
+
 # ✅ FLUID MOTION REBUILD - COMPLETE!
 
 **Mission:** 100% Framer Motion Compliance  

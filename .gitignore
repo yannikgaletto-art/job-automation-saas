@@ -51,3 +51,6 @@ next.d.ts
 .temp/
 supabase/.temp/
 
+# Auto-generated dev logs
+.next_dev_log.txt
+*.dev_log.txt
