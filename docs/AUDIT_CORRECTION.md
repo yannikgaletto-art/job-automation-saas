@@ -41,9 +41,14 @@
 ---
 ## Offen — Noch nicht umgesetzt (Warten auf Prompt 2+3)
 - [x] ARCHITECTURE.md auf aktuellen Stand reduzieren
-- [ ] supabase/migrations/ als autoritatives Migrationsverzeichnis festlegen
-- [ ] Alle /dashboard/applications Links fixen (Route wurde umbenannt)
-- [ ] CLAUDE.md aktualisieren (Motion Principles, Migrations-Pfad)
+- [x] supabase/migrations/ als autoritatives Migrationsverzeichnis festlegen
+- [x] Alle /dashboard/applications Links fixen (Route wurde umbenannt)
+- [x] CLAUDE.md aktualisieren (Motion Principles, Migrations-Pfad)
+
+## 2026-02-24 — Route Fix: /dashboard/applications → /dashboard/job-queue
+| Datei | Was geändert |
+|-------|-------------|
+| Keine | Es wurden im Code keine kaputten Links auf diese Route mehr gefunden. |
 
 ## 2026-02-24 — ARCHITECTURE.md Aktualisierung
 - Veraltete Abschnitte entfernt: Python-Code, Playwright, ScraperAPI, company_slug

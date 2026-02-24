@@ -2,7 +2,31 @@
 
 **Status:** MANDATORY FOR ALL AI AGENTS
 **Version:** 2.1
-**Last Updated:** 2026-02-13
+**Last Updated:** 2026-02-24
+
+---
+
+## ⚠️ PFLICHTLEKTÜRE VOR ANIMATIONEN
+→ docs/MOTION_PRINCIPLES.md
+Kein Framer Motion Code ohne diese Datei gelesen zu haben.
+
+## ⚠️ MIGRATIONS — AUTORITATIVER PFAD
+→ supabase/migrations/ ist das einzige aktive Migrationsverzeichnis.
+→ database/migrations/ ist veraltet — NIEMALS neue Migrationen dort anlegen.
+→ Neue Migrationen IMMER in: supabase/migrations/
+
+## ⚠️ COMPANY RESEARCH DIRECTIVE
+→ directives/company_research.md (die einzige aktuelle Version)
+→ AGENT_2.1 und AGENT_3.1 wurden gelöscht
+
+## ⚠️ KANONISCHE IMPORT-PFADE
+| Service | Korrekter Import |
+|---------|----------------|
+| Supabase (Server) | @/lib/supabase/server |
+| Supabase (Client) | @/lib/supabase/client |
+| Job Search Pipeline | @/lib/services/job-search-pipeline |
+| Onboarding Store | @/store/use-onboarding-store |
+| Company Card | @/components/company/company-intel-card |
 
 ---
 
