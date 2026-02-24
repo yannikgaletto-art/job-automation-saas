@@ -45,6 +45,7 @@ interface CreditsCardProps {
 interface SidebarProps {
   children: React.ReactNode;
   className?: string;
+  collapsed?: boolean;
 }
 
 // ============================================================================
@@ -228,17 +229,21 @@ export function CreditsCard({ remaining, className }: CreditsCardProps) {
 // MAIN SIDEBAR
 // ============================================================================
 
-export function Sidebar({ children, className }: SidebarProps) {
+export function Sidebar({ children, className, collapsed = false }: SidebarProps) {
   return (
     <motion.aside
       className={cn(
-        "fixed left-0 top-0 h-screen w-64 border-r border-[#E7E7E5] bg-white",
-        "flex flex-col p-4 space-y-6 z-50",
+        "fixed left-0 top-0 h-screen border-r border-[#E7E7E5] bg-white",
+        "flex flex-col p-4 space-y-6 z-50 overflow-hidden",
         className
       )}
       initial={{ x: -264 }}
-      animate={{ x: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      animate={{
+        x: 0,
+        width: collapsed ? 0 : 256,
+        padding: collapsed ? 0 : 16,
+      }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
     >
       {/* Logo */}
       <motion.div

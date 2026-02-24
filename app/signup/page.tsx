@@ -26,14 +26,14 @@ export default function SignupPage() {
                 email,
                 password,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/dashboard`,
+                    emailRedirectTo: `${window.location.origin}/onboarding`,
                 }
             })
 
             if (error) throw error
 
             console.log("✅ Signup successful")
-            router.push("/dashboard")
+            router.push("/onboarding")
             router.refresh()
 
         } catch (err: any) {

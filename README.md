@@ -41,12 +41,16 @@ Pathly automatisiert die Jobsuche und Bewerbung unter **strikter Einhaltung** vo
 
 ## ✨ Features (Implemented)
 
-- **Job Queue Dashboard:** Progressive Workflow (Job → CV → Optimize → Review)
-- **Company Research:** Auto-enrichment via Perplexity (Values, News, Tech Stack)
-- **Cover Letter Generation:** Claude 3.5 Sonnet pipeline with style matching
-- **Pomodoro Timer:** Integrated focus tool for deep work
-- **Compliance:** DSGVO Data Export & Security Docs
-- **Motion UI:** Fluid animations & transitions (Framer Motion)
+- **Onboarding Flow:** DSGVO/NIS2 Consent, Document Upload, and CV Template Selection.
+- **Split Dashboard Navigation:** Clear separation of context (Today's Goals, Job Search, Job Queue, Analytics).
+- **Morning Briefing:** AI-powered daily focus overlay with energy tracking.
+- **Kalender-Task-Sync (Today's Goals):** Integrated Timeblocking and Pomodoro focus cycles.
+- **Job Queue & History:** Progressive Workflow (Job → CV → Optimize → Review) and Application History tracking.
+- **Analytics & Human Performance:** Flow state heatmaps and momentum scoring.
+- **Company Research:** Auto-enrichment via Perplexity (Values, News, Tech Stack).
+- **Cover Letter Generation:** Claude 3.5 Sonnet pipeline with style matching.
+- **Command Palette:** `Cmd+K` global navigation and quick actions.
+- **Motion UI:** Fluid animations & transitions (Framer Motion).
 
 ---
 

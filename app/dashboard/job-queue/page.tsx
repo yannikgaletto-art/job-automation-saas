@@ -10,6 +10,7 @@ import { CustomDialog } from '@/components/ui/custom-dialog';
 import { CVComparison } from '@/components/cv/cv-comparison';
 import type { CVOptimizationResult } from '@/lib/services/cv-optimizer';
 import { toast } from "sonner";
+import { ApplicationHistory } from '@/app/dashboard/components/application-history';
 
 export default function JobQueuePage() {
     const [jobs, setJobs] = useState<Job[]>([]);
@@ -194,6 +195,12 @@ export default function JobQueuePage() {
                     loading={isLoading}
                     optimizingJobId={isOptimizing ? currentJobId : null}
                 />
+            </div>
+
+            {/* Application History */}
+            <div className="space-y-4 pt-8 border-t border-[#d6d6d6]">
+                <h2 className="text-xl font-semibold text-[#37352F]">Application History</h2>
+                <ApplicationHistory />
             </div>
 
             {/* Optimization Modal */}

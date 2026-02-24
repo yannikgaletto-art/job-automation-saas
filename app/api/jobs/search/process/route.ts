@@ -1,0 +1,207 @@
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Required for Vercel Pro — pipeline can take 25-35s
+
+/**
+ * POST /api/jobs/search/process
+ * Deep pipeline: Firecrawl → GPT-4o-mini Harvester → Claude Judge
+ * Processes a single job and saves to job_queue.
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import {
+    deepScrapeJob,
+    harvestJobData,
+    judgeJob,
+    getDefaultUserValues,
+    type SerpApiJob,
+    type UserValues,
+} from '@/lib/services/job-search-pipeline';
+
+const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+);
+
+export async function POST(request: NextRequest) {
+    const startTime = Date.now();
+
+    try {
+        // Auth
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const { serpApiJob, searchQuery } = body as {
+            serpApiJob: SerpApiJob;
+            searchQuery: string;
+        };
+
+        if (!serpApiJob?.title || !serpApiJob?.company_name) {
+            return NextResponse.json({ error: 'Invalid job data' }, { status: 400 });
+        }
+
+        console.log(`✅ [Process] Starting pipeline for: ${serpApiJob.title} @ ${serpApiJob.company_name}`);
+
+        // ─── Duplicate check ────────────────────────────────────────
+        const { data: existing } = await supabaseAdmin
+            .from('job_queue')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('job_title', serpApiJob.title)
+            .eq('company_name', serpApiJob.company_name)
+            .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
+            .limit(1);
+
+        if (existing && existing.length > 0) {
+            console.log(`⚠️ [Process] Duplicate detected, returning existing job`);
+            return NextResponse.json({
+                success: true,
+                job: existing[0],
+                duplicate: true,
+            });
+        }
+
+        // ─── Step 1: Firecrawl deep scrape ──────────────────────────
+        const firecrawlMarkdown = serpApiJob.apply_link
+            ? await deepScrapeJob(serpApiJob.apply_link)
+            : null;
+
+        // ─── Step 2: GPT-4o-mini Harvester ──────────────────────────
+        const harvested = await harvestJobData(
+            firecrawlMarkdown || '',
+            serpApiJob.description,
+        );
+
+        // ─── Step 3: Claude Judge ───────────────────────────────────
+        // Fetch user values (or use defaults)
+        let userValues: UserValues = getDefaultUserValues();
+        const { data: uv } = await supabaseAdmin
+            .from('user_values')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+        if (uv) {
+            userValues = {
+                experience_level: uv.experience_level,
+                company_values: uv.company_values || [],
+                preferred_org_type: uv.preferred_org_type || [],
+                diversity_important: uv.diversity_important ?? false,
+                sustainability_important: uv.sustainability_important ?? false,
+                leadership_style_pref: uv.leadership_style_pref,
+                innovation_level_pref: uv.innovation_level_pref,
+                purpose_keywords: uv.purpose_keywords || [],
+            };
+        }
+
+        const judgeResult = harvested ? await judgeJob(harvested, userValues) : null;
+
+        // ─── Step 4: Ensure user_profiles exists ────────────────────
+        const { data: profile } = await supabaseAdmin
+            .from('user_profiles')
+            .select('id')
+            .eq('id', user.id)
+            .single();
+
+        if (!profile) {
+            await supabaseAdmin.from('user_profiles').insert({
+                id: user.id,
+                pii_encrypted: {},
+                onboarding_completed: false,
+            });
+        }
+
+        // ─── Step 5: Insert into job_queue ───────────────────────────
+        const jobData = {
+            user_id: user.id,
+            user_profile_id: user.id,
+            job_url: serpApiJob.apply_link || `search:${Date.now()}`,
+            job_title: serpApiJob.title,
+            company_name: serpApiJob.company_name,
+            location: harvested?.location || serpApiJob.location || null,
+            description: serpApiJob.description,
+            platform: 'google_jobs',
+            source: 'search',
+            search_query: searchQuery,
+            apply_link: serpApiJob.apply_link || null,
+            serpapi_raw: serpApiJob.raw || null,
+            firecrawl_markdown: firecrawlMarkdown,
+            salary_range: harvested?.salary_range || serpApiJob.detected_extensions?.salary || null,
+            status: 'pending', // Uses existing status flow per feedback
+            snapshot_at: new Date().toISOString(),
+            // Harvester fields
+            work_model: harvested?.work_model || (serpApiJob.detected_extensions?.work_from_home ? 'remote' : 'unknown'),
+            contract_type: harvested?.contract_type || 'unknown',
+            experience_years_min: harvested?.experience_years_min || null,
+            experience_years_max: harvested?.experience_years_max || null,
+            experience_level_stated: harvested?.experience_level_stated || 'unknown',
+            hard_requirements: harvested?.hard_requirements || null,
+            soft_requirements: harvested?.soft_requirements || null,
+            tasks: harvested?.tasks || null,
+            requirements: harvested?.hard_requirements || null,
+            responsibilities: harvested?.tasks || null,
+            benefits: harvested?.benefits_and_perks || [],
+            buzzwords: harvested?.ats_keywords || null,
+            about_company_raw: harvested?.about_company_raw || null,
+            mission_statement_raw: harvested?.mission_statement_raw || null,
+            diversity_section_raw: harvested?.diversity_section_raw || null,
+            sustainability_section_raw: harvested?.sustainability_section_raw || null,
+            leadership_signals_raw: harvested?.leadership_signals_raw || null,
+            tech_stack_mentioned: harvested?.tech_stack_mentioned || null,
+            ats_keywords: harvested?.ats_keywords || null,
+            application_deadline: harvested?.application_deadline || null,
+            // Judge fields
+            match_score_overall: judgeResult?.match_score_overall || null,
+            score_breakdown: judgeResult?.score_breakdown || null,
+            judge_reasoning: judgeResult?.judge_reasoning || null,
+            recommendation: judgeResult?.recommendation || null,
+            red_flags: judgeResult?.red_flags || null,
+            green_flags: judgeResult?.green_flags || null,
+            knockout_reason: judgeResult?.knockout_reason || null,
+        };
+
+        const { data: insertedJob, error: insertError } = await supabaseAdmin
+            .from('job_queue')
+            .insert(jobData)
+            .select('id, job_title, company_name, match_score_overall, recommendation, status')
+            .single();
+
+        if (insertError) {
+            console.error('❌ [Process] DB insert error:', insertError);
+            return NextResponse.json({ error: 'Database error' }, { status: 500 });
+        }
+
+        const duration = Date.now() - startTime;
+        console.log(`✅ [Process] Complete in ${duration}ms: ${insertedJob.job_title} (score: ${insertedJob.match_score_overall})`);
+
+        return NextResponse.json({
+            success: true,
+            job: {
+                ...insertedJob,
+                score_breakdown: judgeResult?.score_breakdown || null,
+                judge_reasoning: judgeResult?.judge_reasoning || null,
+                red_flags: judgeResult?.red_flags || [],
+                green_flags: judgeResult?.green_flags || [],
+                knockout_reason: judgeResult?.knockout_reason || null,
+                work_model: harvested?.work_model || 'unknown',
+                ats_keywords: harvested?.ats_keywords || [],
+            },
+            pipeline: {
+                firecrawl: !!firecrawlMarkdown,
+                harvester: !!harvested,
+                judge: !!judgeResult,
+                duration_ms: duration,
+            },
+        });
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error('❌ [Process] Error:', errMsg);
+        return NextResponse.json({ error: errMsg }, { status: 500 });
+    }
+}
