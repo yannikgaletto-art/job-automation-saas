@@ -21,7 +21,15 @@ function generateRecommendation(
     company: string,
     requirements: string[]
 ): { requirement: string; reasoning: string } | null {
-    if (!bullets || bullets.length === 0 || requirements.length === 0) return null;
+    if (requirements.length === 0) return null;
+
+    // Fallback if no bullets available
+    if (!bullets || bullets.length === 0) {
+        return {
+            requirement: requirements[0],
+            reasoning: `${company} (${role}) zeigt grundsätzlich deine Erfahrung in diesem Bereich.`,
+        };
+    }
 
     // Find best matching requirement via keyword overlap
     let bestReq = '';

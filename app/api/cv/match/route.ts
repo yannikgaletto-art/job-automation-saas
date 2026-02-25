@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
                         ...matchResult,
                     }
                 },
-                status: 'processing', // DB CHECK constraint only allows: pending, processing, ready_for_review, ready_to_apply, submitted, failed, skipped
+                status: 'cv_matched', // DB CHECK constraint now allows cv_matched
             })
             .eq('id', jobId);
 
