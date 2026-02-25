@@ -113,7 +113,7 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
                     onClick={handleFinalize}
                     className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-all flex items-center gap-2"
                 >
-                    Optimierten CV speichern <ArrowRight className="w-4 h-4" />
+                    Speichern und Preview <ArrowRight className="w-4 h-4" />
                 </button>
             </div>
         </div>

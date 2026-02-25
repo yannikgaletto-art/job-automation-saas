@@ -1,13 +1,15 @@
 "use client";
 
 /**
- * ProgressWorkflow — Horizontal node-chain stepper.
+ * ProgressWorkflow -- Horizontal node-chain stepper.
  * 4 circular nodes connected by lines, matching the Pathly design language.
- * No emojis — only Lucide icons and Framer Motion transitions.
+ * No emojis -- only Lucide icons and Framer Motion transitions.
  */
 
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import confetti from 'canvas-confetti';
 
 interface ProgressWorkflowProps {
     current: number; // 0-4 (current step index from job status)
@@ -17,28 +19,55 @@ interface ProgressWorkflowProps {
 }
 
 const WORKFLOW_NODES = [
-    { label: 'CV Match', pct: '10%', tabIndex: 1 },
-    { label: 'CV Opt.', pct: '30%', tabIndex: 2 },
-    { label: 'Cover Letter', pct: '75%', tabIndex: 3 },
-    { label: '', pct: '100%', tabIndex: 4 },
+    { label: 'Steckbrief', pct: '10%', tabIndex: 0 },
+    { label: 'CV Match', pct: '30%', tabIndex: 1 },
+    { label: 'CV Opt.', pct: '75%', tabIndex: 2 },
+    { label: 'Cover Letter', pct: '100%', tabIndex: 3 },
 ];
 
 /**
  * Mapping from `current` (workflowStep 0-4) to which nodes turn green:
- *  workflowStep 0 (NEW)          → none
- *  workflowStep 1 (JOB_REVIEWED / CV Match ready) → node 0
- *  workflowStep 2 (CV_CHECKED)   → node 0, 1
- *  workflowStep 3 (CV_OPTIMIZED) → node 0, 1, 2
- *  workflowStep 4 (CL_GENERATED / READY) → all
+ *  workflowStep 0 (NEW)          -> none
+ *  workflowStep 1 (JOB_REVIEWED / Steckbrief done) -> node 0
+ *  workflowStep 2 (CV_CHECKED)   -> node 0, 1
+ *  workflowStep 3 (CV_OPTIMIZED) -> node 0, 1, 2
+ *  workflowStep 4 (CL_GENERATED / READY) -> all
  */
 function nodeFilled(nodeIndex: number, workflowStep: number): boolean {
-    // Offset: workflowStep 1 fills node 0, etc.
     return nodeIndex < workflowStep;
 }
 
 const NODE_SIZE = 36; // px
 
 export function ProgressWorkflow({ current, className, onStepClick, activeTab }: ProgressWorkflowProps) {
+    // Confetti when all 4 nodes are filled (workflowStep >= 4)
+    useEffect(() => {
+        if (current >= 4) {
+            const duration = 2500;
+            const end = Date.now() + duration;
+            const frame = () => {
+                confetti({
+                    particleCount: 4,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0, y: 0.7 },
+                    colors: ['#002e7a', '#3b82f6', '#22c55e', '#60a5fa'],
+                });
+                confetti({
+                    particleCount: 4,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1, y: 0.7 },
+                    colors: ['#002e7a', '#3b82f6', '#22c55e', '#60a5fa'],
+                });
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            };
+            frame();
+        }
+    }, [current]);
+
     return (
         <div className={cn("flex items-center h-14", className)}>
             {WORKFLOW_NODES.map((node, idx) => {
@@ -69,7 +98,7 @@ export function ProgressWorkflow({ current, className, onStepClick, activeTab }:
                             transition={{ duration: 0.4, ease: "easeOut" }}
                             whileHover={isClickable ? { scale: 1.1, y: -1 } : {}}
                             whileTap={isClickable ? { scale: 0.95 } : {}}
-                            title={node.label || 'Fertig'}
+                            title={node.label}
                             type="button"
                         >
                             {/* Percentage text */}

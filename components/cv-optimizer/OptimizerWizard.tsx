@@ -4,12 +4,13 @@ import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { TemplateSelector } from "./TemplateSelector"
 import { DiffReview } from "./DiffReview"
+import { InlineCvEditor } from "./InlineCvEditor"
 import { CvStructuredData, CvOptimizationProposal, UserDecisions } from "@/types/cv"
 import { saveCvDecisions } from "@/app/actions/save-cv-decisions"
 import { createClient } from '@/lib/supabase/client'
 import { toast } from "sonner"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { Check, Settings, Sparkles, FileText, Layout } from "lucide-react"
+import { Check, Settings, Sparkles, FileText, Layout, Pencil, CheckCheck } from "lucide-react"
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
@@ -37,11 +38,15 @@ export interface OptimizerWizardProps {
 }
 
 export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps) {
-    const [step, setStep] = useState<1 | 2 | 3>(1);
+    const [step, setStep] = useState<1 | 2>(1);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [optProgressText, setOptProgressText] = useState("Lade CV-Daten...");
+
+    // Inline editor state
+    const [isEditing, setIsEditing] = useState(false);
+    const [editablePdfData, setEditablePdfData] = useState<CvStructuredData | null>(null);
 
     useEffect(() => {
         if (isOptimizing) {
@@ -49,9 +54,9 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                 "Lade CV-Daten...",
                 "Analysiere Schwachstellen...",
                 "Formuliere Bullet-Points neu...",
-                "Optimiere für ATS-Systeme...",
+                "Optimiere fuer ATS-Systeme...",
                 "Integriere Job-Keywords...",
-                "Prüfe Lesbarkeit und Struktur..."
+                "Pruefe Lesbarkeit und Struktur...",
             ];
             let index = 1;
             const interval = setInterval(() => {
@@ -105,24 +110,19 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                         if (jobRes.cv_optimization_proposal && jobRes.cv_optimization_user_decisions) {
                             setProposal(jobRes.cv_optimization_proposal);
                             setUserDecisions(jobRes.cv_optimization_user_decisions);
-
-                            // Because cvAdmin depends on cv_structured_data, wait for userRes assignment below
                         }
                     }
                     if (userRes) {
                         if (userRes.cv_structured_data) {
                             setCvData(userRes.cv_structured_data);
 
-                            // If we have restored decisions and proposal, we can skip straight to Step 3
+                            // If we have restored decisions+proposal -> skip to Step 2 (Preview)
                             if (jobRes?.cv_optimization_proposal && jobRes?.cv_optimization_user_decisions) {
-                                // Since DiffReview isn't rendered, we manually apply the restored decisions to set finalCv
                                 const restoredFinalData = applyOptimizations(userRes.cv_structured_data, jobRes.cv_optimization_user_decisions);
                                 setFinalCv(restoredFinalData);
-                                setStep(3);
-                            } else if (jobRes?.metadata?.cv_match) {
-                                // If CV match exists but optimization doesn't, go to Step 2
                                 setStep(2);
                             }
+                            // Otherwise stay at Step 1 (Optimize)
                         }
                         if (userRes.preferred_cv_template) {
                             setTemplateId(userRes.preferred_cv_template);
@@ -130,7 +130,7 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                     }
                 }
             } catch (err) {
-                console.error("❌ Failed to fetch wizard data:", err);
+                console.error("Failed to fetch wizard data:", err);
                 toast.error("Ein Fehler ist beim Laden aufgetreten.");
             } finally {
                 if (isMounted) setIsLoading(false);
@@ -142,13 +142,6 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     }, [jobId]);
 
     // -- Step 1 Actions --
-    const handleTemplateSelected = (id: string) => {
-        setTemplateId(id);
-        toast.success("Template ausgewählt");
-        setStep(2);
-    };
-
-    // -- Step 2 Actions --
     const runOptimizer = async () => {
         if (!cvData) {
             toast.error("Keine CV-Daten gefunden. Bitte lade zuerst deinen Lebenslauf in den Einstellungen hoch.");
@@ -171,7 +164,7 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                 || jobData?.metadata?.cv_match
                 || jobData?.cv_match_result;
             if (!cvMatch) {
-                toast.error("CV-Match-Analyse nicht gefunden. Bitte zuerst den 'CV Match' Tab ausführen.");
+                toast.error("CV-Match-Analyse nicht gefunden. Bitte zuerst den 'CV Match' Tab ausfuehren.");
                 setIsOptimizing(false);
                 return;
             }
@@ -196,10 +189,11 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
             }
 
             setProposal(data.proposal);
-            toast.success("Optimierung abgeschlossen – bitte jetzt prüfen!");
-        } catch (error: any) {
-            console.error("❌ Optimizer error:", error);
-            toast.error("Optimizer fehlgeschlagen", { description: error.message });
+            toast.success("Optimierung abgeschlossen - bitte jetzt pruefen!");
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : 'Unbekannter Fehler';
+            console.error("Optimizer error:", msg);
+            toast.error("Optimizer fehlgeschlagen", { description: msg });
         } finally {
             setIsOptimizing(false);
         }
@@ -222,14 +216,14 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
         const res = await saveCvDecisions(jobId, decisions, proposal);
         if (res.success) {
             toast.success("Einstellungen gespeichert");
-            setStep(3);
+            setStep(2); // -> Preview
         } else {
             toast.error("Fehler", { description: res.error });
         }
     };
 
-    // -- Step 3: Template Switcher --
-    const handleTemplateSwitchInStep3 = async (newId: string) => {
+    // -- Step 2: Template Switcher --
+    const handleTemplateSwitchInPreview = async (newId: string) => {
         setTemplateId(newId);
         if (userId) {
             try {
@@ -247,9 +241,16 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     // Compute clean PDF data from finalCv + decisions
     const pdfData = useMemo(() => {
         if (!finalCv) return null;
-        // finalCv already has accepted changes applied by DiffReview
         return stripTodoItems(finalCv);
     }, [finalCv]);
+
+    // Sync editablePdfData when pdfData changes
+    useEffect(() => {
+        setEditablePdfData(pdfData);
+    }, [pdfData]);
+
+    // Active render data (editor overrides pdfData)
+    const activePdfData = editablePdfData ?? pdfData;
 
     if (isLoading) {
         return <div className="p-10 flex justify-center"><LoadingSpinner className="w-8 h-8 text-blue-600" /></div>;
@@ -258,12 +259,12 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     if (!cvData) {
         return (
             <div className="p-8 text-center bg-gray-50 border border-gray-200 rounded-lg space-y-4">
-                <p className="text-gray-800 text-lg font-medium">⚠️ Kein Lebenslauf gefunden.</p>
+                <p className="text-gray-800 text-lg font-medium">Kein Lebenslauf gefunden.</p>
                 <p className="text-sm text-gray-500 max-w-sm mx-auto">
                     Bitte lade deinen initialen Lebenslauf zuerst hoch und scanne ihn, bevor du ihn optimieren kannst.
                 </p>
                 <Link href="/dashboard/settings" className="inline-block mt-4 text-blue-600 hover:text-blue-800 font-medium underline">
-                    → Zu den Einstellungen
+                    Zu den Einstellungen
                 </Link>
             </div>
         );
@@ -277,21 +278,16 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
 
     return (
         <div className="w-full flex flex-col space-y-6">
-            {/* Step Indicator */}
+            {/* Step Indicator — 2 steps only */}
             <div className="flex gap-4 items-center mb-4 px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg">
                 <div className={`flex items-center gap-2 text-sm font-medium ${step >= 1 ? 'text-blue-700' : 'text-gray-400'}`}>
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 1 ? 'bg-blue-100' : 'bg-gray-200'}`}>1</span>
-                    Layout
-                </div>
-                <div className="w-8 h-[1px] bg-gray-300" />
-                <div className={`flex items-center gap-2 text-sm font-medium ${step >= 2 ? 'text-blue-700' : 'text-gray-400'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 2 ? 'bg-blue-100' : 'bg-gray-200'}`}>2</span>
                     Optimize
                 </div>
                 <div className="w-8 h-[1px] bg-gray-300" />
-                <div className={`flex items-center gap-2 text-sm font-medium ${step === 3 ? 'text-blue-700' : 'text-gray-400'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step === 3 ? 'bg-blue-100' : 'bg-gray-200'}`}>3</span>
-                    Preview & Download
+                <div className={`flex items-center gap-2 text-sm font-medium ${step === 2 ? 'text-blue-700' : 'text-gray-400'}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step === 2 ? 'bg-blue-100' : 'bg-gray-200'}`}>2</span>
+                    Preview
                 </div>
             </div>
 
@@ -302,17 +298,8 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
             >
-                {step === 1 && userId && (
-                    <div className="bg-white border rounded-xl overflow-hidden pb-4">
-                        <TemplateSelector
-                            userId={userId}
-                            initialTemplateId={templateId}
-                            onSelected={handleTemplateSelected}
-                        />
-                    </div>
-                )}
-
-                {step === 2 && !proposal && (
+                {/* ===== STEP 1: OPTIMIZE ===== */}
+                {step === 1 && !proposal && (
                     <div className="flex flex-col items-center justify-center p-12 bg-white border border-gray-200 rounded-xl space-y-6">
                         {isOptimizing ? (
                             <>
@@ -349,16 +336,16 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                                     <Settings className="w-8 h-8" />
                                 </div>
                                 <div className="text-center max-w-md">
-                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Ready to Optimize</h3>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Bereit zur Optimierung</h3>
                                     <p className="text-gray-500 mb-6">
-                                        The AI will now cross-reference your CV with the job match results to rewrite bullet points and maximize your ATS score without hallucinating.
+                                        Die KI gleicht deinen Lebenslauf mit den Match-Ergebnissen ab und formuliert Bullet Points neu, um deinen ATS-Score zu maximieren.
                                     </p>
                                     <button
                                         onClick={runOptimizer}
                                         className="px-6 py-3 bg-blue-600 hover:bg-blue-700 transition flex items-center gap-2 font-medium text-white rounded-lg shadow-sm w-full justify-center"
                                     >
                                         <Sparkles className="w-5 h-5" />
-                                        Run Optimizer
+                                        Optimierung starten
                                     </button>
                                 </div>
                             </>
@@ -366,7 +353,7 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                     </div>
                 )}
 
-                {step === 2 && proposal && (
+                {step === 1 && proposal && (
                     <DiffReview
                         originalCv={cvData}
                         proposal={proposal}
@@ -375,16 +362,17 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                     />
                 )}
 
-                {step === 3 && pdfData && (
+                {/* ===== STEP 2: PREVIEW ===== */}
+                {step === 2 && activePdfData && (
                     <div className="space-y-4">
-                        {/* Template Switcher */}
+                        {/* Template Switcher + Bearbeiten */}
                         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-3">
-                            <div className="text-sm font-medium text-gray-700">Template wählen:</div>
+                            <div className="text-sm font-medium text-gray-700">Template waehlen:</div>
                             <div className="flex gap-2">
                                 {TEMPLATES.map((t) => (
                                     <button
                                         key={t.id}
-                                        onClick={() => handleTemplateSwitchInStep3(t.id)}
+                                        onClick={() => handleTemplateSwitchInPreview(t.id)}
                                         className={`
                                             px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all
                                             ${templateId === t.id
@@ -396,21 +384,44 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                                         {t.label}
                                     </button>
                                 ))}
+                                <button
+                                    onClick={() => setIsEditing(!isEditing)}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all
+                                        ${isEditing
+                                            ? 'bg-green-600 text-white shadow-sm'
+                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                        }`}
+                                >
+                                    {isEditing ? <><CheckCheck size={15} /> Fertig</> : <><Pencil size={15} /> Bearbeiten</>}
+                                </button>
                             </div>
                         </div>
 
-                        {/* PDF Preview */}
-                        <DynamicPdfViewer data={pdfData} templateId={templateId} />
+                        {/* PDF Preview + optional editor panel */}
+                        {isEditing ? (
+                            <div className="grid grid-cols-[1fr_340px] gap-4 items-start">
+                                <DynamicPdfViewer data={activePdfData} templateId={templateId} />
+                                <div className="sticky top-4 bg-white rounded-xl border border-slate-200 p-4 h-[800px]">
+                                    <InlineCvEditor
+                                        data={activePdfData}
+                                        onChange={setEditablePdfData}
+                                        onClose={() => setIsEditing(false)}
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <DynamicPdfViewer data={activePdfData} templateId={templateId} />
+                        )}
 
                         <div className="flex justify-between items-center py-4 border-t border-gray-100 mt-6">
                             <button
-                                onClick={() => setStep(2)}
+                                onClick={() => { setStep(1); setIsEditing(false); }}
                                 className="px-5 py-2 text-gray-600 hover:text-gray-900 font-medium rounded-lg hover:bg-gray-50 flex items-center transition"
                             >
-                                ← Zurück zum Optimizer
+                                Zurueck zum Optimizer
                             </button>
 
-                            <DynamicDownloadButton data={pdfData} templateId={templateId} />
+                            <DynamicDownloadButton data={activePdfData} templateId={templateId} />
                         </div>
                     </div>
                 )}

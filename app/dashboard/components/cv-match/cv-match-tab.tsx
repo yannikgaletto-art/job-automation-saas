@@ -415,11 +415,9 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                                         <ExpandableCell text={row.currentState} boldFn={boldFirst} />
                                     </td>
 
-                                    {/* Empfehlung — bold imperative verb, truncated */}
+                                    {/* Empfehlung — expandable teaser */}
                                     <td className="py-3 px-4 align-top border-l border-slate-100">
-                                        <p className="text-xs text-slate-700 leading-snug">
-                                            {boldFirst(row.suggestion || '')}
-                                        </p>
+                                        <ExpandableCell text={row.suggestion || ''} boldFn={boldFirst} />
                                     </td>
                                 </motion.tr>
                             ))}
