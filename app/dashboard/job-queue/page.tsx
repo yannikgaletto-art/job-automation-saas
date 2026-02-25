@@ -39,6 +39,8 @@ export default function JobQueuePage() {
             case 'pending': return 0;
             case 'processing': return 1;
             case 'ready_for_review': return 2;
+            case 'cv_matched': return 2;
+            case 'cv_optimized': return 3;
             case 'ready_to_apply': return 4;
             case 'submitted': return 4;
             default: return 0;

@@ -62,8 +62,6 @@ const s = StyleSheet.create({
     expRole: {
         fontSize: 10,
         fontWeight: 700,
-        flex: 1,
-        paddingRight: 8,
     },
     expCompany: {
         fontSize: 10,

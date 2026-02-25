@@ -15,7 +15,8 @@ export async function saveCvDecisions(
             .from('job_queue')
             .update({
                 cv_optimization_user_decisions: decisions,
-                cv_optimization_proposal: proposal
+                cv_optimization_proposal: proposal,
+                status: 'cv_optimized',
             })
             .eq('id', jobId);
 
