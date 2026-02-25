@@ -233,13 +233,11 @@ export function Sidebar({ children, className, collapsed = false }: SidebarProps
   return (
     <motion.aside
       className={cn(
-        "fixed left-0 top-0 h-screen border-r border-[#E7E7E5] bg-white",
-        "flex flex-col p-4 space-y-6 z-50 overflow-hidden",
+        "sticky top-0 h-screen shrink-0 border-r border-[#E7E7E5] bg-white",
+        "flex flex-col p-4 space-y-6 z-30 overflow-hidden",
         className
       )}
-      initial={{ x: -264 }}
       animate={{
-        x: 0,
         width: collapsed ? 0 : 256,
         padding: collapsed ? 0 : 16,
       }}

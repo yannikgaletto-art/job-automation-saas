@@ -2,7 +2,6 @@
 
 import { Sidebar, NavSection, NavItem } from '@/components/motion/sidebar';
 import { Home, Search, Inbox, BarChart3, Shield, Settings } from 'lucide-react';
-import { PomodoroCard } from './components/pomodoro-card';
 import { PomodoroMiniWidget } from './components/pomodoro-mini-widget';
 import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
@@ -42,9 +41,6 @@ export default function DashboardLayout({
                         <NavItem icon={Settings} label="Settings" href="/dashboard/settings" />
                     </NavSection>
 
-                    <NavSection title="Focus" className="mt-auto">
-                        <PomodoroCard />
-                    </NavSection>
                 </Sidebar>
 
                 {/* Main Content */}
