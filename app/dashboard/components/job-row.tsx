@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, FileText, Check, Sparkles, Mail, Info, Trash2, ChevronDown } from 'lucide-react';
 import { ProgressWorkflow } from './progress-workflow';
 import { Button } from '@/components/motion/button';
-import { AnimatedMatchScore } from '@/components/motion/count-up';
+
 import { cn } from '@/lib/utils';
 import { Step4CoverLetter } from './workflow-steps/step-4-cover-letter';
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -132,9 +132,8 @@ function SummaryBlock({ summary }: { summary: string }) {
     );
 }
 
-/** ATS Mindmap — center badge surrounded by keyword pills in a radial wrap */
-function ATSMindmap({ buzzwords }: { buzzwords: string[] }) {
-    // Limit to 10 keywords, remove generic low-signal terms
+/** ATS Keywords — simple pill grid, no circle badge */
+function ATSKeywords({ buzzwords }: { buzzwords: string[] }) {
     const LOW_SIGNAL = ['und', 'oder', 'bzw', 'etc', 'diverse', 'sonstige', 'allgemein', 'gut', 'gute'];
     const filtered = buzzwords
         .filter(bw => !LOW_SIGNAL.includes(bw.toLowerCase()))
@@ -143,22 +142,14 @@ function ATSMindmap({ buzzwords }: { buzzwords: string[] }) {
     if (filtered.length === 0) return null;
 
     return (
-        <div className="flex flex-wrap items-center justify-center gap-2 py-3">
-            {/* Center ATS badge */}
-            <div className="flex items-center justify-center rounded-full bg-slate-100 text-slate-700 font-semibold text-xs w-12 h-12 shadow-sm border border-slate-200 shrink-0">
-                ATS
-            </div>
-            {/* Surrounding keyword pills */}
+        <div className="flex flex-wrap gap-2 mt-2">
             {filtered.map((kw, i) => (
-                <motion.span
+                <span
                     key={i}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: i * 0.04, duration: 0.3 }}
-                    className="text-[10px] bg-white border border-slate-200 shadow-sm text-slate-700 px-2 py-0.5 rounded-md font-medium"
+                    className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"
                 >
                     {kw}
-                </motion.span>
+                </span>
             ))}
         </div>
     );
@@ -262,10 +253,6 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                 <div className="w-28 md:w-32 font-medium text-[#002e7a] truncate" title={job.company}>{job.company}</div>
                 <div className="w-40 md:w-48 text-[#002e7a] font-medium truncate" title={job.jobTitle}>{job.jobTitle}</div>
 
-                <div className="w-20 text-center flex justify-center">
-                    <AnimatedMatchScore score={job.matchScore} showIcon={false} className="scale-90" />
-                </div>
-
                 <div className="flex-1 min-w-[200px]" onClick={(e) => e.stopPropagation()}>
                     <ProgressWorkflow
                         current={job.workflowStep}
@@ -302,7 +289,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3 }}
-                        className="overflow-hidden bg-[#d4e3fe] border-t border-[#d6d6d6]"
+                        className="overflow-hidden bg-white border-t border-slate-200"
                     >
                         {/* Tab bar — no Review tab, no emojis */}
                         <div className="flex items-center gap-1 px-6 pt-4 pb-0 border-b border-[#d6d6d6]">
@@ -331,16 +318,12 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                         {/* ===== TAB 0: STECKBRIEF (2-column layout) ===== */}
                         {displayTab === 0 && (
                             <div className="px-5 py-3 space-y-3">
-                                {/* Meta row */}
-                                <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500">
-                                    <span className="text-lg font-bold text-[#37352F]">{job.jobTitle}</span>
-                                    <span className="text-sm text-slate-500">{job.company}</span>
-                                    {formatLevel(job.seniority) && (
-                                        <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 text-[10px] font-medium">
-                                            {formatLevel(job.seniority)}
-                                        </span>
-                                    )}
-                                </div>
+                                {/* Seniority chip only — title is already in the row header */}
+                                {formatLevel(job.seniority) && (
+                                    <span className="inline-block bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 text-[10px] font-medium">
+                                        {formatLevel(job.seniority)}
+                                    </span>
+                                )}
 
                                 {/* 2-Column Split */}
                                 <div className="grid grid-cols-[3fr_2fr] gap-4">
@@ -351,16 +334,16 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
 
                                         {/* Aufgaben */}
                                         {job.responsibilities && job.responsibilities.length > 0 && (
-                                            <div>
-                                                <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Aufgaben</h4>
+                                            <div className="rounded-lg border border-slate-200 p-4">
+                                                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Aufgaben</h4>
                                                 <CollapsibleList items={job.responsibilities} limit={3} />
                                             </div>
                                         )}
 
                                         {/* Qualifikationen */}
                                         {job.qualifications && job.qualifications.length > 0 && (
-                                            <div>
-                                                <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Qualifikationen</h4>
+                                            <div className="rounded-lg border border-slate-200 p-4">
+                                                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Qualifikationen</h4>
                                                 <CollapsibleList items={job.qualifications} limit={3} />
                                             </div>
                                         )}
@@ -368,11 +351,11 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
 
                                     {/* RIGHT COLUMN (40%) */}
                                     <div className="space-y-3">
-                                        {/* ATS Mindmap */}
+                                        {/* ATS Keywords */}
                                         {job.buzzwords && job.buzzwords.length > 0 && (
                                             <div>
-                                                <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">ATS Keywords</h4>
-                                                <ATSMindmap buzzwords={job.buzzwords} />
+                                                <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">ATS Keywords</h4>
+                                                <ATSKeywords buzzwords={job.buzzwords} />
                                             </div>
                                         )}
 

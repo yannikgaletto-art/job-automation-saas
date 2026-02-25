@@ -238,89 +238,85 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
         const metPercent = totalCount > 0 ? Math.round((metCount / totalCount) * 100) : 0;
 
         const scoreColor = matchData.overallScore >= 70 ? '#22c55e' : matchData.overallScore >= 50 ? '#f59e0b' : '#ef4444';
+        const score = typeof matchData.overallScore === 'number' ? matchData.overallScore : parseInt(String(matchData.overallScore ?? 0), 10);
 
-        // Extract one concise bullet per category (max 12 words roughly, by truncating if needed, but the LLM usually gives decent points. We'll just take the first string directly)
-        const topStrength = matchData.strengths[0] || "Keine spezifischen Stärken dokumentiert.";
-        const topGap = matchData.gaps[0] || "Keine kritischen Lücken identifiziert.";
-        const topPotential = matchData.potentialHighlights[0] || "Keine ungenutzten Potenziale erkannt.";
+        // Extract one concise bullet per category
+        const topStrength = matchData.strengths[0] || 'Keine spezifischen Stärken dokumentiert.';
+        const topGap = matchData.gaps[0] || 'Keine kritischen Lücken identifiziert.';
+        const topPotential = matchData.potentialHighlights[0] || 'Keine ungenutzten Potenziale erkannt.';
+
+        /** Truncate to word boundary at ~60 chars */
+        const trunc = (s: string, n = 60) =>
+            s.length > n ? s.slice(0, s.lastIndexOf(' ', n)) + '…' : s;
+
+        /** Extract boldable first term (noun/verb before first , : - em-dash) */
+        const boldFirst = (text: string): React.ReactNode => {
+            const m = text.match(/^([^:,\-–]+)[:\-–,]\s*(.*)/);
+            if (m) return <><strong className="font-semibold text-slate-900">{m[1].trim()}</strong>{' — '}{trunc(m[2])}</>;
+            return trunc(text);
+        };
 
         return (
-            <div className="p-6 bg-[#FAFAF9] rounded-b-xl border-t border-slate-200 space-y-4">
+            <div className="p-5 bg-[#FAFAF9] rounded-b-xl border-t border-slate-200 space-y-4">
 
-                {/* ── Match Score & Score Breakdown (side-by-side) ── */}
-                <div className="flex flex-col md:flex-row gap-4">
-                    {/* Match Score Card (Iteration 1) */}
-                    <div className="flex-1 bg-white border border-slate-200 rounded-lg px-5 py-4 shadow-sm md:max-h-[220px] overflow-hidden flex flex-col">
-                        <div className="w-full">
-                            <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-sm font-semibold text-slate-800">
-                                    Match Score
-                                </span>
-                                <span className="text-sm font-bold text-slate-900">
-                                    {matchData.overallScore}%
-                                </span>
-                            </div>
-                            <div className="h-2 w-full rounded-full bg-slate-100">
-                                <div
-                                    className="h-2 rounded-full transition-all duration-700 ease-out"
-                                    style={{
-                                        width: `${matchData.overallScore}%`,
-                                        backgroundColor: scoreColor
-                                    }}
-                                />
-                            </div>
+                {/* ── Match Score & Score Breakdown — identical card shells, same height ── */}
+                <div className="grid grid-cols-2 gap-4 items-stretch">
+                    {/* Match Score Card */}
+                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col">
+                        <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">
+                            Match Score
+                        </h3>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-sm font-semibold text-slate-800">Übereinstimmung</span>
+                            <span className="text-sm font-bold text-slate-900">{score}%</span>
                         </div>
-
-                        <div className="mt-4 flex-1 space-y-3">
-                            <div>
-                                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Stärken</h4>
-                                <ul className="list-disc list-inside">
-                                    <li className="text-sm text-slate-700 truncate" title={topStrength}>{topStrength}</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Lücken</h4>
-                                <ul className="list-disc list-inside">
-                                    <li className="text-sm text-slate-700 truncate" title={topGap}>{topGap}</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Versteckte Potenziale</h4>
-                                <ul className="list-disc list-inside">
-                                    <li className="text-sm text-slate-700 truncate" title={topPotential}>{topPotential}</li>
-                                </ul>
-                            </div>
+                        <div className="h-2 w-full rounded-full bg-slate-100 mb-5">
+                            <div
+                                className="h-2 rounded-full transition-all duration-700 ease-out"
+                                style={{ width: `${score}%`, backgroundColor: scoreColor }}
+                            />
+                        </div>
+                        <div className="space-y-4 flex-1">
+                            {[
+                                { label: 'Stärken', value: topStrength },
+                                { label: 'Lücken', value: topGap },
+                                { label: 'Versteckte Potenziale', value: topPotential },
+                            ].map(({ label, value }) => (
+                                <div key={label}>
+                                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
+                                    <ul className="list-disc list-inside">
+                                        <li className="text-sm text-slate-700 leading-snug">{value}</li>
+                                    </ul>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Score Breakdown (Iteration 2) */}
-                    <div className="flex-1 bg-white border border-slate-200 rounded-lg px-5 py-4 shadow-sm h-auto md:max-h-[350px] overflow-y-auto custom-scrollbar">
+                    {/* Score Breakdown */}
+                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col overflow-y-auto max-h-[400px] custom-scrollbar">
                         <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">Score-Breakdown</h4>
-                        <div className="space-y-3">
+                        <div className="space-y-3 flex-1">
                             {[
                                 { label: 'Technische Skills', value: matchData.scoreBreakdown.technicalSkills },
                                 { label: 'Soft Skills', value: matchData.scoreBreakdown.softSkills },
                                 { label: 'Erfahrungslevel', value: matchData.scoreBreakdown.experienceLevel },
                                 { label: 'Domain-Wissen', value: matchData.scoreBreakdown.domainKnowledge },
                             ].map((item, i) => {
-                                const score = typeof item.value === 'number' ? item.value : item.value?.score || 0;
+                                const sc = typeof item.value === 'number' ? item.value : item.value?.score || 0;
                                 const reasons = typeof item.value === 'number' ? [] : item.value?.reasons || [];
-
                                 return (
                                     <div key={i} className="mb-2 last:mb-0">
                                         <div className="flex items-center text-sm mb-1">
-                                            <div className="w-32 text-slate-500 font-medium text-xs">
-                                                <strong>{item.label}</strong>
-                                            </div>
+                                            <div className="w-32 text-slate-500 font-medium text-xs"><strong>{item.label}</strong></div>
                                             <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden mx-2">
                                                 <motion.div
                                                     initial={{ width: 0 }}
-                                                    animate={{ width: score + '%' }}
+                                                    animate={{ width: sc + '%' }}
                                                     transition={{ duration: 1, delay: i * 0.1 }}
                                                     className="h-full bg-[#002e7a]"
                                                 />
                                             </div>
-                                            <div className="w-8 text-right font-medium text-xs text-[#37352F]">{score}%</div>
+                                            <div className="w-8 text-right font-medium text-xs text-[#37352F]">{sc}%</div>
                                         </div>
                                         <ReasonsList reasons={reasons} />
                                     </div>
@@ -330,10 +326,10 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                     </div>
                 </div>
 
-                {/* ── Anforderungs-Check (Iteration 3) ── */}
-                <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                    <div className="px-4 py-3 border-b border-slate-200 bg-[#FAFAF9] flex justify-between items-center">
-                        <h3 className="text-sm font-semibold text-[#37352F]">Anforderungs-Check</h3>
+                {/* ── Anforderungs-Check (Fix 3b) ── */}
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                        <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">Anforderungs-Check</h3>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-400">{metCount}/{totalCount}</span>
                             <div className="w-20 h-1 bg-slate-100 rounded overflow-hidden">
@@ -342,39 +338,51 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-[2fr_3fr_4fr] bg-slate-50 px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                        <span>Anforderung</span>
-                        <span>Ist-Zustand</span>
-                        <span>Empfehlung</span>
-                    </div>
+                    <table className="w-full table-fixed">
+                        <colgroup>
+                            <col className="w-[22%]" />
+                            <col className="w-[36%]" />
+                            <col className="w-[42%]" />
+                        </colgroup>
+                        <thead>
+                            <tr className="bg-slate-50 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                                <th className="px-4 py-2 text-left font-semibold">Anforderung</th>
+                                <th className="px-4 py-2 text-left font-semibold">Ist-Zustand</th>
+                                <th className="px-4 py-2 text-left font-semibold">Empfehlung</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {matchData.requirementRows.map((row, i) => (
+                                <motion.tr
+                                    key={i}
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.04 }}
+                                    className="group hover:bg-slate-50 transition-colors"
+                                >
+                                    {/* Anforderung */}
+                                    <td className="py-3 px-4 align-top">
+                                        <StatusBadge status={row.status} />
+                                        <p className="text-xs text-slate-700 mt-1.5 leading-snug">{row.requirement}</p>
+                                    </td>
 
-                    <div className="divide-y divide-slate-100">
-                        {matchData.requirementRows.map((row, i) => (
-                            <motion.div
-                                key={i}
-                                initial={{ opacity: 0, y: 5 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: i * 0.05 }}
-                                className="grid grid-cols-[2fr_3fr_4fr] text-sm text-[#37352F] group"
-                            >
-                                {/* Anforderung */}
-                                <div className="p-3 border-r border-slate-100 flex flex-col items-start gap-2 bg-white group-hover:bg-slate-50 transition-colors">
-                                    <StatusBadge status={row.status} />
-                                    <span className="leading-snug text-xs mt-0.5">{row.requirement}</span>
-                                </div>
+                                    {/* Ist-Zustand — bold first term, truncated */}
+                                    <td className="py-3 px-4 align-top border-l border-slate-100">
+                                        <p className="text-xs text-slate-600 leading-snug">
+                                            {boldFirst(row.currentState)}
+                                        </p>
+                                    </td>
 
-                                {/* Ist-Zustand */}
-                                <div className="p-3 border-r border-slate-100 text-xs text-slate-500 bg-white group-hover:bg-slate-50 transition-colors leading-snug">
-                                    {row.currentState}
-                                </div>
-
-                                {/* Vorschlag */}
-                                <div className="p-3 text-xs text-[#37352F] bg-blue-50/30 group-hover:bg-blue-50/50 transition-colors leading-snug">
-                                    {row.suggestion || '--'}
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
+                                    {/* Empfehlung — bold imperative verb, truncated */}
+                                    <td className="py-3 px-4 align-top border-l border-slate-100">
+                                        <p className="text-xs text-slate-700 leading-snug">
+                                            {boldFirst(row.suggestion || '')}
+                                        </p>
+                                    </td>
+                                </motion.tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
 
                 {/* ── ATS Keywords ── */}

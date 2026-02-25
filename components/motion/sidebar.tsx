@@ -1,15 +1,19 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { LucideIcon, LogOut } from 'lucide-react';
+import { LucideIcon, LogOut, Coins } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { Badge } from './badge';
 import { Progress } from './progress';
 import { CountUp } from './count-up';
+
+/** Extracts up to 2 uppercase initials from a name or email */
+const getInitials = (str: string) =>
+  str.split(/[\s@.]/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
 
 // ============================================================================
 // FLUID SIDEBAR - 100% Framer Motion Compliance
@@ -204,12 +208,7 @@ export function CreditsCard({ remaining, className }: CreditsCardProps) {
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-[#37352F] flex items-center gap-1">
-          <motion.span
-            animate={{ rotate: [0, -10, 10, -10, 0] }}
-            transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-          >
-            💰
-          </motion.span>
+          <Coins className="h-3.5 w-3.5 text-[#0066FF]" />
           Credits
         </span>
         <motion.span
@@ -230,6 +229,20 @@ export function CreditsCard({ remaining, className }: CreditsCardProps) {
 // ============================================================================
 
 export function Sidebar({ children, className, collapsed = false }: SidebarProps) {
+  const [user, setUser] = useState<{ email?: string; full_name?: string } | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setUser({
+          email: data.user.email,
+          full_name: data.user.user_metadata?.full_name,
+        });
+      }
+    });
+  }, []);
+
   return (
     <motion.aside
       className={cn(
@@ -265,8 +278,25 @@ export function Sidebar({ children, className, collapsed = false }: SidebarProps
         {children}
       </div>
 
+      {/* User Info */}
+      <div className="pt-4 border-t border-[#E7E7E5]">
+        <div className="flex items-center gap-3 px-2 py-2">
+          <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+            {getInitials(user?.full_name || user?.email || '?')}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-slate-900 truncate leading-tight">
+              {user?.full_name || 'Kein Name'}
+            </p>
+            <p className="text-xs text-slate-500 truncate leading-tight">
+              {user?.email || ''}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Logout Button */}
-      <div className="mt-auto pt-4 border-t border-[#E7E7E5]">
+      <div className="pt-2 border-t border-[#E7E7E5]">
         <LogoutButton />
       </div>
     </motion.aside>
