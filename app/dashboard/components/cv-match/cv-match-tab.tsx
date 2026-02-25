@@ -93,6 +93,56 @@ function ReasonsList({ reasons }: { reasons: string[] }) {
     );
 }
 
+/** Insights list for Match Score card — all items + toggle, text-xs to match Score Breakdown */
+function InsightsList({ items }: { items: string[] }) {
+    const [expanded, setExpanded] = useState(false);
+    if (items.length === 0) return <p className="text-xs text-slate-400 italic">–</p>;
+    const shown = expanded ? items : items.slice(0, 1);
+    return (
+        <div>
+            <ul className="list-disc list-inside space-y-0.5">
+                {shown.map((item, i) => (
+                    <li key={i} className="text-xs text-slate-700 leading-snug">{item}</li>
+                ))}
+            </ul>
+            {items.length > 1 && (
+                <button
+                    onClick={() => setExpanded(!expanded)}
+                    className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
+                >
+                    <ChevronDown size={12} className={cn("transition-transform duration-200", expanded && "rotate-180")} />
+                    {expanded ? 'Weniger anzeigen' : `+${items.length - 1} mehr`}
+                </button>
+            )}
+        </div>
+    );
+}
+
+/** Expandable table cell for Anforderungs-Check rows */
+function ExpandableCell({ text, boldFn }: { text: string; boldFn: (s: string) => React.ReactNode }) {
+    const [expanded, setExpanded] = useState(false);
+    const SHORT_LIMIT = 80;
+    const isLong = text.length > SHORT_LIMIT;
+    return (
+        <div>
+            {expanded ? (
+                <p className="text-xs text-slate-600 leading-snug">{text}</p>
+            ) : (
+                <p className="text-xs text-slate-600 leading-snug">{boldFn(text)}</p>
+            )}
+            {isLong && (
+                <button
+                    onClick={() => setExpanded(!expanded)}
+                    className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
+                >
+                    <ChevronDown size={12} className={cn("transition-transform duration-200", expanded && "rotate-180")} />
+                    {expanded ? 'Weniger anzeigen' : 'Mehr Details'}
+                </button>
+            )}
+        </div>
+    );
+}
+
 export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, onNextStep }: CVMatchTabProps) {
     const [state, setState] = useState<'idle' | 'loading' | 'complete' | 'error'>('idle');
     const [matchData, setMatchData] = useState<CVMatchResult | null>(null);
@@ -240,11 +290,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
         const scoreColor = matchData.overallScore >= 70 ? '#22c55e' : matchData.overallScore >= 50 ? '#f59e0b' : '#ef4444';
         const score = typeof matchData.overallScore === 'number' ? matchData.overallScore : parseInt(String(matchData.overallScore ?? 0), 10);
 
-        // Extract one concise bullet per category
-        const topStrength = matchData.strengths[0] || 'Keine spezifischen Stärken dokumentiert.';
-        const topGap = matchData.gaps[0] || 'Keine kritischen Lücken identifiziert.';
-        const topPotential = matchData.potentialHighlights[0] || 'Keine ungenutzten Potenziale erkannt.';
-
+        // Arrays sourced directly from matchData
         /** Truncate to word boundary at ~60 chars */
         const trunc = (s: string, n = 60) =>
             s.length > n ? s.slice(0, s.lastIndexOf(' ', n)) + '…' : s;
@@ -267,7 +313,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                             Match Score
                         </h3>
                         <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-sm font-semibold text-slate-800">Übereinstimmung</span>
+                            <span className="text-xs font-semibold text-slate-700">Übereinstimmung</span>
                             <span className="text-sm font-bold text-slate-900">{score}%</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-slate-100 mb-5">
@@ -276,17 +322,15 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                                 style={{ width: `${score}%`, backgroundColor: scoreColor }}
                             />
                         </div>
-                        <div className="space-y-4 flex-1">
+                        <div className="space-y-3 flex-1">
                             {[
-                                { label: 'Stärken', value: topStrength },
-                                { label: 'Lücken', value: topGap },
-                                { label: 'Versteckte Potenziale', value: topPotential },
-                            ].map(({ label, value }) => (
+                                { label: 'Stärken', items: matchData.strengths.length > 0 ? matchData.strengths : ['Keine spezifischen Stärken dokumentiert.'] },
+                                { label: 'Lücken', items: matchData.gaps.length > 0 ? matchData.gaps : ['Keine kritischen Lücken identifiziert.'] },
+                                { label: 'Versteckte Potenziale', items: matchData.potentialHighlights.length > 0 ? matchData.potentialHighlights : ['Keine ungenutzten Potenziale erkannt.'] },
+                            ].map(({ label, items }) => (
                                 <div key={label}>
                                     <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
-                                    <ul className="list-disc list-inside">
-                                        <li className="text-sm text-slate-700 leading-snug">{value}</li>
-                                    </ul>
+                                    <InsightsList items={items} />
                                 </div>
                             ))}
                         </div>
@@ -366,11 +410,9 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                                         <p className="text-xs text-slate-700 mt-1.5 leading-snug">{row.requirement}</p>
                                     </td>
 
-                                    {/* Ist-Zustand — bold first term, truncated */}
+                                    {/* Ist-Zustand — expandable teaser */}
                                     <td className="py-3 px-4 align-top border-l border-slate-100">
-                                        <p className="text-xs text-slate-600 leading-snug">
-                                            {boldFirst(row.currentState)}
-                                        </p>
+                                        <ExpandableCell text={row.currentState} boldFn={boldFirst} />
                                     </td>
 
                                     {/* Empfehlung — bold imperative verb, truncated */}

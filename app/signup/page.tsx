@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import Link from "next/link"
 
 export default function SignupPage() {
+    const [firstName, setFirstName] = useState("")
+    const [lastName, setLastName] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
@@ -21,12 +23,17 @@ export default function SignupPage() {
         setLoading(true)
         setError("")
 
+        const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ")
+
         try {
             const { error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
                     emailRedirectTo: `${window.location.origin}/onboarding`,
+                    data: {
+                        full_name: fullName,
+                    },
                 }
             })
 
@@ -36,9 +43,10 @@ export default function SignupPage() {
             router.push("/onboarding")
             router.refresh()
 
-        } catch (err: any) {
-            console.error("❌ Signup failed:", err.message)
-            setError(err.message || "Signup failed")
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Signup failed"
+            console.error("❌ Signup failed:", msg)
+            setError(msg)
         } finally {
             setLoading(false)
         }
@@ -54,25 +62,51 @@ export default function SignupPage() {
                         </div>
                         <h1 className="text-3xl font-bold text-[#37352F]">Pathly</h1>
                     </div>
-                    <h2 className="text-2xl font-semibold text-[#37352F]">Create your account</h2>
-                    <p className="text-[#73726E] mt-2">Start automating your job applications</p>
+                    <h2 className="text-2xl font-semibold text-[#37352F]">Konto erstellen</h2>
+                    <p className="text-[#73726E] mt-2">Starte mit deiner automatisierten Bewerbung</p>
                 </div>
 
                 <form onSubmit={handleSignup} className="space-y-4">
+                    {/* Name fields — side by side */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-sm font-medium mb-2 text-[#37352F]">Vorname</label>
+                            <Input
+                                type="text"
+                                value={firstName}
+                                onChange={(e) => setFirstName(e.target.value)}
+                                required
+                                placeholder="Max"
+                                className="border-[#E7E7E5]"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-2 text-[#37352F]">Nachname</label>
+                            <Input
+                                type="text"
+                                value={lastName}
+                                onChange={(e) => setLastName(e.target.value)}
+                                required
+                                placeholder="Mustermann"
+                                className="border-[#E7E7E5]"
+                            />
+                        </div>
+                    </div>
+
                     <div>
-                        <label className="block text-sm font-medium mb-2 text-[#37352F]">Email</label>
+                        <label className="block text-sm font-medium mb-2 text-[#37352F]">E-Mail</label>
                         <Input
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            placeholder="your@email.com"
+                            placeholder="max@beispiel.de"
                             className="border-[#E7E7E5]"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium mb-2 text-[#37352F]">Password</label>
+                        <label className="block text-sm font-medium mb-2 text-[#37352F]">Passwort</label>
                         <Input
                             type="password"
                             value={password}
@@ -82,7 +116,7 @@ export default function SignupPage() {
                             placeholder="••••••••"
                             className="border-[#E7E7E5]"
                         />
-                        <p className="text-xs text-[#73726E] mt-1">Minimum 6 characters</p>
+                        <p className="text-xs text-[#73726E] mt-1">Mindestens 6 Zeichen</p>
                     </div>
 
                     {error && (
@@ -92,14 +126,14 @@ export default function SignupPage() {
                     )}
 
                     <Button type="submit" disabled={loading} className="w-full" variant="primary">
-                        {loading ? "Creating account..." : "Sign Up"}
+                        {loading ? "Konto wird erstellt..." : "Registrieren"}
                     </Button>
                 </form>
 
                 <p className="mt-6 text-sm text-center text-[#73726E]">
-                    Already have an account?{" "}
+                    Bereits registriert?{" "}
                     <Link href="/login" className="text-[#0066FF] hover:underline font-medium">
-                        Sign in
+                        Einloggen
                     </Link>
                 </p>
             </div>
