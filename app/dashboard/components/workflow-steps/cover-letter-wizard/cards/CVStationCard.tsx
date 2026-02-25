@@ -29,7 +29,7 @@ export function CVStationCard({
             whileTap={!isDisabled ? { scale: 0.99 } : {}}
             onClick={!isDisabled ? onToggle : undefined}
             className={[
-                'rounded-md px-3 py-2.5 transition-all select-none',
+                'rounded-md px-4 py-3.5 transition-all select-none',
                 isDisabled && !isSelected ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer',
                 isSelected
                     ? 'border-2 border-[#002e7a] bg-[#f0f4ff]'
@@ -39,19 +39,19 @@ export function CVStationCard({
             <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-semibold text-[#37352F]">{role}</span>
-                        <span className="text-[10px] text-[#73726E]">@</span>
-                        <span className="text-xs font-medium text-[#73726E]">{company}</span>
+                        <span className="text-[13px] font-semibold text-[#37352F]">{role}</span>
+                        <span className="text-[11px] text-[#73726E]">@</span>
+                        <span className="text-[13px] font-medium text-[#73726E]">{company}</span>
                     </div>
-                    <p className="text-[10px] text-[#A8A29E] mt-0.5">{period}</p>
+                    <p className="text-[11px] text-[#A8A29E] mt-0.5">{period}</p>
                     {bullets && bullets.length > 0 && bullets[0] && (
-                        <p className="text-[11px] text-[#73726E] mt-1.5 line-clamp-2">· {bullets[0]}</p>
+                        <p className="text-[12px] text-[#73726E] mt-2 line-clamp-2">· {bullets[0]}</p>
                     )}
                 </div>
 
                 {/* Selection Badge */}
                 {isSelected && (
-                    <div className="shrink-0 w-5 h-5 rounded-full bg-[#002e7a] text-white text-[10px] font-bold flex items-center justify-center">
+                    <div className="shrink-0 w-6 h-6 rounded-full bg-[#002e7a] text-white text-[11px] font-bold flex items-center justify-center">
                         {selectedIndex}
                     </div>
                 )}

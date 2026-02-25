@@ -3,8 +3,9 @@
 import { CVStationCard } from '../cards/CVStationCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse } from '@/types/cover-letter-setup';
-import { ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
-import { useMemo } from 'react';
+import { ChevronLeft, ChevronRight, Lightbulb, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { generateStationReasoning } from '@/app/actions/generate-station-reasoning';
 
 interface Props {
     setupData: SetupDataResponse;
@@ -71,6 +72,32 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
     const { cvStations, toggleStation, isStepComplete } = useCoverLetterSetupStore();
     const canProceed = isStepComplete(2);
 
+    const [expandedRecs, setExpandedRecs] = useState<Record<number, string[]>>({});
+    const [loadingRecs, setLoadingRecs] = useState<Record<number, boolean>>({});
+
+    const handleExpandRec = async (
+        idx: number,
+        role: string,
+        company: string,
+        bullets: string[],
+        requirement: string
+    ) => {
+        if (expandedRecs[idx]) {
+            // Toggle off
+            const next = { ...expandedRecs };
+            delete next[idx];
+            setExpandedRecs(next);
+            return;
+        }
+        setLoadingRecs((prev) => ({ ...prev, [idx]: true }));
+        try {
+            const reasons = await generateStationReasoning(role, company, bullets, requirement);
+            setExpandedRecs((prev) => ({ ...prev, [idx]: reasons }));
+        } finally {
+            setLoadingRecs((prev) => ({ ...prev, [idx]: false }));
+        }
+    };
+
     // Precalculate recommendations for all stations and find the top 3 best matching ones
     const { recs, top3Set } = useMemo(() => {
         const computed = setupData.cvStations.map((station, idx) => {
@@ -128,7 +155,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
     return (
         <div className="space-y-4">
             <div>
-                <h3 className="text-sm font-semibold text-[#37352F]">Wähle deine relevantesten Stationen</h3>
+                <h3 className="text-[15.5px] font-semibold text-[#37352F]">Wähle deine relevantesten Stationen</h3>
                 <p className="text-xs text-[#73726E] mt-0.5">
                     Wähle max. 3 Stationen, die die Stelle am besten belegen.
                 </p>
@@ -136,11 +163,11 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                 {/* Job Requirements */}
                 {setupData.jobRequirements.length > 0 && (
                     <div className="mt-3 space-y-1">
-                        <p className="text-[12px] font-semibold text-[#A8A29E] uppercase tracking-wide">Top-Anforderungen</p>
+                        <p className="text-[11.5px] font-semibold text-[#A8A29E] uppercase tracking-wide">Top-Anforderungen</p>
                         {setupData.jobRequirements.map((req, i) => (
                             <div key={i} className="flex items-start gap-1.5">
-                                <span className="text-[12px] text-[#002e7a] font-bold">{i + 1}.</span>
-                                <span className="text-[14px] leading-snug text-[#73726E]">{req}</span>
+                                <span className="text-[11.5px] text-[#002e7a] font-bold">{i + 1}.</span>
+                                <span className="text-[13px] leading-snug text-[#73726E]">{req}</span>
                             </div>
                         ))}
                     </div>
@@ -156,7 +183,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                     const rec = top3Set.has(idx) ? recs[idx]?.rec : null;
 
                     return (
-                        <div key={idx} className="flex gap-3 items-stretch">
+                        <div key={idx} className="grid grid-cols-2 gap-3 items-stretch">
                             {/* Left: Station Card */}
                             <div className="flex-1 min-w-0">
                                 <CVStationCard
@@ -171,21 +198,51 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                             </div>
 
                             {/* Right: Recommendation */}
-                            {rec && (
-                                <div className="flex-1 min-w-0 bg-[#F8FAFC] border border-[#E7E7E5] rounded-lg p-3 flex flex-col justify-center">
-                                    <div className="flex items-start gap-2">
-                                        <Lightbulb className="w-4 h-4 text-amber-500 shrink-0" />
-                                        <div className="min-w-0 pt-0.5">
-                                            <p className="text-[10px] font-semibold text-[#002e7a] uppercase tracking-wide mb-1">
-                                                Empfehlung
-                                            </p>
-                                            <p className="text-[10px] text-[#73726E] leading-relaxed">
-                                                {rec.reasoning}
-                                            </p>
+                            {rec ? (
+                                <div
+                                    onClick={() => handleExpandRec(idx, station.role, station.company, station.bullets || [], rec.requirement)}
+                                    className="min-w-0 bg-[#F8FAFC] border border-[#E7E7E5] rounded-lg p-3 flex flex-col justify-center cursor-pointer hover:bg-[#F1F5F9] transition-colors"
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex items-start gap-2">
+                                            <Lightbulb className="w-4 h-4 text-amber-500 shrink-0" />
+                                            <div className="min-w-0 pt-0.5">
+                                                <p className="text-[10px] font-semibold text-[#002e7a] uppercase tracking-wide mb-1">
+                                                    Empfehlung
+                                                </p>
+                                                <p className="text-[10px] text-[#73726E] leading-relaxed">
+                                                    {rec.reasoning}
+                                                </p>
+
+                                                {/* Expanded Content */}
+                                                {loadingRecs[idx] ? (
+                                                    <div className="mt-3 flex items-center gap-1.5 text-[10px] text-[#002e7a] opacity-70">
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                        Berechne tiefere Begründung...
+                                                    </div>
+                                                ) : expandedRecs[idx] && (
+                                                    <div className="mt-3 space-y-1.5 border-t border-[#E7E7E5] pt-2">
+                                                        {expandedRecs[idx].map((r, i) => (
+                                                            <div key={i} className="flex gap-1.5 items-start">
+                                                                <span className="text-[10px] text-[#002e7a] font-bold mt-0.5">•</span>
+                                                                <span className="text-[10.5px] leading-snug text-[#73726E]">{r}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {/* Dropdown Chevron */}
+                                        <div className="shrink-0 pt-0.5">
+                                            {expandedRecs[idx] ? (
+                                                <ChevronUp className="w-4 h-4 text-[#A8A29E]" />
+                                            ) : (
+                                                <ChevronDown className="w-4 h-4 text-[#A8A29E]" />
+                                            )}
                                         </div>
                                     </div>
                                 </div>
-                            )}
+                            ) : <div /> /* Empty div to pad the second grid column if no recommendation */}
                         </div>
                     );
                 })}
