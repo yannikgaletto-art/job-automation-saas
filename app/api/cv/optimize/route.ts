@@ -77,6 +77,7 @@ function applyCvChanges(cv: CvStructuredData, changes: CvChange[]): CvStructured
     return optimized;
 }
 
+
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
@@ -183,7 +184,7 @@ Muss folgendem Zod Schema entsprechen:
             .eq('user_id', user_id);
 
         if (dbError) {
-            console.error('❌ Failed to save optimized CV to DB', dbError);
+            console.error('Failed to save optimized CV to DB', dbError);
             throw dbError; // Bubble up
         }
 
@@ -193,7 +194,7 @@ Muss folgendem Zod Schema entsprechen:
         });
 
     } catch (error: any) {
-        console.error('❌ Error handling optimizer API:', error);
+        console.error('Error handling optimizer API:', error);
         return NextResponse.json(
             { error: 'Internal server error', details: error.message },
             { status: 500 }
