@@ -399,7 +399,7 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
 
                         {/* PDF Preview + optional editor panel */}
                         {isEditing ? (
-                            <div className="grid grid-cols-[1fr_340px] gap-4 items-start">
+                            <div className="grid grid-cols-[1fr_480px] gap-4 items-start">
                                 <DynamicPdfViewer data={activePdfData} templateId={templateId} />
                                 <div className="sticky top-4 bg-white rounded-xl border border-slate-200 p-4 h-[800px]">
                                     <InlineCvEditor

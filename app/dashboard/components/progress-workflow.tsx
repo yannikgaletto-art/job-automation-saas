@@ -9,7 +9,6 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-// canvas-confetti uses browser globals — must be imported dynamically in useEffect only
 
 interface ProgressWorkflowProps {
     current: number; // 0-4 (current step index from job status)
@@ -26,22 +25,23 @@ const WORKFLOW_NODES = [
 ];
 
 /**
- * Mapping from `current` (workflowStep 0-4) to which nodes turn green:
- *  workflowStep 0 (NEW)          -> none
- *  workflowStep 1 (JOB_REVIEWED / Steckbrief done) -> node 0
- *  workflowStep 2 (CV_CHECKED)   -> node 0, 1
- *  workflowStep 3 (CV_OPTIMIZED) -> node 0, 1, 2
- *  workflowStep 4 (CL_GENERATED / READY) -> all
+ * Node states:
+ *  - FILLED (green): nodeIndex < workflowStep -- this step is completed
+ *  - CURRENT (blue ring): nodeIndex === workflowStep -- actively being worked on
+ *  - EMPTY (gray): nodeIndex > workflowStep -- not yet reached
  */
 function nodeFilled(nodeIndex: number, workflowStep: number): boolean {
     return nodeIndex < workflowStep;
 }
 
-const NODE_SIZE = 36; // px
+function nodeIsCurrent(nodeIndex: number, workflowStep: number): boolean {
+    return nodeIndex === workflowStep;
+}
+
+const NODE_SIZE = 36;
 
 export function ProgressWorkflow({ current, className, onStepClick, activeTab }: ProgressWorkflowProps) {
     // Confetti when all 4 nodes are filled (workflowStep >= 4)
-    // Dynamic import ensures canvas-confetti never runs on the server
     useEffect(() => {
         if (current >= 4) {
             import('canvas-confetti').then(({ default: confetti }) => {
@@ -75,6 +75,7 @@ export function ProgressWorkflow({ current, className, onStepClick, activeTab }:
         <div className={cn("flex items-center h-14", className)}>
             {WORKFLOW_NODES.map((node, idx) => {
                 const filled = nodeFilled(idx, current);
+                const isCurrent = nodeIsCurrent(idx, current);
                 const isActiveTab = activeTab === node.tabIndex;
                 const isClickable = !!onStepClick;
 
@@ -94,7 +95,9 @@ export function ProgressWorkflow({ current, className, onStepClick, activeTab }:
                                 isActiveTab && "ring-2 ring-offset-1 ring-blue-600",
                                 filled
                                     ? "bg-green-500 border-green-500 text-white"
-                                    : "bg-white border-slate-300 text-slate-400"
+                                    : isCurrent
+                                        ? "bg-blue-50 border-blue-500 text-blue-600"
+                                        : "bg-white border-slate-300 text-slate-400"
                             )}
                             style={{ width: NODE_SIZE, height: NODE_SIZE }}
                             animate={filled ? { scale: [0.85, 1] } : {}}
@@ -104,12 +107,12 @@ export function ProgressWorkflow({ current, className, onStepClick, activeTab }:
                             title={node.label}
                             type="button"
                         >
-                            {/* Percentage text */}
+                            {/* Percentage text or label */}
                             <span className={cn(
                                 "text-[10px] font-bold leading-none select-none",
-                                filled ? "text-white" : "text-slate-400"
+                                filled ? "text-white" : isCurrent ? "text-blue-600" : "text-slate-400"
                             )}>
-                                {filled ? node.pct : ''}
+                                {filled ? node.pct : isCurrent ? node.pct : ''}
                             </span>
                         </motion.button>
 

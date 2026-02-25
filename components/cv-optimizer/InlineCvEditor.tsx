@@ -104,7 +104,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
                         {exp.description?.map((bullet, bIdx) => (
                             <div key={bullet.id} className="flex items-start gap-1.5 mb-1.5">
                                 <textarea
-                                    rows={2}
+                                    rows={3}
                                     value={bullet.text}
                                     onChange={(e) => updateBullet(eIdx, bIdx, e.target.value)}
                                     className="flex-1 px-2 py-1 text-xs rounded border border-slate-200

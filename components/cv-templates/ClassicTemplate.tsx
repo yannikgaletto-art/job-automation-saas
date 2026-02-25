@@ -62,6 +62,8 @@ const s = StyleSheet.create({
     expRole: {
         fontSize: 10,
         fontWeight: 700,
+        flex: 1,
+        paddingRight: 8,
     },
     expCompany: {
         fontSize: 10,
@@ -70,6 +72,7 @@ const s = StyleSheet.create({
     expDate: {
         fontSize: 10,
         fontWeight: 600,
+        flexShrink: 0,
     },
     expLocation: {
         fontSize: 9,
@@ -85,10 +88,10 @@ const s = StyleSheet.create({
     bulletRow: {
         flexDirection: 'row',
         marginBottom: 3,
-        paddingRight: 10,
+        paddingRight: 0,
     },
     bulletDot: {
-        width: 12,
+        width: 14,
         fontSize: 10,
     },
     bulletText: {
@@ -100,13 +103,18 @@ const s = StyleSheet.create({
     eduBlock: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 8,
+        alignItems: 'flex-start',
+        marginBottom: 10,
     },
     eduLeft: {
         flex: 1,
+        paddingRight: 4,
     },
     eduRight: {
         alignItems: 'flex-end',
+        flexShrink: 0,
+        width: 80,
+        marginLeft: 8,
     },
     eduDegree: {
         fontSize: 10,
@@ -128,17 +136,21 @@ const s = StyleSheet.create({
     // Skills
     skillRow: {
         flexDirection: 'row',
-        marginBottom: 4,
+        marginBottom: 5,
+        alignItems: 'flex-start',
     },
     skillCategory: {
-        width: 120,
+        width: 165,
         fontWeight: 700,
         fontSize: 9.5,
+        paddingRight: 8,
+        flexShrink: 0,
     },
     skillItems: {
         flex: 1,
         fontSize: 9.5,
         color: GRAY,
+        lineHeight: 1.5,
     },
 });
 
@@ -168,11 +180,11 @@ export function ClassicTemplate({ data }: { data: CvStructuredData }) {
                     <Text style={s.name}>{pi.name || ''}</Text>
                     <View style={s.contactInfo}>
                         {pi.location && <Text>{pi.location}</Text>}
-                        {pi.location && pi.phone && <Text>•</Text>}
+                        {pi.location && pi.phone && <Text>{'\u2022'}</Text>}
                         {pi.phone && <Text>{pi.phone}</Text>}
-                        {pi.phone && pi.email && <Text>•</Text>}
+                        {pi.phone && pi.email && <Text>{'\u2022'}</Text>}
                         {pi.email && <Text>{pi.email}</Text>}
-                        {pi.email && pi.linkedin && <Text>•</Text>}
+                        {pi.email && pi.linkedin && <Text>{'\u2022'}</Text>}
                         {pi.linkedin && <Text>{pi.linkedin}</Text>}
                     </View>
                 </View>
@@ -192,11 +204,11 @@ export function ClassicTemplate({ data }: { data: CvStructuredData }) {
                         {data.experience.map((exp) => (
                             <View key={exp.id} style={s.expBlock} wrap={false}>
                                 <View style={s.expHeaderRow}>
-                                    <View>
+                                    <View style={{ flex: 1, paddingRight: 8 }}>
                                         <Text style={s.expRole}>{exp.role || ''}</Text>
                                         <Text style={s.expCompany}>{exp.company || ''}</Text>
                                     </View>
-                                    <View style={{ alignItems: 'flex-end' }}>
+                                    <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
                                         <Text style={s.expDate}>{exp.dateRangeText || ''}</Text>
                                         {exp.location && <Text style={s.expLocation}>{exp.location}</Text>}
                                     </View>
@@ -204,7 +216,7 @@ export function ClassicTemplate({ data }: { data: CvStructuredData }) {
                                 {exp.summary && <Text style={s.expSummary}>{exp.summary}</Text>}
                                 {exp.description?.map((bullet) => (
                                     <View key={bullet.id} style={s.bulletRow}>
-                                        <Text style={s.bulletDot}>•</Text>
+                                        <Text style={s.bulletDot}>{'\u2022'}</Text>
                                         <RenderBullet text={bullet.text} />
                                     </View>
                                 ))}
@@ -232,7 +244,7 @@ export function ClassicTemplate({ data }: { data: CvStructuredData }) {
                     </View>
                 )}
 
-                {/* Skills & Certifications Side-by-Side or Stacked */}
+                {/* Skills & Certifications */}
                 {(data.skills.length > 0 || (data.certifications && data.certifications.length > 0)) && (
                     <View style={s.section} wrap={false}>
                         <Text style={s.sectionTitle}>Skills & Certifications</Text>

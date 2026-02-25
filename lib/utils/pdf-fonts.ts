@@ -29,4 +29,8 @@ export function registerPdfFonts() {
             },
         ],
     });
+
+    // Disable mid-word hyphenation globally.
+    // German compound words were breaking at arbitrary syllables.
+    Font.registerHyphenationCallback((word: string) => [word]);
 }

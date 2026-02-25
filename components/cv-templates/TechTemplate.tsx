@@ -5,10 +5,10 @@ import { CvStructuredData } from '@/types/cv';
 
 registerPdfFonts();
 
-const ACCENT = '#0E7490'; // Cyan-700
-const DARK = '#0F172A';   // Slate-900
-const GRAY = '#475569';   // Slate-600
-const LIGHT = '#F1F5F9';  // Slate-100
+const ACCENT = '#0E7490';
+const DARK = '#0F172A';
+const GRAY = '#475569';
+const LIGHT = '#F1F5F9';
 
 const s = StyleSheet.create({
     page: {
@@ -30,6 +30,7 @@ const s = StyleSheet.create({
     },
     headerLeft: {
         flex: 1,
+        paddingRight: 8,
     },
     name: {
         fontSize: 28,
@@ -48,6 +49,7 @@ const s = StyleSheet.create({
     headerRight: {
         alignItems: 'flex-end',
         justifyContent: 'flex-end',
+        flexShrink: 0,
         gap: 4,
     },
     contactTag: {
@@ -94,15 +96,18 @@ const s = StyleSheet.create({
         fontSize: 10,
         fontWeight: 700,
         color: DARK,
+        flex: 1,
+        paddingRight: 8,
     },
     expDateTag: {
         fontSize: 8,
         fontWeight: 600,
         color: ACCENT,
-        backgroundColor: '#CFFAFE', // cyan-100
+        backgroundColor: '#CFFAFE',
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 4,
+        flexShrink: 0,
     },
     expCompany: {
         fontSize: 9,
@@ -115,7 +120,7 @@ const s = StyleSheet.create({
         marginBottom: 4,
     },
     bulletDot: {
-        width: 10,
+        width: 14,
         color: ACCENT,
         fontSize: 9,
     },
@@ -217,7 +222,7 @@ export function TechTemplate({ data }: { data: CvStructuredData }) {
 
                                         {exp.description?.map(bullet => (
                                             <View key={bullet.id} style={s.bulletRow}>
-                                                <Text style={s.bulletDot}>›</Text>
+                                                <Text style={s.bulletDot}>{'\u203A'}</Text>
                                                 <RenderBullet text={bullet.text} />
                                             </View>
                                         ))}
@@ -229,7 +234,7 @@ export function TechTemplate({ data }: { data: CvStructuredData }) {
 
                     {/* Sidebar Column */}
                     <View style={s.sideCol}>
-                        {/* Skills */}
+                        {/* Skills — keep tags for tech template style */}
                         {data.skills.length > 0 && (
                             <View style={{ marginBottom: 20 }}>
                                 <Text style={s.sectionTitle}>Tech Stack</Text>

@@ -5,8 +5,8 @@ import { CvStructuredData } from '@/types/cv';
 
 registerPdfFonts();
 
-const SIDEBAR_W = 190; // fixed pixel width — no percentage bugs
-const PAGE_W = 595;   // A4 width in points
+const SIDEBAR_W = 190;
+const PAGE_W = 595;
 
 const SIDEBAR_BG = '#111827';
 const SIDEBAR_TEXT = '#F3F4F6';
@@ -50,7 +50,7 @@ const s = StyleSheet.create({
         lineHeight: 1.4,
     },
     sidebarSection: {
-        marginTop: 18,
+        marginTop: 20,
     },
     sidebarTitle: {
         fontSize: 8.5,
@@ -64,17 +64,18 @@ const s = StyleSheet.create({
         marginBottom: 10,
     },
     skillCat: {
-        fontSize: 8,
+        fontSize: 7.5,
         fontWeight: 600,
         color: SIDEBAR_TEXT,
-        marginTop: 6,
-        marginBottom: 2,
+        marginTop: 8,
+        marginBottom: 1.5,
+        lineHeight: 1.3,
     },
     skillItem: {
-        fontSize: 8,
+        fontSize: 7.5,
         color: SIDEBAR_MUTED,
-        marginBottom: 1,
-        lineHeight: 1.3,
+        marginBottom: 3,
+        lineHeight: 1.4,
     },
     langRow: {
         flexDirection: 'row',
@@ -95,10 +96,9 @@ const s = StyleSheet.create({
     main: {
         marginLeft: SIDEBAR_W,
         paddingLeft: 28,
-        paddingRight: 28,
+        paddingRight: 32,
         paddingTop: 40,
         paddingBottom: 40,
-        // explicit width so the PDF engine knows the boundary
         width: PAGE_W - SIDEBAR_W,
     },
     sectionContainer: {
@@ -131,11 +131,14 @@ const s = StyleSheet.create({
         fontSize: 10.5,
         fontWeight: 700,
         color: DARK,
+        flex: 1,
+        paddingRight: 8,
     },
     expDate: {
         fontSize: 8.5,
         color: ACCENT,
         fontWeight: 600,
+        flexShrink: 0,
     },
     expCompany: {
         fontSize: 9,
@@ -148,7 +151,7 @@ const s = StyleSheet.create({
         marginBottom: 3,
     },
     bulletDot: {
-        width: 11,
+        width: 14,
         fontSize: 9,
         color: ACCENT,
         fontWeight: 700,
@@ -172,10 +175,13 @@ const s = StyleSheet.create({
         fontSize: 10,
         fontWeight: 700,
         color: DARK,
+        flex: 1,
+        paddingRight: 8,
     },
     eduDate: {
         fontSize: 8.5,
         color: MUTED,
+        flexShrink: 0,
     },
     eduInstitution: {
         fontSize: 9,
@@ -214,7 +220,7 @@ export function ModernTemplate({ data }: { data: CvStructuredData }) {
         <Document>
             <Page size="A4" style={s.page}>
 
-                {/* ===== SIDEBAR — absolutely positioned ===== */}
+                {/* ===== SIDEBAR ===== */}
                 <View style={s.sidebar} fixed>
                     <Text style={s.sidebarName}>{pi.name || ''}</Text>
 
@@ -229,9 +235,9 @@ export function ModernTemplate({ data }: { data: CvStructuredData }) {
                             {data.skills.map((g) => (
                                 <View key={g.id}>
                                     {g.category && <Text style={s.skillCat}>{g.category}</Text>}
-                                    {g.items.map((item, i) => (
-                                        <Text key={i} style={s.skillItem}>{item}</Text>
-                                    ))}
+                                    <Text style={s.skillItem}>
+                                        {g.items.join(' \u00B7 ')}
+                                    </Text>
                                 </View>
                             ))}
                         </View>
@@ -250,7 +256,7 @@ export function ModernTemplate({ data }: { data: CvStructuredData }) {
                     )}
                 </View>
 
-                {/* ===== MAIN CONTENT — margin pushes past sidebar ===== */}
+                {/* ===== MAIN CONTENT ===== */}
                 <View style={s.main}>
                     {pi.summary && (
                         <View style={s.sectionContainer}>
@@ -270,12 +276,12 @@ export function ModernTemplate({ data }: { data: CvStructuredData }) {
                                     </View>
                                     {exp.company && (
                                         <Text style={s.expCompany}>
-                                            {exp.company}{exp.location ? ` • ${exp.location}` : ''}
+                                            {exp.company}{exp.location ? ` \u2022 ${exp.location}` : ''}
                                         </Text>
                                     )}
                                     {exp.description?.map((b) => (
                                         <View key={b.id} style={s.bulletRow}>
-                                            <Text style={s.bulletDot}>•</Text>
+                                            <Text style={s.bulletDot}>{'\u2022'}</Text>
                                             <RenderBullet text={b.text} />
                                         </View>
                                     ))}
