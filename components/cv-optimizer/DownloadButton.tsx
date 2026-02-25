@@ -26,8 +26,27 @@ function resolveDocument(data: CvStructuredData, templateId: string) {
 }
 
 export default function DownloadButton({ data, templateId }: DownloadButtonProps) {
+    const [isMounted, setIsMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const fileName = `CV_${data.personalInfo?.name?.replace(/\s+/g, '_') || 'Pathly'}.pdf`;
     const document = resolveDocument(data, templateId);
+
+    if (!isMounted) {
+        return (
+            <button
+                disabled
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium
+                           rounded-lg flex items-center justify-center gap-2 transition-colors
+                           disabled:opacity-50 min-w-[200px]"
+            >
+                <Loader2 className="w-4 h-4 animate-spin" /> PDF wird generiert...
+            </button>
+        );
+    }
 
     return (
         <PDFDownloadLink document={document} fileName={fileName}>
