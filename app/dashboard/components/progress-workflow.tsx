@@ -9,7 +9,7 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import confetti from 'canvas-confetti';
+// canvas-confetti uses browser globals — must be imported dynamically in useEffect only
 
 interface ProgressWorkflowProps {
     current: number; // 0-4 (current step index from job status)
@@ -41,30 +41,33 @@ const NODE_SIZE = 36; // px
 
 export function ProgressWorkflow({ current, className, onStepClick, activeTab }: ProgressWorkflowProps) {
     // Confetti when all 4 nodes are filled (workflowStep >= 4)
+    // Dynamic import ensures canvas-confetti never runs on the server
     useEffect(() => {
         if (current >= 4) {
-            const duration = 2500;
-            const end = Date.now() + duration;
-            const frame = () => {
-                confetti({
-                    particleCount: 4,
-                    angle: 60,
-                    spread: 55,
-                    origin: { x: 0, y: 0.7 },
-                    colors: ['#002e7a', '#3b82f6', '#22c55e', '#60a5fa'],
-                });
-                confetti({
-                    particleCount: 4,
-                    angle: 120,
-                    spread: 55,
-                    origin: { x: 1, y: 0.7 },
-                    colors: ['#002e7a', '#3b82f6', '#22c55e', '#60a5fa'],
-                });
-                if (Date.now() < end) {
-                    requestAnimationFrame(frame);
-                }
-            };
-            frame();
+            import('canvas-confetti').then(({ default: confetti }) => {
+                const duration = 2500;
+                const end = Date.now() + duration;
+                const frame = () => {
+                    confetti({
+                        particleCount: 4,
+                        angle: 60,
+                        spread: 55,
+                        origin: { x: 0, y: 0.7 },
+                        colors: ['#002e7a', '#3b82f6', '#22c55e', '#60a5fa'],
+                    });
+                    confetti({
+                        particleCount: 4,
+                        angle: 120,
+                        spread: 55,
+                        origin: { x: 1, y: 0.7 },
+                        colors: ['#002e7a', '#3b82f6', '#22c55e', '#60a5fa'],
+                    });
+                    if (Date.now() < end) {
+                        requestAnimationFrame(frame);
+                    }
+                };
+                frame();
+            });
         }
     }, [current]);
 

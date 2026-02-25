@@ -4,10 +4,11 @@ let registered = false;
 
 /**
  * Register Inter font family for React-PDF rendering.
- * Uses Google Fonts CDN for reliable loading in all environments.
  * Call this once before rendering any PDF template.
+ * Guard: only runs in the browser — @react-pdf/renderer is SSR-unsafe.
  */
 export function registerPdfFonts() {
+    if (typeof window === 'undefined') return; // SSR guard
     if (registered) return;
     registered = true;
 

@@ -6,7 +6,6 @@ import { SuggestionsList } from "./SuggestionsList"
 import { ScoreBadges } from "./ScoreBadges"
 import type { QualityScores } from "@/components/cover-letter/types"
 import type { CoverLetterSetupContext } from "@/types/cover-letter-setup"
-import confetti from "canvas-confetti"
 
 interface GenerationResult {
     coverLetter: string
@@ -150,10 +149,12 @@ export function CoverLetterResultView({ initialResult, userId, jobId, setupConte
             if (!res.ok) throw new Error()
 
             setIsApplied(true)
-            confetti({
-                particleCount: 100,
-                spread: 70,
-                origin: { y: 0.6 }
+            import('canvas-confetti').then(({ default: confetti }) => {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                })
             })
         } catch {
             alert("Konnte den Status nicht aktualisieren.")

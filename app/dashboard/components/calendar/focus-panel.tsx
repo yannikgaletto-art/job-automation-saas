@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, SkipForward, Coffee, ArrowLeft, CheckCircle2, RotateCcw, Clock } from 'lucide-react';
 import { useCalendarStore } from '@/store/use-calendar-store';
 import { toast } from 'sonner';
-import confetti from 'canvas-confetti';
+
 
 const DEFAULT_BREAK_DURATION = 5 * 60; // 5 minutes (for 25-min pomodoro)
 const DEEP_BREAK_DURATION = 10 * 60; // 10 minutes (for 50-min pomodoro)
@@ -399,10 +399,12 @@ function getNextDay(): string {
 }
 
 function fireConfetti() {
-    confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#002e7a', '#16a34a', '#f59e0b'],
+    import('canvas-confetti').then(({ default: confetti }) => {
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#002e7a', '#16a34a', '#f59e0b'],
+        });
     });
 }

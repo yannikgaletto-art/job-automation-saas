@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Briefcase, Chrome, Plus, Search, Mail, CheckCircle2, Upload } from 'lucide-react';
-import confetti from 'canvas-confetti';
+
 import { DocumentUpload } from '@/components/onboarding/document-upload';
 
 // ─── Step Definitions ─────────────────────────────────────────────────────────
@@ -50,29 +50,31 @@ export default function OnboardingPage() {
     // Confetti on mount (Step 1)
     useEffect(() => {
         if (step === 1) {
-            const duration = 2000;
-            const end = Date.now() + duration;
+            import('canvas-confetti').then(({ default: confetti }) => {
+                const duration = 2000;
+                const end = Date.now() + duration;
 
-            const frame = () => {
-                confetti({
-                    particleCount: 3,
-                    angle: 60,
-                    spread: 55,
-                    origin: { x: 0, y: 0.7 },
-                    colors: ['#002e7a', '#3b82f6', '#60a5fa', '#93c5fd'],
-                });
-                confetti({
-                    particleCount: 3,
-                    angle: 120,
-                    spread: 55,
-                    origin: { x: 1, y: 0.7 },
-                    colors: ['#002e7a', '#3b82f6', '#60a5fa', '#93c5fd'],
-                });
-                if (Date.now() < end) {
-                    requestAnimationFrame(frame);
-                }
-            };
-            frame();
+                const frame = () => {
+                    confetti({
+                        particleCount: 3,
+                        angle: 60,
+                        spread: 55,
+                        origin: { x: 0, y: 0.7 },
+                        colors: ['#002e7a', '#3b82f6', '#60a5fa', '#93c5fd'],
+                    });
+                    confetti({
+                        particleCount: 3,
+                        angle: 120,
+                        spread: 55,
+                        origin: { x: 1, y: 0.7 },
+                        colors: ['#002e7a', '#3b82f6', '#60a5fa', '#93c5fd'],
+                    });
+                    if (Date.now() < end) {
+                        requestAnimationFrame(frame);
+                    }
+                };
+                frame();
+            });
         }
     }, [step]);
 
