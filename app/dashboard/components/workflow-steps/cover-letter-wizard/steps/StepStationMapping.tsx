@@ -4,6 +4,7 @@ import { CVStationCard } from '../cards/CVStationCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse } from '@/types/cover-letter-setup';
 import { ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
+import { useMemo } from 'react';
 
 interface Props {
     setupData: SetupDataResponse;
@@ -20,7 +21,7 @@ function generateRecommendation(
     role: string,
     company: string,
     requirements: string[]
-): { requirement: string; reasoning: string } | null {
+): { requirement: string; reasoning: string; _score: number } | null {
     if (requirements.length === 0) return null;
 
     // Fallback if no bullets available
@@ -28,6 +29,7 @@ function generateRecommendation(
         return {
             requirement: requirements[0],
             reasoning: `${company} (${role}) zeigt grundsätzlich deine Erfahrung in diesem Bereich.`,
+            _score: 0
         };
     }
 
@@ -61,6 +63,7 @@ function generateRecommendation(
     return {
         requirement: bestReq,
         reasoning: `${company} zeigt, dass du "${shortBullet}" kannst — das belegt die Anforderung.`,
+        _score: bestScore
     };
 }
 
@@ -68,9 +71,25 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
     const { cvStations, toggleStation, isStepComplete } = useCoverLetterSetupStore();
     const canProceed = isStepComplete(2);
 
-    const handleToggle = (station: SetupDataResponse['cvStations'][number]) => {
+    // Precalculate recommendations for all stations and find the top 3 best matching ones
+    const { recs, top3Set } = useMemo(() => {
+        const computed = setupData.cvStations.map((station, idx) => {
+            const safeBullets = station.bullets || [];
+            return {
+                idx,
+                rec: generateRecommendation(safeBullets, station.role, station.company, setupData.jobRequirements)
+            };
+        });
+        const sortedIndices = [...computed].sort((a, b) => (b.rec?._score || 0) - (a.rec?._score || 0)).map(r => r.idx);
+        return {
+            recs: computed,
+            top3Set: new Set(sortedIndices.slice(0, 3)),
+        };
+    }, [setupData.cvStations, setupData.jobRequirements]);
+
+    const handleToggle = (stationIndex: number, station: SetupDataResponse['cvStations'][number]) => {
         const safeBullets = station.bullets || [];
-        const rec = generateRecommendation(safeBullets, station.role, station.company, setupData.jobRequirements);
+        const rec = recs[stationIndex]?.rec;
         toggleStation({
             company: station.company,
             role: station.role,
@@ -117,11 +136,11 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                 {/* Job Requirements */}
                 {setupData.jobRequirements.length > 0 && (
                     <div className="mt-3 space-y-1">
-                        <p className="text-[10px] font-semibold text-[#A8A29E] uppercase tracking-wide">Top-Anforderungen</p>
+                        <p className="text-[12px] font-semibold text-[#A8A29E] uppercase tracking-wide">Top-Anforderungen</p>
                         {setupData.jobRequirements.map((req, i) => (
                             <div key={i} className="flex items-start gap-1.5">
-                                <span className="text-[10px] text-[#002e7a] font-bold">{i + 1}.</span>
-                                <span className="text-[11px] text-[#73726E]">{req}</span>
+                                <span className="text-[12px] text-[#002e7a] font-bold">{i + 1}.</span>
+                                <span className="text-[14px] leading-snug text-[#73726E]">{req}</span>
                             </div>
                         ))}
                     </div>
@@ -134,7 +153,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                     const selected = cvStations.find(
                         (s) => s.company === station.company && s.role === station.role
                     );
-                    const rec = generateRecommendation(station.bullets, station.role, station.company, setupData.jobRequirements);
+                    const rec = top3Set.has(idx) ? recs[idx]?.rec : null;
 
                     return (
                         <div key={idx} className="flex gap-3 items-stretch">
@@ -147,7 +166,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                                     bullets={station.bullets}
                                     selectedIndex={selected?.stationIndex ?? null}
                                     isDisabled={!selected && cvStations.length >= 3}
-                                    onToggle={() => handleToggle(station)}
+                                    onToggle={() => handleToggle(idx, station)}
                                 />
                             </div>
 

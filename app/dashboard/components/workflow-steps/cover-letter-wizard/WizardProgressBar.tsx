@@ -23,7 +23,7 @@ export function WizardProgressBar({ currentStep }: WizardProgressBarProps) {
                         <div className="flex flex-col items-center gap-0.5 shrink-0">
                             <div
                                 className={[
-                                    'w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold transition-all',
+                                    'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all',
                                     isDone ? 'bg-[#002e7a] text-white' :
                                         isActive ? 'border-2 border-[#002e7a] bg-white text-[#002e7a]' :
                                             'bg-[#E7E7E5] text-[#73726E]',
@@ -31,10 +31,10 @@ export function WizardProgressBar({ currentStep }: WizardProgressBarProps) {
                             >
                                 {isDone ? '✓' : step.number}
                             </div>
-                            <span className={`text-[10px] font-semibold whitespace-nowrap ${isActive ? 'text-[#002e7a]' : 'text-[#73726E]'}`}>
+                            <span className={`text-[13px] font-semibold whitespace-nowrap ${isActive ? 'text-[#002e7a]' : 'text-[#73726E]'}`}>
                                 {step.title}
                             </span>
-                            <span className="text-[9px] text-[#A8A29E] whitespace-nowrap">{step.sub}</span>
+                            <span className="text-xs text-[#A8A29E] whitespace-nowrap">{step.sub}</span>
                         </div>
 
                         {/* Connector */}
