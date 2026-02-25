@@ -153,10 +153,10 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
 
                             {/* Right: Recommendation */}
                             {rec && (
-                                <div className="w-[260px] shrink-0 bg-[#F8FAFC] border border-[#E7E7E5] rounded-lg p-2.5 flex flex-col justify-center">
-                                    <div className="flex items-start gap-1.5">
-                                        <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                                        <div className="min-w-0">
+                                <div className="flex-1 min-w-0 bg-[#F8FAFC] border border-[#E7E7E5] rounded-lg p-3 flex flex-col justify-center">
+                                    <div className="flex items-start gap-2">
+                                        <Lightbulb className="w-4 h-4 text-amber-500 shrink-0" />
+                                        <div className="min-w-0 pt-0.5">
                                             <p className="text-[10px] font-semibold text-[#002e7a] uppercase tracking-wide mb-1">
                                                 Empfehlung
                                             </p>
