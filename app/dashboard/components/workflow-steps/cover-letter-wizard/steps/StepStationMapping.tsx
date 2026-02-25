@@ -3,7 +3,7 @@
 import { CVStationCard } from '../cards/CVStationCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse } from '@/types/cover-letter-setup';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
 
 interface Props {
     setupData: SetupDataResponse;
@@ -11,16 +11,49 @@ interface Props {
     onNext: () => void;
 }
 
-// Suggest which requirement best matches a station's bullets
-function suggestMatch(bullets: string[] | undefined, requirements: string[]): string {
-    if (!bullets || bullets.length === 0) return requirements[0] || '';
-    return requirements.find((req) =>
-        bullets.some((b) =>
-            b.toLowerCase().split(' ').some((word) =>
-                req.toLowerCase().includes(word) && word.length > 4
-            )
-        )
-    ) || requirements[0] || '';
+/**
+ * Generate a recommendation for WHY a station matches a job requirement.
+ * Uses keyword overlap between bullet points and requirements.
+ */
+function generateRecommendation(
+    bullets: string[] | undefined,
+    role: string,
+    company: string,
+    requirements: string[]
+): { requirement: string; reasoning: string } | null {
+    if (!bullets || bullets.length === 0 || requirements.length === 0) return null;
+
+    // Find best matching requirement via keyword overlap
+    let bestReq = '';
+    let bestScore = 0;
+    let bestBullet = '';
+
+    for (const req of requirements) {
+        const reqWords = req.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+        for (const bullet of bullets) {
+            const bulletWords = bullet.toLowerCase().split(/\s+/);
+            const overlap = reqWords.filter(rw => bulletWords.some(bw => bw.includes(rw) || rw.includes(bw))).length;
+            if (overlap > bestScore) {
+                bestScore = overlap;
+                bestReq = req;
+                bestBullet = bullet;
+            }
+        }
+    }
+
+    if (bestScore === 0) {
+        // Fallback: just use the first requirement
+        bestReq = requirements[0];
+        bestBullet = bullets[0];
+    }
+
+    // Truncate bullet to ~80 chars for display
+    const shortBullet = bestBullet.length > 80 ? bestBullet.slice(0, 77) + '...' : bestBullet;
+
+    return {
+        requirement: bestReq,
+        reasoning: `${company} zeigt, dass du "${shortBullet}" kannst — das belegt die Anforderung.`,
+    };
 }
 
 export function StepStationMapping({ setupData, onBack, onNext }: Props) {
@@ -29,14 +62,14 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
 
     const handleToggle = (station: SetupDataResponse['cvStations'][number]) => {
         const safeBullets = station.bullets || [];
-        const matched = suggestMatch(safeBullets, setupData.jobRequirements);
+        const rec = generateRecommendation(safeBullets, station.role, station.company, setupData.jobRequirements);
         toggleStation({
             company: station.company,
             role: station.role,
             period: station.period,
             keyBullet: safeBullets[0] || '',
-            matchedRequirement: matched,
-            intent: `Beweis für: ${matched || 'Berufserfahrung'}`,
+            matchedRequirement: rec?.requirement || setupData.jobRequirements[0] || '',
+            intent: `Beweis für: ${rec?.requirement || 'Berufserfahrung'}`,
         });
     };
 
@@ -87,23 +120,46 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                 )}
             </div>
 
-            {/* CV Stations */}
+            {/* CV Stations — two-column: left=station, right=recommendation */}
             <div className="space-y-2">
                 {setupData.cvStations.map((station, idx) => {
                     const selected = cvStations.find(
                         (s) => s.company === station.company && s.role === station.role
                     );
+                    const rec = generateRecommendation(station.bullets, station.role, station.company, setupData.jobRequirements);
+
                     return (
-                        <CVStationCard
-                            key={idx}
-                            company={station.company}
-                            role={station.role}
-                            period={station.period}
-                            bullets={station.bullets}
-                            selectedIndex={selected?.stationIndex ?? null}
-                            isDisabled={!selected && cvStations.length >= 3}
-                            onToggle={() => handleToggle(station)}
-                        />
+                        <div key={idx} className="flex gap-3 items-stretch">
+                            {/* Left: Station Card */}
+                            <div className="flex-1 min-w-0">
+                                <CVStationCard
+                                    company={station.company}
+                                    role={station.role}
+                                    period={station.period}
+                                    bullets={station.bullets}
+                                    selectedIndex={selected?.stationIndex ?? null}
+                                    isDisabled={!selected && cvStations.length >= 3}
+                                    onToggle={() => handleToggle(station)}
+                                />
+                            </div>
+
+                            {/* Right: Recommendation */}
+                            {rec && (
+                                <div className="w-[260px] shrink-0 bg-[#F8FAFC] border border-[#E7E7E5] rounded-lg p-2.5 flex flex-col justify-center">
+                                    <div className="flex items-start gap-1.5">
+                                        <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] font-semibold text-[#002e7a] uppercase tracking-wide mb-1">
+                                                Empfehlung
+                                            </p>
+                                            <p className="text-[10px] text-[#73726E] leading-relaxed">
+                                                {rec.reasoning}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     );
                 })}
             </div>

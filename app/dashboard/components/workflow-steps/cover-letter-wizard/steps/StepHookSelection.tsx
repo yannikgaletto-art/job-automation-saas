@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { HookCard } from '../cards/HookCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse, SelectedHook, SelectedQuote } from '@/types/cover-letter-setup';
-import { Sparkles, ChevronRight, Search, SkipForward, RefreshCw, Quote, ExternalLink } from 'lucide-react';
+import { Sparkles, ChevronRight, ChevronDown, Search, SkipForward, RefreshCw, Quote, ExternalLink } from 'lucide-react';
 
 // ─── State Machine ─────────────────────────────────────────────────
 type Phase = 'idle' | 'analyzing' | 'results' | 'quotePrompt' | 'quoteSearching' | 'quoteResults';
@@ -22,6 +22,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     const { selectedHook, selectedQuote, fetchedQuotes, setHook, setQuote, setFetchedQuotes, setStep } = useCoverLetterSetupStore();
     const [manualText, setManualText] = useState('');
     const [quoteError, setQuoteError] = useState<string | null>(null);
+    const [openAccordion, setOpenAccordion] = useState<string | null>(null);
 
     // ─── State Machine: resume at correct phase ────────────────────
     const getInitialPhase = (): Phase => {
@@ -211,9 +212,8 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 </button>
             </div>
 
-            {/* Hook Cards — grouped by category */}
+            {/* Hook Cards — accordion per category */}
             {(() => {
-                // Filter out 'quote' type — quotes are handled separately below
                 const filteredHooks = setupData.hooks.filter(h => h.type !== 'quote');
                 const groups: { label: string; icon: string; types: string[] }[] = [
                     { label: 'News', icon: '📰', types: ['news'] },
@@ -228,21 +228,70 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 return groups.map(group => {
                     const groupHooks = filteredHooks.filter(h => group.types.includes(h.type));
                     if (groupHooks.length === 0) return null;
+
+                    const hasSelection = groupHooks.some(h => selectedHook?.id === h.id);
+                    const isOpen = openAccordion === group.label || hasSelection;
+                    const bestScore = Math.max(...groupHooks.map(h => Math.round((h.relevanceScore || 0) * 100)));
+
                     return (
-                        <div key={group.label} className="space-y-1.5">
-                            <h4 className="text-[11px] font-semibold text-[#73726E] uppercase tracking-wide mt-3">
-                                {group.icon} {group.label}
-                            </h4>
-                            <div className="grid grid-cols-1 gap-2">
-                                {groupHooks.map((hook) => (
-                                    <HookCard
-                                        key={hook.id}
-                                        hook={hook}
-                                        isSelected={selectedHook?.id === hook.id}
-                                        onSelect={() => handleSelect(hook)}
-                                    />
-                                ))}
-                            </div>
+                        <div key={group.label} className="border border-[#E7E7E5] rounded-lg overflow-hidden">
+                            {/* Accordion Header */}
+                            <button
+                                type="button"
+                                onClick={() => setOpenAccordion(isOpen && !hasSelection ? null : group.label)}
+                                className={[
+                                    'w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors',
+                                    isOpen ? 'bg-[#f7f7f5]' : 'bg-white hover:bg-[#fafaf9]',
+                                ].join(' ')}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm">{group.icon}</span>
+                                    <span className="text-xs font-semibold text-[#37352F]">{group.label}</span>
+                                    <span className="text-[10px] text-[#A8A29E] font-medium">
+                                        ({groupHooks.length})
+                                    </span>
+                                    {hasSelection && (
+                                        <span className="text-[10px] bg-[#002e7a] text-white px-1.5 py-0.5 rounded-full font-medium">
+                                            Gewaehlt
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {bestScore > 0 && (
+                                        <span className="text-[10px] text-[#73726E] font-medium">
+                                            bis {bestScore}% Match
+                                        </span>
+                                    )}
+                                    <ChevronDown className={[
+                                        'w-3.5 h-3.5 text-[#A8A29E] transition-transform',
+                                        isOpen ? 'rotate-180' : '',
+                                    ].join(' ')} />
+                                </div>
+                            </button>
+
+                            {/* Accordion Body */}
+                            <AnimatePresence initial={false}>
+                                {isOpen && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="px-3 pb-3 pt-1 space-y-2 border-t border-[#E7E7E5]">
+                                            {groupHooks.map((hook) => (
+                                                <HookCard
+                                                    key={hook.id}
+                                                    hook={hook}
+                                                    isSelected={selectedHook?.id === hook.id}
+                                                    onSelect={() => handleSelect(hook)}
+                                                />
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     );
                 });
