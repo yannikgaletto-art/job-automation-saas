@@ -2,187 +2,266 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, SlidersHorizontal, Loader2, X, Sparkles, ExternalLink, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
+import {
+    Search, SlidersHorizontal, Loader2, X, Sparkles,
+    ExternalLink, ArrowRight, CheckCircle2, AlertTriangle,
+    ChevronDown, ChevronRight, Clock, Trash2, Plus, Star, RefreshCw
+} from 'lucide-react';
 import type { SerpApiJob } from '@/lib/services/job-search-pipeline';
 
 // ─── Types ────────────────────────────────────────────────────────
 
-interface ProcessedJob {
+interface SavedSearch {
     id: string;
-    job_title: string;
-    company_name: string;
-    match_score_overall: number | null;
-    recommendation: string | null;
-    status: string;
-    score_breakdown: Record<string, number> | null;
-    judge_reasoning: string | null;
-    red_flags: string[];
-    green_flags: string[];
-    knockout_reason: string | null;
-    work_model: string;
-    ats_keywords: string[];
+    query: string;
+    location: string;
+    filters: Record<string, unknown>;
+    results: EnrichedJob[];
+    result_count: number;
+    fetched_at: string;
 }
 
-type ViewMode = 'search' | 'results' | 'detail';
+interface EnrichedJob extends SerpApiJob {
+    already_in_queue?: boolean;
+}
+
+// ─── Constants ────────────────────────────────────────────────────
+
+const EXPERIENCE_LEVELS = ['Entry', 'Mid', 'Senior', 'Lead'] as const;
+const ORG_TYPES = ['Startup', 'Konzern', 'NGO', 'Staat'] as const;
+const WERTE_FILTERS = [
+    { key: 'nachhaltigkeit', label: 'Nachhaltigkeit' },
+    { key: 'innovation', label: 'Innovation' },
+    { key: 'social_impact', label: 'Social Impact' },
+    { key: 'deep_tech', label: 'Deep Tech' },
+] as const;
+
+// ─── Helpers ──────────────────────────────────────────────────────
+
+function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 60) return `vor ${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `vor ${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `vor ${days}d`;
+}
+
+function getScoreBar(score: number): { color: string; label: string | null } {
+    if (score >= 80) return { color: 'bg-green-500', label: 'Strong Match' };
+    if (score >= 65) return { color: 'bg-[#0066FF]', label: null };
+    return { color: 'bg-stone-400', label: null };
+}
 
 // ─── Main Page ────────────────────────────────────────────────────
 
 export default function JobSearchPage() {
+    const [starredUrls, setStarredUrls] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        const saved = localStorage.getItem('pathly_starred_jobs');
+        if (saved) {
+            try { setStarredUrls(new Set(JSON.parse(saved))); } catch (e) { }
+        }
+    }, []);
+
+    const toggleStar = useCallback((url: string) => {
+        setStarredUrls(prev => {
+            const next = new Set(prev);
+            if (next.has(url)) next.delete(url);
+            else next.add(url);
+            localStorage.setItem('pathly_starred_jobs', JSON.stringify(Array.from(next)));
+            return next;
+        });
+    }, []);
+
+    const handleRefreshSearch = useCallback(async (searchToRefresh: SavedSearch, e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            const res = await fetch('/api/job-search/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: searchToRefresh.query,
+                    location: searchToRefresh.location,
+                    filters: searchToRefresh.filters,
+                    forceRefresh: true
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            setSavedSearches(prev => prev.map(s => {
+                if (s.id !== searchToRefresh.id) return s;
+                const oldStarred = s.results.filter(oldJob => starredUrls.has(oldJob.apply_link));
+                const newJobs = (data.results || []).filter((newJob: any) => !starredUrls.has(newJob.apply_link));
+                const combined = [...oldStarred, ...newJobs];
+                return {
+                    ...s,
+                    results: combined,
+                    result_count: combined.length,
+                    fetched_at: new Date().toISOString()
+                };
+            }));
+        } catch (err) {
+            console.error("Refresh failed:", err);
+        }
+    }, [starredUrls]);
+
     // Search state
     const [query, setQuery] = useState('');
     const [location, setLocation] = useState('Berlin');
     const [isSearching, setIsSearching] = useState(false);
-    const [searchResults, setSearchResults] = useState<SerpApiJob[]>([]);
     const [showFilters, setShowFilters] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // Pipeline state
-    const [processingJobs, setProcessingJobs] = useState<Set<number>>(new Set());
-    const [processedJobs, setProcessedJobs] = useState<Map<number, ProcessedJob>>(new Map());
-    const [addedToQueue, setAddedToQueue] = useState<Set<string>>(new Set());
+    // Filter state
+    const [selectedExperience, setSelectedExperience] = useState<string[]>([]);
+    const [selectedOrgType, setSelectedOrgType] = useState<string[]>([]);
+    const [selectedWerte, setSelectedWerte] = useState<string[]>([]);
 
-    // Detail panel
-    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    // Saved searches (accordion)
+    const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+    const [expandedSearchId, setExpandedSearchId] = useState<string | null>(null);
+    const [loadingSearches, setLoadingSearches] = useState(true);
 
     // Suggested titles
     const [suggestedTitles, setSuggestedTitles] = useState<string[]>([]);
     const [loadingTitles, setLoadingTitles] = useState(true);
 
-    // Error
-    const [error, setError] = useState<string | null>(null);
+    // ─── Load saved searches on mount ────────────────────────────
 
-    // Fetch suggested titles on mount
     useEffect(() => {
-        async function fetchTitles() {
-            try {
-                const res = await fetch('/api/jobs/search/suggest-titles');
-                const data = await res.json();
-                if (data.success && data.titles) {
-                    setSuggestedTitles(data.titles);
-                }
-            } catch {
-                // Silently use empty suggestions
-            } finally {
-                setLoadingTitles(false);
-            }
-        }
-        fetchTitles();
+        loadSavedSearches();
+        loadSuggestedTitles();
     }, []);
+
+    const loadSavedSearches = async () => {
+        try {
+            const res = await fetch('/api/job-search/saved');
+            const data = await res.json();
+            if (data.searches) {
+                setSavedSearches(data.searches);
+                // Auto-expand the most recent search
+                if (data.searches.length > 0) {
+                    setExpandedSearchId(data.searches[0].id);
+                }
+            }
+        } catch {
+            // Silently handle
+        } finally {
+            setLoadingSearches(false);
+        }
+    };
+
+    const loadSuggestedTitles = async () => {
+        try {
+            const res = await fetch('/api/jobs/search/suggest-titles');
+            const data = await res.json();
+            if (data.success && data.titles) {
+                setSuggestedTitles(data.titles);
+            }
+        } catch {
+            // Silently use empty suggestions
+        } finally {
+            setLoadingTitles(false);
+        }
+    };
 
     // ─── Search Handler ─────────────────────────────────────────────
 
     const handleSearch = useCallback(async () => {
-        if (!query.trim() || !location.trim()) return;
+        if (!query.trim()) return;
 
         setIsSearching(true);
         setError(null);
-        setSearchResults([]);
-        setProcessedJobs(new Map());
-        setSelectedIndex(null);
 
         try {
-            const res = await fetch('/api/jobs/search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: query.trim(), location: location.trim() }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) throw new Error(data.error || 'Search failed');
-
-            setSearchResults(data.jobs || []);
-
-            // Auto-process top 5 results through the deep pipeline
-            const topJobs = (data.jobs || []).slice(0, 5);
-            topJobs.forEach((_: SerpApiJob, i: number) => {
-                processJob(i, data.jobs[i]);
-            });
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setIsSearching(false);
-        }
-    }, [query, location]);
-
-    // ─── Process Single Job ─────────────────────────────────────────
-
-    const processJob = async (index: number, serpApiJob: SerpApiJob) => {
-        if (processingJobs.has(index) || processedJobs.has(index)) return;
-
-        setProcessingJobs(prev => new Set(prev).add(index));
-
-        try {
-            const res = await fetch('/api/jobs/search/process', {
+            const res = await fetch('/api/job-search/query', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    serpApiJob,
-                    searchQuery: `${query} ${location}`,
+                    query: query.trim(),
+                    location: location.trim() || 'Deutschland',
+                    filters: {
+                        experience: selectedExperience.length > 0 ? selectedExperience : undefined,
+                        orgType: selectedOrgType.length > 0 ? selectedOrgType : undefined,
+                        werte: selectedWerte.length > 0 ? selectedWerte : undefined,
+                    },
                 }),
             });
 
             const data = await res.json();
 
-            if (data.success && data.job) {
-                setProcessedJobs(prev => {
-                    const next = new Map(prev);
-                    next.set(index, data.job);
-                    return next;
-                });
-            }
-        } catch (err) {
-            console.error(`Failed to process job ${index}:`, err);
-        } finally {
-            setProcessingJobs(prev => {
-                const next = new Set(prev);
-                next.delete(index);
-                return next;
+            if (!res.ok) throw new Error(data.error || 'Suche fehlgeschlagen');
+
+            // Insert new search at top of list
+            const newSearch: SavedSearch = {
+                id: data.search_id || crypto.randomUUID(),
+                query: query.trim(),
+                location: location.trim() || 'Deutschland',
+                filters: {},
+                results: data.results || [],
+                result_count: data.result_count || 0,
+                fetched_at: new Date().toISOString(),
+            };
+
+            setSavedSearches(prev => {
+                // Remove existing search with same query+location
+                const filtered = prev.filter(
+                    s => !(s.query === newSearch.query && s.location === newSearch.location)
+                );
+                // Add new one at top, limit to 10
+                return [newSearch, ...filtered].slice(0, 10);
             });
+
+            setExpandedSearchId(newSearch.id);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsSearching(false);
+        }
+    }, [query, location, selectedExperience, selectedOrgType, selectedWerte]);
+
+    // ─── Delete Search ──────────────────────────────────────────────
+
+    const handleDeleteSearch = async (searchId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSavedSearches(prev => prev.filter(s => s.id !== searchId));
+
+        try {
+            await fetch(`/api/job-search/saved?id=${searchId}`, { method: 'DELETE' });
+        } catch {
+            // Already removed from UI optimistically
         }
     };
 
-    // ─── Score Badge ────────────────────────────────────────────────
+    // ─── Toggle filter chip ─────────────────────────────────────────
 
-    const ScoreBadge = ({ score }: { score: number | null }) => {
-        if (score === null) return <span className="text-xs text-stone-400">—</span>;
-        const color = score >= 75 ? 'text-green-700 bg-green-50 border-green-200'
-            : score >= 50 ? 'text-amber-700 bg-amber-50 border-amber-200'
-                : 'text-red-700 bg-red-50 border-red-200';
-        const emoji = score >= 75 ? '🟢' : score >= 50 ? '🟡' : '🔴';
-        return (
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${color}`}>
-                {emoji} {score}%
-            </span>
+    const toggleFilter = (
+        value: string,
+        selected: string[],
+        setSelected: (val: string[]) => void,
+    ) => {
+        setSelected(
+            selected.includes(value)
+                ? selected.filter(v => v !== value)
+                : [...selected, value]
         );
     };
 
-    // ─── Recommendation Badge ──────────────────────────────────────
-
-    const RecBadge = ({ rec }: { rec: string | null }) => {
-        if (!rec) return null;
-        const map: Record<string, { label: string; cls: string }> = {
-            apply: { label: 'Bewerben!', cls: 'text-green-700 bg-green-50' },
-            consider: { label: 'Prüfen', cls: 'text-amber-700 bg-amber-50' },
-            skip: { label: 'Überspringen', cls: 'text-red-700 bg-red-50' },
-        };
-        const info = map[rec] || { label: rec, cls: 'text-stone-600 bg-stone-50' };
-        return (
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${info.cls}`}>
-                {info.label}
-            </span>
-        );
-    };
-
-    const selectedJob = selectedIndex !== null ? searchResults[selectedIndex] : null;
-    const selectedProcessed = selectedIndex !== null ? processedJobs.get(selectedIndex) : null;
+    // ─── Check if any saved searches exist ──────────────────────────
+    const hasSearches = savedSearches.length > 0;
+    const showEmptyState = !loadingSearches && !hasSearches && !isSearching && !error;
 
     return (
         <div className="space-y-6 max-w-[1200px]">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-[#37352F]">🔍 Job Search</h1>
+                <h1 className="text-2xl font-bold text-[#37352F]">Job Search</h1>
                 <p className="text-sm text-[#73726E] mt-1">
-                    Finde passende Jobs — KI-bewertet nach deinem Werteprofil.
+                    Finde passende Jobs — powered by Google Jobs.
                 </p>
             </div>
 
@@ -237,17 +316,17 @@ export default function JobSearchPage() {
                 </div>
 
                 {/* Suggested Titles */}
-                {suggestedTitles.length > 0 && !isSearching && searchResults.length === 0 && (
+                {suggestedTitles.length > 0 && !isSearching && !hasSearches && (
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-[#A8A29E] flex items-center gap-1">
-                            <Sparkles className="w-3 h-3" /> Vorschläge:
+                            <Sparkles className="w-3 h-3" /> Vorschlaege:
                         </span>
                         {suggestedTitles.map(title => (
                             <motion.button
                                 key={title}
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                onClick={() => { setQuery(title); }}
+                                onClick={() => setQuery(title)}
                                 className="px-3 py-1 rounded-full bg-[#f0f4ff] text-[#002e7a] text-xs font-medium border border-[#002e7a]/10 hover:border-[#002e7a]/30 transition-colors"
                             >
                                 {title}
@@ -266,29 +345,59 @@ export default function JobSearchPage() {
                             transition={{ duration: 0.2 }}
                             className="overflow-hidden"
                         >
-                            <div className="mt-4 pt-4 border-t border-[#E7E7E5] grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Erfahrungslevel</label>
-                                    <div className="flex gap-2">
-                                        {['Entry', 'Mid', 'Senior', 'Lead'].map(level => (
-                                            <button
-                                                key={level}
-                                                className="px-3 py-1.5 rounded-md text-xs border border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a] transition-colors"
-                                            >
-                                                {level}
-                                            </button>
-                                        ))}
+                            <div className="mt-4 pt-4 border-t border-[#E7E7E5] space-y-4">
+                                {/* Row 1: Experience + OrgType */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Erfahrungslevel</label>
+                                        <div className="flex gap-2">
+                                            {EXPERIENCE_LEVELS.map(level => (
+                                                <button
+                                                    key={level}
+                                                    onClick={() => toggleFilter(level, selectedExperience, setSelectedExperience)}
+                                                    className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedExperience.includes(level)
+                                                        ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                        : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                        }`}
+                                                >
+                                                    {level}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Organisationsform</label>
+                                        <div className="flex gap-2">
+                                            {ORG_TYPES.map(org => (
+                                                <button
+                                                    key={org}
+                                                    onClick={() => toggleFilter(org, selectedOrgType, setSelectedOrgType)}
+                                                    className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedOrgType.includes(org)
+                                                        ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                        : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                        }`}
+                                                >
+                                                    {org}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
+
+                                {/* Row 2: Werte-Filter (NEW) */}
                                 <div>
-                                    <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Organisationsform</label>
+                                    <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Ausrichtung</label>
                                     <div className="flex gap-2">
-                                        {['Startup', 'Konzern', 'NGO', 'Staat'].map(org => (
+                                        {WERTE_FILTERS.map(wf => (
                                             <button
-                                                key={org}
-                                                className="px-3 py-1.5 rounded-md text-xs border border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a] transition-colors"
+                                                key={wf.key}
+                                                onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
+                                                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
+                                                    ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                    : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                    }`}
                                             >
-                                                {org}
+                                                {wf.label}
                                             </button>
                                         ))}
                                     </div>
@@ -326,258 +435,28 @@ export default function JobSearchPage() {
                 </div>
             )}
 
-            {/* Results */}
-            {!isSearching && searchResults.length > 0 && (
-                <div className="flex gap-6">
-                    {/* Left: Results List */}
-                    <div className="flex-1 space-y-2">
-                        <div className="flex items-center justify-between mb-3">
-                            <h2 className="text-sm font-semibold text-[#37352F]">
-                                ERGEBNISSE ({searchResults.length} Jobs)
-                            </h2>
-                        </div>
-
-                        {searchResults.map((job, i) => {
-                            const processed = processedJobs.get(i);
-                            const isProcessing = processingJobs.has(i);
-                            const isSelected = selectedIndex === i;
-                            const isAdded = processed?.id && addedToQueue.has(processed.id);
-
-                            return (
-                                <motion.div
-                                    key={i}
-                                    initial={{ opacity: 0, y: 8 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.05 }}
-                                    whileHover={{ scale: 1.01, y: -1 }}
-                                    onClick={() => {
-                                        setSelectedIndex(i);
-                                        if (!processed && !isProcessing) processJob(i, job);
-                                    }}
-                                    className={`p-4 rounded-lg border cursor-pointer transition-all ${isSelected
-                                        ? 'border-[#002e7a] bg-[#f0f4ff] shadow-sm'
-                                        : 'border-[#E7E7E5] bg-white hover:border-[#002e7a]/30 hover:shadow-sm'
-                                        }`}
-                                >
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <h3 className="text-sm font-semibold text-[#37352F] truncate">
-                                                    {job.company_name}
-                                                </h3>
-                                                {isAdded && (
-                                                    <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-[#73726E] mt-0.5 truncate">
-                                                {job.title} · {job.location}
-                                            </p>
-                                            {job.detected_extensions?.posted_at && (
-                                                <p className="text-[10px] text-[#A8A29E] mt-1">
-                                                    {job.detected_extensions.posted_at}
-                                                </p>
-                                            )}
-                                        </div>
-
-                                        <div className="flex items-center gap-2 shrink-0 ml-3">
-                                            {isProcessing ? (
-                                                <Loader2 className="w-4 h-4 animate-spin text-[#002e7a]" />
-                                            ) : processed ? (
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <ScoreBadge score={processed.match_score_overall} />
-                                                    <RecBadge rec={processed.recommendation} />
-                                                </div>
-                                            ) : (
-                                                <span className="text-[10px] text-[#A8A29E]">Klick für Score</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Right: Detail Panel */}
-                    <AnimatePresence mode="wait">
-                        {selectedJob && (
-                            <motion.div
-                                key={selectedIndex}
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
-                                transition={{ duration: 0.2 }}
-                                className="w-[400px] shrink-0"
-                            >
-                                <div className="bg-white border border-[#E7E7E5] rounded-xl p-5 shadow-sm sticky top-8 space-y-4">
-                                    {/* Header */}
-                                    <div>
-                                        <div className="flex items-center justify-between">
-                                            <h3 className="text-base font-bold text-[#37352F]">
-                                                {selectedJob.company_name}
-                                            </h3>
-                                            <button
-                                                onClick={() => setSelectedIndex(null)}
-                                                className="text-[#A8A29E] hover:text-[#37352F]"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <p className="text-sm text-[#73726E] mt-0.5">
-                                            {selectedJob.title} · {selectedJob.location}
-                                        </p>
-                                        {selectedJob.detected_extensions?.schedule_type && (
-                                            <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-[#F7F7F5] text-[10px] text-[#73726E] border border-[#E7E7E5]">
-                                                {selectedJob.detected_extensions.schedule_type}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Loading state */}
-                                    {processingJobs.has(selectedIndex!) && (
-                                        <div className="bg-[#f0f4ff] rounded-lg p-4 flex items-center gap-3">
-                                            <Loader2 className="w-5 h-5 animate-spin text-[#002e7a]" />
-                                            <div>
-                                                <p className="text-xs font-medium text-[#002e7a]">Analysiere...</p>
-                                                <p className="text-[10px] text-[#002e7a]/60">Firecrawl → GPT-4o-mini → Claude Judge</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Processed data */}
-                                    {selectedProcessed && (
-                                        <>
-                                            {/* Match Score */}
-                                            <div className="text-center py-2">
-                                                <p className="text-xs text-[#73726E] mb-1">MATCH-SCORE</p>
-                                                <span className="text-3xl font-bold text-[#002e7a]">
-                                                    {selectedProcessed.match_score_overall ?? '—'}
-                                                    {selectedProcessed.match_score_overall !== null && (
-                                                        <span className="text-lg">%</span>
-                                                    )}
-                                                </span>
-                                            </div>
-
-                                            {/* Score Breakdown */}
-                                            {selectedProcessed.score_breakdown && (
-                                                <div className="space-y-2">
-                                                    <p className="text-[10px] font-semibold text-[#73726E] uppercase tracking-wider">Score Breakdown</p>
-                                                    {Object.entries(selectedProcessed.score_breakdown).map(([key, val]) => (
-                                                        <div key={key} className="flex items-center gap-2">
-                                                            <span className="text-[10px] text-[#73726E] w-28 truncate capitalize">
-                                                                {key.replace('_', ' ')}
-                                                            </span>
-                                                            <div className="flex-1 h-1.5 bg-[#F4F4F0] rounded-full overflow-hidden">
-                                                                <motion.div
-                                                                    initial={{ width: 0 }}
-                                                                    animate={{ width: `${val}%` }}
-                                                                    transition={{ duration: 0.6, delay: 0.2 }}
-                                                                    className="h-full rounded-full"
-                                                                    style={{
-                                                                        backgroundColor: val >= 70 ? '#16a34a' : val >= 40 ? '#d97706' : '#dc2626',
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <span className="text-[10px] font-mono text-[#73726E] w-8 text-right">{val}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* Judge Reasoning */}
-                                            {selectedProcessed.judge_reasoning && (
-                                                <div className="bg-[#F7F7F5] rounded-lg p-3">
-                                                    <p className="text-[10px] font-semibold text-[#73726E] uppercase tracking-wider mb-1">JUDGE-EMPFEHLUNG (Claude)</p>
-                                                    <p className="text-xs text-[#37352F] leading-relaxed">
-                                                        {selectedProcessed.judge_reasoning}
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {/* Flags */}
-                                            {(selectedProcessed.green_flags?.length > 0 || selectedProcessed.red_flags?.length > 0) && (
-                                                <div className="space-y-2">
-                                                    {selectedProcessed.green_flags?.map((flag, i) => (
-                                                        <div key={`g-${i}`} className="flex items-start gap-2">
-                                                            <span className="text-green-500 text-xs mt-0.5">✅</span>
-                                                            <span className="text-xs text-[#37352F]">{flag}</span>
-                                                        </div>
-                                                    ))}
-                                                    {selectedProcessed.red_flags?.map((flag, i) => (
-                                                        <div key={`r-${i}`} className="flex items-start gap-2">
-                                                            <span className="text-red-500 text-xs mt-0.5">⚠️</span>
-                                                            <span className="text-xs text-[#37352F]">{flag}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* ATS Keywords */}
-                                            {selectedProcessed.ats_keywords?.length > 0 && (
-                                                <div>
-                                                    <p className="text-[10px] font-semibold text-[#73726E] uppercase tracking-wider mb-2">ATS KEYWORDS</p>
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {selectedProcessed.ats_keywords.slice(0, 8).map(kw => (
-                                                            <span key={kw} className="px-2 py-0.5 rounded-md bg-[#f0f4ff] text-[#002e7a] text-[10px] font-medium border border-[#002e7a]/10">
-                                                                {kw}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-
-                                    {/* Description (always visible) */}
-                                    {selectedJob.description && (
-                                        <div>
-                                            <p className="text-[10px] font-semibold text-[#73726E] uppercase tracking-wider mb-1">BESCHREIBUNG</p>
-                                            <p className="text-xs text-[#37352F] leading-relaxed line-clamp-4">
-                                                {selectedJob.description}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {/* Actions */}
-                                    <div className="flex flex-col gap-2 pt-2 border-t border-[#E7E7E5]">
-                                        {selectedJob.apply_link && (
-                                            <a
-                                                href={selectedJob.apply_link}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-[#E7E7E5] text-xs text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a] transition-colors"
-                                            >
-                                                <ExternalLink className="w-3.5 h-3.5" />
-                                                Stellenanzeige öffnen
-                                            </a>
-                                        )}
-                                        {selectedProcessed && !addedToQueue.has(selectedProcessed.id) ? (
-                                            <motion.button
-                                                whileHover={{ scale: 1.02, y: -1 }}
-                                                whileTap={{ scale: 0.98 }}
-                                                onClick={() => {
-                                                    setAddedToQueue(prev => new Set(prev).add(selectedProcessed.id));
-                                                }}
-                                                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#002e7a] text-white text-sm font-medium hover:bg-[#001d4f] transition-colors"
-                                            >
-                                                <ArrowRight className="w-4 h-4" />
-                                                In Queue aufnehmen
-                                            </motion.button>
-                                        ) : selectedProcessed ? (
-                                            <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-green-50 text-green-700 text-sm font-medium border border-green-200">
-                                                <CheckCircle2 className="w-4 h-4" />
-                                                In der Queue
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+            {/* Saved Searches (Accordion) */}
+            {!isSearching && hasSearches && (
+                <div className="space-y-2">
+                    {savedSearches.map(search => (
+                        <SearchAccordion
+                            key={search.id}
+                            search={search}
+                            isExpanded={expandedSearchId === search.id}
+                            onToggle={() => setExpandedSearchId(
+                                expandedSearchId === search.id ? null : search.id
+                            )}
+                            onDelete={(e) => handleDeleteSearch(search.id, e)}
+                            onRefresh={(e) => handleRefreshSearch(search, e)}
+                            starredUrls={starredUrls}
+                            toggleStar={toggleStar}
+                        />
+                    ))}
                 </div>
             )}
 
             {/* Empty State */}
-            {!isSearching && searchResults.length === 0 && !error && (
+            {showEmptyState && (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
                     <div className="w-16 h-16 rounded-2xl bg-[#f0f4ff] flex items-center justify-center mb-4">
                         <Search className="w-8 h-8 text-[#002e7a]" />
@@ -586,11 +465,302 @@ export default function JobSearchPage() {
                         Starte deine Jobsuche
                     </h3>
                     <p className="text-xs text-[#73726E] max-w-sm">
-                        Gib einen Jobtitel und Ort ein. Pathly durchsucht Google Jobs,
-                        analysiert jede Stelle und bewertet den Culture Fit für dich.
+                        Gib einen Jobtitel und Ort ein. Pathly durchsucht Google Jobs
+                        und zeigt dir passende Stellen mit echten Bewerbungslinks.
                     </p>
                 </div>
             )}
         </div>
+    );
+}
+
+// ─── Search Accordion Component ─────────────────────────────────────
+
+function SearchAccordion({
+    search,
+    isExpanded,
+    onToggle,
+    onDelete,
+    onRefresh,
+    starredUrls,
+    toggleStar,
+}: {
+    search: SavedSearch;
+    isExpanded: boolean;
+    onToggle: () => void;
+    onDelete: (e: React.MouseEvent) => void;
+    onRefresh: (e: React.MouseEvent) => void;
+    starredUrls: Set<string>;
+    toggleStar: (url: string) => void;
+}) {
+    return (
+        <div className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden shadow-sm">
+            {/* Header (always visible) */}
+            <div
+                onClick={onToggle}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && onToggle()}
+                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-[#FAFAF9] transition-colors text-left cursor-pointer"
+            >
+                <div className="flex items-center gap-3 min-w-0">
+                    <motion.div
+                        animate={{ rotate: isExpanded ? 0 : -90 }}
+                        transition={{ duration: 0.15 }}
+                    >
+                        <ChevronDown className="w-4 h-4 text-[#A8A29E]" />
+                    </motion.div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#37352F] truncate">
+                            {search.query} · {search.location}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-[#73726E]">
+                                {search.result_count} Jobs
+                            </span>
+                            <span className="text-xs text-[#A8A29E] flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {timeAgo(search.fetched_at)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div className="flex items-center gap-1">
+                <button
+                    onClick={onRefresh}
+                    className="p-1.5 rounded-md text-[#002e7a] hover:bg-[#f0f4ff] transition-colors"
+                    title="Ergebnisse aktualisieren"
+                >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(e); }}
+                    className="p-1.5 rounded-md text-[#A8A29E] hover:text-red-500 hover:bg-red-50 transition-colors"
+                    title="Suche entfernen"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
+
+            {/* Results (expanded) */}
+            <AnimatePresence>
+                {isExpanded && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="px-5 pb-4 border-t border-[#E7E7E5]">
+                            {search.results.length === 0 ? (
+                                <p className="text-xs text-[#A8A29E] py-6 text-center">
+                                    Keine Ergebnisse gefunden.
+                                </p>
+                            ) : (
+                                <div className="space-y-1 pt-3">
+                                    {search.results.map((job, i) => (
+                                        <JobRow
+                                            key={`${job.company_name}-${job.title}-${i}`}
+                                            job={job}
+                                            starredUrls={starredUrls}
+                                            toggleStar={toggleStar}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+// ─── Job Row Component ──────────────────────────────────────────────
+
+function JobRow({ job, starredUrls, toggleStar }: { job: EnrichedJob; starredUrls: Set<string>; toggleStar: (url: string) => void }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    return (
+        <div className="border border-[#E7E7E5] rounded-lg overflow-hidden">
+            {/* Row */}
+            <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#FAFAF9] transition-colors text-left"
+            >
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-semibold text-[#37352F] truncate">
+                            {job.company_name}
+                        </h4>
+                        {job.already_in_queue && (
+                            <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Bereits in Queue
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-xs text-[#73726E] mt-0.5 truncate">
+                        {job.title} · {job.location}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-3">
+                    {job.detected_extensions?.posted_at && (
+                        <span className="text-[10px] text-[#A8A29E]">
+                            {job.detected_extensions.posted_at}
+                        </span>
+                    )}
+                    <motion.div
+                        animate={{ rotate: isExpanded ? 0 : -90 }}
+                        transition={{ duration: 0.15 }}
+                    >
+                        <ChevronDown className="w-4 h-4 text-[#A8A29E]" />
+                    </motion.div>
+                </div>
+            </button>
+
+            {/* Expanded Detail */}
+            <AnimatePresence>
+                {isExpanded && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="px-4 pb-4 border-t border-[#E7E7E5] space-y-3 pt-3">
+                            {/* Schedule type / salary */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {job.detected_extensions?.schedule_type && (
+                                    <span className="px-2 py-0.5 rounded-md bg-[#F7F7F5] text-[10px] text-[#73726E] border border-[#E7E7E5]">
+                                        {job.detected_extensions.schedule_type}
+                                    </span>
+                                )}
+                                {job.detected_extensions?.salary && (
+                                    <span className="px-2 py-0.5 rounded-md bg-[#F7F7F5] text-[10px] text-[#73726E] border border-[#E7E7E5]">
+                                        {job.detected_extensions.salary}
+                                    </span>
+                                )}
+                                {job.detected_extensions?.work_from_home && (
+                                    <span className="px-2 py-0.5 rounded-md bg-[#f0f4ff] text-[10px] text-[#002e7a] border border-[#002e7a]/10">
+                                        Remote
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Description */}
+                            {job.description && (
+                                <ul className="text-xs text-[#37352F] leading-relaxed space-y-1 mt-2 list-disc list-outside ml-4">
+                                    {job.description
+                                        .split('. ')
+                                        .filter(s => s.trim().length > 5)
+                                        .slice(0, 3)
+                                        .map((sentence, idx) => (
+                                            <li key={idx} className="line-clamp-2">
+                                                {sentence.trim()}{!sentence.trim().endsWith('.') && !sentence.trim().endsWith('!') && !sentence.trim().endsWith('?') ? '.' : ''}
+                                            </li>
+                                        ))}
+                                </ul>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 pt-1">
+                                {job.apply_link && (
+                                    <a
+                                        href={job.apply_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E7E7E5] text-xs font-semibold text-[#002e7a] hover:bg-[#002e7a]/5 transition-colors"
+                                    >
+                                        <ExternalLink className="w-3 h-3" />
+                                        Website
+                                    </a>
+                                )}
+                                {!job.already_in_queue && (
+                                    <div className="flex items-center gap-2">
+                                        <AddToQueueButton job={job} />
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); toggleStar(job.apply_link); }}
+                                            className={`p-1.5 rounded-lg border transition-colors ${starredUrls.has(job.apply_link)
+                                                ? 'border-[#002e7a] text-[#002e7a] bg-[#002e7a]/5'
+                                                : 'border-[#E7E7E5] text-[#A8A29E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                }`}
+                                            title="Job merken"
+                                        >
+                                            <Star className={`w-4 h-4 ${starredUrls.has(job.apply_link) ? 'fill-[#002e7a]' : ''}`} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+// ─── Add to Queue Button ────────────────────────────────────────────
+
+function AddToQueueButton({ job }: { job: EnrichedJob }) {
+    const [adding, setAdding] = useState(false);
+    const [added, setAdded] = useState(false);
+
+    const handleAdd = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (adding || added) return;
+
+        setAdding(true);
+        try {
+            const res = await fetch('/api/jobs/ingest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jobTitle: job.title,
+                    company: job.company_name,
+                    location: job.location,
+                    jobDescription: job.description || 'Keine Beschreibung verfügbar',
+                    source_url: job.apply_link,
+                    source: 'job_search',
+                }),
+            });
+
+            if (res.ok) {
+                setAdded(true);
+            }
+        } catch {
+            // Silent fail
+        } finally {
+            setAdding(false);
+        }
+    };
+
+    if (added) {
+        return (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium border border-green-200">
+                <CheckCircle2 className="w-3 h-3" />
+                In der Queue
+            </span>
+        );
+    }
+
+    return (
+        <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleAdd}
+            disabled={adding}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#002e7a] text-white text-xs font-medium hover:bg-[#001d4f] disabled:opacity-50 transition-colors"
+        >
+            {adding ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+                <Plus className="w-3 h-3" />
+            )}
+            Hinzufügen
+        </motion.button>
     );
 }

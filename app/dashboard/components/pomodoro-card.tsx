@@ -103,9 +103,9 @@ export function PomodoroCard({ className }: PomodoroCardProps) {
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     {mode === 'focus' ? (
-                        <span className="text-xl">🍅</span>
+                        <span className="text-xl font-bold text-[#002e7a]">P</span>
                     ) : (
-                        <span className="text-xl">{focusDuration === 25 ? '📱' : '☕️'}</span>
+                        <Coffee className="w-5 h-5 text-[#002e7a]" />
                     )}
                     <span className="text-sm font-medium text-[#002e7a]">
                         {mode === 'focus' ? 'Focus Time' : 'Break Time'}

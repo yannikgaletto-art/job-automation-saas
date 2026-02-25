@@ -2,21 +2,23 @@
 
 /**
  * Timeline Grid — Left column of the calendar.
- * Renders 8:00–20:00 hour slots as drop zones.
+ * Renders 0:00–23:30 (48 half-hour slots) in a scrollable container.
+ * Automatically scrolls to current time on mount.
+ * Red "now" line like Google Calendar.
  * Scheduled tasks appear as blocks with progress bars.
  * Double-click on empty slot to create task inline.
  * Resize handle at bottom of blocks to change duration.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
-import { CheckCircle2, GripHorizontal } from 'lucide-react';
+import { CheckCircle2, GripHorizontal, Calendar } from 'lucide-react';
 import { useCalendarStore, type CalendarTask } from '@/store/use-calendar-store';
 import { toast } from 'sonner';
 
-const HOURS = Array.from({ length: 13 }, (_, i) => i + 8); // 8:00 to 20:00
-const SLOT_HEIGHT = 64; // px per hour
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0:00 to 23:00
+const SLOT_HEIGHT = 48; // px per 30min slot → 96px per hour
 
 // ─── Drop Zone (per half-hour slot) ──────────────────────────────
 
@@ -36,8 +38,9 @@ function TimeSlot({
         <div
             ref={setNodeRef}
             onDoubleClick={() => onDoubleClick(hour, half)}
-            className={`h-8 border-b border-dashed border-[#E7E7E5]/40 transition-colors cursor-pointer hover:bg-[#002e7a]/[0.02] ${isOver ? 'bg-[#002e7a]/8 border-[#002e7a]/40' : ''
+            className={`h-[${SLOT_HEIGHT}px] border-b border-dashed border-[#E7E7E5]/40 transition-colors cursor-pointer hover:bg-[#002e7a]/[0.02] ${isOver ? 'bg-[#002e7a]/8 border-[#002e7a]/40' : ''
                 }`}
+            style={{ height: `${SLOT_HEIGHT}px` }}
         />
     );
 }
@@ -58,7 +61,6 @@ function InlineTaskCreator({
     onCancel: () => void;
 }) {
     const [title, setTitle] = useState('');
-    const inputRef = useRef<HTMLInputElement>(null);
 
     return (
         <motion.div
@@ -71,7 +73,6 @@ function InlineTaskCreator({
                 Neuer Task um {hour}:{minute === 0 ? '00' : '30'}
             </p>
             <input
-                ref={inputRef}
                 autoFocus
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -104,11 +105,12 @@ function TaskBlock({ task }: { task: CalendarTask }) {
         ? new Date(task.scheduled_end)
         : new Date(start.getTime() + task.estimated_minutes * 60000);
 
-    const startHour = start.getHours() + start.getMinutes() / 60;
-    const durationHours = (end.getTime() - start.getTime()) / 3600000;
+    const startMinutes = start.getHours() * 60 + start.getMinutes();
+    const durationMinutes = (end.getTime() - start.getTime()) / 60000;
 
-    const top = (startHour - 8) * SLOT_HEIGHT;
-    const height = Math.max(durationHours * SLOT_HEIGHT, 32);
+    const pxPerMinute = (SLOT_HEIGHT * 2) / 60; // 96px per 60 min
+    const top = startMinutes * pxPerMinute;
+    const height = Math.max(durationMinutes * pxPerMinute, 32);
 
     const isCompleted = task.status === 'completed';
     const isFocus = task.status === 'focus';
@@ -136,7 +138,7 @@ function TaskBlock({ task }: { task: CalendarTask }) {
             const y = 'touches' in ev ? ev.touches[0].clientY : ev.clientY;
             const delta = y - resizeStartRef.current.y;
             const newHeight = Math.max(32, resizeStartRef.current.height + delta);
-            const newMinutes = Math.round((newHeight / SLOT_HEIGHT) * 60 / 15) * 15; // Snap to 15 min
+            const newMinutes = Math.round((newHeight / pxPerMinute) / 15) * 15;
             const clampedMinutes = Math.max(15, Math.min(180, newMinutes));
 
             updateTask(task.id, {
@@ -230,17 +232,18 @@ function TaskBlock({ task }: { task: CalendarTask }) {
 export function TimelineGrid() {
     const { tasks, addTask, scheduleTask } = useCalendarStore();
     const [inlineCreate, setInlineCreate] = useState<{ hour: number; minute: number } | null>(null);
+    const timelineRef = useRef<HTMLDivElement>(null);
 
     const scheduledTasks = tasks.filter((t) =>
         ['scheduled', 'focus', 'in_progress', 'completed'].includes(t.status) && t.scheduled_start
     );
 
     const now = new Date();
-    const currentHour = now.getHours() + now.getMinutes() / 60;
-    const currentLineTop = (currentHour - 8) * SLOT_HEIGHT;
-    const showCurrentLine = currentHour >= 8 && currentHour <= 20;
+    const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
+    const pxPerMinute = (SLOT_HEIGHT * 2) / 60;
+    const currentLineTop = minutesSinceMidnight * pxPerMinute;
 
-    // Calculate free time
+    // Calculate free time (based on waking hours 8-20)
     const scheduledMinutes = scheduledTasks
         .filter(t => t.status !== 'completed')
         .reduce((sum, t) => sum + t.estimated_minutes, 0);
@@ -248,6 +251,12 @@ export function TimelineGrid() {
     const freeMinutes = totalMinutes - scheduledMinutes;
     const freeHours = Math.floor(freeMinutes / 60);
     const freeMin = freeMinutes % 60;
+
+    // Scroll to current time − 1h on mount
+    useEffect(() => {
+        const scrollTarget = (minutesSinceMidnight - 60) * pxPerMinute;
+        timelineRef.current?.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
+    }, []);
 
     // Double-click handler
     const handleDoubleClick = useCallback((hour: number, minute: number) => {
@@ -266,7 +275,6 @@ export function TimelineGrid() {
             });
             const data = await res.json();
             if (data.success && data.task) {
-                // Build local time and schedule immediately
                 const today = new Date();
                 const startLocal = new Date(
                     today.getFullYear(), today.getMonth(), today.getDate(),
@@ -277,7 +285,6 @@ export function TimelineGrid() {
                 addTask(data.task);
                 scheduleTask(data.task.id, startLocal.toISOString(), endLocal.toISOString());
 
-                // Sync schedule to DB
                 await fetch('/api/tasks', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
@@ -289,7 +296,7 @@ export function TimelineGrid() {
                     }),
                 });
 
-                toast.success(`„${title}" um ${inlineCreate.hour}:${inlineCreate.minute === 0 ? '00' : '30'} erstellt`);
+                toast.success(`\u201E${title}\u201C um ${inlineCreate.hour}:${inlineCreate.minute === 0 ? '00' : '30'} erstellt`);
             }
         } catch {
             toast.error('Task konnte nicht erstellt werden');
@@ -298,64 +305,71 @@ export function TimelineGrid() {
         setInlineCreate(null);
     }, [inlineCreate, addTask, scheduleTask]);
 
+    const totalGridHeight = 24 * SLOT_HEIGHT * 2; // 24 hours × 2 slots × 48px
+
     return (
         <div className="bg-white border border-[#E7E7E5] rounded-xl shadow-sm overflow-hidden">
             {/* Header */}
             <div className="px-5 py-3 border-b border-[#E7E7E5] flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[#37352F]">
-                    📅 {now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'short' })}
+                <h2 className="text-sm font-semibold text-[#37352F] flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'short' })}
                 </h2>
                 <span className="text-[10px] text-[#73726E]">
-                    ⚡ {freeHours}h {freeMin > 0 ? `${freeMin}m ` : ''}frei heute
+                    {freeHours}h {freeMin > 0 ? `${freeMin}m ` : ''}frei heute
                 </span>
             </div>
 
-            {/* Grid */}
-            <div className="relative px-2" style={{ height: `${13 * SLOT_HEIGHT}px` }}>
-                {/* Hour labels + drop zones */}
-                {HOURS.map((hour) => (
-                    <div
-                        key={hour}
-                        className="absolute left-0 right-0"
-                        style={{ top: `${(hour - 8) * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px` }}
-                    >
-                        <div className="flex items-start h-full">
-                            <span className="w-14 text-xs font-mono text-[#A8A29E] pr-3 pt-px shrink-0 text-right select-none">
-                                {hour}:00
-                            </span>
-                            <div className="flex-1 border-t border-[#E7E7E5]/70 h-full">
-                                <TimeSlot hour={hour} half={0} onDoubleClick={handleDoubleClick} />
-                                <TimeSlot hour={hour} half={30} onDoubleClick={handleDoubleClick} />
+            {/* Scrollable Grid */}
+            <div
+                ref={timelineRef}
+                className="relative px-2 overflow-y-auto"
+                style={{ height: '520px' }}
+            >
+                <div className="relative" style={{ height: `${totalGridHeight}px` }}>
+                    {/* Hour labels + drop zones */}
+                    {HOURS.map((hour) => (
+                        <div
+                            key={hour}
+                            className="absolute left-0 right-0"
+                            style={{ top: `${hour * SLOT_HEIGHT * 2}px`, height: `${SLOT_HEIGHT * 2}px` }}
+                        >
+                            <div className="flex items-start h-full">
+                                <span className="w-14 text-xs font-mono text-[#A8A29E] pr-3 pt-px shrink-0 text-right select-none">
+                                    {hour}:00
+                                </span>
+                                <div className="flex-1 border-t border-[#E7E7E5]/70 h-full">
+                                    <TimeSlot hour={hour} half={0} onDoubleClick={handleDoubleClick} />
+                                    <TimeSlot hour={hour} half={30} onDoubleClick={handleDoubleClick} />
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
 
-                {/* Current time line */}
-                {showCurrentLine && (
+                    {/* Current time line (red) */}
                     <div
-                        className="absolute left-14 right-0 h-0.5 bg-red-400 z-20 pointer-events-none"
+                        className="absolute left-14 right-0 h-[2px] bg-red-500 z-20 pointer-events-none"
                         style={{ top: `${currentLineTop}px` }}
                     >
-                        <div className="absolute -left-1.5 -top-1 w-3 h-3 bg-red-400 rounded-full" />
+                        <div className="absolute -left-1.5 -top-1 w-3 h-3 bg-red-500 rounded-full" />
                     </div>
-                )}
 
-                {/* Scheduled task blocks */}
-                {scheduledTasks.map((task) => (
-                    <TaskBlock key={task.id} task={task} />
-                ))}
+                    {/* Scheduled task blocks */}
+                    {scheduledTasks.map((task) => (
+                        <TaskBlock key={task.id} task={task} />
+                    ))}
 
-                {/* Inline create overlay */}
-                {inlineCreate && (
-                    <InlineTaskCreator
-                        hour={inlineCreate.hour}
-                        minute={inlineCreate.minute}
-                        top={(inlineCreate.hour - 8 + inlineCreate.minute / 60) * SLOT_HEIGHT}
-                        onSubmit={handleInlineSubmit}
-                        onCancel={() => setInlineCreate(null)}
-                    />
-                )}
+                    {/* Inline create overlay */}
+                    {inlineCreate && (
+                        <InlineTaskCreator
+                            hour={inlineCreate.hour}
+                            minute={inlineCreate.minute}
+                            top={(inlineCreate.hour * 60 + inlineCreate.minute) * pxPerMinute}
+                            onSubmit={handleInlineSubmit}
+                            onCancel={() => setInlineCreate(null)}
+                        />
+                    )}
+                </div>
             </div>
         </div>
     );

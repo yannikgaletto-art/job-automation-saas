@@ -102,11 +102,11 @@ export function FocusConfirmationModal() {
                                         whileTap={{ scale: 0.97 }}
                                         onClick={() => setSelectedDuration(dur)}
                                         className={`flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-all ${selectedDuration === dur
-                                                ? 'border-[#002e7a] bg-[#f0f4ff] text-[#002e7a]'
-                                                : 'border-[#E7E7E5] bg-white text-[#73726E] hover:border-[#002e7a]/30'
+                                            ? 'border-[#002e7a] bg-[#f0f4ff] text-[#002e7a]'
+                                            : 'border-[#E7E7E5] bg-white text-[#73726E] hover:border-[#002e7a]/30'
                                             }`}
                                     >
-                                        🍅 {dur} min
+                                        {dur} min
                                     </motion.button>
                                 ))}
                             </div>
@@ -158,7 +158,7 @@ export function FocusConfirmationModal() {
                             onClick={handleConfirm}
                             className="flex-1 px-4 py-2.5 rounded-lg bg-[#002e7a] text-white text-sm font-medium hover:bg-[#001d4f] transition-colors"
                         >
-                            Ich bin bereit – Focus starten ✓
+                            Ich bin bereit – Focus starten
                         </motion.button>
                         <motion.button
                             whileHover={{ scale: 1.02 }}

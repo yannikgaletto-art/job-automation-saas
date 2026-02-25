@@ -80,7 +80,7 @@ function ProgressPanel({
             }),
         });
         fireConfetti();
-        toast.success('🎉 Task erledigt!');
+        toast.success('Task erledigt!');
         onClose();
     };
 
@@ -92,7 +92,7 @@ function ProgressPanel({
             className="bg-[#F7F7F5] rounded-xl p-4 space-y-4 border border-[#E7E7E5]"
         >
             <div>
-                <p className="text-sm font-semibold text-[#37352F]">⏸ Wo stehst du gerade?</p>
+                <p className="text-sm font-semibold text-[#37352F]">Wo stehst du gerade?</p>
                 <p className="text-xs text-[#73726E] mt-0.5">„{taskTitle}"</p>
             </div>
 
@@ -252,7 +252,7 @@ export function FocusPanel() {
             }),
         });
         fireConfetti();
-        toast.success('🎉 Task erledigt!');
+        toast.success('Task erledigt!');
     };
 
     if (!task) return null;
@@ -280,7 +280,7 @@ export function FocusPanel() {
                     <span className="text-[10px]">·</span>
                     <span className="text-[10px]">
                         {Array.from({ length: totalPomodoros }).map((_, i) => (
-                            <span key={i}>{i < completedPomodoros ? '🍅' : '○'} </span>
+                            <span key={i}>{i < completedPomodoros ? '●' : '○'} </span>
                         ))}
                     </span>
                 </div>
@@ -291,7 +291,7 @@ export function FocusPanel() {
                 <div className="text-center py-4">
                     <div className={`inline-flex flex-col items-center p-6 rounded-2xl ${isBreak ? 'bg-green-50' : 'bg-[#F7F7F5]'}`}>
                         <span className="text-[10px] text-[#73726E] mb-1">
-                            {isBreak ? '☕ Pause' : `Pomodoro ${Math.min(completedPomodoros + 1, totalPomodoros)} von ${totalPomodoros}`}
+                            {isBreak ? 'Pause' : `Pomodoro ${Math.min(completedPomodoros + 1, totalPomodoros)} von ${totalPomodoros}`}
                         </span>
                         <span className="text-4xl font-mono font-bold text-[#37352F] tabular-nums">
                             {formatTimer(secondsLeft)}

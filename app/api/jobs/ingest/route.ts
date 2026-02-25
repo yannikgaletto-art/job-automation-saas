@@ -18,7 +18,7 @@ const anthropic = new Anthropic({
 const IngestRequestSchema = z.object({
     company: z.string().min(2, 'Company name must be at least 2 characters'),
     jobTitle: z.string().min(2, 'Job title must be at least 2 characters'),
-    jobDescription: z.string().min(500, 'Mindestens 500 Zeichen').max(5000, 'Maximal 5.000 Zeichen'),
+    jobDescription: z.string().min(10, 'Mindestens 10 Zeichen').max(10000, 'Maximal 10.000 Zeichen'),
 });
 
 export async function POST(request: NextRequest) {

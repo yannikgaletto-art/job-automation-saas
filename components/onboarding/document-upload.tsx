@@ -16,6 +16,8 @@ interface FileWithPreview extends File {
 interface DocumentUploadProps {
     onComplete: (files: { cv: File; coverLetters: File[] }) => Promise<void>
     onBack?: () => void
+    introHeadline?: string
+    introText?: string
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -25,7 +27,7 @@ const ACCEPTED_FILE_TYPES = {
     'application/msword': ['.doc']
 }
 
-export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
+export function DocumentUpload({ onComplete, onBack, introHeadline, introText }: DocumentUploadProps) {
     const [cvFile, setCvFile] = useState<FileWithPreview | null>(null)
     const [coverLetterFiles, setCoverLetterFiles] = useState<FileWithPreview[]>([])
     const [isUploading, setIsUploading] = useState(false)
@@ -213,11 +215,11 @@ export function DocumentUpload({ onComplete, onBack }: DocumentUploadProps) {
                         </motion.div>
 
                         <CardTitle className="text-2xl font-semibold text-[#37352F]">
-                            Dokumente hochladen
+                            {introHeadline || 'Dokumente hochladen'}
                         </CardTitle>
 
                         <CardDescription className="text-[#73726E] text-base mt-2">
-                            Laden Sie Ihren Lebenslauf und Anschreiben hoch
+                            {introText || 'Laden Sie Ihren Lebenslauf und Anschreiben hoch'}
                         </CardDescription>
                     </CardHeader>
 

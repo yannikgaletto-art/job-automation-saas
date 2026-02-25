@@ -76,6 +76,38 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(redirectUrl)
     }
 
+    // Onboarding gate: if logged in and accessing /dashboard, check onboarding status
+    // Uses a separate SSR client with SERVICE_ROLE_KEY to bypass RLS (Edge-compatible)
+    if (session && request.nextUrl.pathname.startsWith('/dashboard')) {
+        try {
+            const supabaseAdmin = createServerClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                {
+                    cookies: {
+                        get() { return undefined },
+                        set() { },
+                        remove() { },
+                    },
+                }
+            )
+
+            const { data: settings } = await supabaseAdmin
+                .from('user_settings')
+                .select('onboarding_completed')
+                .eq('user_id', session.user.id)
+                .maybeSingle()
+
+            // If no settings row or onboarding not completed → redirect to onboarding
+            if (!settings || settings.onboarding_completed !== true) {
+                const redirectUrl = new URL('/onboarding', request.url)
+                return NextResponse.redirect(redirectUrl)
+            }
+        } catch (err) {
+            // Don't block dashboard access on settings query failure
+            console.error('[middleware] Onboarding check failed:', err)
+        }
+    }
 
     return response
 }
@@ -92,3 +124,4 @@ export const config = {
         '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }
+

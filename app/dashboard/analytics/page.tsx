@@ -77,7 +77,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-semibold text-[#37352F]">
-                        ⚡ Flow State & Performance
+                        Flow State & Performance
                     </h1>
                     <p className="text-[#73726E] mt-1">
                         Deine Muster. Dein Rhythmus. Deine Golden Hours.
@@ -91,8 +91,8 @@ export default function AnalyticsPage() {
                             key={opt.value}
                             onClick={() => setDays(opt.value)}
                             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${days === opt.value
-                                    ? 'bg-white text-[#002e7a] shadow-sm'
-                                    : 'text-[#73726E] hover:text-[#37352F]'
+                                ? 'bg-white text-[#002e7a] shadow-sm'
+                                : 'text-[#73726E] hover:text-[#37352F]'
                                 }`}
                         >
                             {opt.label}
@@ -114,7 +114,7 @@ export default function AnalyticsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-white rounded-xl border border-[#d6d6d6] p-12 text-center shadow-sm"
                 >
-                    <p className="text-4xl mb-4">🧘</p>
+                    <p className="text-4xl mb-4">—</p>
                     <h2 className="text-lg font-semibold text-[#37352F] mb-2">
                         Starte deine erste Pomodoro-Session
                     </h2>
@@ -135,7 +135,7 @@ export default function AnalyticsPage() {
                             animate={{ opacity: 1, scale: 1 }}
                             className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center gap-3"
                         >
-                            <span className="text-2xl">🔥</span>
+                            <span className="text-2xl font-bold text-[#002e7a]">Streak</span>
                             <p className="text-sm text-amber-800">
                                 <strong>{streak}-Tage-Streak!</strong> Du bist seit {streak} Tagen in Folge aktiv.
                             </p>
@@ -155,7 +155,7 @@ export default function AnalyticsPage() {
                             </h2>
                             <p className="text-xs text-[#73726E]">Wann bist du am schärfsten?</p>
                             <FlowHeatmap cells={data!.heatmap} />
-                            {peakText && <InsightBox text={peakText} icon="💡" />}
+                            {peakText && <InsightBox text={peakText} icon="" />}
                         </motion.div>
 
                         <motion.div
@@ -183,7 +183,7 @@ export default function AnalyticsPage() {
                         </h2>
                         <p className="text-xs text-[#73726E]">Dein Energielevel × Completion Rate der Sessions</p>
                         <EnergyResonanceChart sessions={data!.energyTimeline} />
-                        {energyText && <InsightBox text={energyText} icon="⚡" />}
+                        {energyText && <InsightBox text={energyText} icon="" />}
                     </motion.div>
 
                     {/* Momentum + Funnel */}

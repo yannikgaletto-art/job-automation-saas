@@ -93,8 +93,8 @@ function DraggableTaskItem({ task }: { task: CalendarTask }) {
             exit={{ opacity: 0, x: -50, height: 0, marginBottom: 0, padding: 0, transition: { duration: 0.2 } }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             className={`group p-3 rounded-lg border transition-all ${isDragging
-                    ? 'border-[#002e7a] bg-[#f0f4ff] shadow-xl'
-                    : 'border-[#E7E7E5] bg-white hover:border-[#002e7a]/30 hover:shadow-sm'
+                ? 'border-[#002e7a] bg-[#f0f4ff] shadow-xl'
+                : 'border-[#E7E7E5] bg-white hover:border-[#002e7a]/30 hover:shadow-sm'
                 }`}
         >
             <div className="flex items-center gap-2">
@@ -112,7 +112,7 @@ function DraggableTaskItem({ task }: { task: CalendarTask }) {
                     <div className="flex items-center gap-2">
                         {isCarryOver && (
                             <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded-full border border-amber-200 font-medium shrink-0">
-                                ↩ Von gestern{task.progress_percent ? ` · ${task.progress_percent}%` : ''}
+                                Von gestern{task.progress_percent ? ` · ${task.progress_percent}%` : ''}
                             </span>
                         )}
                         <p className="text-sm text-[#37352F] truncate font-medium">{task.title}</p>
@@ -330,7 +330,7 @@ export function TaskInbox() {
                         </p>
                         {tasks.filter(t => t.status === 'scheduled').map(task => (
                             <div key={task.id} className="flex items-center gap-2 px-2 py-1 text-xs text-[#73726E]">
-                                <span>✓</span>
+                                <span>Done</span>
                                 <span className="truncate flex-1">{task.title}</span>
                                 <span className="font-mono text-[10px]">
                                     {task.scheduled_start ? new Date(task.scheduled_start).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}

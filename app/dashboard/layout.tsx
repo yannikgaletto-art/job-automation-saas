@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
 import { MorningBriefing } from '@/components/dashboard/morning-briefing';
 import { CommandPalette } from '@/components/dashboard/command-palette';
+import { MoodCheckInOverlay } from '@/components/MoodCheckInOverlay';
+import { useMoodCheckIn } from './hooks/useMoodCheckIn';
 import { useCalendarStore } from '@/store/use-calendar-store';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -19,6 +21,7 @@ export default function DashboardLayout({
     const contextMode = useCalendarStore((s) => s.contextMode);
     const focusedTaskId = useCalendarStore((s) => s.focusedTaskId);
     const isFocusMode = contextMode === 'focus' && focusedTaskId !== null;
+    const { showOverlay: showMoodOverlay, dismiss: dismissMoodOverlay } = useMoodCheckIn();
 
     return (
         <>
@@ -77,6 +80,9 @@ export default function DashboardLayout({
             {/* Morning Briefing overlay (once per day) */}
             <MorningBriefing />
 
+            {/* Midday Mood Check-in overlay (every 3 hours) */}
+            <MoodCheckInOverlay visible={showMoodOverlay} onDismiss={dismissMoodOverlay} />
+
             {/* Command Palette (Cmd+K) */}
             <CommandPalette />
 
@@ -84,3 +90,4 @@ export default function DashboardLayout({
         </>
     );
 }
+

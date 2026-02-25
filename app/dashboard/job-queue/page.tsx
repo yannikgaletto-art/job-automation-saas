@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { JobQueueTable } from '../components/job-queue-table';
 import { Job } from '../components/job-row';
 import { Button } from '@/components/motion/button';
-import { Plus } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { AddJobDialog } from '@/components/dashboard/add-job-dialog';
 import { CustomDialog } from '@/components/ui/custom-dialog';
 import { CVComparison } from '@/components/cv/cv-comparison';
@@ -169,21 +169,23 @@ export default function JobQueuePage() {
             />
 
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div>
                 <div>
                     <h1 className="text-3xl font-semibold text-[#37352F]">Job Queue</h1>
                     <p className="text-[#73726E] mt-1">Manage and track your active job applications</p>
                 </div>
-                <Button variant="primary" onClick={() => setIsAddJobOpen(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Job
-                </Button>
+                <div className="mt-3">
+                    <Button variant="primary" onClick={() => setIsAddJobOpen(true)} className="rounded-xl px-5 py-2.5 font-medium">
+                        <PlusCircle className="w-4 h-4 mr-2" />
+                        Add Job
+                    </Button>
+                </div>
             </div>
 
             {/* Job Queue Table */}
             <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                    {isOptimizing && <span className="text-sm text-blue-600 animate-pulse">✨ Optimizing CV...</span>}
+                    {isOptimizing && <span className="text-sm text-blue-600 animate-pulse">Optimizing CV...</span>}
                 </div>
 
                 <JobQueueTable

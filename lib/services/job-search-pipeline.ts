@@ -101,23 +101,55 @@ export async function withRetry<T>(
 
 // ─── Step 1: SerpAPI Search ───────────────────────────────────────
 
+// ─── Werte-Filter Keyword Mapping ─────────────────────────────────
+
+const WERTE_FILTER_KEYWORDS: Record<string, string> = {
+    nachhaltigkeit: 'nachhaltig OR ESG OR Green OR Klimaschutz',
+    innovation: 'Innovation OR Disruption OR New Work',
+    social_impact: 'Social Impact OR gemeinnützig OR NGO',
+    deep_tech: 'Deep Tech OR KI OR AI OR Machine Learning',
+};
+
+export interface JobSearchFilters {
+    experience?: string[];   // ['Entry', 'Mid', 'Senior', 'Lead']
+    orgType?: string[];      // ['Startup', 'Konzern', 'NGO', 'Staat']
+    werte?: string[];        // ['nachhaltigkeit', 'innovation', 'social_impact', 'deep_tech']
+}
+
 export async function searchJobs(
     query: string,
     location: string,
+    filters?: JobSearchFilters,
 ): Promise<SerpApiJob[]> {
     const apiKey = process.env.SERPAPI_KEY;
     if (!apiKey) throw new Error('SERPAPI_KEY not configured');
 
+    // Build query with Werte-Filter keyword injection
+    let enrichedQuery = query;
+    if (location) {
+        // Appending location to the query works much better than SerpAPI's strict 'location' parameter
+        enrichedQuery = `${query} ${location}`;
+    }
+
+    if (filters?.werte && filters.werte.length > 0) {
+        const keywords = filters.werte
+            .map(w => WERTE_FILTER_KEYWORDS[w])
+            .filter(Boolean)
+            .join(' OR ');
+        if (keywords) {
+            enrichedQuery = `${enrichedQuery} ${keywords}`;
+        }
+    }
+
     const params = new URLSearchParams({
         engine: 'google_jobs',
-        q: `${query} ${location}`,
-        location: location,
+        q: `${enrichedQuery}`,
         hl: 'de',
         chips: 'date_posted:week',
         api_key: apiKey,
     });
 
-    console.log(`✅ [Pipeline] SerpAPI search: "${query}" in "${location}"`);
+    console.log(`[Search] SerpAPI search: "${enrichedQuery}"`);
 
     const response = await withRetry(async () => {
         const res = await fetch(`https://serpapi.com/search?${params.toString()}`);
@@ -127,12 +159,23 @@ export async function searchJobs(
 
     const jobsResults = response.jobs_results || [];
 
-    return jobsResults.map((job: any) => ({
+    if (jobsResults.length === 0) {
+        console.log('[Search] SerpAPI returned 0 results');
+        return [];
+    }
+
+    // Map initial results — use share_link as the base link
+    const mapped: SerpApiJob[] = jobsResults.map((job: any) => ({
         title: job.title || '',
         company_name: job.company_name || '',
         location: job.location || '',
         description: job.description || '',
-        apply_link: job.apply_options?.[0]?.link || job.related_links?.[0]?.link || '',
+        // Primary: share_link (Google Jobs link — always present)
+        // Fallback: any apply_options if somehow present
+        apply_link: job.share_link
+            || job.apply_options?.[0]?.link
+            || job.related_links?.[0]?.link
+            || '',
         detected_extensions: {
             posted_at: job.detected_extensions?.posted_at,
             schedule_type: job.detected_extensions?.schedule_type,
@@ -141,6 +184,58 @@ export async function searchJobs(
         },
         raw: job,
     }));
+
+    // Fetch real direct apply links via google_jobs_listing for top results
+    // This is a second API call per job but gives actual employer apply URLs
+    const MAX_LISTING_FETCHES = 10;
+    const jobsToEnrich = mapped.slice(0, MAX_LISTING_FETCHES);
+
+    await Promise.allSettled(
+        jobsToEnrich.map(async (job, index) => {
+            const jobId = (job.raw as any).job_id;
+            if (!jobId) return;
+
+            try {
+                const listingParams = new URLSearchParams({
+                    engine: 'google_jobs_listing',
+                    q: jobId,
+                    api_key: apiKey,
+                });
+
+                const listingRes = await fetch(
+                    `https://serpapi.com/search?${listingParams.toString()}`
+                );
+                if (!listingRes.ok) return;
+
+                const listingData = await listingRes.json();
+                const applyOptions = listingData.apply_options || [];
+
+                if (applyOptions.length > 0) {
+                    // Use the first direct apply link (usually the employer's own site)
+                    const directLink = applyOptions[0]?.link;
+                    if (directLink) {
+                        mapped[index].apply_link = directLink;
+                    }
+                }
+            } catch {
+                // Silently fall back to share_link
+            }
+        })
+    );
+
+    // Deduplicate on company_name + title
+    const seen = new Set<string>();
+    const deduplicated = mapped.filter(j => {
+        const key = `${j.company_name}::${j.title}`.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+
+    const withLinks = deduplicated.filter(j => j.apply_link).length;
+    console.log(`[Search] ${jobsResults.length} raw → ${deduplicated.length} unique (${withLinks} with apply links)`);
+
+    return deduplicated;
 }
 
 // ─── Step 2: Firecrawl Deep Scrape ────────────────────────────────

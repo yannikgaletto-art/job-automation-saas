@@ -91,7 +91,7 @@ export function GoldenHoursClock({ cells }: { cells: HeatmapCell[] }) {
                 </text>
             </svg>
             <p className="text-xs text-stone-500 text-center">
-                ✨ Peak: <strong className="text-[#002e7a]">{peakHour}:00 – {(peakHour + 2) % 24}:00 Uhr</strong>
+                Peak: <strong className="text-[#002e7a]">{peakHour}:00 – {(peakHour + 2) % 24}:00 Uhr</strong>
             </p>
         </div>
     );
