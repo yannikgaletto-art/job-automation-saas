@@ -41,6 +41,13 @@ interface CalendarState {
     pomodoroDuration: number; // 25 or 50 minutes
     autoStartTimer: boolean; // Auto-start timer on focus confirm
 
+    // ── Persistent Pomodoro Timer State ──────────────────────────
+    timerTimeRemaining: number;    // seconds left
+    timerIsActive: boolean;
+    timerMode: 'focus' | 'break';
+    timerTotalTime: number;        // total seconds for current phase
+    timerSessions: number;         // completed focus sessions
+
     // Actions
     setTasks: (tasks: CalendarTask[]) => void;
     addTask: (task: CalendarTask) => void;
@@ -57,6 +64,12 @@ interface CalendarState {
     cancelFocus: () => void;
     exitFocus: () => void;
     setPomodoroDuration: (minutes: number) => void;
+
+    // Timer actions
+    timerToggle: () => void;
+    timerTick: () => void;
+    timerSkip: () => void;
+    timerSetDuration: (minutes: 25 | 50) => void;
 
     // Progress
     updateProgress: (id: string, percent: number | null, note: string | null) => void;
@@ -82,6 +95,13 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     contextMode: 'inbox',
     pomodoroDuration: 25,
     autoStartTimer: false,
+
+    // Timer initial state (25-min focus)
+    timerTimeRemaining: 25 * 60,
+    timerIsActive: false,
+    timerMode: 'focus',
+    timerTotalTime: 25 * 60,
+    timerSessions: 0,
 
     // Basic CRUD
     setTasks: (tasks) => set({ tasks }),
@@ -134,6 +154,49 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     exitFocus: () =>
         set({ focusedTaskId: null, contextMode: 'inbox', autoStartTimer: false }),
     setPomodoroDuration: (minutes) => set({ pomodoroDuration: minutes }),
+
+    // Timer actions
+    timerToggle: () => set((s) => ({ timerIsActive: !s.timerIsActive })),
+    timerTick: () => {
+        const s = get();
+        if (!s.timerIsActive) return;
+        if (s.timerTimeRemaining > 1) {
+            set({ timerTimeRemaining: s.timerTimeRemaining - 1 });
+        } else {
+            // Phase transition
+            if (s.timerMode === 'focus') {
+                const breakDuration = s.pomodoroDuration === 25 ? 5 * 60 : 10 * 60;
+                set({
+                    timerMode: 'break',
+                    timerTimeRemaining: breakDuration,
+                    timerTotalTime: breakDuration,
+                    timerIsActive: false,
+                    timerSessions: s.timerSessions + 1,
+                });
+            } else {
+                const focusDuration = s.pomodoroDuration * 60;
+                set({
+                    timerMode: 'focus',
+                    timerTimeRemaining: focusDuration,
+                    timerTotalTime: focusDuration,
+                    timerIsActive: false,
+                });
+            }
+        }
+    },
+    timerSkip: () => {
+        const s = get();
+        if (s.timerMode === 'focus') {
+            const breakDuration = s.pomodoroDuration === 25 ? 5 * 60 : 10 * 60;
+            set({ timerMode: 'break', timerTimeRemaining: breakDuration, timerTotalTime: breakDuration, timerIsActive: false, timerSessions: s.timerSessions + 1 });
+        } else {
+            const focusDuration = s.pomodoroDuration * 60;
+            set({ timerMode: 'focus', timerTimeRemaining: focusDuration, timerTotalTime: focusDuration, timerIsActive: false });
+        }
+    },
+    timerSetDuration: (minutes) => {
+        set({ pomodoroDuration: minutes, timerTimeRemaining: minutes * 60, timerTotalTime: minutes * 60, timerIsActive: false, timerMode: 'focus' });
+    },
 
     // Progress
     updateProgress: (id, percent, note) =>

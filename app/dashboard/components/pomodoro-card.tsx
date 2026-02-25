@@ -1,85 +1,45 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+/**
+ * PomodoroCard — wired to the global Zustand store.
+ * The useEffect tick drives the timer for the entire app session.
+ * Since this card lives in the always-mounted sidebar, the timer
+ * stays alive across ALL page navigations.
+ */
+
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, SkipForward, Coffee, Smartphone, Timer } from 'lucide-react';
+import { Play, Pause, SkipForward, Coffee } from 'lucide-react';
 import { Button } from '@/components/motion/button';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/motion/badge';
+import { useCalendarStore } from '@/store/use-calendar-store';
 
 interface PomodoroCardProps {
     className?: string;
 }
 
-type TimerMode = 'focus' | 'break';
-type FocusDuration = 25 | 50;
-
 export function PomodoroCard({ className }: PomodoroCardProps) {
-    // Settings
-    const [focusDuration, setFocusDuration] = useState<FocusDuration>(25);
+    const timerTimeRemaining = useCalendarStore((s) => s.timerTimeRemaining);
+    const timerIsActive = useCalendarStore((s) => s.timerIsActive);
+    const timerMode = useCalendarStore((s) => s.timerMode);
+    const timerTotalTime = useCalendarStore((s) => s.timerTotalTime);
+    const timerSessions = useCalendarStore((s) => s.timerSessions);
+    const pomodoroDuration = useCalendarStore((s) => s.pomodoroDuration) as 25 | 50;
 
-    // Timer State
-    const [mode, setMode] = useState<TimerMode>('focus');
-    const [timeRemaining, setTimeRemaining] = useState(25 * 60);
-    const [isActive, setIsActive] = useState(false);
-    const [sessions, setSessions] = useState(0);
+    const timerToggle = useCalendarStore((s) => s.timerToggle);
+    const timerTick = useCalendarStore((s) => s.timerTick);
+    const timerSkip = useCalendarStore((s) => s.timerSkip);
+    const timerSetDuration = useCalendarStore((s) => s.timerSetDuration);
 
-    // Derived values
-    const totalTime = mode === 'focus'
-        ? focusDuration * 60
-        : (focusDuration === 25 ? 5 * 60 : 10 * 60);
-
-    const progress = ((totalTime - timeRemaining) / totalTime) * 100;
-
-    // Timer Logic
+    // ── Heart of persistence: tick lives in the always-mounted sidebar ──
     useEffect(() => {
-        let interval: NodeJS.Timeout | null = null;
+        if (!timerIsActive) return;
+        const interval = setInterval(() => timerTick(), 1000);
+        return () => clearInterval(interval);
+    }, [timerIsActive, timerTick]);
 
-        if (isActive && timeRemaining > 0) {
-            interval = setInterval(() => {
-                setTimeRemaining((time) => time - 1);
-            }, 1000);
-        } else if (timeRemaining === 0 && isActive) {
-            handleTimerComplete();
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [isActive, timeRemaining]);
-
-    const handleTimerComplete = () => {
-        // Play notification sound here if needed
-
-        if (mode === 'focus') {
-            // Focus finished -> Start Break
-            setSessions(s => s + 1);
-            setMode('break');
-            setTimeRemaining(focusDuration === 25 ? 5 * 60 : 10 * 60);
-            setIsActive(false); // Auto-pause or auto-start (user preference usually pause)
-        } else {
-            // Break finished -> Start Focus
-            setMode('focus');
-            setTimeRemaining(focusDuration * 60);
-            setIsActive(false);
-        }
-    };
-
-    const handleModeSelect = (duration: FocusDuration) => {
-        setFocusDuration(duration);
-        if (mode === 'focus') {
-            setTimeRemaining(duration * 60);
-            setIsActive(false);
-        }
-    };
-
-    const handleSkip = () => {
-        handleTimerComplete();
-    };
-
-    const handleToggle = () => {
-        setIsActive(!isActive);
-    };
+    const progress = ((timerTotalTime - timerTimeRemaining) / timerTotalTime) * 100;
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -91,7 +51,7 @@ export function PomodoroCard({ className }: PomodoroCardProps) {
         <motion.div
             className={cn(
                 "px-4 py-4 rounded-lg border transition-colors",
-                mode === 'focus'
+                timerMode === 'focus'
                     ? "bg-white border-[#d6d6d6]"
                     : "bg-[#d4e3fe] border-[#002e7a]/20",
                 className
@@ -102,54 +62,46 @@ export function PomodoroCard({ className }: PomodoroCardProps) {
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                    {mode === 'focus' ? (
+                    {timerMode === 'focus' ? (
                         <span className="text-xl font-bold text-[#002e7a]">P</span>
                     ) : (
                         <Coffee className="w-5 h-5 text-[#002e7a]" />
                     )}
                     <span className="text-sm font-medium text-[#002e7a]">
-                        {mode === 'focus' ? 'Focus Time' : 'Break Time'}
+                        {timerMode === 'focus' ? 'Focus Time' : 'Break Time'}
                     </span>
                 </div>
                 <div className="flex items-center gap-1">
                     <span className="text-xs font-medium text-[#002e7a]/60 mr-1">Runs:</span>
                     <Badge variant="outline" className="bg-[#d4e3fe] text-[#002e7a] border-[#002e7a]/20">
-                        {sessions}
+                        {timerSessions}
                     </Badge>
                 </div>
             </div>
 
-            {/* Duration Selector (Only visible in Focus mode or when stopped) */}
+            {/* Duration Selector (only when paused in focus mode) */}
             <AnimatePresence>
-                {mode === 'focus' && !isActive && (
+                {timerMode === 'focus' && !timerIsActive && (
                     <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         className="flex gap-2 mb-4 justify-center"
                     >
-                        <button
-                            onClick={() => handleModeSelect(25)}
-                            className={cn(
-                                "px-3 py-1 text-xs rounded-full border transition-all",
-                                focusDuration === 25
-                                    ? "bg-[#002e7a] text-white border-[#002e7a]"
-                                    : "text-[#002e7a] border-[#d6d6d6] hover:bg-[#d4e3fe]"
-                            )}
-                        >
-                            25min
-                        </button>
-                        <button
-                            onClick={() => handleModeSelect(50)}
-                            className={cn(
-                                "px-3 py-1 text-xs rounded-full border transition-all",
-                                focusDuration === 50
-                                    ? "bg-[#002e7a] text-white border-[#002e7a]"
-                                    : "text-[#002e7a] border-[#d6d6d6] hover:bg-[#d4e3fe]"
-                            )}
-                        >
-                            50min
-                        </button>
+                        {([25, 50] as const).map((d) => (
+                            <button
+                                key={d}
+                                onClick={() => timerSetDuration(d)}
+                                className={cn(
+                                    "px-3 py-1 text-xs rounded-full border transition-all",
+                                    pomodoroDuration === d
+                                        ? "bg-[#002e7a] text-white border-[#002e7a]"
+                                        : "text-[#002e7a] border-[#d6d6d6] hover:bg-[#d4e3fe]"
+                                )}
+                            >
+                                {d}min
+                            </button>
+                        ))}
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -157,32 +109,28 @@ export function PomodoroCard({ className }: PomodoroCardProps) {
             {/* Timer Display */}
             <div className="text-center mb-4">
                 <motion.div
-                    className={cn(
-                        "text-4xl font-bold tabular-nums tracking-tight",
-                        mode === 'break' ? "text-[#002e7a]" : "text-[#002e7a]"
-                    )}
-                    animate={{ scale: isActive ? [1, 1.02, 1] : 1 }}
-                    transition={{ duration: 1, repeat: isActive ? Infinity : 0 }}
+                    className="text-4xl font-bold tabular-nums tracking-tight text-[#002e7a]"
+                    animate={{ scale: timerIsActive ? [1, 1.02, 1] : 1 }}
+                    transition={{ duration: 1, repeat: timerIsActive ? Infinity : 0 }}
                 >
-                    {formatTime(timeRemaining)}
+                    {formatTime(timerTimeRemaining)}
                 </motion.div>
 
                 <div className="text-xs text-[#002e7a]/60 mt-1 font-medium">
-                    {mode === 'focus'
-                        ? (focusDuration === 25 ? "+ 5min Break" : "+ 10min Break")
+                    {timerMode === 'focus'
+                        ? (pomodoroDuration === 25 ? "+ 5min Break" : "+ 10min Break")
                         : "Recharge"}
                 </div>
 
-                {/* Progress Ring */}
+                {/* Progress bar */}
                 <div className="relative w-full h-1.5 bg-[#d6d6d6]/50 rounded-full mt-4 overflow-hidden">
                     <motion.div
                         className={cn(
                             "absolute left-0 top-0 h-full",
-                            mode === 'focus'
+                            timerMode === 'focus'
                                 ? "bg-gradient-to-r from-[#002e7a] to-[#3385FF]"
                                 : "bg-gradient-to-r from-[#00C853] to-[#69F0AE]"
                         )}
-                        initial={{ width: 0 }}
                         animate={{ width: `${progress}%` }}
                         transition={{ duration: 0.3 }}
                     />
@@ -192,26 +140,20 @@ export function PomodoroCard({ className }: PomodoroCardProps) {
             {/* Controls */}
             <div className="flex items-center gap-2">
                 <Button
-                    variant={isActive ? "secondary" : "primary"}
+                    variant={timerIsActive ? "secondary" : "primary"}
                     className="flex-1 text-sm h-9"
-                    onClick={handleToggle}
+                    onClick={timerToggle}
                 >
-                    {isActive ? (
-                        <>
-                            <Pause className="w-3.5 h-3.5 mr-1.5" />
-                            Pause
-                        </>
+                    {timerIsActive ? (
+                        <><Pause className="w-3.5 h-3.5 mr-1.5" />Pause</>
                     ) : (
-                        <>
-                            <Play className="w-3.5 h-3.5 mr-1.5" />
-                            {timeRemaining === totalTime ? 'Start' : 'Resume'}
-                        </>
+                        <><Play className="w-3.5 h-3.5 mr-1.5" />{timerTimeRemaining === timerTotalTime ? 'Start' : 'Resume'}</>
                     )}
                 </Button>
                 <Button
                     variant="ghost"
                     className="px-3 h-9 text-[#002e7a] hover:bg-[#d4e3fe]"
-                    onClick={handleSkip}
+                    onClick={timerSkip}
                     title="Skip to next phase"
                 >
                     <SkipForward className="w-4 h-4" />
