@@ -62,7 +62,7 @@ export default function DownloadButton({ data, templateId }: DownloadButtonProps
                     ) : error ? (
                         'Fehler -- erneut versuchen'
                     ) : (
-                        <><Download className="w-4 h-4" /> PDF Herunterladen</>
+                        <><Download className="w-4 h-4" /> Download & Cover Letter</>
                     )}
                 </button>
             )}

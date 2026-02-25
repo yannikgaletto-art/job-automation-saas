@@ -198,41 +198,66 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     <h3 className="text-sm font-semibold text-[#37352F]">
                         Ergebnisse für <span className="text-[#002e7a]">{companyName}</span>
                     </h3>
-                    <p className="text-xs text-[#73726E] mt-0.5">
-                        Wähle einen Aufhänger für dein Anschreiben.
+                    <p className="text-xs text-[#73726E] mt-1 max-w-xl leading-relaxed">
+                        Damit wir aus der Masse herausstechen, empfehlen wir eine personalisierte Einleitung. Dazu analysierten wir die derzeitigen News des Unternehmens. Wähle eine aus, die du spannend findest.
                     </p>
                 </div>
                 <button
                     onClick={handleAnalyze}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium transition-colors border border-[#E7E7E5] text-[#73726E] hover:bg-gray-50"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium transition-colors border border-[#E7E7E5] text-[#73726E] hover:bg-gray-50 shrink-0"
                     title="Analyse wiederholen"
                 >
                     <RefreshCw className="w-3 h-3" /> Aktualisieren
                 </button>
             </div>
 
-            {/* Hook Cards */}
-            <div className="grid grid-cols-1 gap-2">
-                {setupData.hooks.map((hook) => (
-                    <HookCard
-                        key={hook.id}
-                        hook={hook}
-                        isSelected={selectedHook?.id === hook.id}
-                        onSelect={() => handleSelect(hook)}
-                    />
-                ))}
+            {/* Hook Cards — grouped by category */}
+            {(() => {
+                // Filter out 'quote' type — quotes are handled separately below
+                const filteredHooks = setupData.hooks.filter(h => h.type !== 'quote');
+                const groups: { label: string; icon: string; types: string[] }[] = [
+                    { label: 'News', icon: '📰', types: ['news'] },
+                    { label: 'Werte', icon: '✦', types: ['value'] },
+                    { label: 'Vision', icon: '🎯', types: ['vision'] },
+                    { label: 'Projekte', icon: '🚀', types: ['project'] },
+                    { label: 'Wachstum & Funding', icon: '📈', types: ['funding'] },
+                    { label: 'LinkedIn', icon: '🔗', types: ['linkedin'] },
+                    { label: 'Eigener Text', icon: '✏️', types: ['manual'] },
+                ];
 
-                {/* Manual text input */}
-                {selectedHook?.type === 'manual' && (
-                    <textarea
-                        value={manualText}
-                        onChange={(e) => handleManualChange(e.target.value)}
-                        placeholder="Beschreibe dein persönliches Interesse an der Stelle oder einem spezifischen Aspekt des Unternehmens..."
-                        rows={3}
-                        className="w-full text-xs text-[#37352F] border border-[#002e7a] rounded-lg p-3 resize-none outline-none focus:ring-1 focus:ring-[#002e7a] placeholder-[#A8A29E]"
-                    />
-                )}
-            </div>
+                return groups.map(group => {
+                    const groupHooks = filteredHooks.filter(h => group.types.includes(h.type));
+                    if (groupHooks.length === 0) return null;
+                    return (
+                        <div key={group.label} className="space-y-1.5">
+                            <h4 className="text-[11px] font-semibold text-[#73726E] uppercase tracking-wide mt-3">
+                                {group.icon} {group.label}
+                            </h4>
+                            <div className="grid grid-cols-1 gap-2">
+                                {groupHooks.map((hook) => (
+                                    <HookCard
+                                        key={hook.id}
+                                        hook={hook}
+                                        isSelected={selectedHook?.id === hook.id}
+                                        onSelect={() => handleSelect(hook)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    );
+                });
+            })()}
+
+            {/* Manual text input */}
+            {selectedHook?.type === 'manual' && (
+                <textarea
+                    value={manualText}
+                    onChange={(e) => handleManualChange(e.target.value)}
+                    placeholder="Beschreibe dein persönliches Interesse an der Stelle oder einem spezifischen Aspekt des Unternehmens..."
+                    rows={3}
+                    className="w-full text-xs text-[#37352F] border border-[#002e7a] rounded-lg p-3 resize-none outline-none focus:ring-1 focus:ring-[#002e7a] placeholder-[#A8A29E]"
+                />
+            )}
 
             {/* ─── Phase B: Quote Selection ──────────────────────── */}
             {canProceed && phase === 'results' && (
@@ -245,9 +270,9 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                         <div className="flex gap-2">
                             <Quote className="w-4 h-4 text-[#002e7a] shrink-0 mt-0.5" />
                             <div>
-                                <h4 className="text-xs font-semibold text-[#002e7a]">Optionales Zitat</h4>
+                                <h4 className="text-xs font-semibold text-[#002e7a]">Passendes Zitat</h4>
                                 <p className="text-xs text-[#37352F] leading-relaxed mt-1">
-                                    Um deiner Einleitung den letzten Schliff zu geben, empfehlen wir dir eines der drei passenden Zitate zu wählen. Damit setzt du dich selbst und das Unternehmen in Bezug.
+                                    Zudem empfehlen wir auch die Integration eines Zitats. Das kommt immer gut an :)
                                 </p>
                             </div>
                         </div>
