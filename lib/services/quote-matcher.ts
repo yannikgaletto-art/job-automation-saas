@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 
+
 // Initialize OpenAI client lazily to allow env vars to load first in tests
 let openaiClient: OpenAI | null = null;
 function getOpenAI() {
@@ -10,6 +11,7 @@ function getOpenAI() {
     }
     return openaiClient;
 }
+
 
 export interface QuoteSuggestion {
     quote: string;
@@ -22,6 +24,7 @@ export interface QuoteSuggestion {
     language: 'en' | 'de';
 }
 
+
 /**
  * Calculates cosine similarity between two vectors
  */
@@ -31,6 +34,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
     const magnitudeB = Math.sqrt(vecB.reduce((acc, val) => acc + val * val, 0));
     return dotProduct / (magnitudeA * magnitudeB);
 }
+
 
 /**
  * STEP 2: Score quotes using OpenAI embeddings
@@ -42,6 +46,7 @@ async function scoreQuoteRelevance(
 ): Promise<QuoteSuggestion[]> {
     if (quotes.length === 0 || companyValues.length === 0) return quotes;
 
+
     try {
         // 1. Generate embedding for company values (combined)
         const valuesText = companyValues.join(" ");
@@ -50,6 +55,7 @@ async function scoreQuoteRelevance(
             input: valuesText,
         });
         const valuesEmbedding = valuesEmbeddingResponse.data[0].embedding;
+
 
         // 2. Generate embeddings for each quote and calculate similarity
         const scoredQuotes = await Promise.all(
@@ -61,7 +67,9 @@ async function scoreQuoteRelevance(
                 });
                 const quoteEmbedding = quoteEmbeddingResponse.data[0].embedding;
 
+
                 const similarity = cosineSimilarity(valuesEmbedding, quoteEmbedding);
+
 
                 return {
                     ...quote,
@@ -70,8 +78,10 @@ async function scoreQuoteRelevance(
             })
         );
 
+
         // 3. Sort by match_score descending
         return scoredQuotes.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
+
 
     } catch (error) {
         console.error("Error scoring quotes:", error);
@@ -80,18 +90,37 @@ async function scoreQuoteRelevance(
     }
 }
 
+
 /**
  * STEP 1: Find quotes via Perplexity (with OpenAI fallback)
  */
 export async function suggestRelevantQuotes(
     companyName: string,
     companyValues: string[],
-    companyVision: string = ""
+    companyVision: string = "",
+    jobTitle: string = "",
+    jobField: string = ""
 ): Promise<QuoteSuggestion[]> {
-    const promptText = `Find exactly 5 high-quality, visionary quotes that thematically match the company "${companyName}".
+    // ✅ Context injection (SICHERHEITSARCHITEKTUR.md Section 11)
+    const jobContext = jobTitle
+        ? `\nStelle: ${jobTitle}${jobField ? `\nBranche/Kontext: ${jobField}` : ''}`
+        : '';
 
-Focus the quotes on their core values: ${JSON.stringify(companyValues)}
-${companyVision ? `and their vision: ${companyVision}` : ''}
+
+    const promptText = `Du suchst Zitate, Werte oder offizielle Statements von ${companyName},
+die DIREKT relevant sind für die Stelle "${jobTitle || 'diese Position'}".
+
+
+Kriterien:
+- Das Zitat/der Wert muss zum Tätigkeitsbereich der Stelle passen
+- Quelle MUSS von der offiziellen Unternehmenswebsite oder verifizierten Quellen stammen
+- NICHT: Generische Unternehmens-Statements ("wir sind innovativ")
+- JA: Spezifische Aussagen über Kultur, Rolle, Team, Wachstumsstrategie die zur Stelle passen
+
+
+Unternehmen: ${companyName}
+Kernwerte: ${JSON.stringify(companyValues)}${companyVision ? `\nVision: ${companyVision}` : ''}${jobContext}
+
 
 CRITICAL INSTRUCTIONS ON QUOTE SELECTION:
 1. You may include MAXIMUM ONE (1) quote from the CEO/Founder of ${companyName}.
@@ -100,7 +129,8 @@ CRITICAL INSTRUCTIONS ON QUOTE SELECTION:
 4. DO NOT select quotes about specific recent news events, stock prices, or funding rounds. Focus on timeless values and overarching visions.
 5. Support German language if the company values are in German, otherwise English.
 
-Return a strict JSON array matching this exact structure:
+
+Return exactly 5 quotes as a strict JSON array matching this exact structure:
 [
   {
     "quote": "The actual quote text",
@@ -113,7 +143,9 @@ Return a strict JSON array matching this exact structure:
   }
 ]`;
 
+
     let quotes: QuoteSuggestion[] = [];
+
 
     try {
         const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -134,6 +166,7 @@ Return a strict JSON array matching this exact structure:
             })
         });
 
+
         if (!response.ok) {
             console.warn(`Perplexity Quote API error: ${response.status}`);
             // Let the fallback handle it
@@ -141,7 +174,9 @@ Return a strict JSON array matching this exact structure:
             const data = await response.json();
             const content = data.choices[0]?.message?.content;
 
+
             const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/) || [null, content];
+
 
             try {
                 quotes = JSON.parse(jsonMatch[1] ? jsonMatch[1].trim() : content.trim());
@@ -152,6 +187,7 @@ Return a strict JSON array matching this exact structure:
     } catch (error) {
         console.error('Suggest Quotes Perplexity Error:', error);
     }
+
 
     // FALLBACK to OpenAI if Perplexity failed or returned no quotes
     if (!Array.isArray(quotes) || quotes.length === 0) {
@@ -168,9 +204,11 @@ Return a strict JSON array matching this exact structure:
                 temperature: 0.6,
             });
 
+
             const content = response.choices[0].message.content || '{"quotes":[]}';
             const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/) || [null, content];
             const parsed = JSON.parse(jsonMatch[1] ? jsonMatch[1].trim() : content.trim());
+
 
             // Handle both wrapped inside "quotes" key and direct array formats
             if (Array.isArray(parsed)) {
@@ -188,16 +226,20 @@ Return a strict JSON array matching this exact structure:
         }
     }
 
+
     if (!Array.isArray(quotes) || quotes.length === 0) {
         console.warn("❌ Both AI engines failed to return quotes.");
         return [];
     }
 
+
     // Validate structure briefly
     quotes = quotes.filter(q => q.quote && q.matched_value);
 
+
     // Step 2: Score them with embeddings for double-verification
     const scored = await scoreQuoteRelevance(quotes, companyValues);
+
 
     // Return top 5
     return scored.slice(0, 5);

@@ -23,26 +23,32 @@ export default function JobQueuePage() {
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
+    // ✅ Canonical UI Status mapping (SICHERHEITSARCHITEKTUR.md Section 9)
     const mapDbStatusToUi = (dbStatus: string): Job['status'] => {
         switch (dbStatus.toLowerCase()) {
             case 'pending': return 'NEW';
             case 'processing': return 'JOB_REVIEWED';
-            case 'ready_for_review': return 'CV_OPTIMIZED';
-            case 'ready_to_apply': return 'CL_GENERATED';
-            case 'submitted': return 'READY';
+            case 'steckbrief_confirmed': return 'JOB_REVIEWED';
+            case 'cv_match_done': return 'CV_OPTIMIZED';
+            case 'cv_optimized': return 'CV_OPTIMIZED';
+            case 'cover_letter_done': return 'CL_GENERATED';
+            case 'ready_for_review': return 'CL_GENERATED';
+            case 'ready_to_apply': return 'READY';
             default: return 'NEW';
         }
     };
 
+    // ✅ Canonical Stepper % mapping (SICHERHEITSARCHITEKTUR.md Section 9)
     const mapDbStatusToStep = (dbStatus: string): number => {
         switch (dbStatus.toLowerCase()) {
             case 'pending': return 0;
-            case 'processing': return 1;
-            case 'ready_for_review': return 2;
-            case 'cv_matched': return 2;
-            case 'cv_optimized': return 3;
-            case 'ready_to_apply': return 4;
-            case 'submitted': return 4;
+            case 'processing': return 10;
+            case 'steckbrief_confirmed': return 30;
+            case 'cv_match_done': return 30;
+            case 'cv_optimized': return 60;
+            case 'cover_letter_done': return 100;
+            case 'ready_for_review': return 100;
+            case 'ready_to_apply': return 100;
             default: return 0;
         }
     };
@@ -107,7 +113,7 @@ export default function JobQueuePage() {
                 body: JSON.stringify({ jobId }),
             });
             setJobs(prev => prev.map(j =>
-                j.id === jobId ? { ...j, status: 'JOB_REVIEWED', workflowStep: 1 } : j
+                j.id === jobId ? { ...j, status: 'JOB_REVIEWED', workflowStep: 10 } : j
             ));
             showSafeToast('Steckbrief bestätigt → CV Match freigeschaltet', `confirm_success:${jobId}`);
         } catch {
@@ -148,7 +154,7 @@ export default function JobQueuePage() {
             const result = await response.json();
             setOptimizationResult(result);
             setShowOptimization(true);
-            setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'CV_OPTIMIZED', workflowStep: 3 } : j));
+            setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'CV_OPTIMIZED', workflowStep: 60 } : j));
             showSafeToast('CV optimiert', `cv_optimized:${jobId}`);
         } catch (error) {
             showSafeToast('Optimierung fehlgeschlagen', `cv_optimize_error:${jobId}`, 'error', error instanceof Error ? error.message : 'Bitte erneut versuchen');
@@ -219,7 +225,7 @@ export default function JobQueuePage() {
                             optimizationResult={optimizationResult}
                             onAcceptAll={async () => { setShowOptimization(false); showSafeToast('\u00c4nderungen übernommen', `cv_accepted:${currentJobId}`); }}
                             onRejectAll={() => setShowOptimization(false)}
-                            onDownload={async () => { showSafeToast('PDF Download noch nicht implementiert', 'pdf_download', 'info'); }}
+                            onDownload={async () => { window.open(`/api/cv/download?jobId=${currentJobId}&type=cv`, '_blank'); }}
                         />
                     )}
                 </div>
