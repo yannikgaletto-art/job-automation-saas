@@ -31,16 +31,18 @@ export async function POST(request: NextRequest) {
 
         console.log(`[${requestId}] step=complete iterations=${result.iterations} score=${result.finalScores?.overall_score ?? 'N/A'} cost=${result.costCents}¢`);
 
-        // Store result + setup_context as audit trail
+        // ─── B1.4: Auto-Save as Draft ─────────────────────────────────────────
+        // Contract 2 (Document Storage Safety): Write → Read-Back → Validate
         const supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
-        const { error: insertError } = await supabase.from('documents').insert({
+        const { data: insertData, error: insertError } = await supabase.from('documents').insert({
             user_id: userId,
             document_type: 'cover_letter',
             metadata: {
+                status: 'draft', // B1.4: Every generated CL starts as draft
                 job_id: jobId,
                 generated_content: result.coverLetter,
                 quality_scores: result.finalScores,
@@ -48,22 +50,44 @@ export async function POST(request: NextRequest) {
                 iterations: result.iterations,
                 setup_context: setupContext ?? null,
                 cost_cents: result.costCents,
+                fluff_warning: result.fluffWarning ?? false,
             },
             pii_encrypted: {}
-        });
+        }).select('id').single();
+
+        let draftId: string | null = null;
 
         if (insertError) {
-            console.error(`[${requestId}] ❌ Failed to save cover letter: ${insertError.message}`);
+            console.error(`[${requestId}] ❌ Failed to save cover letter draft: ${insertError.message}`);
+        } else {
+            draftId = insertData?.id ?? null;
+
+            // Read-Back Verification (Contract 2: Double-Assurance)
+            if (draftId) {
+                const { data: readBack } = await supabase
+                    .from('documents')
+                    .select('id, metadata')
+                    .eq('id', draftId)
+                    .single();
+
+                if (!readBack || readBack.metadata?.status !== 'draft') {
+                    console.error(`[${requestId}] ❌ Read-back verification FAILED for draft ${draftId}`);
+                } else {
+                    console.log(`[${requestId}] ✅ Draft saved and verified: ${draftId}`);
+                }
+            }
         }
 
         return NextResponse.json({
             success: true,
             requestId,
+            draft_id: draftId, // B1.4: Frontend can reference this draft
             cover_letter: result.coverLetter,
             quality_scores: result.finalScores,
             validation: result.finalValidation,
             iterations: result.iterations,
             iteration_log: result.iterationLog,
+            fluff_warning: result.fluffWarning ?? false,
         });
 
     } catch (error: unknown) {

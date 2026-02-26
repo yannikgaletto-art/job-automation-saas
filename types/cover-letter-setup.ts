@@ -2,7 +2,7 @@
 // Dieser Typ-Vertrag verbindet UI-Wizard mit buildSystemPrompt() in Phase 2.
 
 export type HookType = 'news' | 'value' | 'quote' | 'linkedin' | 'manual' | 'vision' | 'project' | 'funding';
-export type TonePreset = 'data-driven' | 'storytelling' | 'formal';
+export type TonePreset = 'data-driven' | 'storytelling' | 'formal' | 'philosophisch';
 export type TargetLanguage = 'de' | 'en';
 
 // ─── Step A Output ────────────────────────────────────────────────
@@ -58,6 +58,7 @@ export interface CoverLetterSetupContext {
     tone: ToneConfig;
     autoFilled: boolean;               // Wurde Auto-Fill verwendet?
     completedAt: string;               // ISO Timestamp
+    enablePingPong?: boolean;          // B1.3: Ping-Pong Modus (default: false, UI in Batch 2)
 }
 
 // ─── API Response Shape ───────────────────────────────────────────

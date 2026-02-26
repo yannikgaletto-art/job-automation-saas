@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { validateCoverLetter, logValidation } from './cover-letter-validator';
 import { enrichCompany, linkEnrichmentToJob } from './company-enrichment';
 import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
+import type { StyleAnalysis } from './writing-style-analyzer';
+import { scanForFluff, buildBlacklistPromptSection } from './anti-fluff-blacklist';
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
@@ -41,12 +43,8 @@ interface CompanyResearchData {
     tech_stack?: string[];
     [key: string]: unknown;
 }
-interface StyleAnalysis {
-    tone?: string;
-    avg_sentence_length?: number;
-    summary?: string;
-    [key: string]: unknown;
-}
+// StyleAnalysis is imported from writing-style-analyzer.ts
+// Canonical interface: { tone, sentence_length, conjunctions, greeting, rhetorical_devices, forbidden_constructs }
 interface JudgeResult {
     scores: {
         naturalness: number;
@@ -94,6 +92,7 @@ export interface CoverLetterResult {
         timestamp: string;
     }>;
     costCents: number;
+    fluffWarning?: boolean; // True if blacklist patterns persisted after re-gen attempts
 }
 
 const MAX_ITERATIONS = 3;
@@ -353,9 +352,67 @@ export async function generateCoverLetter(params: CoverLetterGenerationParams): 
         }
     }
 
-    // Cost tracking: Sonnet ~$0.025/call, Haiku ~$0.003/call
+    // ─── Post-Generation Fluff Scan (B1.2) ───────────────────────────────
+    let fluffWarning = false;
+    const MAX_FLUFF_RETRIES = 2;
+    let fluffRetries = 0;
+
+    const fluffScan = scanForFluff(coverLetter);
+    if (fluffScan.found && coverLetter.length > 0) {
+        console.warn(`⚠️ [Anti-Fluff] ${fluffScan.matches.length} patterns found in final CL. Starting re-gen loop (max ${MAX_FLUFF_RETRIES})...`);
+
+        while (fluffRetries < MAX_FLUFF_RETRIES) {
+            fluffRetries++;
+            console.log(`🛠️ [Anti-Fluff] Re-gen attempt ${fluffRetries}/${MAX_FLUFF_RETRIES}...`);
+
+            const fluffFeedback = fluffScan.matches.map(m => `BLACKLIST-TREFFER: "${m.pattern}" — Ersetze durch konkrete, belegbare Aussage aus dem User-Profil.`);
+
+            const fixPrompt = `Du bist ein Senior-Karriereberater. Das folgende Anschreiben enthält generische KI-Phrasen die erkannt wurden.
+
+AKTUELLES ANSCHREIBEN:
+---
+${coverLetter}
+---
+
+ERKANNTE PROBLEME:
+${fluffFeedback.join('\n')}
+
+AUFGABE: Ersetze ALLE markierten Passagen durch konkrete, belegbare Aussagen. Behalte Struktur und Länge bei.
+GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, keine Kommentare.`;
+
+            try {
+                const fixMessage = await anthropic.messages.create({
+                    model: 'claude-sonnet-4-5',
+                    max_tokens: 2000,
+                    temperature: 0.5,
+                    messages: [{ role: 'user', content: fixPrompt }]
+                });
+
+                const fixedText = fixMessage.content[0].type === 'text' ? fixMessage.content[0].text.trim() : coverLetter;
+                const reScan = scanForFluff(fixedText);
+
+                if (!reScan.found) {
+                    console.log(`✅ [Anti-Fluff] Clean after ${fluffRetries} re-gen(s).`);
+                    coverLetter = fixedText;
+                    break;
+                } else {
+                    coverLetter = fixedText; // Use improved version even if not perfect
+                    if (fluffRetries >= MAX_FLUFF_RETRIES) {
+                        console.warn(`⚠️ [Anti-Fluff] Max retries reached. ${reScan.matches.length} patterns remain. Setting fluffWarning.`);
+                        fluffWarning = true;
+                    }
+                }
+            } catch (fluffErr) {
+                console.error('❌ [Anti-Fluff] Re-gen failed:', fluffErr);
+                fluffWarning = true;
+                break;
+            }
+        }
+    }
+
+    // Cost tracking: Sonnet ~$0.025/call, Haiku ~$0.003/call, Fluff re-gen ~$0.025/call
     const judgeCallCount = iterationLog.filter(l => l.validation.isValid).length;
-    const costCents = iterationLog.length * 2.5 + judgeCallCount * 0.3;
+    const costCents = iterationLog.length * 2.5 + judgeCallCount * 0.3 + fluffRetries * 2.5;
 
     return {
         coverLetter,
@@ -364,6 +421,7 @@ export async function generateCoverLetter(params: CoverLetterGenerationParams): 
         iterations: iterationLog.length,
         iterationLog,
         costCents,
+        fluffWarning,
     };
 }
 
@@ -380,7 +438,24 @@ function buildSystemPrompt(
     const lang = ctx?.tone.targetLanguage === 'en' ? 'English' : 'Deutsch';
     const companyName = job?.company_name || ctx?.companyName || 'das Unternehmen';
     const jobTitle = job?.job_title || 'die ausgeschriebene Stelle';
-    const contactPersonGreeting = ctx?.tone.contactPerson ? `"Sehr geehrte/r ${ctx.tone.contactPerson}," (bzw. auf Englisch übersetzt)` : `"Sehr geehrte Damen und Herren," oder "Dear Hiring Team,"`;
+
+    // ─── B1.6: Ansprechperson-Binding (Cascading Fallback) ────────────────────
+    // Priority: 1. contactPerson → 2. userStyle.greeting → 3. formal default
+    let contactPersonGreeting: string;
+    if (ctx?.tone.contactPerson) {
+        const name = ctx.tone.contactPerson.trim();
+        if (lang === 'English') {
+            contactPersonGreeting = `"Dear ${name},"`;
+        } else {
+            contactPersonGreeting = `"Liebe/r ${name}," (nutze die wahrscheinlich korrekte Anrede, z.B. "Lieber Max," oder "Liebe Anna,")`;
+        }
+    } else if (style?.greeting && style.greeting !== 'Sehr geehrte Damen und Herren') {
+        contactPersonGreeting = `"${style.greeting}"`;
+    } else {
+        contactPersonGreeting = lang === 'English'
+            ? `"Dear Hiring Team,"`
+            : `"Sehr geehrte Damen und Herren,"`;
+    }
 
     // ─── CV Input (CV-Optimizer-Priorität) ────────────────────────────────────
     const cvInput = job?.cv_optimization_user_decisions?.appliedChanges
@@ -397,32 +472,80 @@ ${JSON.stringify(profile?.cv_structured_data || {}, null, 2)}`
         : `KANDIDATEN-LEBENSLAUF:
 ${JSON.stringify(profile?.cv_structured_data || {}, null, 2)}`;
 
-    // ─── Tone Instructions ────────────────────────────────────────────────────
+    // ─── Tone Instructions (B1.5: Jeder Stil verändert GESAMTE Prompt-Struktur) ─
     const toneInstructions: Record<string, string> = {
-        'data-driven': `Schreibe datengetrieben und präzise.
-- Nutze konkrete Zahlen, Prozentsätze und messbare Resultate wo möglich
+        'data-driven': `STIL: DATENGETRIEBEN & PRÄZISE
+ÖFFNUNG: Starte mit einem konkreten, quantifizierbaren Fakt über das Unternehmen ODER einem eigenen messbaren Ergebnis. Kein allgemeines Statement.
+ABSATZ-STRUKTUR: Jeder Hauptabsatz folgt dem Schema: Claim → Beweis (Zahl/KPI/Ergebnis) → Implikation für den neuen Arbeitgeber.
+BEWEISFÜHRUNG:
+- Nutze konkrete Zahlen, Prozentsätze und messbare Resultate in JEDEM Absatz
 - Struktur pro Achievement: "Ich habe [X] durch [Y] erreicht, was [Z] bewirkte"
-- Aktive Verben: implementiert, gesteigert, reduziert, aufgebaut, verantwortet
-- Keine vagen Formulierungen wie "sehr erfolgreich" — immer quantifizieren`,
-        'storytelling': `Schreibe als Erzähler, nicht als Aufzähler.
-- Pro Station: Situation (1 Satz) → Handlung (1 Satz) → Ergebnis (1 Satz)
-- Verbinde die Stationen zu einem kohärenten Karriere-Narrativ
-- Das "Warum" ist wichtiger als das "Was"
-- Erlaube 1 persönliche Aussage zur Motivation`,
-        'formal': `Schreibe klassisch-formell.
+- Aktive Verben: implementiert, gesteigert, reduziert, aufgebaut, verantwortet, optimiert
+- Keine vagen Formulierungen wie "sehr erfolgreich" — immer quantifizieren
+- Mindestens 3 konkrete Zahlen im gesamten Anschreiben
+SCHLUSS: Konkreter Mehrwert in einem Satz mit Zahl (z.B. "Ich bringe 5 Jahre Erfahrung in X mit, die Ihre Y-Strategie um Z beschleunigen können.").
+VERBOTEN: Adjektive ohne Beleg, Superlative ohne Beweis, "leidenschaftlich", "motiviert", "engagiert" ohne konkretes Beispiel.`,
+
+        'storytelling': `STIL: NARRATIV & PERSÖNLICH
+ÖFFNUNG: Beginne mit einer kurzen persönlichen Situation oder einem Schlüsselmoment deiner Karriere (max. 2 Sätze). Kein "Es war einmal", sondern ein konkreter Moment: "Als ich bei [Firma] zum ersten Mal [Situation erlebte], wusste ich..."
+ABSATZ-STRUKTUR: Jede CV-Station wird als Mini-Geschichte erzählt:
+- Situation (1 Satz): Was war der Kontext/die Herausforderung?
+- Handlung (1 Satz): Was hast du konkret getan?
+- Ergebnis (1 Satz): Was kam dabei heraus — und was hat es dir beigebracht?
+DRAMATURGIE:
+- Verbinde die Stationen zu einem kohärenten Karriere-Narrativ: Jede Station baut auf der vorherigen auf
+- Das "Warum" ist wichtiger als das "Was" — zeige Motivation und Entwicklung
+- Erlaube 1-2 persönliche Aussagen zur Motivation (aber kein Pathos)
+- Nutze Zeitwörter: "Zunächst", "Später erkannte ich", "Heute weiß ich"
+- Die rote Linie: Alle Absätze führen logisch zur Bewerbung bei DIESER Firma
+SCHLUSS: Schließe den Bogen zum Opening-Moment. Zeige, wie der Karriereweg logisch zu dieser Stelle führt.
+VERBOTEN: Aufzählungen, Bullet-Points-Stil, trockene Fakten ohne Kontext, "Mein Werdegang zeigt..."`,
+
+        'formal': `STIL: KLASSISCH-FORMELL
+ÖFFNUNG: Direkte, höfliche Bezugnahme auf die Stelle. Keine Überraschungen, kein Storytelling. Sachlich und präzise. (z.B. "Die ausgeschriebene Position als [Titel] bei [Firma] verbindet [Kompetenzfeld A] mit [Kompetenzfeld B] — eine Schnittstelle, die meine bisherige Laufbahn durchzieht.")
+ABSATZ-STRUKTUR: Konservative 4-Absatz-Struktur:
+1. Einstieg + Motivation (2-3 Sätze)
+2. Fachliche Qualifikation mit Belegen (3-4 Sätze)
+3. Unternehmens-Passung + kulturelle Verbindung (2-3 Sätze)
+4. Souveräner Abschluss (1-2 Sätze)
+TONALITÄT:
 - Vollständige Formulierungen, keine Kontraktionen
-- Passiv vermeiden, aber formelle Anrede beibehalten
+- Passiv vermeiden, aber formelle Anrede konsequent beibehalten (Sie, Ihnen, Ihr)
 - Keine Ausrufezeichen, keine rhetorischen Fragen
-- Konservative Struktur: Einstieg → Qualifikation → Motivation → Abschluss`,
+- Konjunktiv I für höfliche Formulierungen erlaubt
+- Seriöse Übergänge: "Darüber hinaus", "In gleicher Weise", "Vor diesem Hintergrund"
+SCHLUSS: Souverän auf Augenhöhe, kein Betteln. "Ich freue mich auf ein Gespräch, in dem wir [konkretes Thema] vertiefen können."
+VERBOTEN: Umgangssprache, Emojis, Interjektionen, "Ich brenne für", persönliche Anekdoten.`,
+
+        'philosophisch': `STIL: INTELLEKTUELL & KONZEPTIONELL
+ÖFFNUNG: Starte mit einem relevanten Zitat, einer Beobachtung oder einem Konzept, das die Brücke zwischen deiner Weltsicht und dem Unternehmen schlägt. (z.B. "Peter Drucker sagte einmal: ‚Die beste Art, die Zukunft vorauszusagen, ist sie zu gestalten.' — Ein Gedanke, der meine Arbeit bei [Firma] geprägt hat und den ich bei [Ziel-Firma] vertiefen möchte.")
+ABSATZ-STRUKTUR: Konzept → Beweis → Reflexion
+- Jeder Absatz beginnt mit einer These oder Beobachtung
+- Dann folgt der konkrete Beweis aus der eigenen Karriere
+- Abschluss: Kurze Reflexion, was das für die Zielposition bedeutet
+INTELLEKTUELLER RAHMEN:
+- Zeige Denktiefe: "Wie" und "Warum" statt nur "Was"
+- Erlaube 1 Zitat (vom User gewählt oder aus dem Kontext passend)
+- Verbinde branchenspezifische Trends mit persönlicher Erfahrung
+- Nutze Analogien und Querverweise: "Wie in der [Disziplin/Branche], zeigt sich auch hier..."
+- Die konzeptionelle Ebene zeigt Senioritität und strategisches Denken
+SCHLUSS: Schließe mit einer Vision oder einem Ausblick, der zeigt, wie du die Unternehmens-Mission mitgestalten willst. Kein Betteln, sondern intellektuelle Neugier.
+VERBOTEN: Oberflächliche Name-Dropping von Philosophen ohne Bezug, Arroganz, akademischer Jargon, mehr als 1 Zitat.`,
     };
     const activeTone = toneInstructions[ctx?.tone.preset ?? 'formal'];
 
-    // ─── Style Sample ─────────────────────────────────────────────────────────
+    // ─── Style Sample (B1.1: Alle 6 Marker aus StyleAnalysis) ─────────────────
     const styleSection = style
         ? `SCHREIBSTIL-VORBILD (aus bisherigen Anschreiben des Users):
 Ton: ${style.tone || 'nicht analysiert'}
-Ø Satzlänge: ${style.avg_sentence_length || '?'} Wörter
-Kalibriere deinen Output auf dieses Muster — übernimm den Stil, nicht den Inhalt.`
+Satzlänge: ${style.sentence_length || 'medium'}
+Bevorzugte Konjunktionen: ${(style.conjunctions || []).join(', ') || 'Daher, Deshalb, Zudem'}
+Bevorzugte Begrüßung: ${style.greeting || 'Sehr geehrte Damen und Herren'}
+${(style.rhetorical_devices || []).length > 0 ? `Rhetorische Mittel: ${style.rhetorical_devices.join(', ')}` : ''}
+${(style.forbidden_constructs || []).length > 0 ? `VERBOTEN (User nutzt diese NIE): ${style.forbidden_constructs.join(', ')}` : ''}
+
+Kalibriere deinen Output auf dieses Muster — übernimm den Stil, nicht den Inhalt.
+Nutze die extrahierten Konjunktionen statt generischer Übergänge.`
         : '';
 
     // ─── Stations Section ─────────────────────────────────────────────────────
@@ -438,21 +561,38 @@ Station ${s.stationIndex}: ${s.role} @ ${s.company} (${s.period})
   → Zeige im Text: ${s.intent}`).join('\n')
         : 'Nutze die relevantesten Erfahrungen aus dem CV und beweise damit deinen Wert für das Unternehmen.';
 
-    // ─── Hook Section ─────────────────────────────────────────────────────────
+    // ─── Hook Section (B1.3: Zitat-System repariert) ─────────────────────────
     let hookSection = '';
     if (ctx?.selectedQuote) {
+        const enablePingPong = ctx?.enablePingPong ?? false;
+
         hookSection = `[REGEL: EINLEITUNG - ZITAT-BRIDGING]:
 Gewähltes Zitat: "${ctx.selectedQuote.quote}"
 (Autor: ${ctx.selectedQuote.author})
 ${ctx.selectedHook?.content ? `Zusätzlicher Unternehmens-Fakt: "${ctx.selectedHook.content}"` : ''}
-→ Beginne das Anschreiben zwingend mit dem ausgewählten Zitat. Leite das Zitat jedoch mit einer menschlichen Beobachtung ein (z.B. 'Beim Lesen Ihrer Website musste ich an ein Zitat von ${ctx.selectedQuote.author} denken...'). WICHTIG: Nach dem Zitat MUSST du in einem eigenen Satz eine Brücke bauen, wie dieses Zitat zu einer konkreten Erfahrung aus dem CV des Kandidaten passt (z.B. 'Dieser Gedanke begleitete mich bereits in meiner Rolle als...'). Keine leeren Floskeln wie 'Genau diese Haltung treibt mich an'.`
+
+FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
+- Leite das Zitat mit einer menschlichen Beobachtung ein (z.B. "Beim Lesen Ihrer Website dachte ich an ${ctx.selectedQuote.author}...").
+- Das Zitat MUSS auf einer EIGENEN Zeile stehen, in Anführungszeichen, gefolgt vom Autor:
+
+  [Einleitender Satz]
+
+  "${ctx.selectedQuote.quote}"
+  - ${ctx.selectedQuote.author}
+
+  [Begründungssatz]
+
+- DIREKT NACH dem Zitat: Ein EIGENER Begründungssatz (1 Satz), der erklärt WARUM dieses Zitat zum Unternehmen UND zum Kandidaten passt.
+- Der Begründungssatz MUSS eine konkrete Brücke zu einer Erfahrung aus dem CV bauen (z.B. 'Diesen Gedanken habe ich bei meiner Arbeit als [Rolle] bei [Firma] täglich gelebt, als ich [konkretes Beispiel]...').
+- KEINE leeren Floskeln wie 'Genau diese Haltung treibt mich an'.
+${enablePingPong ? '- PING-PONG (aktiv): Nach der Zitat-Brücke, füge einen kurzen Satz hinzu der eine kritische Gegenposition aufwirft. Dies zeigt intellektuelle Reife.' : ''}`;
     } else if (ctx?.selectedHook?.content) {
         hookSection = `[REGEL: EINLEITUNG]:
 Unternehmens-Fakt: "${ctx.selectedHook.content}"
 (Typ: ${ctx.selectedHook.type}, Quelle: ${ctx.selectedHook.sourceName})
-→ Integriere diesen Aufhänger NATÜRLICH in den ersten Satz
-→ NIEMALS die Quelle direkt nennen (z.B. "Wie auf Ihrer Website gelesen..." ist VERBOTEN)
-→ MAXIMAL 2 SÄTZE für den Aufhänger. Verknüpfe ihn mit deiner Motivation für die Stelle`
+-> Integriere diesen Aufhänger NATÜRLICH in den ersten Satz
+-> NIEMALS die Quelle direkt nennen (z.B. "Wie auf Ihrer Website gelesen..." ist VERBOTEN)
+-> MAXIMAL 2 SÄTZE für den Aufhänger. Verknüpfe ihn mit deiner Motivation für die Stelle`;
     }
 
     // ─── Word-Count Feedback ──────────────────────────────────────────────────
@@ -514,18 +654,7 @@ ${activeTone}
 
 ${styleSection}
 
-VERBOTENE PHRASEN (HARD RULES — niemals verwenden):
-- "Hiermit bewerbe ich mich..." (Verboten!)
-- "auf LinkedIn gefunden"
-- "laut meiner Recherche"
-- "wie ich bei Google sah"
-- "durch künstliche Intelligenz"
-- "meine Analyse ergab"
-- "Ich freue mich sehr darauf, meine Fähigkeiten einzubringen"
-- "Ich bin überzeugt, dass ich ideal zu Ihrem Team passe"
-- "Mit großer Begeisterung bewerbe ich mich"
-- "In der heutigen schnelllebigen Welt..." (und ähnliche Floskeln)
-- "meine Leidenschaft für [beliebiges Thema]"
+${buildBlacklistPromptSection()}
 
 === SEKTION 5: ABSCHLUSS & CALL TO ACTION ===
 [REGEL: SCHLUSSTEIL]
@@ -563,9 +692,10 @@ async function judgeCoverLetter(
     const companyName = job?.company_name || 'das Unternehmen';
 
     const toneRubric: Record<string, string> = {
-        'data-driven': 'Enthält Zahlen/KPIs/messbare Resultate? Aktive Verben? Keine vagen Phrasen?',
-        'storytelling': 'Gibt es eine kurze Erzählstruktur (Situation→Handlung→Ergebnis)? Kohärentes Narrativ?',
-        'formal': 'Klassische Struktur? Vollständige Formulierungen? Kein umgangssprachlicher Ton?'
+        'data-driven': 'Enthält Zahlen/KPIs/messbare Resultate in jedem Absatz? Claim-Beweis-Implikation Struktur? Aktive Verben?',
+        'storytelling': 'Erzählstruktur (Situation-Handlung-Ergebnis)? Kohärentes Karriere-Narrativ? Persönliche Momente? Roter Faden?',
+        'formal': 'Klassische 4-Absatz-Struktur? Vollständige Formulierungen? Kein umgangssprachlicher Ton? Seriöse Übergänge?',
+        'philosophisch': 'Intellektueller Rahmen? Konzept-Beweis-Reflexion? Max. 1 Zitat? Strategische Denktiefe sichtbar?'
     };
 
     const judgePrompt = `Du bist ein strenger Anschreiben-Qualitätsprüfer. Sei ehrlich und kritisch.

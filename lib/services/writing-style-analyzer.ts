@@ -5,15 +5,17 @@ const anthropic = new Anthropic({
 });
 
 export interface StyleAnalysis {
-    tone: 'professional' | 'enthusiastic' | 'technical' | 'conversational';
+    tone: 'professional' | 'enthusiastic' | 'technical' | 'conversational' | 'storytelling' | 'philosophical';
     sentence_length: 'short' | 'medium' | 'long'; // avg 10-15 / 16-25 / 26+ words
     conjunctions: string[]; // Top 5 most used (e.g., ["Daher", "Deshalb", "Gleichzeitig"])
     greeting: string; // e.g., "Sehr geehrte Damen und Herren" or "Hallo [Name]"
+    rhetorical_devices: string[]; // e.g., ["quote", "anecdote", "rhetorical_question"]
+    forbidden_constructs: string[]; // Constructs the user never uses
 }
 
 /**
  * Analyze writing style from cover letter text
- * Uses Claude Haiku for fast, cheap extraction
+ * Uses Claude Haiku for fast, cheap extraction of 6 style markers
  */
 export async function analyzeWritingStyle(
     coverLetterText: string
@@ -35,21 +37,23 @@ export async function analyzeWritingStyle(
 
         const message = await anthropic.messages.create({
             model: 'claude-3-haiku-20240307',
-            max_tokens: 512,
+            max_tokens: 768,
             temperature: 0,
             system: `You are a writing style analyzer. Extract style patterns from cover letters.
-Return ONLY valid JSON with these 4 keys:
-- tone: "professional" | "enthusiastic" | "technical" | "conversational"
-- sentence_length: "short" | "medium" | "long"
-- conjunctions: array of top 5 conjunctions used (German: Daher, Deshalb, etc.)
-- greeting: the exact greeting used (e.g., "Sehr geehrte Damen und Herren")`,
+Return ONLY valid JSON with these 6 keys:
+- tone: "professional" | "enthusiastic" | "technical" | "conversational" | "storytelling" | "philosophical"
+- sentence_length: "short" | "medium" | "long" (avg 10-15 / 16-25 / 26+ words)
+- conjunctions: array of top 5 conjunctions/transition words used (German examples: Daher, Deshalb, Zudem, Gleichzeitig, Außerdem)
+- greeting: the exact greeting used (e.g., "Sehr geehrte Damen und Herren" or "Liebe Anna")
+- rhetorical_devices: array of rhetorical devices found (from: "quote", "anecdote", "rhetorical_question", "metaphor", "enumeration", "contrast", "personal_story", "data_reference")
+- forbidden_constructs: array of writing patterns the author deliberately avoids (e.g., "passive_voice", "exclamation_marks", "generic_openings", "buzzword_lists"). If you cannot determine this, return an empty array.`,
             messages: [{
                 role: 'user',
-                content: `Analyze the writing style of this cover letter:
+                content: `Analyze the writing style of this cover letter thoroughly:
 
 ${textToAnalyze}
 
-Return JSON with: tone, sentence_length, conjunctions, greeting`
+Return JSON with: tone, sentence_length, conjunctions, greeting, rhetorical_devices, forbidden_constructs`
             }]
         });
 
@@ -60,12 +64,22 @@ Return JSON with: tone, sentence_length, conjunctions, greeting`
             if (jsonMatch) {
                 const analysis = JSON.parse(jsonMatch[0]);
 
-                // Validate structure (basic check)
+                // Validate structure (basic check — must have at least the 4 core fields)
                 if (analysis.tone && analysis.sentence_length &&
                     Array.isArray(analysis.conjunctions) && analysis.greeting) {
 
-                    console.log(`📊 Style analysis: ${analysis.tone}, ${analysis.sentence_length} sentences`);
-                    return analysis as StyleAnalysis;
+                    // Ensure new fields exist with defaults
+                    const result: StyleAnalysis = {
+                        tone: analysis.tone,
+                        sentence_length: analysis.sentence_length,
+                        conjunctions: analysis.conjunctions,
+                        greeting: analysis.greeting,
+                        rhetorical_devices: Array.isArray(analysis.rhetorical_devices) ? analysis.rhetorical_devices : [],
+                        forbidden_constructs: Array.isArray(analysis.forbidden_constructs) ? analysis.forbidden_constructs : [],
+                    };
+
+                    console.log(`📊 Style analysis: ${result.tone}, ${result.sentence_length} sentences, ${result.rhetorical_devices.length} devices, ${result.forbidden_constructs.length} forbidden`);
+                    return result;
                 }
             }
         }
@@ -86,6 +100,8 @@ export function getDefaultStyleAnalysis(): StyleAnalysis {
         tone: 'professional',
         sentence_length: 'medium',
         conjunctions: ['Daher', 'Deshalb', 'Zudem', 'Außerdem', 'Gleichzeitig'],
-        greeting: 'Sehr geehrte Damen und Herren'
+        greeting: 'Sehr geehrte Damen und Herren',
+        rhetorical_devices: [],
+        forbidden_constructs: [],
     };
 }

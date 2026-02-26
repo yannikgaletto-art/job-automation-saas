@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { BLACKLIST_PATTERNS } from './anti-fluff-blacklist';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,37 +51,16 @@ export function validateCoverLetter(
         warnings.push(`Company name only mentioned once (recommend: 2-3 times)`);
     }
 
-    // 3. FORBIDDEN PHRASES CHECK
-    const forbiddenPhrases = [
-        {
-            phrase: "auf LinkedIn gefunden",
-            reason: "Reveals scraping source (unprofessional)"
-        },
-        {
-            phrase: "laut meiner Recherche",
-            reason: "Sounds robotic/AI-generated"
-        },
-        {
-            phrase: "wie ich bei Google sah",
-            reason: "Reveals research method (unprofessional)"
-        },
-        {
-            phrase: "durch künstliche Intelligenz",
-            reason: "Never mention AI usage"
-        },
-        {
-            phrase: "meine Analyse ergab",
-            reason: "Too formal/robotic tone"
-        }
-    ];
-
+    // 3. FORBIDDEN PHRASES CHECK (centralized via BLACKLIST_PATTERNS)
     let forbiddenCount = 0;
-    forbiddenPhrases.forEach(({ phrase, reason }) => {
-        if (coverLetter.toLowerCase().includes(phrase.toLowerCase())) {
-            errors.push(`Forbidden phrase detected: "${phrase}" - ${reason}`);
+    const lowerText = coverLetter.toLowerCase();
+
+    for (const { pattern, reason } of BLACKLIST_PATTERNS) {
+        if (lowerText.includes(pattern.toLowerCase())) {
+            errors.push(`Forbidden phrase detected: "${pattern}" - ${reason}`);
             forbiddenCount++;
         }
-    });
+    }
 
     // 4. BASIC STRUCTURE CHECK
     const paragraphs = coverLetter.split(/\n\n+/).filter(p => p.trim().length > 0);
