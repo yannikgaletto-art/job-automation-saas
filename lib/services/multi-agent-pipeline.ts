@@ -1,19 +1,28 @@
 /**
  * Multi-Agent Pipeline — Pathly V2.0
- * Claude (Writer) → GPT-4o (Language Judge) → Perplexity Sonar (Fact Checker)
+ * Claude (Writer) → GPT-4o (Language Judge + Claim Extractor) → Perplexity Sonar (Fact Checker)
  *
  * Reference: QUALITY_CV_COVER_LETTER.md B2.1
  *
  * Design:
- * - Sequential execution: Claude already ran in generator loop
- * - GPT-4o first, Perplexity only if GPT-4o passed
+ * - Sequential: Claude already ran in generator loop
+ * - GPT-4o extracts externalClaims[] alongside language fixes
+ * - Perplexity receives ONLY externalClaims — never the full CL text
+ * - If externalClaims is empty: Perplexity-Call skipped entirely (cost-save)
  * - Graceful Degradation: Missing API keys → warning, CL delivered anyway
  * - No second Judge call after pipeline (Yannik Correction #1)
  */
 
-import { BLACKLIST_PATTERNS, buildBlacklistPromptSection } from './anti-fluff-blacklist';
+import { BLACKLIST_PATTERNS } from './anti-fluff-blacklist';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface GPTJudgeResult {
+    improvedText: string;
+    externalClaims: string[];  // Externe, verifizierbare Claims (für Perplexity)
+    changes: string[];
+    hadIssues: boolean;
+}
+
 interface PipelineResult {
     finalText: string;
     pipelineImproved: boolean;
@@ -36,15 +45,11 @@ interface JobData {
     [key: string]: unknown;
 }
 
-// ─── GPT-4o Language Judge (Agent 2) ──────────────────────────────────────────
-async function runGPTLanguageJudge(coverLetter: string): Promise<{
-    improvedText: string;
-    changes: string[];
-    hadIssues: boolean;
-}> {
+// ─── GPT-4o Language Judge + Claim Extractor (Agent 2) ────────────────────────
+async function runGPTLanguageJudge(coverLetter: string): Promise<GPTJudgeResult> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-        return { improvedText: coverLetter, changes: [], hadIssues: false };
+        return { improvedText: coverLetter, externalClaims: [], changes: [], hadIssues: false };
     }
 
     const blacklistSection = BLACKLIST_PATTERNS.map(p => `- "${p.pattern}"`).join('\n');
@@ -59,12 +64,19 @@ async function runGPTLanguageJudge(coverLetter: string): Promise<{
 BLACKLIST (diese Phrasen MÜSSEN entfernt/ersetzt werden):
 ${blacklistSection}
 
+Zusätzlich: Extrahiere alle externen, öffentlich verifizierbaren Behauptungen aus dem Text.
+Externe Claims sind: Firmennamen mit konkreten Aussagen, genannte News/Ereignisse,
+Zitate mit Autor-Attribution, öffentliche Statistiken oder Kennzahlen über Unternehmen.
+KEINE CV-Aussagen des Kandidaten (persönliche Erfahrungen, Rollen, Achievements).
+
 Output als JSON:
 {
   "improved_text": "Der verbesserte Text",
   "changes": ["Beschreibung jeder Änderung"],
-  "had_issues": true/false
-}`;
+  "had_issues": true/false,
+  "external_claims": ["Claim 1", "Claim 2"]
+}
+Wenn keine externen Claims vorhanden: "external_claims": []`;
 
     try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -96,18 +108,20 @@ Output als JSON:
         const parsed = JSON.parse(content);
         return {
             improvedText: parsed.improved_text || coverLetter,
+            externalClaims: parsed.external_claims || [],
             changes: parsed.changes || [],
             hadIssues: parsed.had_issues ?? false,
         };
     } catch (error) {
         console.error('❌ [Pipeline:GPT-4o] Language Judge failed:', error);
-        throw error; // Let caller handle graceful degradation
+        throw error;
     }
 }
 
 // ─── Perplexity Sonar Fact Checker (Agent 3) ──────────────────────────────────
+// Receives ONLY extracted external claims — never the full CL text
 async function runPerplexityFactCheck(
-    coverLetter: string,
+    externalClaims: string[],
     companyName: string,
 ): Promise<{
     verified: boolean;
@@ -119,23 +133,13 @@ async function runPerplexityFactCheck(
         return { verified: true, issues: [], corrections: [] };
     }
 
-    // Yannik Correction #5: Only check external, verifiable claims — NOT CV statements
-    const prompt = `Prüfe alle EXTERNEN Firmenreferenzen im folgenden Cover Letter für "${companyName}".
+    const prompt = `Prüfe NUR diese externen Claims auf Faktentreue:
+${externalClaims.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
-WICHTIG: Prüfe NUR externe, öffentlich verifizierbare Claims:
-- Sind genannte News/Ereignisse über die Firma real und aktuell?
-- Stimmen Zitate und Zuschreibungen an externe Personen?
-- Gibt es faktische Fehler in Firmen-Beschreibungen (Gründungsdatum, Standort, Produkte)?
+Unternehmen: ${companyName}
 
-NICHT PRÜFEN (diese sind aus dem CV des Kandidaten und können nicht extern verifiziert werden):
-- Persönliche Erfahrungen und Achievements des Kandidaten
-- Rollenbezeichnungen und Firmen aus dem Lebenslauf des Kandidaten
-- Behauptungen über eigene Projekte oder Ergebnisse
-
-Cover Letter:
----
-${coverLetter}
----
+CV-Aussagen des Kandidaten sind NICHT in dieser Liste und werden nicht bewertet.
+Prüfe nur: Sind die genannten Fakten korrekt? Existieren die genannten News/Ereignisse?
 
 Output als JSON:
 {
@@ -183,7 +187,7 @@ Output als JSON:
         };
     } catch (error) {
         console.error('❌ [Pipeline:Perplexity] Fact Check failed:', error);
-        throw error; // Let caller handle graceful degradation
+        throw error;
     }
 }
 
@@ -197,19 +201,23 @@ export async function runMultiAgentPipeline(
     let finalText = coverLetter;
     let improved = false;
     let gptChanges: string[] = [];
+    let extractedClaims: string[] = [];
     let perplexityVerified: boolean | undefined;
     let perplexityIssues: string[] = [];
 
     const companyName = jobData?.company_name || 'das Unternehmen';
 
-    // ── Step 1: GPT-4o Language Judge ──────────────────────────────────────
+    // ── Step 1: GPT-4o Language Judge + Claim Extraction ──────────────────
     if (!process.env.OPENAI_API_KEY) {
         warnings.push('GPT-4o Language Judge übersprungen (OPENAI_API_KEY fehlt). Single-Agent-Mode.');
         console.warn('⚠️ [Pipeline] OPENAI_API_KEY missing — skipping GPT-4o judge');
     } else {
         try {
-            console.log('🔍 [Pipeline:GPT-4o] Running Language Judge...');
+            console.log('🔍 [Pipeline:GPT-4o] Running Language Judge + Claim Extraction...');
             const gptResult = await runGPTLanguageJudge(finalText);
+
+            extractedClaims = gptResult.externalClaims;
+            console.log(`📋 [Pipeline:GPT-4o] Extracted ${extractedClaims.length} external claims`);
 
             if (gptResult.hadIssues && gptResult.changes.length > 0) {
                 finalText = gptResult.improvedText;
@@ -226,14 +234,17 @@ export async function runMultiAgentPipeline(
         }
     }
 
-    // ── Step 2: Perplexity Fact Check (only if GPT-4o passed/skipped) ──────
+    // ── Step 2: Perplexity Fact Check (ONLY on extracted external claims) ──
     if (!process.env.PERPLEXITY_API_KEY) {
         warnings.push('Perplexity Fact Checker übersprungen (PERPLEXITY_API_KEY fehlt).');
         console.warn('⚠️ [Pipeline] PERPLEXITY_API_KEY missing — skipping fact check');
+    } else if (extractedClaims.length === 0) {
+        warnings.push('Kein externer Fact-Check nötig (keine verifizierbaren Claims gefunden).');
+        console.log('✅ [Pipeline:Perplexity] Skipped — no external claims to verify');
     } else {
         try {
-            console.log('🔍 [Pipeline:Perplexity] Running Fact Checker...');
-            const factResult = await runPerplexityFactCheck(finalText, companyName);
+            console.log(`🔍 [Pipeline:Perplexity] Fact-checking ${extractedClaims.length} external claims...`);
+            const factResult = await runPerplexityFactCheck(extractedClaims, companyName);
 
             perplexityVerified = factResult.verified;
             perplexityIssues = factResult.issues;
