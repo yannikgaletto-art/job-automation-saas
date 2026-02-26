@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 2.1
-**Last Updated:** 2026-02-24
+**Version:** 2.2
+**Last Updated:** 2026-02-26
 
 ---
 
@@ -18,6 +18,11 @@ Kein Framer Motion Code ohne diese Datei gelesen zu haben.
 ## ⚠️ COMPANY RESEARCH DIRECTIVE
 → directives/company_research.md (die einzige aktuelle Version)
 → AGENT_2.1 und AGENT_3.1 wurden gelöscht
+
+## ⚠️ NEUES FEATURE? PFLICHT-ANALYSE ZUERST
+→ directives/FEATURE_IMPACT_ANALYSIS.md
+Jedes neue Feature braucht eine Impact Map BEVOR Code geschrieben wird.
+Impact Map Yannik vorlegen und auf "Go" warten.
 
 ## ⚠️ KANONISCHE IMPORT-PFADE
 | Service | Korrekter Import |
@@ -163,6 +168,11 @@ Chrome Extension (Plasmo)
 ## 3. WORKFLOW RULES
 
 ### Before You Code
+
+0. **Impact Analysis (PFLICHT bei jedem neuen Feature):**
+   - Führe `directives/FEATURE_IMPACT_ANALYSIS.md` durch
+   - Erstelle die Impact Map und lege sie Yannik vor
+   - Warte auf "Go" — kein Code ohne Freigabe
 
 1. **Read the docs:**
    - `/docs/ARCHITECTURE.md` - Complete system design
