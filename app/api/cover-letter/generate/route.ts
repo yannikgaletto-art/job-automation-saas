@@ -51,6 +51,9 @@ export async function POST(request: NextRequest) {
                 setup_context: setupContext ?? null,
                 cost_cents: result.costCents,
                 fluff_warning: result.fluffWarning ?? false,
+                xray_annotations: result.annotatedSentences ?? null,     // B4.1
+                pipeline_warnings: result.pipelineWarnings ?? [],        // B4.1 (Correction #2)
+                pipeline_improved: result.pipelineImproved ?? false,     // B4.1 (Correction #2)
             },
             pii_encrypted: {}
         }).select('id').single();

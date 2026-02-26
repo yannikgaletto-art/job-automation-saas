@@ -450,6 +450,7 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
         pipelineWarnings,
         pipelineImproved,
         annotatedSentences,
+        hiringPersonas: undefined, // B4.0: Personas kommen vom /resolve-personas Endpoint, nie aus dem Generator
     };
 }
 
