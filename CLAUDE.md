@@ -24,6 +24,15 @@ Kein Framer Motion Code ohne diese Datei gelesen zu haben.
 Jedes neue Feature braucht eine Impact Map BEVOR Code geschrieben wird.
 Impact Map Yannik vorlegen und auf "Go" warten.
 
+## ⚠️ CV & COVER LETTER QUALITY
+→ directives/QUALITY_CV_COVER_LETTER.md
+Diese Standards sind BINDEND für alle Dokument-Generationen.
+Qualitätsreferenz ist immer T1 (Mission Wertvoll).
+
+## ⚠️ ZURÜCKGESTELLTE FEATURES (Backlog)
+→ directives/DEFERRED_FEATURES.md
+Liste aller Features, die für V2.0 depriorisiert wurden.
+
 ## ⚠️ KANONISCHE IMPORT-PFADE
 | Service | Korrekter Import |
 |---------|----------------|
