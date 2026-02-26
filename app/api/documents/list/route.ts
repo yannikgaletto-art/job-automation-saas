@@ -14,7 +14,7 @@ export async function GET() {
 
         const { data: documents, error } = await supabase
             .from('documents')
-            .select('id, document_type, created_at, file_url_encrypted')
+            .select('id, document_type, created_at, file_url_encrypted, metadata')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
@@ -23,16 +23,17 @@ export async function GET() {
             return NextResponse.json({ success: false, error: error.message }, { status: 500 });
         }
 
-        // Map to a friendlier format for the frontend
+        // ✅ Use original_name from metadata (SICHERHEITSARCHITEKTUR.md Section 2)
+        // Fallback to storage path basename for legacy documents
         const friendlyDocs = documents?.map(doc => {
-            // Extract filename from the path
+            const originalName = (doc.metadata as Record<string, unknown>)?.original_name as string | undefined;
             const pathParts = doc.file_url_encrypted?.split('/') || [];
-            const filename = pathParts[pathParts.length - 1] || 'Unknown File';
+            const fallbackName = pathParts[pathParts.length - 1] || 'Unknown File';
 
             return {
                 id: doc.id,
                 type: doc.document_type,
-                name: filename,
+                name: originalName || fallbackName,
                 createdAt: doc.created_at
             };
         });

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/onboarding/complete
  * Marks onboarding as completed in user_settings.
+ * Implements Write→Read-Back→Validate pattern (SICHERHEITSARCHITEKTUR.md Section 1).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -38,11 +39,23 @@ export async function POST(request: NextRequest) {
             );
 
         if (error) {
-            console.error('[onboarding/complete] Error:', error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            console.error('[onboarding/complete] Upsert error:', error);
+            return NextResponse.json({ error: error.message, success: false }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true });
+        // ✅ READ-BACK: Verify flag was actually written (SICHERHEITSARCHITEKTUR.md Section 1)
+        const { data: verify, error: verifyError } = await supabaseAdmin
+            .from('user_settings')
+            .select('onboarding_completed')
+            .eq('user_id', user.id)
+            .single();
+
+        if (verifyError || !verify?.onboarding_completed) {
+            console.error('[onboarding/complete] Read-back failed:', verifyError);
+            return NextResponse.json({ error: 'Verification failed', success: false }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true }); // NUR hier — nach verifiziertem Read-Back
     } catch (error: unknown) {
         console.error('[onboarding/complete] Fatal:', error);
         return NextResponse.json({ error: 'Internal error' }, { status: 500 });
