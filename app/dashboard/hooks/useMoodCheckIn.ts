@@ -1,10 +1,16 @@
 'use client';
 
+/**
+ * useMoodCheckIn — Controls visibility of the MoodCheckInOverlay.
+ *
+ * Contract (SICHERHEITSARCHITEKTUR.md Section 5):
+ * - Modal appears ONLY on first dashboard visit after a fresh login (< 60s ago)
+ * - sessionStorage key `pathly_checkin_{userId}_{date}` prevents re-appearing on reload
+ * - Falls back silently on any error — never blocks dashboard access
+ */
+
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-
-const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
-const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 export function useMoodCheckIn() {
     const [showOverlay, setShowOverlay] = useState(false);
@@ -12,42 +18,37 @@ export function useMoodCheckIn() {
     const checkIfDue = useCallback(async () => {
         try {
             const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            const { data } = await supabase.auth.getSession();
+            const session = data.session;
+            if (!session?.user) return;
 
-            const { data: settings } = await supabase
-                .from('user_settings')
-                .select('last_mood_checkin_at')
-                .eq('user_id', user.id)
-                .maybeSingle();
+            const userId = session.user.id;
 
-            const lastCheckin = settings?.last_mood_checkin_at;
+            // ✅ sessionStorage guard — only show once per login-session per day
+            // (SICHERHEITSARCHITEKTUR.md Section 5)
+            const CHECKIN_KEY = `pathly_checkin_${userId}_${new Date().toDateString()}`;
+            const alreadyShown = sessionStorage.getItem(CHECKIN_KEY);
+            if (alreadyShown) return; // Already shown this session — do not show again
 
-            if (!lastCheckin) {
-                setShowOverlay(true);
-                return;
-            }
+            // ✅ Only show on fresh login (last_sign_in_at < 60 seconds ago)
+            const lastSignIn = new Date(session.user.last_sign_in_at ?? 0);
+            const isRecentLogin = Date.now() - lastSignIn.getTime() < 60_000;
+            if (!isRecentLogin) return; // Not a fresh login — skip modal
 
-            const elapsed = Date.now() - new Date(lastCheckin).getTime();
-            if (elapsed >= THREE_HOURS_MS) {
-                setShowOverlay(true);
-            }
+            // Mark as shown immediately (before setShowOverlay) to prevent race conditions
+            sessionStorage.setItem(CHECKIN_KEY, 'true');
+            setShowOverlay(true);
         } catch (err) {
             console.error('[useMoodCheckIn] Check failed:', err);
+            // Non-blocking — never prevent dashboard from loading
         }
     }, []);
 
     useEffect(() => {
-        // Initial check after a short delay (let the page render first)
+        // Short delay to let the page render first
         const initialTimeout = setTimeout(checkIfDue, 2000);
-
-        // Poll every 30 minutes
-        const interval = setInterval(checkIfDue, POLL_INTERVAL_MS);
-
-        return () => {
-            clearTimeout(initialTimeout);
-            clearInterval(interval);
-        };
+        return () => clearTimeout(initialTimeout);
+        // No polling interval — sessionStorage guard makes recurring checks unnecessary
     }, [checkIfDue]);
 
     const dismiss = useCallback(() => {
