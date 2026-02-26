@@ -32,6 +32,7 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
     const [coverLetterFiles, setCoverLetterFiles] = useState<FileWithPreview[]>([])
     const [isUploading, setIsUploading] = useState(false)
     const [uploadProgress, setUploadProgress] = useState(0)
+    const [uploadStatus, setUploadStatus] = useState<string>('')
     const [error, setError] = useState<string | null>(null)
     const [uploadSuccess, setUploadSuccess] = useState(false)
     const [existingDocs, setExistingDocs] = useState<any[]>([])
@@ -63,7 +64,6 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
             if (!res.ok || !data.success) {
                 throw new Error(data.error || 'Failed to delete document');
             }
-            // Remove from UI
             setExistingDocs(prev => prev.filter(doc => doc.id !== id));
         } catch (error: any) {
             console.error("Delete error:", error);
@@ -75,32 +75,27 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
         if (file.size > MAX_FILE_SIZE) {
             return `${file.name} ist zu groß. Maximum: 5MB`
         }
-
         const fileType = file.type
         if (!Object.keys(ACCEPTED_FILE_TYPES).includes(fileType)) {
             return `${file.name} hat ein ungültiges Format. Erlaubt: PDF, DOCX, DOC`
         }
-
         return null
     }
 
     const onCvDrop = useCallback((acceptedFiles: File[]) => {
         const file = acceptedFiles[0]
         if (!file) return
-
         const validationError = validateFile(file)
         if (validationError) {
             setError(validationError)
             return
         }
-
         setError(null)
         setCvFile(file)
     }, [])
 
     const onCoverLetterDrop = useCallback((acceptedFiles: File[]) => {
         setError(null)
-
         const validFiles: File[] = []
         for (const file of acceptedFiles) {
             const validationError = validateFile(file)
@@ -110,7 +105,6 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
             }
             validFiles.push(file)
         }
-
         const newFiles = [...coverLetterFiles, ...validFiles].slice(0, 3)
         setCoverLetterFiles(newFiles)
     }, [coverLetterFiles])
@@ -146,50 +140,74 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
 
         setIsUploading(true)
         setUploadProgress(0)
+        setUploadStatus('Datei wird hochgeladen...')
         setError(null)
 
-        console.log("Upload state clicked:", {
-            state: "started",
-            cvPresent: !!cvFile,
-            coverLetterCount: coverLetterFiles.length,
-            hasError: !!error
-        });
-
         try {
-            // Animate progress up to 90% while uploading
-            const progressInterval = setInterval(() => {
-                setUploadProgress(prev => Math.min(prev + 10, 90))
-            }, 300)
-
-            await onComplete({
-                cv: cvFile,
-                coverLetters: coverLetterFiles
+            const formData = new FormData()
+            formData.append('cv', cvFile!)
+            coverLetterFiles.forEach((file, index) => {
+                formData.append(`coverLetter_${index}`, file)
             })
 
-            clearInterval(progressInterval)
+            // ✅ XHR for real upload progress (SICHERHEITSARCHITEKTUR.md Section 6)
+            await new Promise<void>((resolve, reject) => {
+                const xhr = new XMLHttpRequest()
+
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const pct = Math.round((e.loaded / e.total) * 80)
+                        setUploadProgress(pct)
+                        if (pct >= 30) setUploadStatus('Wird gespeichert...')
+                        else setUploadStatus('Datei wird hochgeladen...')
+                    }
+                }
+
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        setUploadProgress(100)
+                        setUploadStatus('Fertig ✅ — Analyse läuft im Hintergrund')
+                        resolve()
+                    } else {
+                        try {
+                            const body = JSON.parse(xhr.responseText)
+                            reject(new Error(body.error || 'Upload fehlgeschlagen'))
+                        } catch {
+                            reject(new Error('Upload fehlgeschlagen'))
+                        }
+                    }
+                }
+
+                xhr.onerror = () => reject(new Error('Netzwerkfehler beim Upload'))
+                xhr.open('POST', '/api/documents/upload')
+                xhr.send(formData)
+            })
+
+            setUploadProgress(90)
+            setUploadStatus('Wird gespeichert...')
+            await new Promise(r => setTimeout(r, 400))
             setUploadProgress(100)
+            setUploadStatus('Fertig ✅ — Analyse läuft im Hintergrund')
+
             setUploadSuccess(true)
             setCvFile(null)
             setCoverLetterFiles([])
-            // Reload existing docs list
-            const res = await fetch('/api/documents/list');
-            const data = await res.json();
-            if (data.success) setExistingDocs(data.documents);
+
+            const res = await fetch('/api/documents/list')
+            const data = await res.json()
+            if (data.success) setExistingDocs(data.documents)
+
             setTimeout(() => {
-                setUploadSuccess(false);
-                setUploadProgress(0);
-            }, 4000);
+                setUploadSuccess(false)
+                setUploadProgress(0)
+                setUploadStatus('')
+            }, 4000)
 
-            console.log("Upload state:", { state: "success" });
-
-        } catch (err: any) {
-            console.log("Upload state:", {
-                state: "error",
-                message: err.message,
-                requestId: err.requestId
-            });
-            setError(err.message || "Upload fehlgeschlagen")
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Upload fehlgeschlagen'
+            setError(msg)
             setUploadProgress(0)
+            setUploadStatus('')
         } finally {
             setIsUploading(false)
         }
@@ -213,18 +231,15 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
                         >
                             <Upload className="w-6 h-6" />
                         </motion.div>
-
                         <CardTitle className="text-2xl font-semibold text-[#37352F]">
                             {introHeadline || 'Dokumente hochladen'}
                         </CardTitle>
-
                         <CardDescription className="text-[#73726E] text-base mt-2">
                             {introText || 'Laden Sie Ihren Lebenslauf und Anschreiben hoch'}
                         </CardDescription>
                     </CardHeader>
 
                     <CardContent className="space-y-6 px-8">
-                        {/* Existing Documents Section */}
                         {!isLoadingDocs && existingDocs.length > 0 && (
                             <div className="mb-6 p-4 bg-[#F7F7F5] rounded-lg border border-[#E7E7E5]">
                                 <h3 className="text-sm font-semibold text-[#37352F] mb-3">Bereits hochgeladen:</h3>
@@ -253,7 +268,6 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
                             </div>
                         )}
 
-                        {/* Success Banner */}
                         <AnimatePresence>
                             {uploadSuccess && (
                                 <motion.div
@@ -281,39 +295,30 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
                         {isUploading && (
                             <div className="space-y-2">
                                 <div className="flex justify-between text-sm text-[#73726E]">
-                                    <span>Uploading...</span>
+                                    <span>{uploadStatus || 'Datei wird hochgeladen...'}</span>
                                     <span className="font-mono">{uploadProgress}%</span>
                                 </div>
                                 <Progress value={uploadProgress} className="h-2 bg-[#F7F7F5]" />
                             </div>
                         )}
 
-                        {/* CV Upload */}
                         <div>
                             <label className="block text-sm font-semibold text-[#37352F] mb-2">
                                 Lebenslauf (CV) <span className="text-red-500">*</span>
                             </label>
-
                             {!cvFile ? (
                                 <div
                                     {...cvDropzone.getRootProps()}
-                                    className={`
-                    border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200
-                    ${cvDropzone.isDragActive
-                                            ? 'border-[#0066FF] bg-[#F0F7FF]'
-                                            : 'border-[#E7E7E5] bg-[#FAFAF9] hover:bg-[#F5F5F4] hover:border-[#D6D6D3]'}
-                  `}
+                                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200 ${
+                                        cvDropzone.isDragActive ? 'border-[#0066FF] bg-[#F0F7FF]' : 'border-[#E7E7E5] bg-[#FAFAF9] hover:bg-[#F5F5F4] hover:border-[#D6D6D3]'
+                                    }`}
                                 >
                                     <input {...cvDropzone.getInputProps()} />
                                     <FileText className={`w-10 h-10 mx-auto mb-3 ${cvDropzone.isDragActive ? 'text-[#0066FF]' : 'text-[#A8A29E]'}`} />
                                     <p className="text-[#37352F] font-medium">
-                                        {cvDropzone.isDragActive
-                                            ? 'Datei hier ablegen...'
-                                            : 'Klicken oder Datei ziehen'}
+                                        {cvDropzone.isDragActive ? 'Datei hier ablegen...' : 'Klicken oder Datei ziehen'}
                                     </p>
-                                    <p className="text-xs text-[#73726E] mt-1.5">
-                                        PDF, DOC, DOCX (max. 5MB)
-                                    </p>
+                                    <p className="text-xs text-[#73726E] mt-1.5">PDF, DOC, DOCX (max. 5MB)</p>
                                 </div>
                             ) : (
                                 <motion.div
@@ -327,54 +332,33 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
                                         </div>
                                         <div>
                                             <p className="text-[#37352F] font-medium text-sm">{cvFile.name}</p>
-                                            <p className="text-xs text-[#73726E]">
-                                                {(cvFile.size / 1024 / 1024).toFixed(2)} MB
-                                            </p>
+                                            <p className="text-xs text-[#73726E]">{(cvFile.size / 1024 / 1024).toFixed(2)} MB</p>
                                         </div>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={removeCv}
-                                        disabled={isUploading}
-                                        className="text-[#73726E] hover:text-red-600 hover:bg-red-50"
-                                    >
+                                    <Button variant="ghost" size="sm" onClick={removeCv} disabled={isUploading} className="text-[#73726E] hover:text-red-600 hover:bg-red-50">
                                         <X className="w-4 h-4" />
                                     </Button>
                                 </motion.div>
                             )}
                         </div>
 
-                        {/* Cover Letters Upload */}
                         <div>
                             <label className="block text-sm font-semibold text-[#37352F] mb-2">
                                 Anschreiben (1-3 Stück) <span className="text-red-500">*</span>
                             </label>
-
                             <div
                                 {...coverLetterDropzone.getRootProps()}
-                                className={`
-                                    border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200
-                                    ${coverLetterDropzone.isDragActive
-                                        ? 'border-[#0066FF] bg-[#F0F7FF]'
-                                        : 'border-[#E7E7E5] bg-[#FAFAF9] hover:bg-[#F5F5F4] hover:border-[#D6D6D3]'}
-                                    ${coverLetterFiles.length >= 3 ? 'opacity-50 cursor-not-allowed bg-[#F5F5F4]' : ''}
-                                `}
+                                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200 ${
+                                    coverLetterDropzone.isDragActive ? 'border-[#0066FF] bg-[#F0F7FF]' : 'border-[#E7E7E5] bg-[#FAFAF9] hover:bg-[#F5F5F4] hover:border-[#D6D6D3]'
+                                } ${coverLetterFiles.length >= 3 ? 'opacity-50 cursor-not-allowed bg-[#F5F5F4]' : ''}`}
                             >
                                 <input {...coverLetterDropzone.getInputProps()} disabled={coverLetterFiles.length >= 3} />
                                 <Upload className={`w-10 h-10 mx-auto mb-3 ${coverLetterDropzone.isDragActive ? 'text-[#0066FF]' : 'text-[#A8A29E]'}`} />
                                 <p className="text-[#37352F] font-medium">
-                                    {coverLetterFiles.length >= 3
-                                        ? 'Maximum erreicht'
-                                        : coverLetterDropzone.isDragActive
-                                            ? 'Dateien hier ablegen...'
-                                            : 'Klicken oder Dateien ziehen'}
+                                    {coverLetterFiles.length >= 3 ? 'Maximum erreicht' : coverLetterDropzone.isDragActive ? 'Dateien hier ablegen...' : 'Klicken oder Dateien ziehen'}
                                 </p>
-                                <p className="text-xs text-[#73726E] mt-1.5">
-                                    {coverLetterFiles.length}/3 hochgeladen
-                                </p>
+                                <p className="text-xs text-[#73726E] mt-1.5">{coverLetterFiles.length}/3 hochgeladen</p>
                             </div>
-
                             {coverLetterFiles.length > 0 && (
                                 <div className="mt-4 space-y-2">
                                     {coverLetterFiles.map((file, index) => (
@@ -390,18 +374,10 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
                                                 </div>
                                                 <div>
                                                     <p className="text-sm text-[#37352F] font-medium">{file.name}</p>
-                                                    <p className="text-xs text-[#73726E]">
-                                                        {(file.size / 1024 / 1024).toFixed(2)} MB
-                                                    </p>
+                                                    <p className="text-xs text-[#73726E]">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                                                 </div>
                                             </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => removeCoverLetter(index)}
-                                                disabled={isUploading}
-                                                className="text-[#73726E] hover:text-red-600 hover:bg-red-50"
-                                            >
+                                            <Button variant="ghost" size="sm" onClick={() => removeCoverLetter(index)} disabled={isUploading} className="text-[#73726E] hover:text-red-600 hover:bg-red-50">
                                                 <X className="w-4 h-4" />
                                             </Button>
                                         </motion.div>
@@ -412,33 +388,22 @@ export function DocumentUpload({ onComplete, onBack, introHeadline, introText }:
 
                         <div className="bg-[#F7F7F5] border border-[#E7E7E5] rounded-lg p-4 flex gap-3 text-sm text-[#73726E]">
                             <div className="shrink-0 pt-0.5">💡</div>
-                            <p>
-                                <strong>Tipp:</strong> Die Anschreiben helfen uns, Ihren persönlichen Schreibstil zu lernen.
-                            </p>
+                            <p><strong>Tipp:</strong> Die Anschreiben helfen uns, Ihren persönlichen Schreibstil zu lernen.</p>
                         </div>
                     </CardContent>
 
                     <CardFooter className="flex gap-3 px-8 pb-8 pt-2">
                         {onBack && (
-                            <Button
-                                variant="ghost"
-                                onClick={onBack}
-                                disabled={isUploading}
-                                className="text-[#73726E] hover:text-[#37352F] hover:bg-[#F7F7F5]"
-                            >
+                            <Button variant="ghost" onClick={onBack} disabled={isUploading} className="text-[#73726E] hover:text-[#37352F] hover:bg-[#F7F7F5]">
                                 Zurück
                             </Button>
                         )}
-
                         <Button
                             onClick={handleSubmit}
                             disabled={!canSubmit || isUploading}
-                            className={`
-                                flex-1 text-white shadow-sm transition-all
-                                ${!canSubmit || isUploading
-                                    ? 'bg-[#E7E7E5] text-[#A8A29E]'
-                                    : 'bg-[#0066FF] hover:bg-[#0052CC] hover:shadow-md'}
-                            `}
+                            className={`flex-1 text-white shadow-sm transition-all ${
+                                !canSubmit || isUploading ? 'bg-[#E7E7E5] text-[#A8A29E]' : 'bg-[#0066FF] hover:bg-[#0052CC] hover:shadow-md'
+                            }`}
                         >
                             {isUploading ? (
                                 <>

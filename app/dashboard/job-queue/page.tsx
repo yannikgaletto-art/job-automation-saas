@@ -9,7 +9,7 @@ import { AddJobDialog } from '@/components/dashboard/add-job-dialog';
 import { CustomDialog } from '@/components/ui/custom-dialog';
 import { CVComparison } from '@/components/cv/cv-comparison';
 import type { CVOptimizationResult } from '@/lib/services/cv-optimizer';
-import { toast } from "sonner";
+import { showSafeToast } from '@/lib/utils/toast';
 import { ApplicationHistory } from '@/app/dashboard/components/application-history';
 
 export default function JobQueuePage() {
@@ -83,7 +83,7 @@ export default function JobQueuePage() {
     }, []);
 
     const handleReanalyze = async (jobId: string) => {
-        toast.info('Analysiere Job-Beschreibung...');
+        showSafeToast('Analysiere Job-Beschreibung...', `reanalyze_start:${jobId}`, 'info');
         try {
             const res = await fetch('/api/jobs/extract', {
                 method: 'POST',
@@ -93,9 +93,9 @@ export default function JobQueuePage() {
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
             await fetchJobs();
-            toast.success('Steckbrief erfolgreich extrahiert ✓');
+            showSafeToast('Steckbrief erfolgreich extrahiert ✓', `extract_success:${jobId}`);
         } catch (err) {
-            toast.error('Extraktion fehlgeschlagen', { description: String(err) });
+            showSafeToast('Extraktion fehlgeschlagen', `extract_error:${jobId}`, 'error', String(err));
         }
     };
 
@@ -109,14 +109,14 @@ export default function JobQueuePage() {
             setJobs(prev => prev.map(j =>
                 j.id === jobId ? { ...j, status: 'JOB_REVIEWED', workflowStep: 1 } : j
             ));
-            toast.success('Steckbrief bestätigt → CV Match freigeschaltet');
+            showSafeToast('Steckbrief bestätigt → CV Match freigeschaltet', `confirm_success:${jobId}`);
         } catch {
-            toast.error('Bestätigung fehlgeschlagen');
+            showSafeToast('Bestätigung fehlgeschlagen', `confirm_error:${jobId}`, 'error');
         }
     };
 
     const handleDelete = async (jobId: string) => {
-        toast.info("Lösche Bewerbung...");
+        showSafeToast('Lösche Bewerbung...', `delete_start:${jobId}`, 'info');
         try {
             const res = await fetch('/api/jobs/delete', {
                 method: 'POST',
@@ -126,9 +126,9 @@ export default function JobQueuePage() {
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
             setJobs(prev => prev.filter(j => j.id !== jobId));
-            toast.success("Bewerbung gelöscht");
+            showSafeToast('Bewerbung gelöscht', `delete_success:${jobId}`);
         } catch (err) {
-            toast.error("Löschen fehlgeschlagen", { description: String(err) });
+            showSafeToast('Löschen fehlgeschlagen', `delete_error:${jobId}`, 'error', String(err));
         }
     };
 
@@ -149,11 +149,9 @@ export default function JobQueuePage() {
             setOptimizationResult(result);
             setShowOptimization(true);
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'CV_OPTIMIZED', workflowStep: 3 } : j));
-            toast.success("CV optimiert");
+            showSafeToast('CV optimiert', `cv_optimized:${jobId}`);
         } catch (error) {
-            toast.error("Optimierung fehlgeschlagen", {
-                description: error instanceof Error ? error.message : "Bitte erneut versuchen"
-            });
+            showSafeToast('Optimierung fehlgeschlagen', `cv_optimize_error:${jobId}`, 'error', error instanceof Error ? error.message : 'Bitte erneut versuchen');
         } finally {
             setIsOptimizing(false);
         }
@@ -166,7 +164,7 @@ export default function JobQueuePage() {
                 onClose={() => setIsAddJobOpen(false)}
                 onJobAdded={() => {
                     fetchJobs();
-                    toast.success("Job hinzugefügt");
+                    showSafeToast('Job hinzugefügt', 'job_added:new');
                 }}
             />
 
@@ -219,9 +217,9 @@ export default function JobQueuePage() {
                     {optimizationResult && (
                         <CVComparison
                             optimizationResult={optimizationResult}
-                            onAcceptAll={async () => { setShowOptimization(false); toast.success("Änderungen übernommen"); }}
+                            onAcceptAll={async () => { setShowOptimization(false); showSafeToast('\u00c4nderungen übernommen', `cv_accepted:${currentJobId}`); }}
                             onRejectAll={() => setShowOptimization(false)}
-                            onDownload={async () => { toast.info("PDF Download noch nicht implementiert"); }}
+                            onDownload={async () => { showSafeToast('PDF Download noch nicht implementiert', 'pdf_download', 'info'); }}
                         />
                     )}
                 </div>
