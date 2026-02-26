@@ -1,6 +1,8 @@
 // Cover Letter Phase 1 – Daten-Vertrag für den Setup-Wizard
 // Dieser Typ-Vertrag verbindet UI-Wizard mit buildSystemPrompt() in Phase 2.
 
+import type { HiringPersona } from '@/lib/services/hiring-manager-resolver';
+
 export type HookType = 'news' | 'value' | 'quote' | 'linkedin' | 'manual' | 'vision' | 'project' | 'funding';
 export type TonePreset = 'data-driven' | 'storytelling' | 'formal' | 'philosophisch';
 export type TargetLanguage = 'de' | 'en';
@@ -65,6 +67,13 @@ export const DEFAULT_OPT_IN_MODULES: OptInModules = {
     stationsSelector: true,
 };
 
+// ─── B3.1: X-Ray Annotation Type ──────────────────────────────────
+export interface SentenceAnnotation {
+    text: string;
+    source: 'user_style' | 'company_research' | 'job_fit';
+    reference: string;
+}
+
 // ─── Gesamt-Vertrag (wird an buildSystemPrompt() übergeben) ───────
 export interface CoverLetterSetupContext {
     jobId: string;
@@ -78,6 +87,8 @@ export interface CoverLetterSetupContext {
     enablePingPong?: boolean;          // B1.3: Set via optInModules.pingPong
     selectedNews?: { title: string; date: string; source?: string }; // B2.5: News-Binding
     optInModules?: OptInModules;       // B2.2: Opt-In Feature-Module
+    xRayMode?: boolean;                // B3.1: Context X-Ray annotations
+    selectedPersona?: HiringPersona;   // B3.2: Ausgewählte Hiring-Persona
 }
 
 // ─── API Response Shape ───────────────────────────────────────────

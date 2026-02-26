@@ -15,6 +15,8 @@ import { scanForFluff } from './anti-fluff-blacklist';
 import { runMultiAgentPipeline } from './multi-agent-pipeline';
 import { buildSystemPrompt, type UserProfileData, type JobData, type CompanyResearchData } from './cover-letter-prompt-builder';
 import { judgeCoverLetter, type JudgeResult } from './cover-letter-judge';
+import type { SentenceAnnotation } from '@/types/cover-letter-setup';
+import type { HiringPersona } from './hiring-manager-resolver';
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
@@ -63,6 +65,9 @@ export interface CoverLetterResult {
     fluffWarning?: boolean;
     pipelineWarnings?: string[];
     pipelineImproved?: boolean;
+    // TODO Batch 4: Persist xray_annotations in draft metadata
+    annotatedSentences?: SentenceAnnotation[];  // B3.1: Only in live response, not persisted
+    hiringPersonas?: HiringPersona[];           // B3.2: Available personas for frontend panel
 }
 
 const MAX_ITERATIONS = 3;
@@ -413,11 +418,26 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
         }
     }
 
+    // ─── B3.1: X-Ray Annotations (after pipeline, before return) ─────────
+    // Correction #2: Separate Haiku call outside generation loop
+    // TODO Batch 4: Persist xray_annotations in draft metadata
+    let annotatedSentences: SentenceAnnotation[] | undefined;
+    if (setupContext?.xRayMode && coverLetter.length > 0) {
+        try {
+            annotatedSentences = await generateXRayAnnotations(coverLetter, setupContext);
+            console.log(`✅ [X-Ray] Generated ${annotatedSentences?.length ?? 0} annotations`);
+        } catch (xrayErr) {
+            console.warn('⚠️ [X-Ray] Annotation generation failed — returning without annotations:', xrayErr);
+            annotatedSentences = undefined;
+        }
+    }
+
     // Cost tracking
     const judgeCallCount = iterationLog.filter(l => l.validation.isValid).length;
     const gptCost = process.env.OPENAI_API_KEY ? 0.5 : 0;
     const perplexityCost = process.env.PERPLEXITY_API_KEY ? 0.3 : 0;
-    const costCents = iterationLog.length * 2.5 + judgeCallCount * 0.3 + fluffRetries * 2.5 + gptCost + perplexityCost;
+    const xrayCost = setupContext?.xRayMode ? 0.1 : 0; // Haiku ~$0.001
+    const costCents = iterationLog.length * 2.5 + judgeCallCount * 0.3 + fluffRetries * 2.5 + gptCost + perplexityCost + xrayCost;
 
     return {
         coverLetter,
@@ -429,5 +449,71 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
         fluffWarning,
         pipelineWarnings,
         pipelineImproved,
+        annotatedSentences,
     };
+}
+
+// ─── B3.1: X-Ray Annotation Generator (separate Haiku call) ──────────────────
+async function generateXRayAnnotations(
+    coverLetter: string,
+    ctx: CoverLetterSetupContext
+): Promise<SentenceAnnotation[]> {
+    if (!process.env.ANTHROPIC_API_KEY) {
+        console.warn('⚠️ [X-Ray] No API Key — skipping annotations');
+        return [];
+    }
+
+    const prompt = `Analysiere dieses fertige Anschreiben und zerlege es in Sätze mit Quellenangabe.
+
+Anschreiben:
+---
+${coverLetter}
+---
+
+Für JEDEN Satz: Bestimme die Hauptquelle:
+- "user_style": Satz stammt primär aus dem Schreibstil/der Persönlichkeit des Kandidaten
+- "company_research": Satz bezieht sich auf Firmendaten, News, Zitate, Werte des Unternehmens
+- "job_fit": Satz verbindet CV-Erfahrung mit einer Job-Anforderung
+
+Antwort NUR als valides JSON-Array:
+[
+  { "text": "Der erste Satz.", "source": "company_research", "reference": "Firmenwerte: Innovation" },
+  { "text": "Der zweite Satz.", "source": "job_fit", "reference": "Anforderung: Python-Erfahrung" }
+]
+
+Kein Freitext, nur das JSON-Array.`;
+
+    console.log('🔍 [X-Ray] Generating annotations via Haiku...');
+
+    const message = await anthropic.messages.create({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 2000,
+        temperature: 0.1,
+        system: 'You are a text analysis assistant. Respond ONLY with a valid JSON array.',
+        messages: [{ role: 'user', content: prompt }]
+    });
+
+    const content = message.content[0].type === 'text' ? message.content[0].text : '';
+
+    // Try to parse JSON — graceful degradation on failure
+    let parsed: SentenceAnnotation[];
+    try {
+        const jsonMatch = content.match(/\[\s*\{[\s\S]*\}\s*\]/);
+        if (!jsonMatch) throw new Error('No JSON array found in X-Ray response');
+        parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+        console.warn('⚠️ [X-Ray] Could not parse JSON response — skipping annotations');
+        return [];
+    }
+
+    // Validate each entry
+    return parsed
+        .filter(s => s.text && s.source && s.reference)
+        .map(s => ({
+            text: s.text,
+            source: (['user_style', 'company_research', 'job_fit'].includes(s.source)
+                ? s.source
+                : 'job_fit') as SentenceAnnotation['source'],
+            reference: s.reference,
+        }));
 }

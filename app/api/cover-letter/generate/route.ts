@@ -88,8 +88,11 @@ export async function POST(request: NextRequest) {
             iterations: result.iterations,
             iteration_log: result.iterationLog,
             fluff_warning: result.fluffWarning ?? false,
-            pipeline_warnings: result.pipelineWarnings ?? [],   // B2.1
-            pipeline_improved: result.pipelineImproved ?? false, // B2.1
+            pipeline_warnings: result.pipelineWarnings ?? [],
+            pipeline_improved: result.pipelineImproved ?? false,
+            // TODO Batch 4: Persist xray_annotations in draft metadata
+            annotated_sentences: result.annotatedSentences ?? [],  // B3.1
+            hiring_personas: result.hiringPersonas ?? [],          // B3.2
         });
 
     } catch (error: unknown) {

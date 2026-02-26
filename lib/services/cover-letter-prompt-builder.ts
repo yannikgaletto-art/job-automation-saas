@@ -9,6 +9,7 @@ import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import type { StyleAnalysis } from './writing-style-analyzer';
 import { buildBlacklistPromptSection } from './anti-fluff-blacklist';
 import { DEFAULT_OPT_IN_MODULES } from '@/types/cover-letter-setup';
+import type { HiringPersona } from './hiring-manager-resolver';
 
 // ─── Supporting Types (duplicated from generator for decoupling) ──────────────
 interface UserProfileData {
@@ -269,6 +270,18 @@ REGELN:
 - Beispiel: [VUL]Ich habe bei Fraunhofer schnell gemerkt, dass...[/VUL]`;
     }
 
+    // ─── B3.2: Persona-Kontext (Hiring Manager Panel) ──────────────────────
+    let personaSection = '';
+    const persona: HiringPersona | undefined = ctx?.selectedPersona;
+    if (persona && persona.confidence > 0.4) {
+        personaSection = `[REGEL: PERSONA-KONTEXT — HIRING MANAGER]
+Du schreibst für: ${persona.name} (${persona.role})
+Vermutliche Prioritäten: ${persona.traits.join(', ')}
+Bevorzugter Stil: ${persona.preferredStyle}
+→ Passe Ton und Argumentationsstruktur entsprechend an.
+→ KEIN explizites Naming der Persona im Text. Der Kandidat soll nicht zeigen, dass er recherchiert hat WER liest — nur WOVON diese Person überzeugt wäre.`;
+    }
+
     const wordCountFeedback = (() => {
         if (lastWordCount > 380) {
             return `WORTANZAHL: Vorherige Version hatte ${lastWordCount} Wörter — ZU LANG. Kürze um ${lastWordCount - 350} Wörter. Maximal 3 Sätze pro Absatz.`;
@@ -328,6 +341,8 @@ ${first90DaysSection}
 ${painPointSection}
 
 ${vulnerabilitySection}
+
+${personaSection}
 
 === SEKTION 4: TONALITÄT & STIL ===
 PRESET: ${ctx?.tone.preset || 'formal'}
