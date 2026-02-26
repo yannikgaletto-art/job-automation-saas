@@ -46,8 +46,24 @@ export default function OnboardingPage() {
     const [aiProcessingAccepted, setAiProcessingAccepted] = useState(false);
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [completing, setCompleting] = useState(false);
+    const [completionError, setCompletionError] = useState<string | null>(null);
 
-    // Confetti on mount (Step 1)
+    // ✅ Mount-guard: if user has already completed onboarding → skip to dashboard
+    // (SICHERHEITSARCHITEKTUR.md Section 1)
+    useEffect(() => {
+        const checkStatus = async () => {
+            try {
+                const res = await fetch('/api/onboarding/status');
+                const data = await res.json() as { completed: boolean };
+                if (data.completed) router.replace('/dashboard');
+            } catch {
+                // Non-blocking: if this fails, user stays on onboarding
+            }
+        };
+        checkStatus();
+    }, []); // No dependencies — runs only once on mount
+
+    // Confetti on mount (Step 1 only)
     useEffect(() => {
         if (step === 1) {
             import('canvas-confetti').then(({ default: confetti }) => {
@@ -85,6 +101,7 @@ export default function OnboardingPage() {
     const handleComplete = async () => {
         if (!allConsentsGiven || completing) return;
         setCompleting(true);
+        setCompletionError(null);
 
         try {
             const res = await fetch('/api/onboarding/complete', {
@@ -92,15 +109,21 @@ export default function OnboardingPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ step: 6 }),
             });
+            const data = await res.json() as { success: boolean; error?: string };
 
-            if (!res.ok) {
-                console.error('[Onboarding] Complete failed:', await res.text());
+            // ✅ router.push NUR bei verifiziertem success:true (SICHERHEITSARCHITEKTUR.md Section 1)
+            if (!res.ok || !data.success) {
+                setCompletionError('Speichern fehlgeschlagen. Bitte erneut versuchen.');
+                setCompleting(false);
+                return;
             }
+
+            router.push('/dashboard');
         } catch (err) {
             console.error('[Onboarding] Network error:', err);
+            setCompletionError('Netzwerkfehler. Bitte versuche es erneut.');
+            setCompleting(false);
         }
-
-        router.push('/dashboard');
     };
 
     return (
@@ -183,8 +206,6 @@ export default function OnboardingPage() {
                                             if (!response.ok) {
                                                 const errorData = await response.json().catch(() => ({}))
                                                 console.error("Onboarding upload failed:", errorData)
-                                                // We don't throw here to not block the onboarding flow completely,
-                                                // but we'll still advance the step. Ideally we'd show a toast.
                                             }
                                         } catch (error) {
                                             console.error('Onboarding upload error:', error)
@@ -233,6 +254,7 @@ export default function OnboardingPage() {
                                     onToggleTerms={() => setTermsAccepted((v) => !v)}
                                     onComplete={handleComplete}
                                     completing={completing}
+                                    error={completionError}
                                 />
                             </motion.div>
                         )}
@@ -374,6 +396,7 @@ function Step6Consent({
     onToggleTerms,
     onComplete,
     completing,
+    error,
 }: {
     privacyAccepted: boolean;
     aiProcessingAccepted: boolean;
@@ -383,6 +406,7 @@ function Step6Consent({
     onToggleTerms: () => void;
     onComplete: () => void;
     completing: boolean;
+    error: string | null;
 }) {
     const allAccepted = privacyAccepted && aiProcessingAccepted && termsAccepted;
 
@@ -399,7 +423,6 @@ function Step6Consent({
             </p>
 
             <div className="space-y-3 mb-8 text-left">
-                {/* Checkbox 1: Privacy Policy */}
                 <label className="flex items-start gap-3 cursor-pointer select-none p-3 rounded-lg border border-[#E7E7E5] hover:border-[#002e7a]/30 transition-colors">
                     <input
                         type="checkbox"
@@ -416,7 +439,6 @@ function Step6Consent({
                     </span>
                 </label>
 
-                {/* Checkbox 2: AI Processing */}
                 <label className="flex items-start gap-3 cursor-pointer select-none p-3 rounded-lg border border-[#E7E7E5] hover:border-[#002e7a]/30 transition-colors">
                     <input
                         type="checkbox"
@@ -433,7 +455,6 @@ function Step6Consent({
                     </span>
                 </label>
 
-                {/* Checkbox 3: Terms of Service */}
                 <label className="flex items-start gap-3 cursor-pointer select-none p-3 rounded-lg border border-[#E7E7E5] hover:border-[#002e7a]/30 transition-colors">
                     <input
                         type="checkbox"
@@ -453,6 +474,9 @@ function Step6Consent({
             <StepButton onClick={onComplete} disabled={!allAccepted || completing}>
                 {completing ? 'Wird gespeichert...' : 'Loslegen'}
             </StepButton>
+            {error && (
+                <p className="mt-3 text-sm text-red-500 text-center">{error}</p>
+            )}
         </div>
     );
 }

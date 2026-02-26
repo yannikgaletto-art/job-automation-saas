@@ -130,7 +130,8 @@ export async function POST(req: NextRequest) {
                     file_url_encrypted: cvUploadData.path,
                     metadata: {
                         ...processedCv.metadata,
-                        extracted_text: processedCv.sanitizedText
+                        extracted_text: processedCv.sanitizedText,
+                        original_name: cvFile.name // ✅ SICHERHEITSARCHITEKTUR.md Section 2
                     },
                     pii_encrypted: processedCv.encryptedPii
                 })
@@ -140,6 +141,18 @@ export async function POST(req: NextRequest) {
             if (cvDbError) {
                 console.error(`[${requestId}] route=documents/upload step=db_insert_cv supabase_error=${cvDbError.message} code=${cvDbError.code}`)
             } else {
+                // ✅ READ-BACK: Verify DB insert was successful (SICHERHEITSARCHITEKTUR.md Section 2)
+                const { data: verify, error: vErr } = await supabaseAdmin
+                    .from('documents')
+                    .select('id')
+                    .eq('id', cvDoc.id)
+                    .single();
+
+                if (vErr || !verify) {
+                    console.error(`[${requestId}] route=documents/upload step=db_insert_cv_verify failed`);
+                    return NextResponse.json({ error: 'CV verification failed' }, { status: 500 });
+                }
+
                 cvDocId = cvDoc.id
                 console.log(`[${requestId}] route=documents/upload step=db_insert_cv success`)
 
@@ -163,8 +176,9 @@ export async function POST(req: NextRequest) {
                         } else {
                             console.log(`[${requestId}] route=documents/upload step=save_profile success`);
                         }
-                    } catch (parseError: any) {
-                        console.error(`[${requestId}] route=documents/upload step=parse_cv_json error=${parseError.message}`);
+                    } catch (parseError: unknown) {
+                        const msg = parseError instanceof Error ? parseError.message : String(parseError);
+                        console.error(`[${requestId}] route=documents/upload step=parse_cv_json error=${msg}`);
                     }
                 }
             }
@@ -179,7 +193,7 @@ export async function POST(req: NextRequest) {
                     user_id: userId,
                     document_type: 'cv',
                     file_url_encrypted: cvUploadData.path,
-                    metadata: { extracted_text: null, extraction_error: errMsg },
+                    metadata: { extracted_text: null, extraction_error: errMsg, original_name: cvFile.name }, // ✅ original_name auch im Fallback
                     pii_encrypted: {}
                 })
                 .select()
@@ -220,7 +234,7 @@ export async function POST(req: NextRequest) {
                         user_id: userId,
                         document_type: 'cover_letter',
                         file_url_encrypted: data.path,
-                        metadata: {},
+                        metadata: { original_name: file.name }, // ✅ original_name für Cover Letters
                         pii_encrypted: {}
                     })
                     .select()
@@ -236,7 +250,6 @@ export async function POST(req: NextRequest) {
 
         console.log(`[${requestId}] route=documents/upload step=complete cv_doc_id=${cvDocId ?? 'none'} cl_count=${coverLetterIds.length}`)
 
-        // Return success with extracted data
         return NextResponse.json({
             success: true,
             requestId,
