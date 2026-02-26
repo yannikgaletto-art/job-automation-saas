@@ -1,7 +1,7 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 2.2
+**Version:** 2.3
 **Last Updated:** 2026-02-26
 
 ---
@@ -32,6 +32,16 @@ Impact Map Yannik vorlegen und auf "Go" warten.
 | Job Search Pipeline | @/lib/services/job-search-pipeline |
 | Onboarding Store | @/store/use-onboarding-store |
 | Company Card | @/components/company/company-intel-card |
+
+---
+
+## 🚀 RECENT BATCH 3 FIXES
+| Feature | Fix / Implementation |
+|---------|----------------------|
+| PDF Download | New API route `/api/documents/download` |
+| Stepper | Fixed status mapping for active-cv-card |
+| Company Research | URL validation in research route |
+| Quote Quality | Enhanced quote matching prompt logic |
 
 ---
 
