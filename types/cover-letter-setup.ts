@@ -48,6 +48,23 @@ export interface SelectedQuote {
     relevanceScore: number; // 0-1
 }
 
+// ─── B2.2: Opt-In Modules ─────────────────────────────────────────
+export interface OptInModules {
+    first90DaysHypothesis: boolean;  // Default: false — KI plant ersten Monat
+    painPointMatching: boolean;      // Default: true  — Implizite Firmenschmerzen
+    vulnerabilityInjector: boolean;  // Default: false — Strategische Schwäche (max 2x)
+    pingPong: boolean;               // Default: false — Sets enablePingPong
+    stationsSelector: boolean;       // Default: true  — Koppelt an B2.3
+}
+
+export const DEFAULT_OPT_IN_MODULES: OptInModules = {
+    first90DaysHypothesis: false,
+    painPointMatching: true,
+    vulnerabilityInjector: false,
+    pingPong: false,
+    stationsSelector: true,
+};
+
 // ─── Gesamt-Vertrag (wird an buildSystemPrompt() übergeben) ───────
 export interface CoverLetterSetupContext {
     jobId: string;
@@ -58,7 +75,9 @@ export interface CoverLetterSetupContext {
     tone: ToneConfig;
     autoFilled: boolean;               // Wurde Auto-Fill verwendet?
     completedAt: string;               // ISO Timestamp
-    enablePingPong?: boolean;          // B1.3: Ping-Pong Modus (default: false, UI in Batch 2)
+    enablePingPong?: boolean;          // B1.3: Set via optInModules.pingPong
+    selectedNews?: { title: string; date: string; source?: string }; // B2.5: News-Binding
+    optInModules?: OptInModules;       // B2.2: Opt-In Feature-Module
 }
 
 // ─── API Response Shape ───────────────────────────────────────────

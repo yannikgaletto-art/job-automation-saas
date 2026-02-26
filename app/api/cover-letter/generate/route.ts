@@ -81,13 +81,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             requestId,
-            draft_id: draftId, // B1.4: Frontend can reference this draft
+            draft_id: draftId,
             cover_letter: result.coverLetter,
             quality_scores: result.finalScores,
             validation: result.finalValidation,
             iterations: result.iterations,
             iteration_log: result.iterationLog,
             fluff_warning: result.fluffWarning ?? false,
+            pipeline_warnings: result.pipelineWarnings ?? [],   // B2.1
+            pipeline_improved: result.pipelineImproved ?? false, // B2.1
         });
 
     } catch (error: unknown) {

@@ -5,6 +5,7 @@ import { enrichCompany, linkEnrichmentToJob } from './company-enrichment';
 import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import type { StyleAnalysis } from './writing-style-analyzer';
 import { scanForFluff, buildBlacklistPromptSection } from './anti-fluff-blacklist';
+import { runMultiAgentPipeline } from './multi-agent-pipeline';
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
@@ -92,7 +93,9 @@ export interface CoverLetterResult {
         timestamp: string;
     }>;
     costCents: number;
-    fluffWarning?: boolean; // True if blacklist patterns persisted after re-gen attempts
+    fluffWarning?: boolean;
+    pipelineWarnings?: string[];  // B2.1: Warnings from GPT-4o/Perplexity
+    pipelineImproved?: boolean;   // B2.1: true if pipeline changed the text
 }
 
 const MAX_ITERATIONS = 3;
@@ -410,9 +413,56 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
         }
     }
 
-    // Cost tracking: Sonnet ~$0.025/call, Haiku ~$0.003/call, Fluff re-gen ~$0.025/call
+    // ─── B2.2: VUL-Tag Enforcement (Vulnerability Injector Post-Gen) ───────
+    if (setupContext?.optInModules?.vulnerabilityInjector && coverLetter.includes('[VUL]')) {
+        const vulMatches = coverLetter.match(/\[VUL\][\s\S]*?\[\/VUL\]/g) || [];
+        console.log(`[VUL-Check] Found ${vulMatches.length} vulnerability tags`);
+
+        if (vulMatches.length > 2) {
+            // More than 2 vulnerabilities — remove the third (keep safest 2)
+            console.warn(`⚠️ [VUL-Check] ${vulMatches.length} > 2 — removing excess via targeted fix`);
+            let vulCount = 0;
+            coverLetter = coverLetter.replace(/\[VUL\][\s\S]*?\[\/VUL\]/g, (match) => {
+                vulCount++;
+                if (vulCount > 2) return ''; // Remove 3rd+ vulnerability
+                return match;
+            });
+        }
+
+        // Strip all VUL tags from final output (keep content inside)
+        coverLetter = coverLetter.replace(/\[VUL\]/g, '').replace(/\[\/VUL\]/g, '');
+        // Clean up any double-spaces or orphan newlines from tag removal
+        coverLetter = coverLetter.replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    // ─── B2.1: Multi-Agent Pipeline (after Fluff + VUL, before return) ───────
+    // Yannik Correction #1: Pipeline runs after fluff scan, finalScores remain Claude scores
+    let pipelineWarnings: string[] | undefined;
+    let pipelineImproved = false;
+
+    if (coverLetter.length > 0 && process.env.ANTHROPIC_API_KEY) {
+        try {
+            const pipelineResult = await runMultiAgentPipeline(
+                coverLetter,
+                jobData,
+                companyResearch
+            );
+            coverLetter = pipelineResult.finalText;
+            pipelineImproved = pipelineResult.pipelineImproved;
+            if (pipelineResult.pipelineWarnings.length > 0) {
+                pipelineWarnings = pipelineResult.pipelineWarnings;
+            }
+        } catch (pipelineErr) {
+            console.error('❌ [Pipeline] Multi-agent pipeline failed entirely:', pipelineErr);
+            pipelineWarnings = ['Multi-Agent-Pipeline komplett fehlgeschlagen. Original-Text wird beibehalten.'];
+        }
+    }
+
+    // Cost tracking: Sonnet ~$0.025/call, Haiku ~$0.003/call, Fluff ~$0.025/call, GPT-4o ~$0.005, Perplexity ~$0.003
     const judgeCallCount = iterationLog.filter(l => l.validation.isValid).length;
-    const costCents = iterationLog.length * 2.5 + judgeCallCount * 0.3 + fluffRetries * 2.5;
+    const gptCost = process.env.OPENAI_API_KEY ? 0.5 : 0;
+    const perplexityCost = process.env.PERPLEXITY_API_KEY ? 0.3 : 0;
+    const costCents = iterationLog.length * 2.5 + judgeCallCount * 0.3 + fluffRetries * 2.5 + gptCost + perplexityCost;
 
     return {
         coverLetter,
@@ -422,6 +472,8 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
         iterationLog,
         costCents,
         fluffWarning,
+        pipelineWarnings,
+        pipelineImproved,
     };
 }
 
@@ -548,23 +600,31 @@ Kalibriere deinen Output auf dieses Muster — übernimm den Stil, nicht den Inh
 Nutze die extrahierten Konjunktionen statt generischer Übergänge.`
         : '';
 
-    // ─── Stations Section ─────────────────────────────────────────────────────
-    const stationsSection = ctx?.cvStations?.length
-        ? `[REGEL: HAUPTTEIL - CV-STATIONEN]\n` +
-        `- Schreibe keinen Fließtext-Lebenslauf! Widme jeder ausgewählten CV-Station einen EIGENEN, kurzen Absatz (max. 3 Sätze).\n` +
-        `- Nenne den Kontext kurz, aber fokussiere dich zu 70% auf den erlernten WERT (Was hat der Kandidat gelernt? Warum ist das für den neuen Arbeitgeber relevant?). Verbinde Sätze logisch (z.B. 'Diese Erfahrung hat meinen Blick dafür geschärft, wie...').\n` +
-        `- REDUZIERE BUZZWORDS DRASTISCH. Pro Absatz maximal 2 zentrale Fachbegriffe. Wenn eine CV-Station viele Technologien enthält, erwähne NUR diejenige, die absolut essenziell für die ausgeschriebene Stelle ist. Lass alles andere weg. Der Text muss natürlich und elegant klingen, nicht wie Keyword-Stuffing.\n\n` +
-        ctx.cvStations.map(s => `
-Station ${s.stationIndex}: ${s.role} @ ${s.company} (${s.period})
+    // ─── Stations Section (B2.3: Stations-Selektor mit PFLICHT/VERBOT) ──────────
+    let stationsSection: string;
+    if (ctx?.cvStations?.length) {
+        const stationNames = ctx.cvStations.map(s => `${s.role} @ ${s.company}`).join(', ');
+        stationsSection = `[REGEL: HAUPTTEIL - CV-STATIONEN]
+PFLICHT: Verwende AUSSCHLIESSLICH diese ${ctx.cvStations.length} Stationen: ${stationNames}
+VERBOT: Erwähne KEINE anderen Stationen aus dem CV — nur die oben genannten sind erlaubt!
+
+- Schreibe keinen Fließtext-Lebenslauf! Widme jeder ausgewählten CV-Station einen EIGENEN, kurzen Absatz (max. 3 Sätze).
+- Nenne den Kontext kurz, aber fokussiere dich zu 70% auf den erlernten WERT (Was hat der Kandidat gelernt? Warum ist das für den neuen Arbeitgeber relevant?). Verbinde Sätze logisch (z.B. 'Diese Erfahrung hat meinen Blick dafür geschärft, wie...').
+- REDUZIERE BUZZWORDS DRASTISCH. Pro Absatz maximal 2 zentrale Fachbegriffe. Wenn eine CV-Station viele Technologien enthält, erwähne NUR diejenige, die absolut essenziell für die ausgeschriebene Stelle ist. Lass alles andere weg.
+
+` + ctx.cvStations.map(s => `Station ${s.stationIndex}: ${s.role} @ ${s.company} (${s.period})
   → Beweis für Job-Anforderung: "${s.matchedRequirement}"
   → Schlüssel-Achievement: "${s.keyBullet}"
-  → Zeige im Text: ${s.intent}`).join('\n')
-        : 'Nutze die relevantesten Erfahrungen aus dem CV und beweise damit deinen Wert für das Unternehmen.';
+  → Zeige im Text: ${s.intent}`).join('\n');
+    } else {
+        stationsSection = 'Nutze die relevantesten Erfahrungen aus dem CV und beweise damit deinen Wert für das Unternehmen.';
+    }
 
     // ─── Hook Section (B1.3: Zitat-System repariert) ─────────────────────────
     let hookSection = '';
     if (ctx?.selectedQuote) {
-        const enablePingPong = ctx?.enablePingPong ?? false;
+        // B2.2: optInModules.pingPong sets enablePingPong — single path
+        const enablePingPong = ctx?.optInModules?.pingPong ?? ctx?.enablePingPong ?? false;
 
         hookSection = `[REGEL: EINLEITUNG - ZITAT-BRIDGING]:
 Gewähltes Zitat: "${ctx.selectedQuote.quote}"
@@ -595,7 +655,53 @@ Unternehmens-Fakt: "${ctx.selectedHook.content}"
 -> MAXIMAL 2 SÄTZE für den Aufhänger. Verknüpfe ihn mit deiner Motivation für die Stelle`;
     }
 
-    // ─── Word-Count Feedback ──────────────────────────────────────────────────
+    // ─── News-Binding (B2.5: selectedNews als Pflicht-Kontext) ────────────────
+    let newsSection = '';
+    if (ctx?.selectedNews) {
+        newsSection = `[REGEL: NEWS-BINDING — PFLICHT]
+PFLICHT: Die folgende News MUSS organisch im Cover Letter vorkommen:
+"${ctx.selectedNews.title}" (${ctx.selectedNews.date}${ctx.selectedNews.source ? `, ${ctx.selectedNews.source}` : ''})
+Integriere sie als Anknüpfungspunkt zwischen User-Erfahrung und Firma.
+Nicht als Fakt hinwerfen, sondern als Brücke nutzen.
+NIEMALS die Quelle direkt nennen — der Kandidat soll wirken, als hätte er die News natürlich mitbekommen.`;
+    }
+
+    // ─── Opt-In Module Sections (B2.2) ────────────────────────────────────────
+    const modules = ctx?.optInModules;
+
+    let first90DaysSection = '';
+    if (modules?.first90DaysHypothesis) {
+        first90DaysSection = `[REGEL: FIRST 90 DAYS HYPOTHESIS — 1x VERWENDEN]
+Basierend auf den Stellenanforderungen und dem Firmenprofil:
+Formuliere in EINEM Absatz (nicht als Liste!) einen konkreten 90-Tage-Ausblick:
+"In den ersten 90 Tagen würde ich mich auf drei Dinge fokussieren:
+1. [Konkretes Problem der Firma + User-Lösungsansatz aus CV]
+2. [Zweites Thema mit Bezug zur Stelle]
+3. [Drittes Thema mit strategischem Blick]"
+Nur 3 Punkte, knapp formuliert. Kein Roman. Zeige dass du die Firma verstanden hast.`;
+    }
+
+    let painPointSection = '';
+    if (modules?.painPointMatching !== false) { // Default: true
+        painPointSection = `[REGEL: PAIN POINT MATCHING — IMPLIZITE FIRMENSCHMERZEN]
+Analysiere die Stellenbeschreibung auf implizite Probleme:
+- Explizit gesucht (z.B. Python, Teamführung) = Skill Match → direkt benennen
+- Impliziter Schmerz (z.B. "Aufbau eines neuen Teams" = Wachstumsproblem) → Zeige mit einer konkreten CV-Station, wo genau du das schon gelöst hast
+Nicht "Ich kann das", sondern "Hier habe ich das gelöst: [konkret]".`;
+    }
+
+    let vulnerabilitySection = '';
+    if (modules?.vulnerabilityInjector) {
+        vulnerabilitySection = `[REGEL: VULNERABILITY INJECTOR — MAX. 2x VERWENDEN]
+Baue 1-2 strategische, authentische Schwächen oder Lernkurven ein.
+Format: "Ich habe bei [Station] schnell gemerkt, dass mein erster Ansatz zu komplex gedacht war. Das hat mich gezwungen, radikal zu vereinfachen — ein Prinzip, das ich auch in eurem [Firmen-Kontext] sehe."
+REGELN:
+- Darf NIE wie eine Entschuldigung klingen — immer als Wachstum framen
+- MAXIMAL 2 Stellen im gesamten Anschreiben
+- Jede Vulnerability MUSS in [VUL]...[/VUL] Tags eingeschlossen werden (wird nach Generierung automatisch geprüft und entfernt)
+- Beispiel: [VUL]Ich habe bei Fraunhofer schnell gemerkt, dass...[/VUL]`;
+    }
+
     const wordCountFeedback = (() => {
         if (lastWordCount > 380) {
             return `WORTANZAHL: Vorherige Version hatte ${lastWordCount} Wörter — ZU LANG. Kürze um ${lastWordCount - 350} Wörter. Maximal 3 Sätze pro Absatz.`;
@@ -634,6 +740,8 @@ ${hookSection || `Beginne mit einem relevanten Aufhänger zu ${companyName}.`}
 ${companyName} muss im ersten Absatz mindestens einmal fallen.
 Der gesamte erste Absatz (Aufhänger + Motivation) darf MAXIMAL 2 SÄTZE lang sein! Keine generischen Abhandlungen über Innovation. Kurz, knackig, direkt zum Punkt.
 
+${newsSection}
+
 === SEKTION 3: KARRIERE-BEWEISE (FOLGENDE ABSÄTZE) ===
 Integriere diese Stationen als fließende Prosa — WICHTIG: Erstelle für jede gewählte Station einen eigenen Absatz.
 
@@ -647,6 +755,12 @@ Werte: ${JSON.stringify(company?.company_values?.slice(0, 3) || [])}
 Tech: ${JSON.stringify(company?.tech_stack?.slice(0, 3) || [])}
 
 ${cvInput}
+
+${first90DaysSection}
+
+${painPointSection}
+
+${vulnerabilitySection}
 
 === SEKTION 4: TONALITÄT & STIL ===
 PRESET: ${ctx?.tone.preset || 'formal'}
