@@ -35,6 +35,44 @@ interface EnrichmentResult {
     linkedin_activity: any[];
     suggested_quotes: QuoteSuggestion[];
     perplexity_citations: string[];
+    needs_company_context?: boolean;
+}
+
+/**
+ * EnrichmentContext — Stufe 0 Steckbrief / Stufe 1 CV Match fallback
+ *
+ * Injected by callers when available. Forms the anchor for Zero-Fake-Data
+ * source validation. The more context provided, the higher possible confidence.
+ *
+ * Source of truth priority:
+ *   1. Steckbrief (job_description fields: website, industry, description)
+ *   2. CV Match result (company_url, company_description)
+ *   3. Nothing → Unsicherheits-Gate may block result
+ */
+export interface EnrichmentContext {
+    website?: string;        // e.g. "myty.com" or "https://myty.com"
+    industry?: string;       // e.g. "Fashion-Tech"
+    description?: string;    // brief company description, used for text-match
+}
+
+/** Helper: strip protocol and www, e.g. "https://www.myty.com/page" → "myty.com" */
+function extractDomain(url: string): string {
+    return url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0].toLowerCase();
+}
+
+/** Empty result for Unsicherheits-Gate — confidence 0, UI shows request-context prompt */
+function getEmptyEnrichmentResult(companyName: string, needsContext: boolean): Partial<EnrichmentResult> & { needs_company_context: boolean } {
+    console.warn(`⚠️ [Enrichment] Empty State for "${companyName}" — needsContext=${needsContext}`);
+    return {
+        confidence_score: 0,
+        recent_news: [],
+        company_values: [],
+        tech_stack: [],
+        linkedin_activity: [],
+        suggested_quotes: [],
+        perplexity_citations: [],
+        needs_company_context: needsContext,
+    };
 }
 
 /**
@@ -86,30 +124,45 @@ async function checkCache(
 /**
  * STEP 2: Fetch from Perplexity (if cache miss)
  *
+ * Zero-Fake-Data Architecture (Batch 7):
+ *   Stufe 0/1: EnrichmentContext injected into prompt for precise targeting
+ *   Stufe 2/3: Citation validation + Confidence Score calculated below
+ *
  * CRITICAL: We ONLY fetch public company data, NO personal data!
  */
 async function fetchCompanyIntel(
-    companyName: string
-): Promise<Partial<EnrichmentResult>> {
+    companyName: string,
+    context?: EnrichmentContext
+): Promise<Partial<EnrichmentResult> & { needs_company_context: boolean }> {
     // 1. Rate Limiting Check
     if (ratelimit) {
         const { success } = await ratelimit.limit('perplexity_enrichment');
         if (!success) {
             console.warn('Perplexity rate limit reached. Returning empty enrichment.');
-            return { confidence_score: 0 };
+            return getEmptyEnrichmentResult(companyName, !context?.website);
         }
     }
 
-    const MAX_RETRIES = 2; // Initial + 2 retries = 3 total
+    // Build context-enriched prompt (Stufe 0 & 1)
+    const contextHints: string[] = [];
+    if (context?.website) contextHints.push(`Domain: ${context.website}`);
+    if (context?.industry) contextHints.push(`Industry: ${context.industry}`);
+    if (context?.description) contextHints.push(`Context: ${context.description}`);
+
+    const contextString = contextHints.length > 0
+        ? `\n\nCRITICAL CONTEXT TO MATCH:\n${contextHints.join('\n')}\nOnly return sources that STRICTLY match this exact company entity. Reject any sources from other companies.`
+        : '';
+
+    const MAX_RETRIES = 2;
     let attempt = 0;
 
     while (attempt <= MAX_RETRIES) {
         attempt++;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         try {
-            console.log(`🔍 Perplexity Research: ${companyName} (Attempt ${attempt})`);
+            console.log(`🔍 Perplexity Research: ${companyName} (Attempt ${attempt}${context?.website ? ` | ctx:${context.website}` : ''})`);
 
             const response = await fetch('https://api.perplexity.ai/chat/completions', {
                 method: 'POST',
@@ -129,7 +182,7 @@ async function fetchCompanyIntel(
                         },
                         {
                             role: 'user',
-                            content: `Find PUBLIC information about ${companyName}.
+                            content: `Find PUBLIC information about ${companyName}.${contextString}
                             
                             Required information:
                             1. Recent news (last 3 months) - specifically look for recent funding, valuation, seed rounds, or major growth.
@@ -173,7 +226,6 @@ async function fetchCompanyIntel(
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                // If 429, respect it immediately (don't retry endlessly if not handling retry-after)
                 if (response.status === 429) {
                     console.warn('Perplexity 429 Too Many Requests');
                     break;
@@ -182,21 +234,18 @@ async function fetchCompanyIntel(
             }
 
             const data = await response.json();
-            const content = data.choices[0]?.message?.content;
-            const citations = data.citations || [];
+            const content = data.choices[0]?.message?.content || '';
+            const citations: string[] = data.citations || [];
 
             let parsed;
             try {
-                // 1. Try parsing pure content (e.g. if model listens well)
                 try {
                     parsed = JSON.parse(content);
                 } catch {
-                    // 2. Try extracting from markdown code block
                     const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/);
                     if (jsonMatch) {
                         parsed = JSON.parse(jsonMatch[1]);
                     } else {
-                        // 3. Fallback: find first { and last }
                         const firstOpen = content.indexOf('{');
                         const lastClose = content.lastIndexOf('}');
                         if (firstOpen !== -1 && lastClose !== -1) {
@@ -208,53 +257,98 @@ async function fetchCompanyIntel(
                 }
             } catch (e) {
                 console.warn('Failed to parse Perplexity JSON. Raw content:', content.substring(0, 200) + '...');
-                // Return low confidence result rather than retrying parser errors which are likely deterministic
-                return { confidence_score: 0.1, perplexity_citations: citations };
+                return getEmptyEnrichmentResult(companyName, !context?.website);
             }
 
-            let confidence = 0.0;
-            if (parsed.recent_news?.length > 0) confidence += 0.2;
-            if (parsed.vision_and_mission) confidence += 0.2;
-            if (parsed.key_projects?.length > 0) confidence += 0.2;
-            if (parsed.company_values?.length > 0) confidence += 0.2;
-            if (parsed.linkedin_activity?.length > 0) confidence += 0.2;
+            // ─── Zero-Fake-Data Validation (Batch 7) ───────────────────────
+            // Stufe 1: Domain/Name Filter on Citations
+            const contextDomain = context?.website ? extractDomain(context.website) : null;
+            const namePart = companyName.toLowerCase().replace(/\s+/g, '');
 
-            console.log(`✅ Enrichment Success (Confidence: ${confidence})`);
+            const validSources = citations.filter(url => {
+                const urlLower = url.toLowerCase();
+                const domainMatch = contextDomain ? urlLower.includes(contextDomain) : false;
+                const nameMatch = urlLower.includes(namePart);
+                return domainMatch || nameMatch;
+            });
+
+            // Stufe 2: Unsicherheits-Gate
+            // If no context was provided AND we found < 2 matching sources → block
+            if (!context?.website && !context?.description && validSources.length < 2) {
+                console.warn(
+                    `⚠️ Unsicherheits-Gate for "${companyName}": ${validSources.length} valid citations, no context.`
+                );
+                return getEmptyEnrichmentResult(companyName, true); // needs_company_context = true
+            }
+
+            // Stufe 3: Explicit Confidence Score Schema (Batch 7, approved 2026-02-27)
+            let confidence = 0.0;
+            const responseTextLower = content.toLowerCase();
+            const companyNameLower = companyName.toLowerCase();
+
+            // +0.4 wenn Domain-Match in mindestens 1 Citation
+            if (contextDomain && validSources.some(url => url.toLowerCase().includes(contextDomain))) {
+                confidence += 0.4;
+            } else if (!contextDomain && validSources.length > 0) {
+                // Wenn kein Context-Domain, aber Name matched: partial score
+                confidence += 0.2;
+            }
+
+            // +0.3 wenn companyName im Response-Text erwähnt wird (case-insensitive)
+            if (responseTextLower.includes(companyNameLower)) {
+                confidence += 0.3;
+            }
+
+            // +0.2 wenn mindestens 2 valide Citations vorhanden
+            if (validSources.length >= 2) {
+                confidence += 0.2;
+            }
+
+            // +0.1 wenn industry/description aus Steckbrief im Response-Text vorkommt
+            if (context?.industry && responseTextLower.includes(context.industry.toLowerCase())) {
+                confidence += 0.1;
+            }
+
+            console.log(`📊 [Enrichment] Confidence for "${companyName}": ${confidence.toFixed(2)} (valid citations: ${validSources.length}/${citations.length})`);
+
+            // Threshold: confidence < 0.9 → Empty State
+            // 0.9 is achievable via: domain-match(0.4) + name-in-text(0.3) + 2-citations(0.2) = 0.9 ✅
+            if (confidence < 0.9) {
+                console.warn(`⚠️ Confidence ${confidence.toFixed(2)} < 0.9 for "${companyName}". Returning empty state.`);
+                return getEmptyEnrichmentResult(companyName, !context?.website);
+            }
+
+            console.log(`✅ Enrichment Success (Confidence: ${confidence.toFixed(2)})`);
 
             return {
                 recent_news: parsed.recent_news || [],
                 company_values: parsed.company_values || [],
-                tech_stack: [], // Deprecated in favor of vision/projects but kept for interface back-compat
+                tech_stack: [],
                 linkedin_activity: parsed.linkedin_activity || [],
-                suggested_quotes: [], // Filled in main function
-                perplexity_citations: citations,
+                suggested_quotes: [],
+                perplexity_citations: validSources, // Only verified citations stored
                 confidence_score: confidence,
-                // Add the new fields dynamically, they'll be saved via the intel_data obj
                 vision_and_mission: parsed.vision_and_mission || "",
                 key_projects: parsed.key_projects || [],
-                funding_status: parsed.funding_status || ""
+                funding_status: parsed.funding_status || "",
+                needs_company_context: false,
             } as any;
 
         } catch (error: any) {
             clearTimeout(timeoutId);
             console.error(`Fetch Company Intel Error (Attempt ${attempt}):`, error.name, error.message);
 
-            if (error.name === 'AbortError') {
-                // Timeout
-            }
-
             if (attempt > MAX_RETRIES) {
                 console.warn('Max retries reached. Returning empty enrichment.');
-                return { confidence_score: 0 };
+                return getEmptyEnrichmentResult(companyName, !context?.website);
             }
 
-            // Exponential backoff: 1s, 2s, 4s...
             const delay = Math.pow(2, attempt) * 1000;
             await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
 
-    return { confidence_score: 0 };
+    return getEmptyEnrichmentResult(companyName, !context?.website);
 }
 
 /**
@@ -264,13 +358,11 @@ async function saveToCache(
     companyName: string,
     intel: Partial<EnrichmentResult>
 ): Promise<string> {
-    // Map to Schema v3.0 columns
     const insertData = {
         company_name: companyName,
         recent_news: intel.recent_news || [],
         linkedin_activity: intel.linkedin_activity || [],
         suggested_quotes: intel.suggested_quotes || [],
-        // Store values and tech stack in generic intel_data jsonb
         intel_data: {
             company_values: intel.company_values || [],
             vision_and_mission: (intel as any).vision_and_mission || "",
@@ -278,10 +370,8 @@ async function saveToCache(
             funding_status: (intel as any).funding_status || "",
             source: 'perplexity'
         },
-        // We removed company_slug from schema v3.0, using company_name as unique
         perplexity_citations: intel.perplexity_citations || [],
         researched_at: new Date().toISOString(),
-        // expires_at automatically handled by DB default (7 days) but we can be explicit if needed
     };
 
     const { data, error } = await supabase
@@ -292,34 +382,56 @@ async function saveToCache(
 
     if (error) {
         console.error('Failed to save to cache:', error);
-        return ''; // Return empty string on failure, don't throw to keep flow alive
+        return '';
     }
 
-    console.log(
-        `💾 Cache WRITE: ${companyName} (TTL: 7 days)`
-    );
+    console.log(`💾 Cache WRITE: ${companyName} (TTL: 7 days)`);
     return data.id;
 }
 
 /**
- * MAIN: Enrich company (with cache + graceful degradation)
+ * MAIN: Enrich company (with cache + graceful degradation + Zero-Fake-Data)
+ *
+ * @param companySlug  Kept for caller compatibility (unused)
+ * @param companyName  Canonical name used as cache key and Perplexity query
+ * @param forceRefresh Skip cache lookup
+ * @param context      Steckbrief context (website, industry, description).
+ *                     Pass Stufe 0 from job Steckbrief, Stufe 1 from CV Match.
+ *                     Without context, the Unsicherheits-Gate may return empty.
  */
 export async function enrichCompany(
-    companySlug: string, // Kept signature for compatibility, but we rely on companyName
+    companySlug: string,
     companyName: string,
-    forceRefresh: boolean = false
+    forceRefresh: boolean = false,
+    context?: EnrichmentContext
 ): Promise<EnrichmentResult> {
     // Step 1: Check cache using companyName (Schema v3.0 uses name as key)
     if (!forceRefresh) {
         const cached = await checkCache(companyName);
         if (cached) return cached;
     } else {
-        console.log(`🔄 Force refresh requested for: ${companyName}`);
+        console.log(`🔄 Force refresh requested for: ${companyName}${context?.website ? ` ctx:${context.website}` : ''}`);
         recordCacheMiss();
     }
 
-    // Step 2: Fetch fresh data
-    const intel = await fetchCompanyIntel(companyName);
+    // Step 2: Fetch fresh data with Zero-Fake-Data validation
+    const intel = await fetchCompanyIntel(companyName, context);
+
+    // If empty state (low confidence or unsicherheits-gate), skip cache write
+    if (intel.confidence_score === 0) {
+        return {
+            id: '',
+            company_name: companyName,
+            confidence_score: 0,
+            recent_news: [],
+            company_values: [],
+            tech_stack: [],
+            linkedin_activity: [],
+            suggested_quotes: [],
+            perplexity_citations: [],
+            needs_company_context: intel.needs_company_context,
+        };
+    }
 
     // Step 2.5: Generate Quotes if we have values
     if (intel.company_values && intel.company_values.length > 0) {
@@ -328,7 +440,7 @@ export async function enrichCompany(
         intel.suggested_quotes = quotes;
     }
 
-    // Step 3: Save to cache
+    // Step 3: Save to cache (only writes if confidence >= 0.9)
     const id = await saveToCache(companyName, intel);
 
     return {
@@ -340,7 +452,8 @@ export async function enrichCompany(
         tech_stack: intel.tech_stack || [],
         linkedin_activity: intel.linkedin_activity || [],
         suggested_quotes: intel.suggested_quotes || [],
-        perplexity_citations: intel.perplexity_citations || []
+        perplexity_citations: intel.perplexity_citations || [],
+        needs_company_context: false,
     };
 }
 
@@ -351,8 +464,6 @@ export async function linkEnrichmentToJob(
     jobId: string,
     companyResearchId: string
 ) {
-    // Schema v3.0: company_research.job_id -> job_queue.id
-    // We update the company_research record to point to this job
     const { error } = await supabase
         .from('company_research')
         .update({ job_id: jobId })
@@ -360,7 +471,6 @@ export async function linkEnrichmentToJob(
 
     if (error) {
         console.error(`Failed to link enrichment to job ${jobId}:`, error);
-        // Don't throw, non-critical
     } else {
         console.log(`🔗 Linked enrichment to job ${jobId}`);
     }

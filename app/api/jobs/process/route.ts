@@ -68,7 +68,14 @@ export async function POST(request: Request) {
 
         console.log(`[${requestId}] route=jobs/process step=enrich_company`);
 
-        const intel = await enrichCompany(job.company_slug, job.company_name);
+        // Stufe 0: Build EnrichmentContext from Steckbrief fields
+        const enrichContext = {
+            website: job.company_url || job.metadata?.company_url || undefined,
+            industry: job.field || job.metadata?.field || undefined,
+            description: job.job_description?.substring(0, 200) || undefined,
+        };
+
+        const intel = await enrichCompany(job.company_slug, job.company_name, false, enrichContext);
 
         if (intel.id) {
             await linkEnrichmentToJob(jobId, intel.id);

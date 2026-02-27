@@ -124,7 +124,13 @@ export async function generateCoverLetterWithQuality(
             const enrichment = await enrichCompany(
                 jobData.company_slug || jobData.company_name,
                 jobData.company_name,
-                false
+                false,
+                {
+                    // Stufe 0: take from job metadata if Steckbrief was filled
+                    website: jobData.metadata?.company_url || undefined,
+                    industry: jobData.field || jobData.metadata?.field || undefined,
+                    description: jobData.job_description?.substring(0, 200) || undefined,
+                }
             );
             await linkEnrichmentToJob(jobId, enrichment.id);
             research = { company_values: enrichment.company_values, tech_stack: enrichment.tech_stack };

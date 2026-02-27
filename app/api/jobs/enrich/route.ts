@@ -4,7 +4,7 @@ import { enrichCompany, linkEnrichmentToJob } from "@/lib/services/company-enric
 
 export async function POST(req: NextRequest) {
     try {
-        const { jobId, companyName } = await req.json()
+        const { jobId, companyName, website, industry, description } = await req.json()
 
         if (!jobId || !companyName) {
             return NextResponse.json(
@@ -20,8 +20,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
-        // 1. Trigger enrichment (fetch from Perplexity / Cache)
-        const enrichment = await enrichCompany(companyName, companyName, true) // Force refresh so it attempts to fetch
+        // 1. Trigger enrichment with optional Steckbrief context (Stufe 0)
+        const enrichContext = {
+            website: website || undefined,
+            industry: industry || undefined,
+            description: description || undefined,
+        };
+        const enrichment = await enrichCompany(companyName, companyName, true, enrichContext)
 
         // 2. Link it to the job if an ID is returned
         if (enrichment.id) {
@@ -29,10 +34,11 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json({ success: true, data: enrichment })
-    } catch (error: any) {
-        console.error("❌ [API] /api/jobs/enrich err:", error)
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error("❌ [API] /api/jobs/enrich err:", errMsg)
         return NextResponse.json(
-            { error: error.message || "Failed to enrich company" },
+            { error: errMsg || "Failed to enrich company" },
             { status: 500 }
         )
     }
