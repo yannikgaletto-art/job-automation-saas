@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
             fluff_warning: result.fluffWarning ?? false,
             pipeline_warnings: result.pipelineWarnings ?? [],
             pipeline_improved: result.pipelineImproved ?? false,
-            // TODO Batch 4: Persist xray_annotations in draft metadata
+            // B4.1: xray_annotations persisted in draft metadata
             annotated_sentences: result.annotatedSentences ?? [],  // B3.1
             hiring_personas: result.hiringPersonas ?? [],          // B3.2
         });

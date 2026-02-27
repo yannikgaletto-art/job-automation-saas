@@ -65,7 +65,7 @@ export interface CoverLetterResult {
     fluffWarning?: boolean;
     pipelineWarnings?: string[];
     pipelineImproved?: boolean;
-    // TODO Batch 4: Persist xray_annotations in draft metadata
+    // B4.1: xray_annotations persisted in draft metadata via generate/route.ts
     annotatedSentences?: SentenceAnnotation[];  // B3.1: Only in live response, not persisted
     hiringPersonas?: HiringPersona[];           // B3.2: Available personas for frontend panel
 }
@@ -419,8 +419,8 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
     }
 
     // ─── B3.1: X-Ray Annotations (after pipeline, before return) ─────────
-    // Correction #2: Separate Haiku call outside generation loop
-    // TODO Batch 4: Persist xray_annotations in draft metadata
+    // B3.1 X-Ray: Separate Haiku call outside generation loop (Correction #2)
+    // B4.1: xray_annotations persisted in draft metadata
     let annotatedSentences: SentenceAnnotation[] | undefined;
     if (setupContext?.xRayMode && coverLetter.length > 0) {
         try {
