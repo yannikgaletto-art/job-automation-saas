@@ -188,6 +188,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
     const [activeTab, setActiveTab] = useState<number | null>(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [liveMatchResult, setLiveMatchResult] = useState<any | null>(null);
+    const [optimisticStep, setOptimisticStep] = useState<number | null>(null);
 
     const displayTab = activeTab ?? 0;
 
@@ -255,9 +256,10 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
 
                 <div className="flex-1 min-w-[200px]" onClick={(e) => e.stopPropagation()}>
                     <ProgressWorkflow
-                        current={job.workflowStep}
+                        current={optimisticStep ?? job.workflowStep}
                         onStepClick={handleStepClick}
                         activeTab={expanded ? activeTab : null}
+                        jobId={job.id}
                     />
                 </div>
 
@@ -428,7 +430,10 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                 jobId={job.id}
                                 cachedMatch={liveMatchResult ?? job.metadata?.cv_match}
                                 onMatchStart={() => console.log('CV Match started')}
-                                onMatchComplete={(result) => setLiveMatchResult(result)}
+                                onMatchComplete={(result) => {
+                                    setLiveMatchResult(result);
+                                    setOptimisticStep(prev => Math.max(prev ?? job.workflowStep, 2));
+                                }}
                                 onNextStep={() => setActiveTab(2)}
                             />
                         )}
@@ -449,7 +454,10 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                 jobId={job.id}
                                 companyName={job.company}
                                 jobTitle={job.jobTitle}
-                                onComplete={() => console.log('Cover letter flow complete')}
+                                onComplete={() => {
+                                    console.log('Cover letter flow complete');
+                                    setOptimisticStep(4);
+                                }}
                             />
                         )}
                     </motion.div>
