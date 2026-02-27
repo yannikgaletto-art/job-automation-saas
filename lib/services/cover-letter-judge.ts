@@ -87,8 +87,15 @@ ANSCHREIBEN:
 ${text}
 ***
 
-Sei streng. Durchschnittlich = 6-7, nicht 8-9.
-WICHTIG: Wenn der 'overall_score' unter 9.0 liegt, MUSST du zwingend mindestens eine konkrete inhaltliche Schwäche im "weaknesses" Array nennen! 
+Sei fair und präzise. Bewertungsskala:
+7 = solide Basis, aber Verbesserungspotenzial klar erkennbar
+8 = stark, nur noch Feinschliff nötig
+9 = exzellent, kaum Verbesserungsbedarf
+10 = perfekt — publizierbar ohne Änderung
+WICHTIG: Wenn der 'overall_score' unter 9.0 liegt, MUSST du zwingend mindestens eine konkrete inhaltliche Schwäche im "weaknesses" Array nennen!
+
+Der overall_score wird NICHT von dir berechnet — gib ihn als 0 zurück. Er wird extern berechnet als:
+overall = 0.3*naturalness + 0.2*style_match + 0.3*company_relevance + 0.2*individuality
 
 Antworte NUR als valides JSON:
 {
@@ -96,7 +103,7 @@ Antworte NUR als valides JSON:
   "style_match": <0-10>,
   "company_relevance": <0-10>,
   "individuality": <0-10>,
-  "overall_score": <0-10>,
+  "overall_score": 0,
   "weaknesses": ["<Schwäche 1>", "<Schwäche 2>"]
 }`;
 
@@ -123,7 +130,12 @@ Antworte NUR als valides JSON:
             parsed = JSON.parse(match[0]);
         }
 
-        console.log(`✅ [Judge] naturalness=${parsed.naturalness} style=${parsed.style_match} relevance=${parsed.company_relevance} individuality=${parsed.individuality} overall=${parsed.overall_score}`);
+        // Weighted overall_score (Batch 6: replaces Claude's self-calculated score)
+        const weightedOverall = Math.round(
+            (parsed.naturalness * 0.3 + parsed.style_match * 0.2 + parsed.company_relevance * 0.3 + parsed.individuality * 0.2) * 100
+        ) / 100;
+
+        console.log(`✅ [Judge] naturalness=${parsed.naturalness} style=${parsed.style_match} relevance=${parsed.company_relevance} individuality=${parsed.individuality} overall=${weightedOverall} (weighted)`);
 
         return {
             scores: {
@@ -131,7 +143,7 @@ Antworte NUR als valides JSON:
                 style_match: parsed.style_match,
                 company_relevance: parsed.company_relevance,
                 individuality: parsed.individuality,
-                overall_score: parsed.overall_score,
+                overall_score: weightedOverall,
             },
             weaknesses: parsed.weaknesses || []
         };
