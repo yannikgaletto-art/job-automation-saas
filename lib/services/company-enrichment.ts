@@ -466,7 +466,7 @@ export async function linkEnrichmentToJob(
 ) {
     // Punkt 3: Skip gracefully when enrichment returned empty state (Batch 7)
     if (!companyResearchId) {
-        console.log(`ℹ️ [Enrichment] linkEnrichmentToJob skipped — no enrichment id (empty state) for job ${jobId}`);
+        console.warn('⚠️ [linkEnrichmentToJob] No enrichment.id — skipping link');
         return;
     }
 

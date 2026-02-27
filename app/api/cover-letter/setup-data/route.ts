@@ -15,18 +15,7 @@ export async function GET(req: NextRequest) {
         const [jobRes, docsRes, profileRes] = await Promise.all([
             supabase
                 .from('job_queue')
-                .select(`
-          requirements,
-          metadata,
-          company_name,
-          company_research (
-            intel_data,
-            suggested_quotes,
-            recent_news,
-            linkedin_activity,
-            perplexity_citations
-          )
-        `)
+                .select('requirements, metadata, company_name')
                 .eq('id', jobId)
                 .single(),
 
@@ -51,8 +40,37 @@ export async function GET(req: NextRequest) {
         }
 
         const job = jobRes.data as any;
-        const research = job.company_research?.[0];
         const styleDoc = docsRes.data?.[0];
+
+        // ─── Two-pass company_research lookup ─────────────────────────
+        // Pass 1: Direct lookup via job_id
+        let research: any = null;
+
+        const { data: pass1Data } = await supabase
+            .from('company_research')
+            .select('intel_data, suggested_quotes, recent_news, linkedin_activity, perplexity_citations')
+            .eq('job_id', jobId)
+            .maybeSingle();
+
+        if (pass1Data) {
+            research = pass1Data;
+        }
+
+        // Pass 2: Fallback — lookup by company_name (matches cache architecture)
+        if (!research && job.company_name) {
+            const { data } = await supabase
+                .from('company_research')
+                .select('intel_data, suggested_quotes, recent_news, linkedin_activity, perplexity_citations')
+                .eq('company_name', job.company_name)
+                .gt('expires_at', new Date().toISOString())
+                .order('researched_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            research = data;
+            if (data) {
+                console.log(`🔗 [SetupData] Fallback: found research for "${job.company_name}" via company_name lookup`);
+            }
+        }
 
         // ─── Build Hooks (Step A) ──────────────────────────────────────
         const citations: string[] = research?.perplexity_citations || [];

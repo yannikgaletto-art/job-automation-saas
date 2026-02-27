@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { FileText, Upload, Trash2, Plus } from "lucide-react";
+import { FileText, Upload, Trash2, Plus, Download } from "lucide-react";
 import { Button } from "@/components/motion/button";
 import { showSafeToast } from "@/lib/utils/toast";
 
@@ -119,8 +119,28 @@ export function ActiveCVCard() {
             if (!res.ok) throw new Error(data.error || 'Löschen fehlgeschlagen');
             showSafeToast('Dokument gelöscht', `delete_success:${id}`);
             setDocs(prev => prev.filter(d => d.id !== id));
-        } catch (err: any) {
-            showSafeToast(err.message || 'Löschen fehlgeschlagen', `delete_error:${id}`, 'error');
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : 'Löschen fehlgeschlagen';
+            showSafeToast(errMsg, `delete_error:${id}`, 'error');
+        }
+    };
+
+    const handleDownload = async (id: string, name: string) => {
+        try {
+            const res = await fetch(`/api/documents/download?id=${id}`);
+            if (!res.ok) throw new Error('Download fehlgeschlagen');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : 'Unbekannter Fehler';
+            showSafeToast('CV-Download fehlgeschlagen — bitte erneut versuchen', `download_error:${id}`, 'error', errMsg);
         }
     };
 
@@ -182,9 +202,14 @@ export function ActiveCVCard() {
                                     <p className="text-sm font-medium text-[#37352F] truncate">{doc.name}</p>
                                     <p className="text-xs text-[#73726E]">Hochgeladen: {formatDate(doc.createdAt)}</p>
                                 </div>
-                                <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1">
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center gap-1">
+                                    <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#0066FF] transition-colors p-1" title="Herunterladen">
+                                        <Download className="w-4 h-4" />
+                                    </button>
+                                    <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1" title="Löschen">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </li>
                         ))}
                     </ul>
@@ -231,9 +256,14 @@ export function ActiveCVCard() {
                                     <p className="text-sm font-medium text-[#37352F] truncate">{doc.name}</p>
                                     <p className="text-xs text-[#73726E]">Hochgeladen: {formatDate(doc.createdAt)}</p>
                                 </div>
-                                <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1">
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center gap-1">
+                                    <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#0066FF] transition-colors p-1" title="Herunterladen">
+                                        <Download className="w-4 h-4" />
+                                    </button>
+                                    <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1" title="Löschen">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </li>
                         ))}
                     </ul>

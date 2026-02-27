@@ -1,33 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { renderToStream } from '@react-pdf/renderer';
+import { renderToBuffer } from '@react-pdf/renderer';
 import { ModernTemplate } from '@/components/cv-templates/ModernTemplate';
+import { ClassicTemplate } from '@/components/cv-templates/ClassicTemplate';
+import { TechTemplate } from '@/components/cv-templates/TechTemplate';
 import { CvStructuredData } from '@/types/cv';
+import { Font, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
-import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
+import path from 'path';
 
+// Register fonts server-side using absolute filesystem paths
+// (Cannot use /fonts/... URLs on the server — browser-only)
+let fontsRegistered = false;
+function registerServerFonts() {
+    if (fontsRegistered) return;
+    fontsRegistered = true;
+    const fontDir = path.join(process.cwd(), 'public', 'fonts');
+    Font.register({
+        family: 'Inter',
+        fonts: [
+            { src: path.join(fontDir, 'Inter-Regular.ttf'), fontWeight: 400 },
+            { src: path.join(fontDir, 'Inter-SemiBold.ttf'), fontWeight: 600 },
+            { src: path.join(fontDir, 'Inter-Bold.ttf'), fontWeight: 700 },
+        ],
+    });
+    // Disable mid-word hyphenation
+    Font.registerHyphenationCallback((word: string) => [word]);
+}
 
-// Simple Cover Letter Template
+// Simple Cover Letter PDF Template
 const clStyles = StyleSheet.create({
     page: { padding: '50px 60px', fontFamily: 'Inter', fontSize: 11, color: '#333' },
     paragraph: { lineHeight: 1.6, marginBottom: 12 }
 });
 
-
-const CoverLetterPDF = ({ text }: { text: string }) => {
-    registerPdfFonts();
+function CoverLetterDoc({ text }: { text: string }) {
     return React.createElement(Document, null,
         React.createElement(Page, { style: clStyles.page },
-            text.split('\n\n').map((paragraph, i) =>
+            ...text.split('\n\n').map((paragraph, i) =>
                 React.createElement(View, { key: i },
                     React.createElement(Text, { style: clStyles.paragraph }, paragraph)
                 )
             )
         )
     );
-};
+}
 
+function resolveTemplate(templateId: string, data: CvStructuredData) {
+    switch (templateId) {
+        case 'classic': return React.createElement(ClassicTemplate, { data });
+        case 'tech': return React.createElement(TechTemplate, { data });
+        default: return React.createElement(ModernTemplate, { data });
+    }
+}
 
 export async function GET(req: NextRequest) {
     try {
@@ -36,50 +61,53 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Missing jobId parameter' }, { status: 400 });
         }
 
-
         const supabase = await createClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
 
-        // Check if user requested a specific document type or defaults to optimized CV
         const type = req.nextUrl.searchParams.get('type') || 'cv';
+        const templateId = req.nextUrl.searchParams.get('template') || 'modern';
 
-
-        let stream: NodeJS.ReadableStream;
-        let filename = 'Download.pdf';
-
-
-        // 1. Hole den Job für den Namen
+        // Fetch job (user-scoped — Contract 2)
         const { data: job, error: jobError } = await supabase
             .from('job_queue')
-            .select('cv_optimization_proposal, metadata, company_name')
+            .select('cv_optimization_proposal, cv_optimization_user_decisions, metadata, company_name, company')
             .eq('id', jobId)
             .eq('user_id', user.id)
             .single();
-
 
         if (jobError || !job) {
             return NextResponse.json({ error: 'Job nicht gefunden' }, { status: 404 });
         }
 
+        // Register fonts before rendering
+        registerServerFonts();
+
+        let buffer: Buffer;
+        let filename = 'Download.pdf';
 
         if (type === 'cv') {
-            const cvData = job.cv_optimization_proposal?.optimized || job.metadata?.optimized_cv;
+            // Try all known data locations for the optimized CV
+            const cvData =
+                job.cv_optimization_proposal?.finalCv ||
+                job.cv_optimization_proposal?.optimized ||
+                job.metadata?.optimized_cv ||
+                job.metadata?.finalCv;
+
             if (!cvData) {
-                return NextResponse.json({ error: 'Optimiertes CV nicht gefunden' }, { status: 404 });
+                return NextResponse.json(
+                    { error: 'Optimiertes CV nicht gefunden — bitte zuerst CV-Optimizer abschliessen' },
+                    { status: 404 }
+                );
             }
 
-
-            stream = await renderToStream(
-                React.createElement(ModernTemplate, { data: cvData as CvStructuredData }) as any
-            );
-            filename = `CV_${job.company_name?.replace(/[^a-z0-9]/gi, '_') || 'Pathly'}.pdf`;
-
+            const element = resolveTemplate(templateId, cvData as CvStructuredData);
+            buffer = await renderToBuffer(element as any);
+            const rawCompany = (job.company_name || job.company || 'Pathly') as string;
+            filename = `CV_${rawCompany.replace(/[^a-z0-9]/gi, '_')}.pdf`;
 
         } else if (type === 'cover_letter') {
             const { data: docData, error: docError } = await supabase
@@ -92,45 +120,35 @@ export async function GET(req: NextRequest) {
                 .limit(1)
                 .single();
 
-
             if (docError || !docData?.metadata?.generated_content) {
                 return NextResponse.json({ error: 'Anschreiben nicht gefunden' }, { status: 404 });
             }
 
-
-            stream = await renderToStream(
-                React.createElement(CoverLetterPDF, { text: docData.metadata.generated_content }) as any
+            buffer = await renderToBuffer(
+                React.createElement(CoverLetterDoc, {
+                    text: docData.metadata.generated_content
+                }) as any
             );
-            filename = `Anschreiben_${job.company_name?.replace(/[^a-z0-9]/gi, '_') || 'Pathly'}.pdf`;
-
+            const rawCompany = (job.company_name || job.company || 'Pathly') as string;
+            filename = `Anschreiben_${rawCompany.replace(/[^a-z0-9]/gi, '_')}.pdf`;
 
         } else {
             return NextResponse.json({ error: 'Invalid document type' }, { status: 400 });
         }
 
-
-        // Web ReadableStream for Next.js Edge / App Router
-        const readableStream = new ReadableStream({
-            start(controller) {
-                stream.on('data', (chunk) => controller.enqueue(chunk));
-                stream.on('end', () => controller.close());
-                stream.on('error', (err) => controller.error(err));
-            }
-        });
-
-
-        return new NextResponse(readableStream, {
+        return new NextResponse(new Uint8Array(buffer), {
             headers: {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="${filename}"`
-            }
+                'Content-Disposition': `attachment; filename="${filename}"`,
+                'Content-Length': String(buffer.length),
+            },
         });
 
-
-    } catch (error: Error | unknown) {
-        console.error('PDF Generation Error:', error);
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.stack || error.message : String(error);
+        console.error('[cv/download] PDF Generation Error:', errMsg);
         return NextResponse.json(
-            { error: 'Internal server error while generating PDF' },
+            { error: `PDF-Generierung fehlgeschlagen: ${errMsg}` },
             { status: 500 }
         );
     }

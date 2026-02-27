@@ -1,9 +1,11 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Building2, Globe, Linkedin, CheckCircle, AlertTriangle, HelpCircle, Search, X, Loader2 } from "lucide-react"
 import { NewsFeed } from "./news-feed"
+import { showSafeToast } from "@/lib/utils/toast"
 
 interface LinkedInPost {
     content: string
@@ -38,6 +40,7 @@ export function CompanyIntelCard({
     jobId,
     onEnrichmentUpdated,
 }: CompanyIntelCardProps) {
+    const router = useRouter()
     const [websiteInput, setWebsiteInput] = useState("")
     const [isResearching, setIsResearching] = useState(false)
     const [contextDismissed, setContextDismissed] = useState(false)
@@ -55,7 +58,7 @@ export function CompanyIntelCard({
             })
             if (!patchRes.ok) throw new Error('Failed to save website')
 
-            // Step 2: Re-trigger enrichment with fresh context
+            // Step 2: Re-trigger enrichment with forceRefresh context (Punkt 2)
             const enrichRes = await fetch('/api/jobs/enrich', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -67,9 +70,22 @@ export function CompanyIntelCard({
             })
             if (!enrichRes.ok) throw new Error('Enrichment failed')
 
+            // Step 3: Notify parent + refresh Next.js server cache
             onEnrichmentUpdated?.()
+            router.refresh()
+            showSafeToast(
+                'Recherche abgeschlossen — Ergebnisse werden geladen ✓',
+                `enrich_started:${jobId}`
+            )
         } catch (err) {
-            console.error('[CompanyIntelCard] Research with context failed:', err)
+            const errMsg = err instanceof Error ? err.message : 'Unbekannter Fehler'
+            console.error('[CompanyIntelCard] Research with context failed:', errMsg)
+            showSafeToast(
+                'Recherche fehlgeschlagen',
+                `enrich_error:${jobId}`,
+                'error',
+                errMsg
+            )
         } finally {
             setIsResearching(false)
         }

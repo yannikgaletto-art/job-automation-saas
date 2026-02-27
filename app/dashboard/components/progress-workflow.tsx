@@ -4,82 +4,67 @@
  * ProgressWorkflow -- Horizontal node-chain stepper.
  * 4 circular nodes connected by lines, matching the Pathly design language.
  * No emojis -- only Lucide icons and Framer Motion transitions.
+ *
+ * Batch 8 Fix (Contract 9, SICHERHEITSARCHITEKTUR.md):
+ * nodeFilled uses threshold comparison (workflowStep >= node.threshold)
+ * instead of the broken index comparison (nodeIndex < workflowStep).
+ * This ensures only completed phases are green.
  */
 
-import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface ProgressWorkflowProps {
-    current: number; // 0-4 (current step index from job status)
+    current: number; // workflowStep percentage (0 | 10 | 30 | 60 | 100)
     className?: string;
     onStepClick?: (stepIndex: number) => void;
     activeTab?: number | null;
     jobId: string;
 }
 
-const WORKFLOW_NODES = [
-    { label: 'Steckbrief', pct: '10%', tabIndex: 0 },
-    { label: 'CV Match', pct: '30%', tabIndex: 1 },
-    { label: 'CV Opt.', pct: '75%', tabIndex: 2 },
-    { label: 'Cover Letter', pct: '100%', tabIndex: 3 },
-];
-
 /**
- * Node states:
- *  - FILLED (green): nodeIndex < workflowStep -- this step is completed
- *  - CURRENT (blue ring): nodeIndex === workflowStep -- actively being worked on
- *  - EMPTY (gray): nodeIndex > workflowStep -- not yet reached
+ * threshold = the workflowStep percentage at which this node turns green.
+ * Contract 9 (SICHERHEITSARCHITEKTUR.md) canonical mapping:
+ *   pending           → 0   → all nodes gray
+ *   processing        → 10  → node 0 green (threshold 10)
+ *   steckbrief_conf.  → 30  → nodes 0+1 green (threshold 10, 30)
+ *   cv_match_done     → 30  → nodes 0+1 green
+ *   cv_optimized      → 60  → nodes 0+1+2 green (threshold 10, 30, 60)
+ *   cover_letter_done → 100 → all nodes green
+ *   ready_for_review  → 100 → all nodes green
  */
-function nodeFilled(nodeIndex: number, workflowStep: number): boolean {
-    return nodeIndex < workflowStep;
+const WORKFLOW_NODES = [
+    { label: 'Steckbrief', pct: '10%', tabIndex: 0, threshold: 10 },
+    { label: 'CV Match', pct: '30%', tabIndex: 1, threshold: 30 },
+    { label: 'CV Opt.', pct: '75%', tabIndex: 2, threshold: 60 },
+    { label: 'Cover Letter', pct: '100%', tabIndex: 3, threshold: 100 },
+] as const;
+
+/** Node is green when the current workflowStep has reached this node's threshold. */
+function nodeFilled(threshold: number, workflowStep: number): boolean {
+    return workflowStep >= threshold;
 }
 
+/**
+ * Node is "current" (blue active ring) when:
+ *   - the previous node's threshold has been reached, but
+ *   - this node's threshold has NOT yet been reached.
+ * Node 0 is current when workflowStep < 10 (i.e. pending state).
+ */
 function nodeIsCurrent(nodeIndex: number, workflowStep: number): boolean {
-    return nodeIndex === workflowStep;
+    const node = WORKFLOW_NODES[nodeIndex];
+    const prevThreshold = nodeIndex === 0 ? 0 : WORKFLOW_NODES[nodeIndex - 1].threshold;
+    return workflowStep >= prevThreshold && workflowStep < node.threshold;
 }
 
 const NODE_SIZE = 36;
 
-export function ProgressWorkflow({ current, className, onStepClick, activeTab, jobId }: ProgressWorkflowProps) {
-    // Confetti when all 4 nodes are filled (workflowStep >= 4)
-    useEffect(() => {
-        if (current >= 4) {
-            const cacheKey = `pathly_confetti_job_${jobId}`;
-            if (localStorage.getItem(cacheKey)) return;
-
-            import('canvas-confetti').then(({ default: confetti }) => {
-                localStorage.setItem(cacheKey, '1');
-                const duration = 2500;
-                const end = Date.now() + duration;
-                const frame = () => {
-                    confetti({
-                        particleCount: 4,
-                        angle: 60,
-                        spread: 55,
-                        origin: { x: 0, y: 0.7 },
-                        colors: ['#002e7a', '#3b82f6', '#22c55e', '#60a5fa'],
-                    });
-                    confetti({
-                        particleCount: 4,
-                        angle: 120,
-                        spread: 55,
-                        origin: { x: 1, y: 0.7 },
-                        colors: ['#002e7a', '#3b82f6', '#22c55e', '#60a5fa'],
-                    });
-                    if (Date.now() < end) {
-                        requestAnimationFrame(frame);
-                    }
-                };
-                frame();
-            });
-        }
-    }, [current]);
+export function ProgressWorkflow({ current, className, onStepClick, activeTab, jobId: _jobId }: ProgressWorkflowProps) {
 
     return (
         <div className={cn("flex items-center h-14", className)}>
             {WORKFLOW_NODES.map((node, idx) => {
-                const filled = nodeFilled(idx, current);
+                const filled = nodeFilled(node.threshold, current);
                 const isCurrent = nodeIsCurrent(idx, current);
                 const isActiveTab = activeTab === node.tabIndex;
                 const isClickable = !!onStepClick;
@@ -121,18 +106,18 @@ export function ProgressWorkflow({ current, className, onStepClick, activeTab, j
                             </span>
                         </motion.button>
 
-                        {/* Connector line */}
+                        {/* Connector line — green only when both adjacent nodes are filled */}
                         {idx < WORKFLOW_NODES.length - 1 && (
                             <motion.div
                                 className={cn(
                                     "h-0.5 mx-1",
-                                    nodeFilled(idx, current) && nodeFilled(idx + 1, current)
+                                    nodeFilled(node.threshold, current) && nodeFilled(WORKFLOW_NODES[idx + 1].threshold, current)
                                         ? "bg-green-500"
                                         : "bg-slate-200"
                                 )}
                                 style={{ width: 24 }}
                                 animate={
-                                    nodeFilled(idx, current) && nodeFilled(idx + 1, current)
+                                    nodeFilled(node.threshold, current) && nodeFilled(WORKFLOW_NODES[idx + 1].threshold, current)
                                         ? { scaleX: [0, 1], originX: 0 }
                                         : {}
                                 }

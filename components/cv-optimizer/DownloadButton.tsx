@@ -1,12 +1,13 @@
 'use client';
 
 import React from 'react';
-import { PDFDownloadLink } from '@react-pdf/renderer';
+import { pdf } from '@react-pdf/renderer';
 import { CvStructuredData } from '@/types/cv';
 import { ModernTemplate } from '../cv-templates/ModernTemplate';
 import { ClassicTemplate } from '../cv-templates/ClassicTemplate';
 import { TechTemplate } from '../cv-templates/TechTemplate';
 import { Download, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface DownloadButtonProps {
     data: CvStructuredData;
@@ -26,46 +27,47 @@ function resolveDocument(data: CvStructuredData, templateId: string) {
 }
 
 export default function DownloadButton({ data, templateId }: DownloadButtonProps) {
-    const [isMounted, setIsMounted] = React.useState(false);
+    const [isDownloading, setIsDownloading] = React.useState(false);
 
-    React.useEffect(() => {
-        setIsMounted(true);
-    }, []);
+    const handleDownload = async () => {
+        setIsDownloading(true);
+        try {
+            const document = resolveDocument(data, templateId);
+            const blob = await pdf(document).toBlob();
 
-    const fileName = `CV_${data.personalInfo?.name?.replace(/\s+/g, '_') || 'Pathly'}.pdf`;
-    const document = resolveDocument(data, templateId);
+            const url = URL.createObjectURL(blob);
+            const a = window.document.createElement('a');
+            a.href = url;
+            const company = typeof data.personalInfo?.name === 'string'
+                ? data.personalInfo.name.replace(/\s+/g, '_')
+                : 'Pathly';
+            a.download = `CV_${company}.pdf`;
 
-    if (!isMounted) {
-        return (
-            <button
-                disabled
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium
-                           rounded-lg flex items-center justify-center gap-2 transition-colors
-                           disabled:opacity-50 min-w-[200px]"
-            >
-                <Loader2 className="w-4 h-4 animate-spin" /> PDF wird generiert...
-            </button>
-        );
-    }
+            window.document.body.appendChild(a);
+            a.click();
+            window.document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(err);
+            toast.error('Download fehlgeschlagen, bitte erneut probieren.');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     return (
-        <PDFDownloadLink document={document} fileName={fileName}>
-            {({ loading, error }) => (
-                <button
-                    disabled={loading || !!error}
-                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium
-                               rounded-lg flex items-center justify-center gap-2 transition-colors
-                               disabled:opacity-50 min-w-[200px]"
-                >
-                    {loading ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> PDF wird generiert...</>
-                    ) : error ? (
-                        'Fehler -- erneut versuchen'
-                    ) : (
-                        <><Download className="w-4 h-4" /> Download & Cover Letter</>
-                    )}
-                </button>
+        <button
+            onClick={handleDownload}
+            disabled={isDownloading}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium
+                       rounded-lg flex items-center justify-center gap-2 transition-colors
+                       disabled:opacity-50 min-w-[200px]"
+        >
+            {isDownloading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> PDF wird generiert...</>
+            ) : (
+                <><Download className="w-4 h-4" /> Download & Cover Letter</>
             )}
-        </PDFDownloadLink>
+        </button>
     );
 }

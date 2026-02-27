@@ -225,7 +225,24 @@ export default function JobQueuePage() {
                             optimizationResult={optimizationResult}
                             onAcceptAll={async () => { setShowOptimization(false); showSafeToast('\u00c4nderungen übernommen', `cv_accepted:${currentJobId}`); }}
                             onRejectAll={() => setShowOptimization(false)}
-                            onDownload={async () => { window.open(`/api/cv/download?jobId=${currentJobId}&type=cv`, '_blank'); }}
+                            onDownload={async () => {
+                                try {
+                                    const res = await fetch(`/api/cv/download?jobId=${currentJobId}&type=cv`);
+                                    if (!res.ok) throw new Error('PDF-Generierung fehlgeschlagen');
+                                    const blob = await res.blob();
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    const company = jobs.find(j => j.id === currentJobId)?.company?.replace(/[^a-z0-9]/gi, '_') || 'Pathly';
+                                    a.download = `CV_${company}.pdf`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                } catch {
+                                    showSafeToast('CV-Download fehlgeschlagen — bitte erneut versuchen', `cv_download_error:${currentJobId}`, 'error');
+                                }
+                            }}
                         />
                     )}
                 </div>
