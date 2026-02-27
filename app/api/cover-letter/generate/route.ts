@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
         const { data: insertData, error: insertError } = await supabase.from('documents').insert({
             user_id: userId,
             document_type: 'cover_letter',
+            file_url_encrypted: 'dummy_url', // B1.4 fix: required by DB constraint for generated texts
             metadata: {
                 status: 'draft', // B1.4: Every generated CL starts as draft
                 job_id: jobId,
