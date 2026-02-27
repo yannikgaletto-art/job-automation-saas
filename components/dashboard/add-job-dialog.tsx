@@ -24,7 +24,7 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
     const [error, setError] = useState<string | null>(null);
     const [errorRequestId, setErrorRequestId] = useState<string | null>(null);
 
-    const isUrlValid = companyWebsite === '' || /^https?:\/\/.+\..+/.test(companyWebsite);
+    const isUrlValid = /^https?:\/\/.+\..+/.test(companyWebsite);
     const isFormValid = company.length >= 2 && title.length >= 2 && description.length >= 500 && description.length <= 5000 && isUrlValid;
     const isSubmitting = isLoading;
 
@@ -125,7 +125,7 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                     <div className="space-y-2">
                         <div className="flex items-center gap-1.5">
                             <Globe className="w-3.5 h-3.5 text-[#73726E]" />
-                            <Label htmlFor="companyWebsite">Unternehmens-Website</Label>
+                            <Label htmlFor="companyWebsite">Unternehmens-Website <span className="text-red-500">*</span></Label>
                         </div>
                         <Input
                             id="companyWebsite"
@@ -133,12 +133,13 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                             placeholder="https://www.beispiel.de"
                             value={companyWebsite}
                             onChange={(e) => setCompanyWebsite(e.target.value)}
+                            required
                         />
                         {companyWebsite && !isUrlValid && (
                             <p className="text-xs text-red-500">Bitte gib eine gültige URL ein (https://...)</p>
                         )}
                         <p className="text-xs text-[#a1a1aa]">
-                            Empfohlen für präzise Unternehmensanalyse
+                            Pflichtfeld — für präzise Unternehmensanalyse
                         </p>
                     </div>
 
