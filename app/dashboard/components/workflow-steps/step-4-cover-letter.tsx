@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { CoverLetterWizard } from "./cover-letter-wizard/CoverLetterWizard"
 import type { CoverLetterSetupContext } from "@/types/cover-letter-setup"
 import { QualityScores } from "@/components/cover-letter/types"
 import { createClient } from "@/lib/supabase/client"
 import { CoverLetterResultView } from "./cover-letter-result/CoverLetterResultView"
+import { useCoverLetterSetupStore } from "@/store/useCoverLetterSetupStore"
 
 interface Step4CoverLetterProps {
     jobId: string
@@ -43,6 +44,9 @@ export function Step4CoverLetter({
     const [wizardContext, setWizardContext] = useState<CoverLetterSetupContext | null>(null)
     const [userId, setUserId] = useState<string | null>(null)
 
+    // Read from Zustand store — persisted across mounts (store > local state > null)
+    const buildContextFromStore = useCoverLetterSetupStore(state => state.buildContext)
+
     const generateCoverLetter = async (context?: CoverLetterSetupContext) => {
         try {
             if (!result) setIsLoading(true)
@@ -58,13 +62,17 @@ export function Step4CoverLetter({
             }
             setUserId(currentUserId)
 
+            // Fallback: store.buildContext() → local wizardContext → null
+            const resolvedContext: CoverLetterSetupContext | null =
+                context ?? buildContextFromStore() ?? wizardContext
+
             const response = await fetch('/api/cover-letter/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     jobId,
                     userId: currentUserId,
-                    setupContext: context || wizardContext,
+                    setupContext: resolvedContext,
                 })
             })
 
@@ -198,7 +206,7 @@ export function Step4CoverLetter({
                     initialResult={result}
                     userId={userId}
                     jobId={jobId}
-                    setupContext={wizardContext}
+                    setupContext={buildContextFromStore() ?? wizardContext}
                 />
             </div>
         )
