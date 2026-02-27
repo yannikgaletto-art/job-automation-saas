@@ -26,8 +26,10 @@ CREATE TABLE IF NOT EXISTS public.daily_briefings (
 ALTER TABLE public.daily_energy ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_briefings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "own_energy" ON public.daily_energy;
 CREATE POLICY "own_energy" ON public.daily_energy
   FOR ALL USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "own_briefings" ON public.daily_briefings;
 CREATE POLICY "own_briefings" ON public.daily_briefings
   FOR ALL USING (auth.uid() = user_id);

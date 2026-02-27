@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_validation_logs_created ON validation_logs(create
 
 ALTER TABLE validation_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can only access their own validation logs" ON validation_logs;
 CREATE POLICY "Users can only access their own validation logs"
   ON validation_logs FOR ALL
   USING (auth.uid() = user_id);

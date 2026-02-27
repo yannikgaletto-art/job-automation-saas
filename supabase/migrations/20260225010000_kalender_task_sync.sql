@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 -- RLS
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own tasks" ON public.tasks;
 CREATE POLICY "Users can manage own tasks" ON public.tasks
   FOR ALL USING (auth.uid() = user_id);
 
