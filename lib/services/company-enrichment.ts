@@ -464,6 +464,12 @@ export async function linkEnrichmentToJob(
     jobId: string,
     companyResearchId: string
 ) {
+    // Punkt 3: Skip gracefully when enrichment returned empty state (Batch 7)
+    if (!companyResearchId) {
+        console.log(`ℹ️ [Enrichment] linkEnrichmentToJob skipped — no enrichment id (empty state) for job ${jobId}`);
+        return;
+    }
+
     const { error } = await supabase
         .from('company_research')
         .update({ job_id: jobId })
