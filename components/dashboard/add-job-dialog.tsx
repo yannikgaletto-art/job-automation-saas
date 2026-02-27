@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
 
 interface AddJobDialogProps {
     isOpen: boolean;
@@ -49,24 +48,29 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
             if (!res.ok) {
                 if (data.requestId) {
                     setErrorRequestId(data.requestId);
+                    // Error toast stays here — parent only handles success
+                    const { toast } = await import('sonner');
                     toast.error(`Fehler. Support-ID: ${data.requestId}`);
                 } else {
+                    const { toast } = await import('sonner');
                     toast.error("Ein unerwarteter Fehler ist aufgetreten.");
                 }
                 setError(data.error || 'Failed to add job');
                 return;
             }
 
-            toast.success("Job erfolgreich hinzugefügt!");
+            // BUG-A Fix: No toast here — parent's onJobAdded fires showSafeToast
             setCompany('');
             setTitle('');
             setDescription('');
             onJobAdded();
             onClose();
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            setError(err.message);
+            const message = err instanceof Error ? err.message : String(err);
+            setError(message);
+            const { toast } = await import('sonner');
             toast.error("Ein unerwarteter Fehler ist aufgetreten.");
         } finally {
             setIsLoading(false);
