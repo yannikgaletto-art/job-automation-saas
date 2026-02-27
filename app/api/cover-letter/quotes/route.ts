@@ -2,27 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { suggestRelevantQuotes } from '@/lib/services/quote-matcher';
 
-/**
- * validateUrl — HEAD fetch with a 3s timeout.
- * Returns true for non-URL strings (text sources like "Letter to Shareholders")
- * so they are never filtered out.
- * Returns false ONLY for strings that look like URLs but are unreachable.
- * (SICHERHEITSARCHITEKTUR.md Section 10)
- */
-async function validateUrl(source: string): Promise<boolean> {
-    if (!source) return false;
-    // Only validate strings that look like URLs
-    if (!source.startsWith('http://') && !source.startsWith('https://')) return true;
-    try {
-        const res = await fetch(source, {
-            method: 'HEAD',
-            signal: AbortSignal.timeout(3000),
-        });
-        return res.ok; // true only for 2xx
-    } catch {
-        return false;
-    }
-}
+// validateUrl removed for Batch 7 — Quotes use text-based sources (books, speeches), not live URLs.
 
 export async function POST(req: NextRequest) {
     try {
@@ -62,21 +42,9 @@ export async function POST(req: NextRequest) {
             relevanceScore: q.match_score ?? q.relevance_score ?? 0,
         }));
 
-        // ✅ Filter invalid source URLs in parallel (SICHERHEITSARCHITEKTUR.md Section 10)
-        const validated = await Promise.all(
-            mapped.map(async (q) => ({
-                ...q,
-                source_valid: await validateUrl(q.source),
-            }))
-        );
-
-        // Remove quotes with a URL source that returned non-200
-        const top3 = validated
-            .filter(q => q.source_valid)
-            .map(({ source_valid: _sv, ...q }) => q); // strip internal field
-
-        console.log(`✅ [Quotes] Returned ${top3.length} validated quotes for ${companyName}`);
-        return NextResponse.json({ success: true, quotes: top3 });
+        // ✅ Batch 7: validateUrl removed. LLM handles source attribution as text.
+        console.log(`✅ [Quotes] Returned ${mapped.length} quotes for ${companyName}`);
+        return NextResponse.json({ success: true, quotes: mapped });
 
     } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

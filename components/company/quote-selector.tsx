@@ -154,7 +154,7 @@ export function QuoteSelector({
                         })}
                         {quotes.length === 0 && (
                             <div className="text-center p-6 bg-[#FAFAF9] rounded text-[#73726E] text-sm">
-                                No quotes found yet. Research company to generate suggestions.
+                                Keine Zitate gefunden.
                             </div>
                         )}
                     </motion.div>

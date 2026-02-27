@@ -16,8 +16,8 @@ function getOpenAI() {
 export interface QuoteSuggestion {
     quote: string;
     author: string;
-    source?: string; // Book, speech, etc.
-    relevance_score: number; // 0-1 (from Perplexity)
+    source?: string; // e.g. "Buch", "Interview", "Shareholder Letter" (KEINE URLs mehr)
+    relevance_score: number; // 0-1
     match_score?: number; // 0-1 (calculated via embeddings)
     matched_value: string; // The specific company value this quote supports
     value_connection: string; // Explanation
@@ -94,6 +94,40 @@ async function scoreQuoteRelevance(
 /**
  * STEP 1: Find quotes via Perplexity (with OpenAI fallback)
  */
+// STEP 1: Generate Quotes via OpenAI GPT-4o (Primary Engine for Batch 7)
+// Perplexity is dropped for quotes because quotes rarely need live web-search,
+// and LLMs are much better at philosophical/thematic value matching.
+async function generateQuotesWithOpenAI(promptText: string): Promise<QuoteSuggestion[]> {
+    try {
+        const openai = getOpenAI();
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+                { role: "system", content: "You are a specialized quote discovery assistant. Output extremely high-quality, visionary quotes strictly matching the required JSON format. DO NOT generate URLs. Use 'Author - Work' format." },
+                { role: "user", content: promptText }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.6,
+        });
+
+        const content = response.choices[0].message.content || '{"quotes":[]}';
+        const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/) || [null, content];
+        const parsed = JSON.parse(jsonMatch[1] ? jsonMatch[1].trim() : content.trim());
+
+        if (Array.isArray(parsed)) {
+            return parsed;
+        } else if (parsed.quotes && Array.isArray(parsed.quotes)) {
+            return parsed.quotes;
+        } else if (parsed.quote && parsed.author) {
+            return [parsed as QuoteSuggestion];
+        }
+        return [];
+    } catch (error) {
+        console.error('OpenAI Quote Generation Error:', error);
+        return [];
+    }
+}
+
 export async function suggestRelevantQuotes(
     companyName: string,
     companyValues: string[],
@@ -101,26 +135,21 @@ export async function suggestRelevantQuotes(
     jobTitle: string = "",
     jobField: string = ""
 ): Promise<QuoteSuggestion[]> {
-    // ✅ Context injection (SICHERHEITSARCHITEKTUR.md Section 11)
     const jobContext = jobTitle
         ? `\nStelle: ${jobTitle}${jobField ? `\nBranche/Kontext: ${jobField}` : ''}`
         : '';
 
-
     const promptText = `Du suchst Zitate, Werte oder offizielle Statements von ${companyName},
 die DIREKT relevant sind für die Stelle "${jobTitle || 'diese Position'}".
 
-
 Kriterien:
 - Das Zitat/der Wert muss zum Tätigkeitsbereich der Stelle passen
-- Quelle MUSS von der offiziellen Unternehmenswebsite oder verifizierten Quellen stammen
-- NICHT: Generische Unternehmens-Statements ("wir sind innovativ")
+- Quelle: Nenne das Format "Autor - Werk/Kontext" (z.B. "M. Aurelius - Selbstbetrachtungen" oder "Tim Cook - Q3 2023 Earnings Call").
+- CRITICAL: Benutze KEINE HTTP-URLs (` + "`" + `http://...` + "`" + `)! Nur plain text Namen.
 - JA: Spezifische Aussagen über Kultur, Rolle, Team, Wachstumsstrategie die zur Stelle passen
-
 
 Unternehmen: ${companyName}
 Kernwerte: ${JSON.stringify(companyValues)}${companyVision ? `\nVision: ${companyVision}` : ''}${jobContext}
-
 
 CRITICAL INSTRUCTIONS ON QUOTE SELECTION:
 1. You may include MAXIMUM ONE (1) quote from the CEO/Founder of ${companyName}.
@@ -129,102 +158,22 @@ CRITICAL INSTRUCTIONS ON QUOTE SELECTION:
 4. DO NOT select quotes about specific recent news events, stock prices, or funding rounds. Focus on timeless values and overarching visions.
 5. Support German language if the company values are in German, otherwise English.
 
-
 Return exactly 5 quotes as a strict JSON array matching this exact structure:
-[
-  {
-    "quote": "The actual quote text",
-    "author": "Author Name (Role/Company)",
-    "source": "Source context (e.g. 'Letter to Shareholders')",
-    "relevance_score": 0.95,
-    "matched_value": "Customer Obsession",
-    "value_connection": "This quote emphasizes putting the customer first...",
-    "language": "en"
-  }
-]`;
-
-
-    let quotes: QuoteSuggestion[] = [];
-
-
-    try {
-        const response = await fetch('https://api.perplexity.ai/chat/completions', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'sonar-pro',
-                messages: [
-                    {
-                        role: 'user',
-                        content: promptText
-                    }
-                ],
-                temperature: 0.2
-            })
-        });
-
-
-        if (!response.ok) {
-            console.warn(`Perplexity Quote API error: ${response.status}`);
-            // Let the fallback handle it
-        } else {
-            const data = await response.json();
-            const content = data.choices[0]?.message?.content;
-
-
-            const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/) || [null, content];
-
-
-            try {
-                quotes = JSON.parse(jsonMatch[1] ? jsonMatch[1].trim() : content.trim());
-            } catch (e) {
-                console.warn('Failed to parse Perplexity Quote JSON', e);
-            }
-        }
-    } catch (error) {
-        console.error('Suggest Quotes Perplexity Error:', error);
+{
+  "quotes": [
+    {
+      "quote": "The actual quote text",
+      "author": "Author Name (Role/Company)",
+      "source": "Source context (e.g. 'Letter to Shareholders' - NO URLs)",
+      "relevance_score": 0.95,
+      "matched_value": "Customer Obsession",
+      "value_connection": "This quote emphasizes putting the customer first...",
+      "language": "en"
     }
+  ]
+}`;
 
-
-    // FALLBACK to OpenAI if Perplexity failed or returned no quotes
-    if (!Array.isArray(quotes) || quotes.length === 0) {
-        console.log("⚠️ Perplexity returned no quotes. Falling back to OpenAI API.");
-        try {
-            const openai = getOpenAI();
-            const response = await openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: [
-                    { role: "system", content: "You are a specialized quote discovery assistant. Output extremely high-quality, visionary quotes strictly matching the required JSON format." },
-                    { role: "user", content: promptText }
-                ],
-                response_format: { type: "json_object" },
-                temperature: 0.6,
-            });
-
-
-            const content = response.choices[0].message.content || '{"quotes":[]}';
-            const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/) || [null, content];
-            const parsed = JSON.parse(jsonMatch[1] ? jsonMatch[1].trim() : content.trim());
-
-
-            // Handle both wrapped inside "quotes" key and direct array formats
-            if (Array.isArray(parsed)) {
-                quotes = parsed;
-            } else if (parsed.quotes && Array.isArray(parsed.quotes)) {
-                quotes = parsed.quotes;
-            } else {
-                // If it returned an object that looks like a single quote, wrap it
-                if (parsed.quote && parsed.author) {
-                    quotes = [parsed as QuoteSuggestion];
-                }
-            }
-        } catch (error) {
-            console.error('OpenAI Fallback Error:', error);
-        }
-    }
+    let quotes: QuoteSuggestion[] = await generateQuotesWithOpenAI(promptText);
 
 
     if (!Array.isArray(quotes) || quotes.length === 0) {
