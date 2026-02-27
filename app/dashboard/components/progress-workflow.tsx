@@ -15,6 +15,7 @@ interface ProgressWorkflowProps {
     className?: string;
     onStepClick?: (stepIndex: number) => void;
     activeTab?: number | null;
+    jobId: string;
 }
 
 const WORKFLOW_NODES = [
@@ -40,11 +41,15 @@ function nodeIsCurrent(nodeIndex: number, workflowStep: number): boolean {
 
 const NODE_SIZE = 36;
 
-export function ProgressWorkflow({ current, className, onStepClick, activeTab }: ProgressWorkflowProps) {
+export function ProgressWorkflow({ current, className, onStepClick, activeTab, jobId }: ProgressWorkflowProps) {
     // Confetti when all 4 nodes are filled (workflowStep >= 4)
     useEffect(() => {
         if (current >= 4) {
+            const cacheKey = `pathly_confetti_job_${jobId}`;
+            if (localStorage.getItem(cacheKey)) return;
+
             import('canvas-confetti').then(({ default: confetti }) => {
+                localStorage.setItem(cacheKey, '1');
                 const duration = 2500;
                 const end = Date.now() + duration;
                 const frame = () => {
