@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, Globe } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,13 +17,15 @@ interface AddJobDialogProps {
 export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps) {
     const [company, setCompany] = useState('');
     const [title, setTitle] = useState('');
+    const [companyWebsite, setCompanyWebsite] = useState('');
     const [description, setDescription] = useState('');
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [errorRequestId, setErrorRequestId] = useState<string | null>(null);
 
-    const isFormValid = company.length >= 2 && title.length >= 2 && description.length >= 500 && description.length <= 5000;
+    const isUrlValid = companyWebsite === '' || /^https?:\/\/.+\..+/.test(companyWebsite);
+    const isFormValid = company.length >= 2 && title.length >= 2 && description.length >= 500 && description.length <= 5000 && isUrlValid;
     const isSubmitting = isLoading;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -39,7 +41,8 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                 body: JSON.stringify({
                     company,
                     jobTitle: title,
-                    jobDescription: description
+                    jobDescription: description,
+                    companyWebsite: companyWebsite.trim() || undefined,
                 }),
             });
 
@@ -62,6 +65,7 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
             // BUG-A Fix: No toast here — parent's onJobAdded fires showSafeToast
             setCompany('');
             setTitle('');
+            setCompanyWebsite('');
             setDescription('');
             onJobAdded();
             onClose();
@@ -116,6 +120,26 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                                 minLength={2}
                             />
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-1.5">
+                            <Globe className="w-3.5 h-3.5 text-[#73726E]" />
+                            <Label htmlFor="companyWebsite">Unternehmens-Website</Label>
+                        </div>
+                        <Input
+                            id="companyWebsite"
+                            type="url"
+                            placeholder="https://www.beispiel.de"
+                            value={companyWebsite}
+                            onChange={(e) => setCompanyWebsite(e.target.value)}
+                        />
+                        {companyWebsite && !isUrlValid && (
+                            <p className="text-xs text-red-500">Bitte gib eine gültige URL ein (https://...)</p>
+                        )}
+                        <p className="text-xs text-[#a1a1aa]">
+                            Empfohlen für präzise Unternehmensanalyse
+                        </p>
                     </div>
 
                     <div className="space-y-2">

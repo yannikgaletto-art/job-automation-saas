@@ -19,6 +19,7 @@ const IngestRequestSchema = z.object({
     company: z.string().min(2, 'Company name must be at least 2 characters'),
     jobTitle: z.string().min(2, 'Job title must be at least 2 characters'),
     jobDescription: z.string().min(10, 'Mindestens 10 Zeichen').max(10000, 'Maximal 10.000 Zeichen'),
+    companyWebsite: z.string().url('Ungültige URL').optional().or(z.literal('')),
 });
 
 export async function POST(request: NextRequest) {
@@ -61,7 +62,9 @@ export async function POST(request: NextRequest) {
             throw validationError;
         }
 
-        const { company, jobTitle, jobDescription } = validated;
+        const { company, jobTitle, jobDescription, companyWebsite } = validated;
+        // Normalize: empty string → undefined
+        const normalizedWebsite = companyWebsite && companyWebsite.trim() !== '' ? companyWebsite.trim() : null;
 
         console.log(`[${requestId}] route=jobs/ingest step=validate title="${jobTitle}" company="${company}"`);
 
@@ -159,6 +162,7 @@ export async function POST(request: NextRequest) {
                 job_url: syntheticJobUrl,
                 job_title: jobTitle,
                 company_name: company,
+                company_website: normalizedWebsite,
                 description: jobDescription,
                 location: extractedData.location || null,
                 requirements: extractedData.qualifications?.length > 0 ? extractedData.qualifications : null,

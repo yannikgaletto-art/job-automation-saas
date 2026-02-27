@@ -390,7 +390,179 @@ async function saveToCache(
 }
 
 /**
+ * STEP 2b: Firecrawl + OpenAI Fallback Chain
+ *
+ * When Perplexity returns empty (confidence < 0.9) AND we have a company_website:
+ *   1. Firecrawl scrapes the company website for markdown content
+ *   2. OpenAI GPT-4o-mini extracts structured intel_data from the scraped text
+ *
+ * Returns null if the fallback chain fails entirely.
+ */
+async function fetchViaFirecrawlAndOpenAI(
+    companyName: string,
+    websiteUrl: string
+): Promise<Partial<EnrichmentResult> & { needs_company_context: boolean } | null> {
+    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+
+    if (!firecrawlApiKey || !openaiApiKey) {
+        console.warn('⚠️ [Fallback] Missing FIRECRAWL_API_KEY or OPENAI_API_KEY — skipping fallback chain.');
+        return null;
+    }
+
+    // ── Step 1: Firecrawl Scrape ──────────────────────────────────────────
+    let scrapedMarkdown = '';
+    try {
+        console.log(`🔥 [Fallback] Firecrawl scraping: ${websiteUrl}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+
+        const firecrawlRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${firecrawlApiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                url: websiteUrl,
+                formats: ['markdown'],
+            }),
+            signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (!firecrawlRes.ok) {
+            console.warn(`⚠️ [Fallback] Firecrawl HTTP ${firecrawlRes.status} for ${websiteUrl}`);
+            return null;
+        }
+
+        const firecrawlData = await firecrawlRes.json();
+        scrapedMarkdown = firecrawlData?.data?.markdown || '';
+
+        if (scrapedMarkdown.length < 100) {
+            console.warn(`⚠️ [Fallback] Firecrawl returned too little content (${scrapedMarkdown.length} chars)`);
+            return null;
+        }
+
+        console.log(`✅ [Fallback] Firecrawl scraped ${scrapedMarkdown.length} chars from ${websiteUrl}`);
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error(`❌ [Fallback] Firecrawl error for ${websiteUrl}:`, errMsg);
+        return null;
+    }
+
+    // ── Step 2: OpenAI Structured Extraction ──────────────────────────────
+    try {
+        console.log(`🤖 [Fallback] OpenAI extracting structured data for "${companyName}"`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+        // Truncate to ~8000 chars to stay within token limits
+        const truncatedContent = scrapedMarkdown.substring(0, 8000);
+
+        const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${openaiApiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                temperature: 0,
+                messages: [
+                    {
+                        role: 'system',
+                        content: `Du bist ein Unternehmens-Analyst. Extrahiere strukturierte Informationen aus dem Website-Inhalt. Antworte NUR mit validem JSON. Wenn eine Information nicht verfügbar ist, verwende ein leeres Array oder leeren String.`,
+                    },
+                    {
+                        role: 'user',
+                        content: `Extrahiere aus dem folgenden Website-Inhalt von "${companyName}" (${websiteUrl}) die Informationen:
+
+${truncatedContent}
+
+JSON-Format:
+{
+  "vision_and_mission": "string — Mission/Vision des Unternehmens",
+  "recent_news": ["string — aktuelle Neuigkeiten, max 3"],
+  "company_values": ["string — Werte des Unternehmens, max 5"],
+  "key_projects": ["string — Hauptprodukte oder Projekte, max 3"],
+  "funding_status": "string — Wachstums-/Funding-Status falls erkennbar, sonst leer"
+}`,
+                    },
+                ],
+            }),
+            signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (!openaiRes.ok) {
+            console.warn(`⚠️ [Fallback] OpenAI HTTP ${openaiRes.status}`);
+            return null;
+        }
+
+        const openaiData = await openaiRes.json();
+        const rawContent = openaiData.choices?.[0]?.message?.content || '';
+
+        let parsed;
+        try {
+            parsed = JSON.parse(rawContent);
+        } catch {
+            const jsonMatch = rawContent.match(/```json?\s*([\s\S]*?)```/);
+            if (jsonMatch) {
+                parsed = JSON.parse(jsonMatch[1]);
+            } else {
+                const firstOpen = rawContent.indexOf('{');
+                const lastClose = rawContent.lastIndexOf('}');
+                if (firstOpen !== -1 && lastClose !== -1) {
+                    parsed = JSON.parse(rawContent.substring(firstOpen, lastClose + 1));
+                } else {
+                    throw new Error('No JSON found in OpenAI response');
+                }
+            }
+        }
+
+        const sourcesFound = [
+            parsed.recent_news?.length > 0 ? 'news' : null,
+            parsed.company_values?.length > 0 ? 'values' : null,
+            parsed.vision_and_mission ? 'vision' : null,
+            parsed.key_projects?.length > 0 ? 'projects' : null,
+        ].filter(Boolean);
+
+        console.log(`✅ [Fallback] OpenAI extracted ${sourcesFound.length} categories: [${sourcesFound.join(', ')}] for "${companyName}"`);
+
+        if (sourcesFound.length === 0) {
+            console.warn(`⚠️ [Fallback] OpenAI found 0 categories for "${companyName}" — returning null`);
+            return null;
+        }
+
+        return {
+            recent_news: parsed.recent_news || [],
+            company_values: parsed.company_values || [],
+            tech_stack: [],
+            linkedin_activity: [],
+            suggested_quotes: [],
+            perplexity_citations: [websiteUrl], // The source is the scraped website itself
+            confidence_score: 0.9, // Meets threshold: we have a first-party source
+            vision_and_mission: parsed.vision_and_mission || '',
+            key_projects: parsed.key_projects || [],
+            funding_status: parsed.funding_status || '',
+            needs_company_context: false,
+        } as any;
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error(`❌ [Fallback] OpenAI extraction error for "${companyName}":`, errMsg);
+        return null;
+    }
+}
+
+/**
  * MAIN: Enrich company (with cache + graceful degradation + Zero-Fake-Data)
+ *
+ * Fallback Chain:
+ *   1. Cache (7-day TTL)
+ *   2. Perplexity (Zero-Fake-Data validated)
+ *   3. Firecrawl + OpenAI (if company_website available)
+ *   4. Empty state (needs_company_context=true if no website, false otherwise)
  *
  * @param companySlug  Kept for caller compatibility (unused)
  * @param companyName  Canonical name used as cache key and Perplexity query
@@ -414,10 +586,28 @@ export async function enrichCompany(
         recordCacheMiss();
     }
 
-    // Step 2: Fetch fresh data with Zero-Fake-Data validation
+    // Step 2: Fetch fresh data with Zero-Fake-Data validation (Perplexity)
     const intel = await fetchCompanyIntel(companyName, context);
 
-    // If empty state (low confidence or unsicherheits-gate), skip cache write
+    // Step 2b: If Perplexity returned empty AND we have a website → Firecrawl+OpenAI fallback
+    if (intel.confidence_score === 0 && context?.website) {
+        console.log(`🔄 [Enrichment] Perplexity empty for "${companyName}" — trying Firecrawl+OpenAI fallback with ${context.website}`);
+
+        // Ensure the URL has a protocol
+        const normalizedUrl = context.website.startsWith('http')
+            ? context.website
+            : `https://${context.website}`;
+
+        const fallbackIntel = await fetchViaFirecrawlAndOpenAI(companyName, normalizedUrl);
+
+        if (fallbackIntel && fallbackIntel.confidence_score && fallbackIntel.confidence_score > 0) {
+            console.log(`✅ [Enrichment] Firecrawl+OpenAI fallback succeeded for "${companyName}"`);
+            // Use fallback result — proceed to quotes + cache
+            Object.assign(intel, fallbackIntel);
+        }
+    }
+
+    // If still empty after all attempts, return empty state
     if (intel.confidence_score === 0) {
         return {
             id: '',

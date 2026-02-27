@@ -69,8 +69,9 @@ export async function POST(request: Request) {
         console.log(`[${requestId}] route=jobs/process step=enrich_company`);
 
         // Stufe 0: Build EnrichmentContext from Steckbrief fields
+        // Primary: company_website column (new). Fallback: metadata.company_url (legacy).
         const enrichContext = {
-            website: job.company_url || job.metadata?.company_url || undefined,
+            website: job.company_website || job.company_url || job.metadata?.company_url || undefined,
             industry: job.field || job.metadata?.field || undefined,
             description: job.job_description?.substring(0, 200) || undefined,
         };
