@@ -61,11 +61,14 @@ export function buildSystemPrompt(
     const jobTitle = job?.job_title || 'die ausgeschriebene Stelle';
 
     // ─── B1.6: Ansprechperson-Binding (Cascading Fallback) ────────────────────
+    const isDuForm = ctx?.tone.formality === 'du';
     let contactPersonGreeting: string;
     if (ctx?.tone.contactPerson) {
         const name = ctx.tone.contactPerson.trim();
         if (lang === 'English') {
             contactPersonGreeting = `"Dear ${name},"`;
+        } else if (isDuForm) {
+            contactPersonGreeting = `"Hallo ${name},"`;
         } else {
             contactPersonGreeting = `"Liebe/r ${name}," (nutze die wahrscheinlich korrekte Anrede, z.B. "Lieber Max," oder "Liebe Anna,")`;
         }
@@ -74,22 +77,30 @@ export function buildSystemPrompt(
     } else {
         contactPersonGreeting = lang === 'English'
             ? `"Dear Hiring Team,"`
-            : `"Sehr geehrte Damen und Herren,"`;
+            : isDuForm
+                ? `"Hallo zusammen," oder "Hi [Team-Name],"`
+                : `"Sehr geehrte Damen und Herren,"`;
     }
 
-    // ─── CV Input (CV-Optimizer-Priorität) ────────────────────────────────────
-    const cvInput = job?.cv_optimization_user_decisions?.appliedChanges
-        ? `OPTIMIERTE CV-ÄNDERUNGEN FÜR DIESEN JOB (MÜSSEN EINFLIESSEN):
+    // ─── CV Input (Zero-Leak Guard) ────────────────────────────────────────────
+    // Wenn der User im Wizard Stationen gewählt hat, darf der rohe CV NICHT
+    // in den Prompt — die KI soll NUR die gewählten Stationen sehen.
+    const hasWizardStations = (ctx?.cvStations?.length ?? 0) > 0;
+
+    const cvInput = hasWizardStations
+        ? '' // Zero-Leak: CV wird komplett unterdrückt — stationsSection ist die einzige Quelle
+        : job?.cv_optimization_user_decisions?.appliedChanges
+            ? `OPTIMIERTE CV-ÄNDERUNGEN FÜR DIESEN JOB (MÜSSEN EINFLIESSEN):
 ${JSON.stringify(
-            job.cv_optimization_user_decisions.appliedChanges.map(c => ({
-                section: c.target.section,
-                vorher: c.before,
-                nachher: c.after
-            })), null, 2)}
+                job.cv_optimization_user_decisions.appliedChanges.map(c => ({
+                    section: c.target.section,
+                    vorher: c.before,
+                    nachher: c.after
+                })), null, 2)}
 
 ORIGINAL CV:
 ${JSON.stringify(profile?.cv_structured_data || {}, null, 2)}`
-        : `KANDIDATEN-LEBENSLAUF:
+            : `KANDIDATEN-LEBENSLAUF:
 ${JSON.stringify(profile?.cv_structured_data || {}, null, 2)}`;
 
     // ─── Tone Instructions (B1.5: Jeder Stil verändert GESAMTE Prompt-Struktur) ─
@@ -103,7 +114,7 @@ BEWEISFÜHRUNG:
 - Aktive Verben: implementiert, gesteigert, reduziert, aufgebaut, verantwortet, optimiert
 - Keine vagen Formulierungen wie "sehr erfolgreich" — immer quantifizieren
 - Mindestens 3 konkrete Zahlen im gesamten Anschreiben
-SCHLUSS: Konkreter Mehrwert in einem Satz mit Zahl (z.B. "Ich bringe 5 Jahre Erfahrung in X mit, die Ihre Y-Strategie um Z beschleunigen können.").
+SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Adjektive ohne Beleg, Superlative ohne Beweis, "leidenschaftlich", "motiviert", "engagiert" ohne konkretes Beispiel.`,
 
         'storytelling': `STIL: NARRATIV & PERSÖNLICH
@@ -118,7 +129,7 @@ DRAMATURGIE:
 - Erlaube 1-2 persönliche Aussagen zur Motivation (aber kein Pathos)
 - Nutze Zeitwörter: "Zunächst", "Später erkannte ich", "Heute weiß ich"
 - Die rote Linie: Alle Absätze führen logisch zur Bewerbung bei DIESER Firma
-SCHLUSS: Schließe den Bogen zum Opening-Moment. Zeige, wie der Karriereweg logisch zu dieser Stelle führt.
+SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Aufzählungen, Bullet-Points-Stil, trockene Fakten ohne Kontext, "Mein Werdegang zeigt..."`,
 
         'formal': `STIL: KLASSISCH-FORMELL
@@ -134,7 +145,7 @@ TONALITÄT:
 - Keine Ausrufezeichen, keine rhetorischen Fragen
 - Konjunktiv I für höfliche Formulierungen erlaubt
 - Seriöse Übergänge: "Darüber hinaus", "In gleicher Weise", "Vor diesem Hintergrund"
-SCHLUSS: Souverän auf Augenhöhe, kein Betteln. "Ich freue mich auf ein Gespräch, in dem wir [konkretes Thema] vertiefen können."
+SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Umgangssprache, Emojis, Interjektionen, "Ich brenne für", persönliche Anekdoten.`,
 
         'philosophisch': `STIL: INTELLEKTUELL & KONZEPTIONELL
@@ -149,14 +160,24 @@ INTELLEKTUELLER RAHMEN:
 - Verbinde branchenspezifische Trends mit persönlicher Erfahrung
 - Nutze Analogien und Querverweise: "Wie in der [Disziplin/Branche], zeigt sich auch hier..."
 - Die konzeptionelle Ebene zeigt Senioritität und strategisches Denken
-SCHLUSS: Schließe mit einer Vision oder einem Ausblick, der zeigt, wie du die Unternehmens-Mission mitgestalten willst. Kein Betteln, sondern intellektuelle Neugier.
+SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Oberflächliche Name-Dropping von Philosophen ohne Bezug, Arroganz, akademischer Jargon, mehr als 1 Zitat.`,
     };
     const activeTone = toneInstructions[ctx?.tone.preset ?? 'formal'];
 
-    // ─── Style Sample (B1.1: Alle 6 Marker aus StyleAnalysis) ─────────────────
+    // ─── Style Sample (Anti-Competition: Preset hat Vorrang über Style-Sample) ──
+    const hasPreset = !!ctx?.tone?.preset;
     const styleSection = style
-        ? `SCHREIBSTIL-VORBILD (aus bisherigen Anschreiben des Users):
+        ? hasPreset
+            // Anti-Competition: Preset hat Vorrang → Style-Sample nur für Rhythmus
+            ? `SCHREIBRHYTHMUS (aus bisherigen Anschreiben des Users — NUR für Satzbau, NICHT für Tonalität):
+Satzlänge: ${style.sentence_length || 'medium'}
+Bevorzugte Konjunktionen: ${(style.conjunctions || []).join(', ') || 'Daher, Deshalb, Zudem'}
+${(style.forbidden_constructs || []).length > 0 ? `VERBOTEN (User nutzt diese NIE): ${style.forbidden_constructs.join(', ')}` : ''}
+
+WICHTIG: Der inhaltliche Ton wird AUSSCHLIESSLICH durch das gewählte PRESET bestimmt (siehe oben). Nutze aus diesem Rhythmus-Block nur Satzlänge und Konjunktionen.`
+            // Kein Preset gewählt → volles Style-Sample (Legacy-Verhalten)
+            : `SCHREIBSTIL-VORBILD (aus bisherigen Anschreiben des Users):
 Ton: ${style.tone || 'nicht analysiert'}
 Satzlänge: ${style.sentence_length || 'medium'}
 Bevorzugte Konjunktionen: ${(style.conjunctions || []).join(', ') || 'Daher, Deshalb, Zudem'}
@@ -183,6 +204,8 @@ VERBOT: Erwähne KEINE anderen Stationen aus dem CV — nur die oben genannten s
 ` + ctx.cvStations.map(s => `Station ${s.stationIndex}: ${s.role} @ ${s.company} (${s.period})
   → Beweis für Job-Anforderung: "${s.matchedRequirement}"
   → Schlüssel-Achievement: "${s.keyBullet}"
+  → Alle Stärken dieser Station (nutze als inhaltliche Basis):
+${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
   → Zeige im Text: ${s.intent}`).join('\n');
     } else {
         stationsSection = 'Nutze die relevantesten Erfahrungen aus dem CV und beweise damit deinen Wert für das Unternehmen.';
@@ -223,9 +246,15 @@ FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
 ${enablePingPong ? '- PING-PONG (aktiv): Nach der Zitat-Brücke, füge einen kurzen Satz hinzu der eine kritische Gegenposition aufwirft.' : ''}` : '';
 
     const quoteBodyBlock = hasQuote ? `[REGEL: ZITAT IM HAUPTTEIL — STATION-1-EINLEITUNG]:
-Das folgende Zitat MUSS als EINLEITUNGSSATZ des ERSTEN Stations-Absatzes verwendet werden:
-"${ctx!.selectedQuote!.quote}" (${ctx!.selectedQuote!.author})
-Formuliere es so: "Diesen Gedanken von ${ctx!.selectedQuote!.author} habe ich bei meiner Arbeit als [Rolle] bei [Firma] täglich gelebt, als ich [konkretes Beispiel]..."
+Das folgende Zitat MUSS WORTWÖRTLICH im Text stehen. Lass es NICHT weg!
+Zitat: "${ctx!.selectedQuote!.quote}" (${ctx!.selectedQuote!.author})
+
+PFLICHT-FORMAT:
+"${ctx!.selectedQuote!.quote}"
+– ${ctx!.selectedQuote!.author}
+
+Diesen Gedanken habe ich bei meiner Arbeit als [Rolle] bei [Firma] täglich gelebt, als ich [konkretes Beispiel]...
+
 Das Zitat dient als Brücke zwischen dem Vordenker und der konkreten Berufserfahrung. Maximal 2 Sätze für Zitat + Brücke, dann direkt in die Station.` : '';
 
     // ─── Hook-Block (wiederverwendbar für Intro oder Body) ─────────────────────
@@ -361,16 +390,29 @@ OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
 - Länge: 280–380 Wörter, 4–5 Absätze
 - Absätze getrennt durch eine Leerzeile
 - Beginne direkt mit der Anrede: ${contactPersonGreeting}
+- Anrede-Form: ${isDuForm ? 'DU-FORM (du/dein/euch/dir). Wende diese Du-Form STRIKT auf das GESAMTE Anschreiben an. Kein "Sie" oder "Ihnen" — NIEMALS.' : 'SIE-FORM (Sie/Ihr/Ihnen). Wende diese Sie-Form STRIKT auf das GESAMTE Anschreiben an.'}
 
-=== SEKTION 2: AUFHÄNGER (KURZ & PRÄGNANT) ===
+=== SEKTION 2: TONALITÄT & STIL (HÖCHSTE PRIORITÄT) ===
+PRESET: ${ctx?.tone.preset || 'formal'}
+${activeTone}
+
+${styleSection}
+
+${buildBlacklistPromptSection()}
+
+=== SEKTION 3: AUFHÄNGER (KURZ & PRÄGNANT) ===
 ${introGuidance || `Beginne mit einem relevanten Aufhänger zu ${companyName}.`}
 
 ${companyName} muss im ersten Absatz mindestens einmal fallen.
 Der gesamte erste Absatz (Aufhänger + Motivation) darf MAXIMAL 2 SÄTZE lang sein! Keine generischen Abhandlungen über Innovation. Kurz, knackig, direkt zum Punkt.
 
+[PFLICHT — ÜBERGANGSSATZ]: Der ERSTE Absatz MUSS zwingend mit diesem Satz enden:
+${isDuForm ? '"Daher möchte ich mich bei euch kurz vorstellen."' : '"Daher möchte ich mich bei Ihnen kurz vorstellen."'}
+Dieser Satz ist NICHT optional. Er bildet die Brücke zum Hauptteil.
+
 ${newsSection}
 
-=== SEKTION 3: KARRIERE-BEWEISE (FOLGENDE ABSÄTZE) ===
+=== SEKTION 4: KARRIERE-BEWEISE (FOLGENDE ABSÄTZE) ===
 Integriere diese Stationen als fließende Prosa — WICHTIG: Erstelle für jede gewählte Station einen eigenen Absatz.
 
 ${bodyIntegrationGuidance}
@@ -394,19 +436,12 @@ ${vulnerabilitySection}
 
 ${personaSection}
 
-=== SEKTION 4: TONALITÄT & STIL ===
-PRESET: ${ctx?.tone.preset || 'formal'}
-${activeTone}
-
-${styleSection}
-
-${buildBlacklistPromptSection()}
-
 === SEKTION 5: ABSCHLUSS & CALL TO ACTION ===
 [REGEL: SCHLUSSTEIL]
-- Der Schlusssatz muss bodenständig und direkt sein. Fasse in einem Satz zusammen, welchen konkreten Mehrwert der Kandidat bringt. Gehe kurz auf die Kultur/DNA des Unternehmens ein.
+- VERBOTEN: Fasse am Ende NICHT noch einmal die Karrierestationen oder Erfahrungen zusammen ("Mit über X Jahren Erfahrung...", "Meine direkte Arbeitsweise..."). Das ist Fluff.
 - VERBOTEN: Das Zitat oder den Aufhänger aus dem ersten Absatz hier noch einmal erwähnen. Schreibe keine poetischen Sprachbilder am Ende.
-- Ein souveräner Schlusssatz auf Augenhöhe (kein Betteln um ein Interview, z.B. "Lassen Sie uns in einem kurzen Gespräch ausloten...").
+- Der Schlusssatz ist ein DIREKTER, KURZER Call-to-Action auf Augenhöhe (max 2 Sätze). Bette einen konkreten Gesprächsvorschlag ein.
+- Beispiel: ${isDuForm ? '"Ich würde mich freuen, in einem kurzen Gespräch zu zeigen, wie ich [konkreter Punkt] bei euch vorantreiben kann."' : '"Lassen Sie uns in einem kurzen Gespräch ausloten, wie ich [konkreter Punkt] bei Ihnen vorantreiben kann."'}
 
 === SEKTION 6: VERBESSERUNGS-FEEDBACK ===
 ${feedbackSection || 'Erste Version — kein vorheriges Feedback.'}

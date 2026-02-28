@@ -58,6 +58,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
                 keyBullet: s.bullets[0] || '',
                 matchedRequirement: req,
                 intent: `Beweis für: ${req || 'Berufserfahrung'}`,
+                bullets: s.bullets || [],
             });
         });
 
@@ -67,6 +68,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
             targetLanguage: setupData.detectedJobLanguage,
             hasStyleSample: setupData.hasStyleSample,
             styleWarningAcknowledged: true,
+            formality: 'sie',
         });
 
         // Jump to last step for review

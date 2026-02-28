@@ -30,6 +30,7 @@ export interface SelectedCVStation {
     // CRITICAL für Phase 2 Prompt-Qualität:
     matchedRequirement: string;       // z.B. "5-7 Jahre Partnerships"
     intent: string;                   // z.B. "Beweis für strategische Kooperationen"
+    bullets?: string[];               // Alle Bullet-Points der gewählten Station für Kontext
 }
 
 // ─── Step C Output ────────────────────────────────────────────────
@@ -39,6 +40,7 @@ export interface ToneConfig {
     hasStyleSample: boolean;             // Wurde altes Anschreiben hochgeladen?
     styleWarningAcknowledged: boolean;   // User hat Anti-GPT-Callout gelesen
     contactPerson?: string;              // Optionaler Ansprechpartner für die Anrede
+    formality: 'sie' | 'du';            // Sie-Form (klassisch) oder Du-Form (Startups/Tech)
 }
 
 // ─── Quote Selection (Phase B, optional) ──────────────────────────

@@ -120,6 +120,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                 keyBullet: safeBullets[0] || '',
                 matchedRequirement: rec?.requirement || setupData.jobRequirements[0] || '',
                 intent: `Beweis für: ${rec?.requirement || 'Berufserfahrung'}`,
+                bullets: safeBullets,
             });
         }
     }, [recs, validStations, cvStations.length, toggleStation, setupData.jobRequirements]);
@@ -134,6 +135,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
             keyBullet: safeBullets[0] || '',
             matchedRequirement: rec?.requirement || setupData.jobRequirements[0] || '',
             intent: `Beweis für: ${rec?.requirement || 'Berufserfahrung'}`,
+            bullets: safeBullets,
         });
     };
 

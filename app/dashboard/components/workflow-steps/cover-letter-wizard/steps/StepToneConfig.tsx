@@ -44,6 +44,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const [selectedPreset, setSelectedPreset] = useState<TonePreset>(tone?.preset || 'data-driven');
     const [language, setLanguage] = useState<TargetLanguage>(tone?.targetLanguage || setupData.detectedJobLanguage);
     const [contactPerson, setContactPerson] = useState(tone?.contactPerson || '');
+    const [formality, setFormality] = useState<'sie' | 'du'>(tone?.formality || 'sie');
 
     // Ensure the store always has a valid tone on mount (for default selection)
     useEffect(() => {
@@ -54,6 +55,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                 hasStyleSample: setupData.hasStyleSample,
                 styleWarningAcknowledged: true,
                 contactPerson,
+                formality,
             });
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -68,6 +70,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             hasStyleSample: setupData.hasStyleSample,
             styleWarningAcknowledged: true,
             contactPerson,
+            formality,
         });
     };
 
@@ -79,6 +82,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             hasStyleSample: setupData.hasStyleSample,
             styleWarningAcknowledged: true,
             contactPerson,
+            formality,
         });
     };
 
@@ -91,6 +95,19 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             hasStyleSample: setupData.hasStyleSample,
             styleWarningAcknowledged: true,
             contactPerson: val,
+            formality,
+        });
+    };
+
+    const handleFormalityChange = (f: 'sie' | 'du') => {
+        setFormality(f);
+        setTone({
+            preset: selectedPreset,
+            targetLanguage: language,
+            hasStyleSample: setupData.hasStyleSample,
+            styleWarningAcknowledged: true,
+            contactPerson,
+            formality: f,
         });
     };
 
@@ -173,6 +190,29 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                     className="w-full border border-[#E7E7E5] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[#002e7a]"
                 />
             </div>
+
+            {/* Du/Sie Toggle — YC Style */}
+            {language === 'de' && (
+                <div className="pt-2">
+                    <label className="block text-xs font-semibold text-[#37352F] mb-1.5">
+                        Anrede im Unternehmen
+                    </label>
+                    <div className="flex items-center gap-0.5 bg-[#E7E7E5] rounded-md p-0.5 w-fit">
+                        {([{ value: 'sie' as const, label: 'Sie-Form (Klassisch)' }, { value: 'du' as const, label: 'Du-Form (Startups/Tech)' }]).map((opt) => (
+                            <button
+                                key={opt.value}
+                                onClick={() => handleFormalityChange(opt.value)}
+                                className={[
+                                    'px-3 py-1.5 rounded text-xs font-semibold transition-all',
+                                    formality === opt.value ? 'bg-white text-[#002e7a] shadow-sm' : 'text-[#73726E]',
+                                ].join(' ')}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Streamlined Style Callout — no checkbox */}
             <div className="bg-[#EEF3FF] border-l-4 border-[#002e7a] rounded-md p-3">
