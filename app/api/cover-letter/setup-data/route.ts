@@ -208,6 +208,7 @@ export async function GET(req: NextRequest) {
         const response: SetupDataResponse = {
             hooks,
             hasPerplexityData: hooks.some((h) => h.type !== 'manual'),
+            companyWebsite: job.company_website ?? null,
             cvStations: cvData,
             jobRequirements: requirements,
             hasStyleSample,

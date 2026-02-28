@@ -64,7 +64,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
             const res = await fetch('/api/jobs/enrich', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId, companyName })
+                body: JSON.stringify({ jobId, companyName, website: setupData.companyWebsite ?? undefined })
             });
             if (!res.ok) throw new Error('Enrichment failed');
 

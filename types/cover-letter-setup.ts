@@ -96,6 +96,7 @@ export interface SetupDataResponse {
     // Step A
     hooks: SelectedHook[];
     hasPerplexityData: boolean;
+    companyWebsite?: string | null; // Enrichment-Kontext für Zero-Fake-Data Gate
 
     // Step B
     cvStations: Array<{
