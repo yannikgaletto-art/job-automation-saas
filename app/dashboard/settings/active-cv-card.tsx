@@ -92,7 +92,7 @@ export function ActiveCVCard() {
                 };
 
                 xhr.onerror = () => reject(new Error('Netzwerkfehler beim Upload'));
-                xhr.open('POST', '/api/documents/upload-simple');
+                xhr.open('POST', '/api/documents/upload');
                 xhr.send(fd);
             });
 

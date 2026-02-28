@@ -13,7 +13,7 @@ const supabaseAdmin = createAdminClient(
 
 export async function POST(req: NextRequest) {
     try {
-        const { jobId } = await req.json();
+        const { jobId, cvDocumentId } = await req.json();
         if (!jobId) {
             return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
         }
@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Job not found' }, { status: 404 });
         }
 
-        const cvData = await getCVText(user.id);
+        // getCVText now supports optional documentId for CV selection
+        const cvData = await getCVText(user.id, cvDocumentId);
         if (!cvData) {
             return NextResponse.json({
                 error: 'CV not found or empty. Please upload your CV in settings.'

@@ -7,7 +7,7 @@
  * - Anforderungs-Check: 2fr_3fr_4fr columns with clear headers and full badge status.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CVMatchResult } from '@/lib/services/cv-match-analyzer';
 import { Button } from '@/components/motion/button';
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { CVSelectDialog, type CVOption } from '@/components/dashboard/cv-select-dialog';
 
 interface CVMatchTabProps {
     jobId: string;
@@ -190,9 +191,14 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
         return () => { cancelled = true; };
     }, [jobId]);
 
-    const runAnalysis = async () => {
+    const [showCVSelect, setShowCVSelect] = useState(false);
+    const [cvOptions, setCvOptions] = useState<CVOption[]>([]);
+    const [selectedCvId, setSelectedCvId] = useState<string | undefined>(undefined);
+
+    const runAnalysis = useCallback(async (cvDocumentId?: string) => {
         setState('loading');
         setLoadingStep(1);
+        setShowCVSelect(false);
         onMatchStart?.();
 
         try {
@@ -202,7 +208,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
             const res = await fetch('/api/cv/match', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId })
+                body: JSON.stringify({ jobId, cvDocumentId })
             });
 
             setLoadingStep(3);
@@ -216,35 +222,76 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
             setState('complete');
             onMatchComplete?.(data.data);
             toast.success('CV Analyse erfolgreich');
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const errMsg = error instanceof Error ? error.message : String(error);
             console.error(error);
             setState('error');
-            toast.error('Analyse fehlgeschlagen', { description: error.message });
+            toast.error('Analyse fehlgeschlagen', { description: errMsg });
         }
-    };
+    }, [jobId, onMatchStart, onMatchComplete]);
+
+    /** Pre-check: how many CVs does the user have? */
+    const handleStartAnalysis = useCallback(async () => {
+        try {
+            const res = await fetch('/api/documents/list-cvs');
+            const data = await res.json();
+            const cvs: CVOption[] = data.cvs || [];
+
+            if (cvs.length === 0) {
+                toast.error('Kein Lebenslauf gefunden', {
+                    description: 'Bitte lade deinen Lebenslauf in den Settings hoch.'
+                });
+                return;
+            }
+
+            if (cvs.length === 1) {
+                // Auto-select the only CV
+                runAnalysis(cvs[0].id);
+                return;
+            }
+
+            // 2+ CVs → show selection dialog
+            setCvOptions(cvs);
+            setShowCVSelect(true);
+        } catch {
+            // Fallback: run without specific ID (uses latest)
+            runAnalysis();
+        }
+    }, [runAnalysis]);
 
     // ── IDLE / ERROR ────────────────────────────────────────────
     if (state === 'idle' || state === 'error') {
         return (
-            <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
-                <div className="bg-white p-4 rounded-full shadow-sm mb-4 border border-slate-200">
-                    <Sparkles className="w-8 h-8 text-[#002e7a]" />
-                </div>
-                <h3 className="text-xl font-semibold text-[#37352F] mb-2">CV Check & Optimierung</h3>
-                <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
-                    Wir vergleichen deinen Lebenslauf mit den Anforderungen dieser Stelle.
-                    Du erhaeltst einen detaillierten Bericht, auf dessen Basis wir einen optimierten CV generieren koennen.
-                </p>
-                {state === 'error' && (
-                    <div className="mb-4 text-sm text-red-600 flex items-center gap-2 bg-red-50 px-3 py-2 rounded-md border border-red-100">
-                        <AlertCircle className="w-4 h-4" />
-                        <div>Ein Fehler ist aufgetreten. Bitte versuche es erneut.</div>
+            <>
+                <CVSelectDialog
+                    isOpen={showCVSelect}
+                    cvOptions={cvOptions}
+                    onSelect={(id) => {
+                        setSelectedCvId(id);
+                        runAnalysis(id);
+                    }}
+                    onClose={() => setShowCVSelect(false)}
+                />
+                <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
+                    <div className="bg-white p-4 rounded-full shadow-sm mb-4 border border-slate-200">
+                        <Sparkles className="w-8 h-8 text-[#002e7a]" />
                     </div>
-                )}
-                <Button variant="primary" onClick={runAnalysis}>
-                    {state === 'error' ? 'Erneut versuchen' : 'Analyse starten'}
-                </Button>
-            </div>
+                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">CV Check & Optimierung</h3>
+                    <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
+                        Wir vergleichen deinen Lebenslauf mit den Anforderungen dieser Stelle.
+                        Du erhaeltst einen detaillierten Bericht, auf dessen Basis wir einen optimierten CV generieren koennen.
+                    </p>
+                    {state === 'error' && (
+                        <div className="mb-4 text-sm text-red-600 flex items-center gap-2 bg-red-50 px-3 py-2 rounded-md border border-red-100">
+                            <AlertCircle className="w-4 h-4" />
+                            <div>Ein Fehler ist aufgetreten. Bitte versuche es erneut.</div>
+                        </div>
+                    )}
+                    <Button variant="primary" onClick={handleStartAnalysis}>
+                        {state === 'error' ? 'Erneut versuchen' : 'Analyse starten'}
+                    </Button>
+                </div>
+            </>
         );
     }
 
