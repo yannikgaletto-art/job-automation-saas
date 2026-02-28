@@ -103,7 +103,12 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
             const res = await fetch('/api/cover-letter/quotes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId, companyName, companyValues })
+                body: JSON.stringify({
+                    jobId,
+                    companyName,
+                    companyValues,
+                    jobTitle: setupData.jobTitle ?? undefined,
+                })
             });
             if (!res.ok) throw new Error('Quote search failed');
 

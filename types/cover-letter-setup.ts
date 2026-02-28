@@ -97,6 +97,7 @@ export interface SetupDataResponse {
     hooks: SelectedHook[];
     hasPerplexityData: boolean;
     companyWebsite?: string | null; // Enrichment-Kontext für Zero-Fake-Data Gate
+    jobTitle?: string | null;       // Für rollenspezifische Zitat-Suche (Contract 11)
 
     // Step B
     cvStations: Array<{

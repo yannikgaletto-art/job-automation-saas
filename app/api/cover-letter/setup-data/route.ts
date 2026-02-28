@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
         const [jobRes, docsRes, profileRes] = await Promise.all([
             supabase
                 .from('job_queue')
-                .select('requirements, metadata, company_name, company_website')
+                .select('requirements, metadata, company_name, company_website, job_title')
                 .eq('id', jobId)
                 .single(),
 
@@ -209,6 +209,7 @@ export async function GET(req: NextRequest) {
             hooks,
             hasPerplexityData: hooks.some((h) => h.type !== 'manual'),
             companyWebsite: job.company_website ?? null,
+            jobTitle: job.job_title ?? null,
             cvStations: cvData,
             jobRequirements: requirements,
             hasStyleSample,

@@ -139,36 +139,52 @@ export async function suggestRelevantQuotes(
         ? `\nStelle: ${jobTitle}${jobField ? `\nBranche/Kontext: ${jobField}` : ''}`
         : '';
 
-    const promptText = `Du suchst Zitate, Werte oder offizielle Statements von ${companyName},
-die DIREKT relevant sind für die Stelle "${jobTitle || 'diese Position'}".
+    const promptText = `Du bist ein Experte für maßgeschneiderte, tiefgründige Zitate in Bewerbungsanschreiben.
 
-Kriterien:
-- Das Zitat/der Wert muss zum Tätigkeitsbereich der Stelle passen
-- Quelle: Nenne das Format "Autor - Werk/Kontext" (z.B. "M. Aurelius - Selbstbetrachtungen" oder "Tim Cook - Q3 2023 Earnings Call").
-- CRITICAL: Benutze KEINE HTTP-URLs (` + "`" + `http://...` + "`" + `)! Nur plain text Namen.
-- JA: Spezifische Aussagen über Kultur, Rolle, Team, Wachstumsstrategie die zur Stelle passen
+KONTEXT:
+- Stelle: "${jobTitle || 'Fachkraft'}"
+- Unternehmen: ${companyName}
+- Kernwerte des Unternehmens: ${JSON.stringify(companyValues)}${companyVision ? `\n- Vision/Mission: ${companyVision}` : ''}
 
-Unternehmen: ${companyName}
-Kernwerte: ${JSON.stringify(companyValues)}${companyVision ? `\nVision: ${companyVision}` : ''}${jobContext}
+DEINE AUFGABE:
+Finde 5 Zitate, die eine BRÜCKE bauen zwischen:
+  (A) der spezifischen ROLLE ("${jobTitle || 'diese Position'}") und
+  (B) den WERTEN/der DNA von ${companyName}.
 
-CRITICAL INSTRUCTIONS ON QUOTE SELECTION:
-1. You may include MAXIMUM ONE (1) quote from the CEO/Founder of ${companyName}.
-2. The remaining 4 quotes MUST be from diverse external sources (renowned authors, historical innovators, philosophers, industry thought leaders) whose profound ideas logically align with the company's mission/values.
-3. Example: If the company focuses on green energy or sustainability, find a profound quote from an environmentalist or author about system change or the planet. The goal is to show deep thematic alignment, not just name-drop the company.
-4. DO NOT select quotes about specific recent news events, stock prices, or funding rounds. Focus on timeless values and overarching visions.
-5. Support German language if the company values are in German, otherwise English.
+Das Zitat soll so wirken, als ob der Bewerber sagt:
+"Eure Maxime [X] erinnert mich an [Vordenker Y], der sagte: [Zitat]. Genau dieses Mindset bringe ich als [Rolle] mit."
 
-Return exactly 5 quotes as a strict JSON array matching this exact structure:
+REGELN FÜR DIE AUSWAHL:
+1. VERBOTEN: Steve Jobs ("Stay hungry"), Elon Musk, Jeff Bezos, Mark Zuckerberg, Bill Gates.
+   Diese sind abgedroschen. Nutze stattdessen TIEFGRÜNDIGE Denker.
+2. Die Autoren MÜSSEN thematisch zur Rolle passen:
+   - Consulting/Strategie → Denker wie Peter Drucker, Clayton Christensen, Roger Martin
+   - Innovation/Tech → Grace Hopper, Ada Lovelace, Alan Kay, Mariana Mazzucato
+   - New Work/HR/Purpose → Frederic Laloux, Amy Edmondson, Simon Sinek
+   - Sales/Growth → Daniel Pink, Zig Ziglar, Jill Konrath
+   - Nachhaltigkeit/Impact → Donella Meadows, Kate Raworth, Hans Rosling
+   - Recht/Compliance → Ruth Bader Ginsburg, Oliver Wendell Holmes
+   - Philosophie/Führung → Marcus Aurelius, Seneca, Hannah Arendt
+   (Dies sind BEISPIELE. Wähle die BESTEN Matches für die konkrete Rolle + Firma.)
+3. Maximal 1 Zitat darf vom CEO/Gründer von ${companyName} stammen (falls bekannt).
+4. Die restlichen 4 MÜSSEN von externen Vordenkern kommen.
+5. Das Feld "value_connection" MUSS die Brücke zwischen Vordenker, Rolle UND Unternehmenswert erklären.
+   SCHLECHT: "Dieses Zitat passt zu Innovation."
+   GUT: "Grace Hoppers Aufruf, den Status quo zu hinterfragen, spiegelt ${companyName}s Maxime [Wert X] wider — und ist genau das Mindset, das ein ${jobTitle || 'Fachkraft'} täglich braucht."
+6. Sprache: Deutsch, wenn die Unternehmenswerte auf Deutsch sind. Sonst Englisch.
+7. Quelle: Nenne das Format "Autor - Werk/Kontext" (z.B. "M. Aurelius - Selbstbetrachtungen"). KEINE URLs.
+
+AUSGABE als JSON:
 {
   "quotes": [
     {
-      "quote": "The actual quote text",
-      "author": "Author Name (Role/Company)",
-      "source": "Source context (e.g. 'Letter to Shareholders' - NO URLs)",
+      "quote": "Der exakte Zitat-Text",
+      "author": "Vorname Nachname",
+      "source": "Werk oder Kontext (z.B. 'Reinventing Organizations', 'Meditations')",
       "relevance_score": 0.95,
-      "matched_value": "Customer Obsession",
-      "value_connection": "This quote emphasizes putting the customer first...",
-      "language": "en"
+      "matched_value": "Der konkrete Unternehmenswert, auf den sich das Zitat bezieht",
+      "value_connection": "Die Brücke: Warum passt dieses Zitat zur Rolle UND zum Unternehmen?",
+      "language": "de"
     }
   ]
 }`;
