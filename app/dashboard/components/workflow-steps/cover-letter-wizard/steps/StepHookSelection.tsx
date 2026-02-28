@@ -385,11 +385,14 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
 
                         {/* Info-Box: So wirkt ein Zitat */}
                         <div className="bg-[#FFFBE6] border border-[#F5E6A3] rounded-lg p-3 mb-1">
-                            <p className="text-[10px] font-semibold text-[#8B7000] mb-1">💡 So wirkt ein Zitat im Anschreiben:</p>
-                            <p className="text-[10px] text-[#5C4A00] italic leading-relaxed">
+                            <p className="text-xs font-semibold text-[#8B7000] mb-1.5">💡 So wirkt ein Zitat im Anschreiben:</p>
+                            <p className="text-xs text-[#5C4A00] leading-relaxed mb-1">
+                                ich möchte gerne ein Zitat mit Euch teilen, da es mich an Eure Maxime des &ldquo;Challenging the Status Quo&rdquo; erinnert hat:
+                            </p>
+                            <p className="text-xs text-[#5C4A00] italic leading-relaxed mb-1">
                                 &ldquo;The most dangerous phrase is, &apos;We&apos;ve always done it this way.&apos;&rdquo;
                             </p>
-                            <p className="text-[10px] text-[#5C4A00] leading-relaxed mt-1">
+                            <p className="text-xs text-[#5C4A00] leading-relaxed">
                                 Dieser Satz von Grace Hopper hat mich schon während meiner Zeit bei der Telekom geprägt. Er erinnert mich täglich daran, neugierig zu bleiben und Eure Maxime des &ldquo;Challenging the Status Quo&rdquo; zu leben.
                             </p>
                         </div>
@@ -455,11 +458,11 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     animate={{ opacity: 1, y: 0 }}
                     className="border border-[#E7E7E5] rounded-lg p-4 bg-[#fafaf9] space-y-2"
                 >
-                    <h4 className="text-xs font-semibold text-[#37352F]">
+                    <h4 className="text-sm font-semibold text-[#37352F]">
                         Welcher Anker soll die Einleitung eröffnen?
                     </h4>
-                    <p className="text-[10px] text-[#73726E] leading-relaxed">
-                        Damit das Anschreiben nicht überladen wirkt, bekommt nur EIN Element die Einleitung. Das andere wird elegant im Hauptteil verwoben.
+                    <p className="text-xs text-[#73726E] leading-relaxed">
+                        Damit das Anschreiben nicht überladen wirkt, bekommt nur EIN Element die Einleitung. <strong className="text-[#37352F]">Das andere wird elegant im Hauptteil verwoben.</strong>
                     </p>
                     <div className="flex flex-col gap-1.5 mt-1">
                         <label

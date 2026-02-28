@@ -58,10 +58,14 @@ interface SidebarProps {
 
 export function NavItem({ icon: Icon, label, href, badge, isActive: isActiveProp, shortcut }: NavItemProps) {
   const pathname = usePathname()
-  // Auto-detect active state if not explicitly provided
-  const isActive = isActiveProp !== undefined
-    ? isActiveProp
-    : pathname === href || pathname.startsWith(href + '/')
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  // Auto-detect active state if not explicitly provided, but only after mount
+  // (prevents SSR/client hydration mismatch)
+  const isActive = mounted
+    ? (isActiveProp !== undefined ? isActiveProp : pathname === href || pathname.startsWith(href + '/'))
+    : false
 
   return (
     <motion.div
@@ -111,7 +115,7 @@ export function NavItem({ icon: Icon, label, href, badge, isActive: isActiveProp
             </Badge>
           )}
 
-          {/* Active Indicator */}
+          {/* Active Indicator — only after mount to avoid hydration mismatch */}
           {isActive && (
             <motion.div
               className="absolute left-0 top-1/2 w-1 h-4 bg-[#0066FF] rounded-r-full"
