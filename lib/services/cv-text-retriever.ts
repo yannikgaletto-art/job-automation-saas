@@ -22,10 +22,9 @@ export async function getCVText(userId: string, documentId?: string): Promise<{
     documentId: string;
     fileName: string;
 } | null> {
-    const supabase = await createClient();
-
-    // Build query — either specific document or latest CV
-    let query = supabase
+    // Use admin client for reads — consistent with cv/match route pattern
+    // Auth client + RLS can silently fail in certain API route contexts
+    let query = supabaseAdmin
         .from('documents')
         .select('id, file_url_encrypted, metadata, pii_encrypted')
         .eq('user_id', userId)
@@ -40,9 +39,11 @@ export async function getCVText(userId: string, documentId?: string): Promise<{
     const { data: doc, error } = await query.maybeSingle();
 
     if (error || !doc) {
-        console.warn('⚠️ CV document not found for user:', userId, documentId ? `docId:${documentId}` : '(latest)');
+        console.warn('⚠️ CV document not found for user:', userId, documentId ? `docId:${documentId}` : '(latest)', 'error:', error?.message);
         return null;
     }
+
+    console.log(`📋 CV document found: id=${doc.id} file_url=${doc.file_url_encrypted?.substring(0, 50)}...`);
 
     let text = (doc.metadata as Record<string, unknown>)?.extracted_text as string | undefined;
 
@@ -50,28 +51,36 @@ export async function getCVText(userId: string, documentId?: string): Promise<{
     // Self-Healing: Extract text on-the-fly if missing
     // ================================================================
     if (!text || (typeof text === 'string' && text.trim().length < 50)) {
-        console.warn('⚠️ [Self-Healing] CV has no extracted_text, attempting on-the-fly extraction:', doc.id);
+        console.warn(`⚠️ [Self-Healing] CV ${doc.id} has no extracted_text (current length: ${text?.length ?? 0}), attempting on-the-fly extraction...`);
 
         try {
             const storagePath = doc.file_url_encrypted;
-            if (!storagePath) throw new Error('No storage path');
+            if (!storagePath || typeof storagePath !== 'string') {
+                throw new Error(`No valid storage path found: ${JSON.stringify(storagePath)}`);
+            }
 
             // Download the file from storage
+            console.log(`⬇️ [Self-Healing] Downloading from bucket 'cvs', path: ${storagePath}`);
             const { data: fileData, error: downloadErr } = await supabaseAdmin.storage
                 .from('cvs')
                 .download(storagePath);
 
-            if (downloadErr || !fileData) throw new Error(downloadErr?.message || 'Download failed');
+            if (downloadErr || !fileData) {
+                throw new Error(`Storage download failed: ${downloadErr?.message || 'No file data returned'}`);
+            }
+            console.log(`⬇️ [Self-Healing] Downloaded ${fileData.size} bytes`);
 
             const buffer = Buffer.from(await fileData.arrayBuffer());
+            console.log(`🤖 [Self-Healing] Calling processDocument (Claude Haiku)...`);
             const { processDocument } = await import('@/lib/services/document-processor');
             const processed = await processDocument(buffer, 'application/pdf');
 
             text = processed.sanitizedText;
+            console.log(`🤖 [Self-Healing] Extraction complete: ${text.length} chars`);
 
             // Save extracted text back to DB for next time
             const existingMeta = (doc.metadata as Record<string, unknown>) || {};
-            await supabaseAdmin
+            const { error: updateErr } = await supabaseAdmin
                 .from('documents')
                 .update({
                     metadata: { ...existingMeta, extracted_text: text, original_name: existingMeta.original_name },
@@ -79,9 +88,15 @@ export async function getCVText(userId: string, documentId?: string): Promise<{
                 })
                 .eq('id', doc.id);
 
-            console.log('✅ [Self-Healing] Text extracted and saved for document:', doc.id, `(${text.length} chars)`);
+            if (updateErr) {
+                console.error(`⚠️ [Self-Healing] DB update failed (non-blocking):`, updateErr.message);
+            } else {
+                console.log('✅ [Self-Healing] Text extracted and saved for document:', doc.id, `(${text.length} chars)`);
+            }
         } catch (healErr) {
-            console.error('❌ [Self-Healing] On-the-fly extraction failed:', healErr);
+            const errMsg = healErr instanceof Error ? healErr.message : String(healErr);
+            console.error(`❌ [Self-Healing] On-the-fly extraction failed for ${doc.id}: ${errMsg}`);
+            console.error('Full error:', healErr);
             return null;
         }
     }
