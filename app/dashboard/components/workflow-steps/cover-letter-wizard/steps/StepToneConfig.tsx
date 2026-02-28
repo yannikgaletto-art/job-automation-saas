@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse, TonePreset, TargetLanguage } from '@/types/cover-letter-setup';
 import { Info, ChevronLeft, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
     setupData: SetupDataResponse;
@@ -11,10 +12,31 @@ interface Props {
     onGenerate: () => void;
 }
 
-const toneOptions: { id: TonePreset; label: string; desc: string }[] = [
-    { id: 'data-driven', label: '📊 Daten-getrieben', desc: 'Zahlen, Fakten, konkrete Ergebnisse' },
-    { id: 'storytelling', label: '📖 Storytelling', desc: 'Narrative, persönliche Geschichte' },
-    { id: 'formal', label: '🎩 Formal', desc: 'Klassisch, strukturiert, konservativ' },
+const toneOptions: { id: TonePreset; label: string; desc: string; previewText: string }[] = [
+    {
+        id: 'data-driven',
+        label: '📊 Daten-getrieben',
+        desc: 'Zahlen, Fakten, konkrete Ergebnisse',
+        previewText: '„Ich konnte den Umsatz im B2B-Segment um 15% steigern — durch systematische Optimierung der Vertriebsprozesse."',
+    },
+    {
+        id: 'storytelling',
+        label: '📖 Storytelling',
+        desc: 'Narrative, persönliche Geschichte',
+        previewText: '„Als ich zum ersten Mal die Herausforderungen im B2B-Sales sah, wusste ich: Hier kann ich wirklich etwas bewegen."',
+    },
+    {
+        id: 'formal',
+        label: '🎩 Formal',
+        desc: 'Klassisch, strukturiert, konservativ',
+        previewText: '„Meine bisherige Laufbahn ist geprägt durch erfolgreiche Abschlüsse im strategischen Vertrieb."',
+    },
+    {
+        id: 'philosophisch',
+        label: '🔮 Philosophisch',
+        desc: 'Konzeptionell, reflektiert, intellektuell',
+        previewText: '„Wachstum entsteht dort, wo bewährte Prozesse hinterfragt und neu gedacht werden."',
+    },
 ];
 
 export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
@@ -22,19 +44,21 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const [selectedPreset, setSelectedPreset] = useState<TonePreset>(tone?.preset || 'data-driven');
     const [language, setLanguage] = useState<TargetLanguage>(tone?.targetLanguage || setupData.detectedJobLanguage);
     const [contactPerson, setContactPerson] = useState(tone?.contactPerson || '');
-    const [acknowledged, setAcknowledged] = useState(tone?.styleWarningAcknowledged || false);
 
-    const handleAcknowledge = () => {
-        const newAck = !acknowledged;
-        setAcknowledged(newAck);
-        setTone({
-            preset: selectedPreset,
-            targetLanguage: language,
-            hasStyleSample: setupData.hasStyleSample,
-            styleWarningAcknowledged: newAck,
-            contactPerson,
-        });
-    };
+    // Ensure the store always has a valid tone on mount (for default selection)
+    useEffect(() => {
+        if (!tone?.preset) {
+            setTone({
+                preset: selectedPreset,
+                targetLanguage: language,
+                hasStyleSample: setupData.hasStyleSample,
+                styleWarningAcknowledged: true,
+                contactPerson,
+            });
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const canGenerate = isStepComplete(3);
 
     const handlePresetSelect = (preset: TonePreset) => {
         setSelectedPreset(preset);
@@ -42,7 +66,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             preset,
             targetLanguage: language,
             hasStyleSample: setupData.hasStyleSample,
-            styleWarningAcknowledged: acknowledged,
+            styleWarningAcknowledged: true,
             contactPerson,
         });
     };
@@ -53,7 +77,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             preset: selectedPreset,
             targetLanguage: lang,
             hasStyleSample: setupData.hasStyleSample,
-            styleWarningAcknowledged: acknowledged,
+            styleWarningAcknowledged: true,
             contactPerson,
         });
     };
@@ -65,12 +89,10 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             preset: selectedPreset,
             targetLanguage: language,
             hasStyleSample: setupData.hasStyleSample,
-            styleWarningAcknowledged: acknowledged,
+            styleWarningAcknowledged: true,
             contactPerson: val,
         });
     };
-
-    const canGenerate = isStepComplete(3);
 
     return (
         <div className="space-y-4">
@@ -97,23 +119,45 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                 </div>
             </div>
 
-            {/* Tone Options */}
+            {/* Tone Options with Micro-Preview */}
             <div className="grid grid-cols-1 gap-2">
-                {toneOptions.map((opt) => (
-                    <button
-                        key={opt.id}
-                        onClick={() => handlePresetSelect(opt.id)}
-                        className={[
-                            'text-left px-3 py-2.5 rounded-lg border transition-all',
-                            selectedPreset === opt.id
-                                ? 'border-2 border-[#002e7a] bg-[#f0f4ff]'
-                                : 'border border-[#E7E7E5] bg-white hover:shadow-sm',
-                        ].join(' ')}
-                    >
-                        <p className="text-xs font-semibold text-[#37352F]">{opt.label}</p>
-                        <p className="text-[10px] text-[#73726E] mt-0.5">{opt.desc}</p>
-                    </button>
-                ))}
+                {toneOptions.map((opt) => {
+                    const isActive = selectedPreset === opt.id;
+                    return (
+                        <button
+                            key={opt.id}
+                            onClick={() => handlePresetSelect(opt.id)}
+                            className={[
+                                'text-left px-3 py-2.5 rounded-lg border transition-all',
+                                isActive
+                                    ? 'border-2 border-[#002e7a] bg-[#f0f4ff]'
+                                    : 'border border-[#E7E7E5] bg-white hover:shadow-sm',
+                            ].join(' ')}
+                        >
+                            <p className="text-xs font-semibold text-[#37352F]">{opt.label}</p>
+                            <p className="text-[10px] text-[#73726E] mt-0.5">{opt.desc}</p>
+
+                            {/* Micro-Preview — animated */}
+                            <AnimatePresence>
+                                {isActive && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.25, ease: 'easeInOut' }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="mt-2 pt-2 border-t border-[#D0DEFF]">
+                                            <p className="text-[11px] text-[#5A7AB5] italic leading-snug">
+                                                {opt.previewText}
+                                            </p>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Contact Person Input */}
@@ -130,34 +174,16 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                 />
             </div>
 
-            {/* Anti-GPT Callout */}
-            <div className="bg-[#EEF3FF] border-l-4 border-[#002e7a] rounded-md p-4">
+            {/* Streamlined Style Callout — no checkbox */}
+            <div className="bg-[#EEF3FF] border-l-4 border-[#002e7a] rounded-md p-3">
                 <div className="flex items-start gap-2">
                     <Info className="w-4 h-4 text-[#002e7a] shrink-0 mt-0.5" />
-                    <div>
-                        <p className="text-xs font-semibold text-[#002e7a]">Wichtig: Deine Schreibstimme</p>
-                        <p className="text-xs text-[#37352F] leading-relaxed mt-1">
-                            Wir kalibrieren Claude auf DEINE Schreibweise aus deinem hochgeladenen Anschreiben.
-                            Falls dein Text bereits GPT-typische Formulierungen enthält, wird das Ergebnis genauso klingen.
-                            Wähle zusätzlich einen Stil, der zur Unternehmenskultur passt — aber immer in deiner Stimme.
-                        </p>
-                        {!setupData.hasStyleSample && (
-                            <p className="text-[10px] text-amber-600 mt-1.5">
-                                ⚠️ Kein altes Anschreiben hochgeladen — Standardstil wird verwendet.
-                            </p>
-                        )}
-                    </div>
+                    <p className="text-xs text-[#37352F] leading-relaxed">
+                        {setupData.hasStyleSample
+                            ? 'Dein persönlicher Schreibstil wurde analysiert. Die KI kalibriert sich auf deine Stimme.'
+                            : 'Lade ein altes Anschreiben in den Settings hoch, damit die KI deinen Stil lernt. Bis dahin nutzen wir den gewählten Ton.'}
+                    </p>
                 </div>
-
-                <label className="flex items-center gap-2 mt-3 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={acknowledged}
-                        onChange={handleAcknowledge}
-                        className="rounded border-[#002e7a] text-[#002e7a] w-3.5 h-3.5"
-                    />
-                    <span className="text-xs text-[#37352F]">Ich habe das verstanden</span>
-                </label>
             </div>
 
             <div className="flex justify-between pt-2">

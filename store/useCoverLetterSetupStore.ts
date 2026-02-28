@@ -118,7 +118,7 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 const s = get();
                 if (step === 1) return !!s.selectedHook;
                 if (step === 2) return s.cvStations.length >= 1;
-                if (step === 3) return !!s.tone?.styleWarningAcknowledged;
+                if (step === 3) return !!s.tone?.preset;
                 return false;
             },
 

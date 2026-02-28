@@ -3,9 +3,8 @@
 import { CVStationCard } from '../cards/CVStationCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse } from '@/types/cover-letter-setup';
-import { ChevronLeft, ChevronRight, Lightbulb, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { generateStationReasoning } from '@/app/actions/generate-station-reasoning';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useRef } from 'react';
 
 interface Props {
     setupData: SetupDataResponse;
@@ -29,7 +28,7 @@ function generateRecommendation(
     if (!bullets || bullets.length === 0) {
         return {
             requirement: requirements[0],
-            reasoning: `${company} (${role}) zeigt grundsätzlich deine Erfahrung in diesem Bereich.`,
+            reasoning: `Dieser Hintergrund unterstützt dein Profil als ${role}.`,
             _score: 0
         };
     }
@@ -54,8 +53,11 @@ function generateRecommendation(
 
     if (bestScore === 0) {
         // Fallback: just use the first requirement
-        bestReq = requirements[0];
-        bestBullet = bullets[0];
+        return {
+            requirement: requirements[0],
+            reasoning: `Dieser Hintergrund unterstützt dein Profil als ${role}.`,
+            _score: 0
+        };
     }
 
     // Truncate bullet to ~80 chars for display
@@ -71,36 +73,17 @@ function generateRecommendation(
 export function StepStationMapping({ setupData, onBack, onNext }: Props) {
     const { cvStations, toggleStation, isStepComplete } = useCoverLetterSetupStore();
     const canProceed = isStepComplete(2);
+    const autoSelectDone = useRef(false);
 
-    const [expandedRecs, setExpandedRecs] = useState<Record<number, string[]>>({});
-    const [loadingRecs, setLoadingRecs] = useState<Record<number, boolean>>({});
+    // Upgrade 1: Daten-Hygiene — nur vollständige Stationen anzeigen
+    const validStations = useMemo(
+        () => setupData.cvStations.filter(s => s.role && s.company),
+        [setupData.cvStations]
+    );
 
-    const handleExpandRec = async (
-        idx: number,
-        role: string,
-        company: string,
-        bullets: string[],
-        requirement: string
-    ) => {
-        if (expandedRecs[idx]) {
-            // Toggle off
-            const next = { ...expandedRecs };
-            delete next[idx];
-            setExpandedRecs(next);
-            return;
-        }
-        setLoadingRecs((prev) => ({ ...prev, [idx]: true }));
-        try {
-            const reasons = await generateStationReasoning(role, company, bullets, requirement);
-            setExpandedRecs((prev) => ({ ...prev, [idx]: reasons }));
-        } finally {
-            setLoadingRecs((prev) => ({ ...prev, [idx]: false }));
-        }
-    };
-
-    // Precalculate recommendations for all stations and find the top 3 best matching ones
+    // Precalculate recommendations for all VALID stations and find the top matches
     const { recs, top3Set } = useMemo(() => {
-        const computed = setupData.cvStations.map((station, idx) => {
+        const computed = validStations.map((station, idx) => {
             const safeBullets = station.bullets || [];
             return {
                 idx,
@@ -112,7 +95,34 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
             recs: computed,
             top3Set: new Set(sortedIndices.slice(0, 3)),
         };
-    }, [setupData.cvStations, setupData.jobRequirements]);
+    }, [validStations, setupData.jobRequirements]);
+
+    // Upgrade 2: Auto-Select — Top 2 beim ersten Betreten vorauswählen
+    useEffect(() => {
+        if (autoSelectDone.current) return;
+        if (cvStations.length > 0) return; // User hat bereits manuell gewählt oder Store hat Daten
+        if (recs.length === 0) return;
+
+        autoSelectDone.current = true;
+
+        const sorted = [...recs].sort((a, b) => (b.rec?._score || 0) - (a.rec?._score || 0));
+        const top2 = sorted.slice(0, 2);
+
+        for (const entry of top2) {
+            const station = validStations[entry.idx];
+            if (!station) continue;
+            const safeBullets = station.bullets || [];
+            const rec = entry.rec;
+            toggleStation({
+                company: station.company,
+                role: station.role,
+                period: station.period,
+                keyBullet: safeBullets[0] || '',
+                matchedRequirement: rec?.requirement || setupData.jobRequirements[0] || '',
+                intent: `Beweis für: ${rec?.requirement || 'Berufserfahrung'}`,
+            });
+        }
+    }, [recs, validStations, cvStations.length, toggleStation, setupData.jobRequirements]);
 
     const handleToggle = (stationIndex: number, station: SetupDataResponse['cvStations'][number]) => {
         const safeBullets = station.bullets || [];
@@ -127,7 +137,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
         });
     };
 
-    if (setupData.cvStations.length === 0) {
+    if (validStations.length === 0) {
         return (
             <div className="space-y-4">
                 <div>
@@ -174,76 +184,26 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                 )}
             </div>
 
-            {/* CV Stations — two-column: left=station, right=recommendation */}
+            {/* Upgrade 3: Single-column layout — no more split-view */}
             <div className="space-y-2">
-                {setupData.cvStations.map((station, idx) => {
+                {validStations.map((station, idx) => {
                     const selected = cvStations.find(
                         (s) => s.company === station.company && s.role === station.role
                     );
                     const rec = top3Set.has(idx) ? recs[idx]?.rec : null;
 
                     return (
-                        <div key={idx} className="grid grid-cols-2 gap-3 items-stretch">
-                            {/* Left: Station Card */}
-                            <div className="flex-1 min-w-0">
-                                <CVStationCard
-                                    company={station.company}
-                                    role={station.role}
-                                    period={station.period}
-                                    bullets={station.bullets}
-                                    selectedIndex={selected?.stationIndex ?? null}
-                                    isDisabled={!selected && cvStations.length >= 3}
-                                    onToggle={() => handleToggle(idx, station)}
-                                />
-                            </div>
-
-                            {/* Right: Recommendation */}
-                            {rec ? (
-                                <div
-                                    onClick={() => handleExpandRec(idx, station.role, station.company, station.bullets || [], rec.requirement)}
-                                    className="min-w-0 bg-[#F8FAFC] border border-[#E7E7E5] rounded-lg p-3 flex flex-col justify-center cursor-pointer hover:bg-[#F1F5F9] transition-colors"
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex items-start gap-2">
-                                            <Lightbulb className="w-4 h-4 text-amber-500 shrink-0" />
-                                            <div className="min-w-0 pt-0.5">
-                                                <p className="text-[10px] font-semibold text-[#002e7a] uppercase tracking-wide mb-1">
-                                                    Empfehlung
-                                                </p>
-                                                <p className="text-[10px] text-[#73726E] leading-relaxed">
-                                                    {rec.reasoning}
-                                                </p>
-
-                                                {/* Expanded Content */}
-                                                {loadingRecs[idx] ? (
-                                                    <div className="mt-3 flex items-center gap-1.5 text-[10px] text-[#002e7a] opacity-70">
-                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                        Berechne tiefere Begründung...
-                                                    </div>
-                                                ) : expandedRecs[idx] && (
-                                                    <div className="mt-3 space-y-1.5 border-t border-[#E7E7E5] pt-2">
-                                                        {expandedRecs[idx].map((r, i) => (
-                                                            <div key={i} className="flex gap-1.5 items-start">
-                                                                <span className="text-[10px] text-[#002e7a] font-bold mt-0.5">•</span>
-                                                                <span className="text-[10.5px] leading-snug text-[#73726E]">{r}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        {/* Dropdown Chevron */}
-                                        <div className="shrink-0 pt-0.5">
-                                            {expandedRecs[idx] ? (
-                                                <ChevronUp className="w-4 h-4 text-[#A8A29E]" />
-                                            ) : (
-                                                <ChevronDown className="w-4 h-4 text-[#A8A29E]" />
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : <div /> /* Empty div to pad the second grid column if no recommendation */}
-                        </div>
+                        <CVStationCard
+                            key={idx}
+                            company={station.company}
+                            role={station.role}
+                            period={station.period}
+                            bullets={station.bullets}
+                            selectedIndex={selected?.stationIndex ?? null}
+                            isDisabled={!selected && cvStations.length >= 3}
+                            onToggle={() => handleToggle(idx, station)}
+                            recommendation={rec ? { requirement: rec.requirement, reasoning: rec.reasoning } : undefined}
+                        />
                     );
                 })}
             </div>

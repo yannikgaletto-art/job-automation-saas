@@ -47,8 +47,9 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
         const bestHook = [...setupData.hooks].sort((a, b) => b.relevanceScore - a.relevanceScore)[0];
         if (bestHook) setHook(bestHook);
 
-        // Top-3 stations
-        setupData.cvStations.slice(0, 3).forEach((s, i) => {
+        // Top-3 stations (filtered for data hygiene, matching Step 2 logic)
+        const validStations = setupData.cvStations.filter(s => s.role && s.company);
+        validStations.slice(0, 3).forEach((s, i) => {
             const req = setupData.jobRequirements[i] || setupData.jobRequirements[0] || '';
             toggleStation({
                 company: s.company,
