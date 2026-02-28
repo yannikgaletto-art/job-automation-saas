@@ -103,6 +103,9 @@ ${JSON.stringify(profile?.cv_structured_data || {}, null, 2)}`
             : `KANDIDATEN-LEBENSLAUF:
 ${JSON.stringify(profile?.cv_structured_data || {}, null, 2)}`;
 
+    // ─── Early declarations needed by toneInstructions template literals ────────
+    const hasQuote = !!ctx?.selectedQuote;
+
     // ─── Tone Instructions (B1.5: Jeder Stil verändert GESAMTE Prompt-Struktur) ─
     const toneInstructions: Record<string, string> = {
         'data-driven': `STIL: DATENGETRIEBEN & PRÄZISE
@@ -148,8 +151,11 @@ TONALITÄT:
 SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Umgangssprache, Emojis, Interjektionen, "Ich brenne für", persönliche Anekdoten.`,
 
+        // WHY: Philosophisch-Preset darf KEINE eigene Zitat-Formatierung vorgeben,
+        // wenn der Wizard bereits ein quoteIntroBlock in Sektion 3 injiziert.
+        // CONFLICTS RESOLVED: Red Flag #3 — zwei konkurrierende Zitat-Format-Anweisungen.
         'philosophisch': `STIL: INTELLEKTUELL & KONZEPTIONELL
-ÖFFNUNG: Starte mit einem relevanten Zitat, einer Beobachtung oder einem Konzept, das die Brücke zwischen deiner Weltsicht und dem Unternehmen schlägt. (z.B. "Peter Drucker sagte einmal: ‚Die beste Art, die Zukunft vorauszusagen, ist sie zu gestalten.' — Ein Gedanke, der meine Arbeit bei [Firma] geprägt hat und den ich bei [Ziel-Firma] vertiefen möchte.")
+${hasQuote ? 'ÖFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhänger) gesteuert. Deine Aufgabe hier: Schreibe nach dem Zitat einen konzeptionellen Begründungssatz, der die Brücke zwischen der Aussage des Zitats und deiner beruflichen Erfahrung schlägt.' : 'ÖFFNUNG: Starte mit einer relevanten Beobachtung oder einem Konzept, das die Brücke zwischen deiner Weltsicht und dem Unternehmen schlägt. (z.B. eine Beobachtung über einen Branchentrend, den das Unternehmen aktiv adressiert.)'}
 ABSATZ-STRUKTUR: Konzept → Beweis → Reflexion
 - Jeder Absatz beginnt mit einer These oder Beobachtung
 - Dann folgt der konkrete Beweis aus der eigenen Karriere
@@ -219,7 +225,7 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
     let bodyIntegrationGuidance = '';
 
     const focus = ctx?.introFocus || 'quote';
-    const hasQuote = !!ctx?.selectedQuote;
+    // hasQuote already declared above toneInstructions (needed for philosophisch preset)
     const hasHook = !!ctx?.selectedHook?.content;
     const hasNews = !!ctx?.selectedNews;
     const enablePingPong = ctx?.optInModules?.pingPong ?? ctx?.enablePingPong ?? false;
@@ -266,11 +272,17 @@ Unternehmens-Fakt: "${hookContent}"
 -> NIEMALS die Quelle direkt nennen (z.B. "Wie auf Ihrer Website gelesen..." ist VERBOTEN)
 -> MAXIMAL 2 SÄTZE für den Aufhänger. Verknüpfe ihn mit deiner Motivation für die Stelle` : '';
 
-    const hookBodyBlock = hasHook ? `[REGEL: UNTERNEHMENS-FAKT IM HAUPTTEIL — STATION-1-EINLEITUNG]:
-Der folgende Fakt MUSS als EINLEITUNGSSATZ des ERSTEN Stations-Absatzes verwendet werden:
+    // WHY: Der alte starre Satz-Vorschlag ("Als ich gesehen habe...") klang wie
+    // ein ZWEITER Einleitungssatz. Claude interpretierte ihn als Intro-Start und
+    // verschmolz Absatz 1 + 2. Jetzt: weiche Instruktion + Positions-Kontext.
+    // CONFLICTS RESOLVED: Red Flag #2 — einleitende Formulierung in Body-Block.
+    const hookBodyBlock = hasHook ? `[REGEL: UNTERNEHMENS-FAKT IM HAUPTTEIL — ABSATZ 2]
+DU BEFINDEST DICH JETZT IN ABSATZ 2 (HAUPTTEIL). Die Einleitung ist bereits abgeschlossen.
+Verknüpfe den folgenden Unternehmens-Fakt organisch mit der Erfahrung aus der ERSTEN CV-Station:
 "${hookContent}"
-Formuliere es so: "Als ich gesehen habe, dass ${companyName} ${hookContent.toLowerCase().startsWith('sie') ? hookContent : hookContent.slice(0, 80) + '...'}${hookContent.length > 80 ? '' : ''}, hat mich das an meine Erfahrung bei [Firma] erinnert..."
-Der Fakt dient als Brücke zu einer konkreten Berufserfahrung. Maximal 2 Sätze, dann direkt in die Station.` : '';
+INSTRUKTION: Webe diesen Fakt als Motivation oder Anknüpfungspunkt in den Stations-Absatz ein.
+BEISPIEL-STRUKTUR: "[Fakt-Bezug in eigenen Worten], das hat mich an meine Erfahrung bei [Firma] erinnert, wo ich [konkretes Achievement]."
+KEIN neuer Einleitungssatz — du bist bereits im Hauptteil. Maximal 2 Sätze für die Fakt-Brücke, dann direkt in die Station.` : '';
 
     // ─── Kreuzungs-Logik ───────────────────────────────────────────────────────
     if (hasQuote && hasHook) {
@@ -404,7 +416,13 @@ ${buildBlacklistPromptSection()}
 ${introGuidance || `Beginne mit einem relevanten Aufhänger zu ${companyName}.`}
 
 ${companyName} muss im ersten Absatz mindestens einmal fallen.
-Der gesamte erste Absatz (Aufhänger + Motivation) darf MAXIMAL 2 SÄTZE lang sein! Keine generischen Abhandlungen über Innovation. Kurz, knackig, direkt zum Punkt.
+${introGuidance && hasQuote && focus === 'quote'
+            // WHY: quoteIntroBlock braucht: Einleitungssatz + Zitat + Autor + Begründungssatz + Übergangssatz.
+            // Das sind physisch 4+ Sätze. Das alte "MAX 2 SÄTZE"-Limit war unmöglich → Claude warf das Zitat weg.
+            // CONFLICTS RESOLVED: Red Flag #1 — hartes Satzzahl-Limit vs. strukturierter Block.
+            ? 'Der erste Absatz darf bis zu 5 SÄTZE lang sein (Einleitung, Zitat auf eigener Zeile, Begründung, Übergang). Halte trotzdem jeden einzelnen Satz kurz und knackig — kein Satz über 25 Wörter.'
+            : 'Der gesamte erste Absatz (Aufhänger + Motivation) darf MAXIMAL 2 SÄTZE lang sein! Keine generischen Abhandlungen über Innovation. Kurz, knackig, direkt zum Punkt.'
+        }
 
 [PFLICHT — ÜBERGANGSSATZ]: Der ERSTE Absatz MUSS zwingend mit diesem Satz enden:
 ${isDuForm ? '"Daher möchte ich mich bei euch kurz vorstellen."' : '"Daher möchte ich mich bei Ihnen kurz vorstellen."'}
