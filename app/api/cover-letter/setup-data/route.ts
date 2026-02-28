@@ -209,7 +209,7 @@ export async function GET(req: NextRequest) {
             hooks,
             hasPerplexityData: hooks.some((h) => h.type !== 'manual'),
             companyWebsite: job.company_website ?? null,
-            jobTitle: job.job_title ?? null,
+            jobTitle: job.metadata?.job_title ?? null,
             cvStations: cvData,
             jobRequirements: requirements,
             hasStyleSample,
