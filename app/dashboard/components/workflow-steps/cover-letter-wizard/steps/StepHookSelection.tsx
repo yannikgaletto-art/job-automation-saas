@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function StepHookSelection({ jobId, companyName, setupData, onNext, onReloadData }: Props) {
-    const { selectedHook, selectedQuote, fetchedQuotes, setHook, setQuote, setFetchedQuotes, setStep } = useCoverLetterSetupStore();
+    const { selectedHook, selectedQuote, fetchedQuotes, introFocus, setHook, setQuote, setFetchedQuotes, setIntroFocus, setStep } = useCoverLetterSetupStore();
     const [manualText, setManualText] = useState('');
     const [quoteError, setQuoteError] = useState<string | null>(null);
     const [openAccordion, setOpenAccordion] = useState<string | null>(null);
@@ -382,6 +382,17 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     </div>
 
                     <div className="grid grid-cols-1 gap-2">
+
+                        {/* Info-Box: So wirkt ein Zitat */}
+                        <div className="bg-[#FFFBE6] border border-[#F5E6A3] rounded-lg p-3 mb-1">
+                            <p className="text-[10px] font-semibold text-[#8B7000] mb-1">💡 So wirkt ein Zitat im Anschreiben:</p>
+                            <p className="text-[10px] text-[#5C4A00] italic leading-relaxed">
+                                &ldquo;The most dangerous phrase is, &apos;We&apos;ve always done it this way.&apos;&rdquo;
+                            </p>
+                            <p className="text-[10px] text-[#5C4A00] leading-relaxed mt-1">
+                                Dieser Satz von Grace Hopper hat mich schon während meiner Zeit bei der Telekom geprägt. Er erinnert mich täglich daran, neugierig zu bleiben und Eure Maxime des &ldquo;Challenging the Status Quo&rdquo; zu leben.
+                            </p>
+                        </div>
                         {fetchedQuotes.map((q, i) => (
                             <motion.button
                                 key={i}
@@ -433,6 +444,65 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                         >
                             Weiter <ChevronRight className="w-3.5 h-3.5" />
                         </button>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* ─── Intro Focus Toggle (nur wenn Hook + Zitat gewählt) ─── */}
+            {selectedHook && selectedQuote && phase === 'quoteResults' && (
+                <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="border border-[#E7E7E5] rounded-lg p-4 bg-[#fafaf9] space-y-2"
+                >
+                    <h4 className="text-xs font-semibold text-[#37352F]">
+                        Welcher Anker soll die Einleitung eröffnen?
+                    </h4>
+                    <p className="text-[10px] text-[#73726E] leading-relaxed">
+                        Damit das Anschreiben nicht überladen wirkt, bekommt nur EIN Element die Einleitung. Das andere wird elegant im Hauptteil verwoben.
+                    </p>
+                    <div className="flex flex-col gap-1.5 mt-1">
+                        <label
+                            className={[
+                                'flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-all text-xs',
+                                introFocus === 'quote'
+                                    ? 'border-[#002e7a] bg-[#f0f4ff]'
+                                    : 'border-[#E7E7E5] bg-white hover:border-[#d6d6d6]',
+                            ].join(' ')}
+                        >
+                            <input
+                                type="radio"
+                                name="introFocus"
+                                checked={introFocus === 'quote'}
+                                onChange={() => setIntroFocus('quote')}
+                                className="mt-0.5 accent-[#002e7a]"
+                            />
+                            <div>
+                                <span className="font-semibold text-[#37352F]">Zitat in die Einleitung</span>
+                                <span className="text-[#73726E]"> — News untermauert eine CV-Station im Hauptteil</span>
+                                <span className="block text-[10px] text-[#A8A29E] mt-0.5">Empfohlen</span>
+                            </div>
+                        </label>
+                        <label
+                            className={[
+                                'flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-all text-xs',
+                                introFocus === 'hook'
+                                    ? 'border-[#002e7a] bg-[#f0f4ff]'
+                                    : 'border-[#E7E7E5] bg-white hover:border-[#d6d6d6]',
+                            ].join(' ')}
+                        >
+                            <input
+                                type="radio"
+                                name="introFocus"
+                                checked={introFocus === 'hook'}
+                                onChange={() => setIntroFocus('hook')}
+                                className="mt-0.5 accent-[#002e7a]"
+                            />
+                            <div>
+                                <span className="font-semibold text-[#37352F]">News in die Einleitung</span>
+                                <span className="text-[#73726E]"> — Zitat untermauert eine CV-Station im Hauptteil</span>
+                            </div>
+                        </label>
                     </div>
                 </motion.div>
             )}

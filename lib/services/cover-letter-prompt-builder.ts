@@ -188,50 +188,98 @@ VERBOT: Erwähne KEINE anderen Stationen aus dem CV — nur die oben genannten s
         stationsSection = 'Nutze die relevantesten Erfahrungen aus dem CV und beweise damit deinen Wert für das Unternehmen.';
     }
 
-    // ─── Hook Section (B1.3: Zitat-System repariert) ─────────────────────────
-    let hookSection = '';
-    if (ctx?.selectedQuote) {
-        // B2.2: optInModules.pingPong sets enablePingPong — single path
-        const enablePingPong = ctx?.optInModules?.pingPong ?? ctx?.enablePingPong ?? false;
+    // ─── Cross-Integration: Intro vs Body (Anti-Overload Architecture) ─────────
+    // REGEL: Die Einleitung bekommt MAX 1 Anker. Das zweite Element wandert
+    // deterministisch in den Hauptteil (als Einleitungssatz des Station-1-Absatzes).
+    // selectedNews wird in dieselbe Logik gefaltet um Triple-Overload zu verhindern.
+    let introGuidance = '';
+    let bodyIntegrationGuidance = '';
 
-        hookSection = `[REGEL: EINLEITUNG - ZITAT-BRIDGING]:
-Gewähltes Zitat: "${ctx.selectedQuote.quote}"
-(Autor: ${ctx.selectedQuote.author})
-${ctx.selectedHook?.content ? `Zusätzlicher Unternehmens-Fakt: "${ctx.selectedHook.content}"` : ''}
+    const focus = ctx?.introFocus || 'quote';
+    const hasQuote = !!ctx?.selectedQuote;
+    const hasHook = !!ctx?.selectedHook?.content;
+    const hasNews = !!ctx?.selectedNews;
+    const enablePingPong = ctx?.optInModules?.pingPong ?? ctx?.enablePingPong ?? false;
+
+    // ─── Zitat-Block (wiederverwendbar für Intro oder Body) ────────────────────
+    const quoteIntroBlock = hasQuote ? `[REGEL: EINLEITUNG — ZITAT-BRIDGING]:
+Gewähltes Zitat: "${ctx!.selectedQuote!.quote}"
+(Autor: ${ctx!.selectedQuote!.author})
 
 FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
-- Leite das Zitat mit einer menschlichen Beobachtung ein (z.B. "Beim Lesen Ihrer Website dachte ich an ${ctx.selectedQuote.author}...").
+- Leite das Zitat mit einer menschlichen Beobachtung ein (z.B. "Beim Lesen Ihrer Website dachte ich an ${ctx!.selectedQuote!.author}...").
 - Das Zitat MUSS auf einer EIGENEN Zeile stehen, in Anführungszeichen, gefolgt vom Autor:
 
   [Einleitender Satz]
 
-  "${ctx.selectedQuote.quote}"
-  - ${ctx.selectedQuote.author}
+  "${ctx!.selectedQuote!.quote}"
+  - ${ctx!.selectedQuote!.author}
 
   [Begründungssatz]
 
 - DIREKT NACH dem Zitat: Ein EIGENER Begründungssatz (1 Satz), der erklärt WARUM dieses Zitat zum Unternehmen UND zum Kandidaten passt.
-- Der Begründungssatz MUSS eine konkrete Brücke zu einer Erfahrung aus dem CV bauen (z.B. 'Diesen Gedanken habe ich bei meiner Arbeit als [Rolle] bei [Firma] täglich gelebt, als ich [konkretes Beispiel]...').
+- Der Begründungssatz MUSS eine konkrete Brücke zu einer Erfahrung aus dem CV bauen.
 - KEINE leeren Floskeln wie 'Genau diese Haltung treibt mich an'.
-${enablePingPong ? '- PING-PONG (aktiv): Nach der Zitat-Brücke, füge einen kurzen Satz hinzu der eine kritische Gegenposition aufwirft. Dies zeigt intellektuelle Reife.' : ''}`;
-    } else if (ctx?.selectedHook?.content) {
-        hookSection = `[REGEL: EINLEITUNG]:
-Unternehmens-Fakt: "${ctx.selectedHook.content}"
-(Typ: ${ctx.selectedHook.type}, Quelle: ${ctx.selectedHook.sourceName})
+${enablePingPong ? '- PING-PONG (aktiv): Nach der Zitat-Brücke, füge einen kurzen Satz hinzu der eine kritische Gegenposition aufwirft.' : ''}` : '';
+
+    const quoteBodyBlock = hasQuote ? `[REGEL: ZITAT IM HAUPTTEIL — STATION-1-EINLEITUNG]:
+Das folgende Zitat MUSS als EINLEITUNGSSATZ des ERSTEN Stations-Absatzes verwendet werden:
+"${ctx!.selectedQuote!.quote}" (${ctx!.selectedQuote!.author})
+Formuliere es so: "Diesen Gedanken von ${ctx!.selectedQuote!.author} habe ich bei meiner Arbeit als [Rolle] bei [Firma] täglich gelebt, als ich [konkretes Beispiel]..."
+Das Zitat dient als Brücke zwischen dem Vordenker und der konkreten Berufserfahrung. Maximal 2 Sätze für Zitat + Brücke, dann direkt in die Station.` : '';
+
+    // ─── Hook-Block (wiederverwendbar für Intro oder Body) ─────────────────────
+    const hookContent = ctx?.selectedHook?.content || '';
+    const hookIntroBlock = hasHook ? `[REGEL: EINLEITUNG]:
+Unternehmens-Fakt: "${hookContent}"
+(Typ: ${ctx!.selectedHook!.type}, Quelle: ${ctx!.selectedHook!.sourceName})
 -> Integriere diesen Aufhänger NATÜRLICH in den ersten Satz
 -> NIEMALS die Quelle direkt nennen (z.B. "Wie auf Ihrer Website gelesen..." ist VERBOTEN)
--> MAXIMAL 2 SÄTZE für den Aufhänger. Verknüpfe ihn mit deiner Motivation für die Stelle`;
+-> MAXIMAL 2 SÄTZE für den Aufhänger. Verknüpfe ihn mit deiner Motivation für die Stelle` : '';
+
+    const hookBodyBlock = hasHook ? `[REGEL: UNTERNEHMENS-FAKT IM HAUPTTEIL — STATION-1-EINLEITUNG]:
+Der folgende Fakt MUSS als EINLEITUNGSSATZ des ERSTEN Stations-Absatzes verwendet werden:
+"${hookContent}"
+Formuliere es so: "Als ich gesehen habe, dass ${companyName} ${hookContent.toLowerCase().startsWith('sie') ? hookContent : hookContent.slice(0, 80) + '...'}${hookContent.length > 80 ? '' : ''}, hat mich das an meine Erfahrung bei [Firma] erinnert..."
+Der Fakt dient als Brücke zu einer konkreten Berufserfahrung. Maximal 2 Sätze, dann direkt in die Station.` : '';
+
+    // ─── Kreuzungs-Logik ───────────────────────────────────────────────────────
+    if (hasQuote && hasHook) {
+        // BEIDE vorhanden → introFocus entscheidet
+        if (focus === 'quote') {
+            introGuidance = quoteIntroBlock;
+            bodyIntegrationGuidance = hookBodyBlock;
+        } else {
+            introGuidance = hookIntroBlock;
+            bodyIntegrationGuidance = quoteBodyBlock;
+        }
+    } else if (hasQuote) {
+        introGuidance = quoteIntroBlock;
+    } else if (hasHook) {
+        introGuidance = hookIntroBlock;
     }
 
-    // ─── News-Binding (B2.5: selectedNews als Pflicht-Kontext) ────────────────
+    // ─── selectedNews: Folding in die Anti-Overload-Logik ──────────────────────
+    // Wenn selectedNews gesetzt ist UND bereits ein Intro-Anker existiert,
+    // wird die News NICHT zusätzlich in die Einleitung gepresst, sondern
+    // als Übergangssatz zwischen Station 1 und Station 2 platziert.
     let newsSection = '';
-    if (ctx?.selectedNews) {
-        newsSection = `[REGEL: NEWS-BINDING — PFLICHT]
-PFLICHT: Die folgende News MUSS organisch im Cover Letter vorkommen:
-"${ctx.selectedNews.title}" (${ctx.selectedNews.date}${ctx.selectedNews.source ? `, ${ctx.selectedNews.source}` : ''})
-Integriere sie als Anknüpfungspunkt zwischen User-Erfahrung und Firma.
-Nicht als Fakt hinwerfen, sondern als Brücke nutzen.
+    if (hasNews) {
+        if (introGuidance) {
+            // Es gibt bereits einen Intro-Anker → News wandert in den Hauptteil
+            newsSection = `[REGEL: NEWS-BINDING — HAUPTTEIL-ÜBERGANG]
+Die folgende News MUSS organisch als ÜBERGANGSSATZ zwischen dem ersten und zweiten Stations-Absatz eingebaut werden:
+"${ctx!.selectedNews!.title}" (${ctx!.selectedNews!.date}${ctx!.selectedNews!.source ? `, ${ctx!.selectedNews!.source}` : ''})
+Formuliere es als Brücke: "Gerade weil ${companyName} kürzlich [News-Bezug], sehe ich meine Erfahrung in [nächste Station] als besonders relevant..."
 NIEMALS die Quelle direkt nennen — der Kandidat soll wirken, als hätte er die News natürlich mitbekommen.`;
+        } else {
+            // Kein Intro-Anker → News bekommt die Einleitung
+            introGuidance = `[REGEL: EINLEITUNG — NEWS-AUFHÄNGER]:
+Aktuelle News: "${ctx!.selectedNews!.title}" (${ctx!.selectedNews!.date})
+-> Integriere diese News NATÜRLICH in den ersten Satz
+-> MAXIMAL 2 SÄTZE. Verknüpfe sie mit deiner Motivation für die Stelle
+-> NIEMALS die Quelle direkt nennen`;
+        }
     }
 
     // ─── Opt-In Module Sections (B2.2) ────────────────────────────────────────
@@ -315,7 +363,7 @@ OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
 - Beginne direkt mit der Anrede: ${contactPersonGreeting}
 
 === SEKTION 2: AUFHÄNGER (KURZ & PRÄGNANT) ===
-${hookSection || `Beginne mit einem relevanten Aufhänger zu ${companyName}.`}
+${introGuidance || `Beginne mit einem relevanten Aufhänger zu ${companyName}.`}
 
 ${companyName} muss im ersten Absatz mindestens einmal fallen.
 Der gesamte erste Absatz (Aufhänger + Motivation) darf MAXIMAL 2 SÄTZE lang sein! Keine generischen Abhandlungen über Innovation. Kurz, knackig, direkt zum Punkt.
@@ -324,6 +372,8 @@ ${newsSection}
 
 === SEKTION 3: KARRIERE-BEWEISE (FOLGENDE ABSÄTZE) ===
 Integriere diese Stationen als fließende Prosa — WICHTIG: Erstelle für jede gewählte Station einen eigenen Absatz.
+
+${bodyIntegrationGuidance}
 
 ${stationsSection}
 

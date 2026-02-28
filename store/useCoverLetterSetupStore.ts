@@ -16,6 +16,7 @@ interface SetupStore {
     fetchedQuotes: SelectedQuote[];
     cvStations: SelectedCVStation[];
     tone: ToneConfig | null;
+    introFocus: 'quote' | 'hook';
 
     // Actions
     setStep: (step: 1 | 2 | 3) => void;
@@ -25,6 +26,7 @@ interface SetupStore {
     setFetchedQuotes: (quotes: SelectedQuote[]) => void;
     toggleStation: (station: Omit<SelectedCVStation, 'stationIndex'>) => void;
     setTone: (tone: ToneConfig) => void;
+    setIntroFocus: (focus: 'quote' | 'hook') => void;
     reset: () => void;
 
     // Computed
@@ -43,6 +45,7 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
             fetchedQuotes: [],
             cvStations: [],
             tone: null,
+            introFocus: 'quote',
 
             setStep: (step) => set({ currentStep: step }),
 
@@ -50,7 +53,7 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 const current = get().jobId;
                 // Reset only if switching to a different job
                 if (current !== jobId) {
-                    set({ jobId, currentStep: 1, selectedHook: null, selectedQuote: null, fetchedQuotes: [], cvStations: [], tone: null });
+                    set({ jobId, currentStep: 1, selectedHook: null, selectedQuote: null, fetchedQuotes: [], cvStations: [], tone: null, introFocus: 'quote' });
                     console.log(`✅ [WizardSetup] Initialized for job: ${jobId}`);
                 }
             },
@@ -95,6 +98,11 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 console.log(`✅ [WizardSetup] Tone set: ${tone.preset} / ${tone.targetLanguage}`);
             },
 
+            setIntroFocus: (focus) => {
+                set({ introFocus: focus });
+                console.log(`✅ [WizardSetup] Intro focus set: ${focus}`);
+            },
+
             reset: () => set({
                 currentStep: 1,
                 jobId: null,
@@ -103,6 +111,7 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 fetchedQuotes: [],
                 cvStations: [],
                 tone: null,
+                introFocus: 'quote',
             }),
 
             isStepComplete: (step) => {
@@ -130,6 +139,7 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                     tone: s.tone,
                     autoFilled: false,
                     completedAt: new Date().toISOString(),
+                    introFocus: s.introFocus,
                 };
             },
         }),

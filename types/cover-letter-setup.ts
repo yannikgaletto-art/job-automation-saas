@@ -89,6 +89,7 @@ export interface CoverLetterSetupContext {
     optInModules?: OptInModules;       // B2.2: Opt-In Feature-Module
     xRayMode?: boolean;                // B3.1: Context X-Ray annotations
     selectedPersona?: HiringPersona;   // B3.2: Ausgewählte Hiring-Persona
+    introFocus?: 'quote' | 'hook';     // Cross-Integration: Wer bekommt die Pole Position?
 }
 
 // ─── API Response Shape ───────────────────────────────────────────
