@@ -183,36 +183,38 @@ async function fetchCompanyIntel(
                         {
                             role: 'user',
                             content: `Find PUBLIC information about ${companyName}.${contextString}
-                            
-                            Required information:
-                            1. Recent news (last 3 months) - specifically look for recent funding, valuation, seed rounds, or major growth.
-                            2. Company Vision & Mission (what is their ultimate goal?).
-                            3. Key Projects or Core Products.
-                            4. Company values (from official website).
-                            5. Last 5-7 LinkedIn posts from ${companyName} official page.
-                            
-                            For LinkedIn posts, extract:
-                            - Post content (first 200 chars)
-                            - Theme/Category (e.g., "Team Culture", "Product Launch")
-                            - Engagement (likes + comments approx)
-                            - Date posted (approx)
-                            
-                            Output as JSON:
-                            {
-                              "recent_news": ["headline1", "headline2"],
-                              "vision_and_mission": "...",
-                              "key_projects": ["project1", "project2"],
-                              "funding_status": "...",
-                              "company_values": ["value1", "value2"],
-                              "linkedin_activity": [
-                                {
-                                  "content": "...",
-                                  "theme": "...",
-                                  "engagement": "100+",
-                                  "date": "2023-10-01"
-                                }
-                              ]
-                            }
+                                                        Required information:
+                             1. Recent news (last 3 months) - specifically look for recent funding, valuation, seed rounds, or major growth.
+                             2. Company Vision & Mission (what is their ultimate goal?).
+                             3. Key Projects or Core Products.
+                             4. Company values (from official website).
+                             5. Last 5-7 LinkedIn posts from ${companyName} official page.
+                             6. Current strategic challenges: What is ${companyName} visibly struggling with or actively trying to solve right now? Examples: scaling issues, team building, entering new markets, technical debt, competition pressure. STRICT FORMAT: Exactly 2 bullet points, maximum 15 words each.
+                             7. Roadmap signals: Any public hints about ${companyName}'s direction in the next 6-12 months (expansion plans, product launches, hiring patterns, public announcements). STRICT FORMAT: Exactly 2 bullet points, maximum 15 words each.
+                             
+                             For LinkedIn posts, extract:
+                             - Post content (first 200 chars)
+                             - Theme/Category (e.g., "Team Culture", "Product Launch")
+                             - Engagement (likes + comments approx)
+                             - Date posted (approx)
+                                                        Output as JSON:
+                             {
+                               "recent_news": ["headline1", "headline2"],
+                               "vision_and_mission": "...",
+                               "key_projects": ["project1", "project2"],
+                               "funding_status": "...",
+                               "company_values": ["value1", "value2"],
+                               "current_challenges": ["challenge1 (max 15 words)", "challenge2 (max 15 words)"],
+                               "roadmap_signals": ["signal1 (max 15 words)", "signal2 (max 15 words)"],
+                               "linkedin_activity": [
+                                 {
+                                   "content": "...",
+                                   "theme": "...",
+                                   "engagement": "100+",
+                                   "date": "2023-10-01"
+                                 }
+                               ]
+                             }
                             
                             CRITICAL: Do NOT include employee names or personal data. Company-level data only.`,
                         },
@@ -331,6 +333,9 @@ async function fetchCompanyIntel(
                 vision_and_mission: parsed.vision_and_mission || "",
                 key_projects: parsed.key_projects || [],
                 funding_status: parsed.funding_status || "",
+                // First 90 Days data — strictly capped by Perplexity prompt
+                current_challenges: (parsed.current_challenges || []).slice(0, 2),
+                roadmap_signals: (parsed.roadmap_signals || []).slice(0, 2),
                 needs_company_context: false,
             } as any;
 
@@ -368,6 +373,9 @@ async function saveToCache(
             vision_and_mission: (intel as any).vision_and_mission || "",
             key_projects: (intel as any).key_projects || [],
             funding_status: (intel as any).funding_status || "",
+            // First 90 Days fields — persisted in intel_data JSONB (no migration needed)
+            current_challenges: (intel as any).current_challenges || [],
+            roadmap_signals: (intel as any).roadmap_signals || [],
             source: 'perplexity'
         },
         perplexity_citations: intel.perplexity_citations || [],
@@ -623,12 +631,9 @@ export async function enrichCompany(
         };
     }
 
-    // Step 2.5: Generate Quotes if we have values
-    if (intel.company_values && intel.company_values.length > 0) {
-        console.log(`💡 Generating quotes for ${companyName}...`);
-        const quotes = await suggestRelevantQuotes(companyName, intel.company_values, (intel as any).vision_and_mission || "");
-        intel.suggested_quotes = quotes;
-    }
+    // Step 2.5: Quotes werden jetzt on-demand via /api/cover-letter/quotes geladen
+    // und nicht mehr im Enrichment-Flow blockiert (Lazy Quote Architecture)
+    intel.suggested_quotes = [];
 
     // Step 3: Save to cache (only writes if confidence >= 0.9)
     const id = await saveToCache(companyName, intel);

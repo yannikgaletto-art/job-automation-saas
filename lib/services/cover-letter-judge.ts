@@ -1,8 +1,8 @@
 /**
  * Cover Letter Quality Judge — Claude Haiku
  *
+ * Pass/Fail judge: Checks hard constraints only (no numeric scores).
  * Extracted from cover-letter-generator.ts for maintainability.
- * Only depends on Anthropic SDK for Haiku judge calls.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -11,13 +11,8 @@ import type { StyleAnalysis } from './writing-style-analyzer';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface JudgeResult {
-    scores: {
-        naturalness: number;
-        style_match: number;
-        company_relevance: number;
-        individuality: number;
-        overall_score: number;
-    };
+    pass: boolean;
+    failReasons: string[];
     weaknesses: string[];
 }
 
@@ -35,122 +30,90 @@ export async function judgeCoverLetter(
     setupContext: CoverLetterSetupContext | undefined,
     style: StyleAnalysis | null
 ): Promise<JudgeResult> {
-    const FALLBACK_SCORES: JudgeResult = {
-        scores: { naturalness: 7, style_match: 7, company_relevance: 7, individuality: 7, overall_score: 7 },
+    const FALLBACK: JudgeResult = {
+        pass: true,
+        failReasons: [],
         weaknesses: []
     };
 
     if (!process.env.ANTHROPIC_API_KEY) {
-        console.warn('⚠️ [Judge] No API Key — returning fallback scores');
-        return FALLBACK_SCORES;
+        console.warn('⚠️ [Judge] No API Key — returning fallback (pass)');
+        return FALLBACK;
     }
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    const hookContent = setupContext?.selectedQuote?.quote || setupContext?.selectedHook?.content || '';
-    const tonePreset = setupContext?.tone.preset || 'formal';
-    const requirements = (job?.requirements || []).slice(0, 3);
     const companyName = job?.company_name || 'das Unternehmen';
+    const enablePingPong = setupContext?.optInModules?.pingPong ?? setupContext?.enablePingPong ?? false;
+    const hasQuote = !!setupContext?.selectedQuote?.quote;
 
-    const toneRubric: Record<string, string> = {
-        'data-driven': 'Enthält Zahlen/KPIs/messbare Resultate in jedem Absatz? Claim-Beweis-Implikation Struktur? Aktive Verben?',
-        'storytelling': 'Erzählstruktur (Situation-Handlung-Ergebnis)? Kohärentes Karriere-Narrativ? Persönliche Momente? Roter Faden?',
-        'formal': 'Klassische 4-Absatz-Struktur? Vollständige Formulierungen? Kein umgangssprachlicher Ton? Seriöse Übergänge?',
-        'philosophisch': 'Intellektueller Rahmen? Konzept-Beweis-Reflexion? Max. 1 Zitat? Strategische Denktiefe sichtbar?'
-    };
-
-    const judgePrompt = `Du bist ein strenger Anschreiben-Qualitätsprüfer. Sei ehrlich und kritisch.
-
-Bewerte dieses Anschreiben auf 4 Dimensionen (0–10, halbe Punkte erlaubt).
-
-BEWERTUNGSKRITERIEN:
-
-1. NATÜRLICHKEIT (0–10):
-GPT-Marker (sofort -2 Punkte pro Treffer):
-- "Ich freue mich sehr darauf", "Ich bin überzeugt, dass", "meine Leidenschaft für", "ideal auf diese Stelle", "Mit großer Begeisterung"
-10 = klingt wie ein realer Mensch, 0 = eindeutig KI-generiert
-
-2. STIL-MATCH (0–10):
-Gewünschter Preset: ${tonePreset}
-Rubrik: ${toneRubric[tonePreset] || toneRubric['formal']}
-
-3. RELEVANZ (0–10):
-Job-Anforderungen: ${requirements.map((r, i) => `${i + 1}. ${r}`).join(' | ')}
-Unternehmen: ${companyName}
-${hookContent ? `Aufhänger (soll integriert sein): "${hookContent.substring(0, 100)}..."` : ''}
-
-4. INDIVIDUALITÄT (0–10):
-Spezifische Details, Zahlen, Projekte? Oder austauschbar?
+    const judgePrompt = `Du bist ein strenger Anschreiben-Qualitätsprüfer. Prüfe NUR harte Constraints.
 
 ANSCHREIBEN:
 ***
 ${text}
 ***
 
-Sei fair und präzise. Bewertungsskala:
-7 = solide Basis, aber Verbesserungspotenzial klar erkennbar
-8 = stark, nur noch Feinschliff nötig
-9 = exzellent, kaum Verbesserungsbedarf
-10 = perfekt — publizierbar ohne Änderung
-WICHTIG: Wenn der 'overall_score' unter 9.0 liegt, MUSST du zwingend mindestens eine konkrete inhaltliche Schwäche im "weaknesses" Array nennen!
+HARTE CONSTRAINT-CHECKS (jeder Verstoß = fail):
 
-Der overall_score wird NICHT von dir berechnet — gib ihn als 0 zurück. Er wird extern berechnet als:
-overall = 0.3*naturalness + 0.2*style_match + 0.3*company_relevance + 0.2*individuality
+1. GPT-BLACKLIST: Enthält der Text eine dieser verbotenen Phrasen?
+   - "Ich freue mich sehr darauf", "Ich bin überzeugt, dass", "meine Leidenschaft für"
+   - "ideal auf diese Stelle", "Mit großer Begeisterung", "hiermit bewerbe ich mich"
+   - "I am excited to apply", "I am confident that"
+   Wenn JA → fail_reason: "BLACKLIST: [gefundene Phrase]"
+
+2. FIRMENNENNUNG: Wird "${companyName}" (oder eine erkennbare Variante) mindestens 1x im Text erwähnt?
+   Wenn NEIN → fail_reason: "FIRMA: Unternehmensname fehlt im Text"
+
+3. WORTLÄNGE: Hat der Text zwischen 150 und 500 Wörter?
+   Wenn NEIN → fail_reason: "LÄNGE: Text hat [N] Wörter (erlaubt: 150-500)"
+${enablePingPong && hasQuote ? `
+4. PING-PONG: Enthält die Einleitung eine ECHTE Antithese — eine frühere andere Perspektive des Kandidaten?
+   Pseudo-Kontrast (SCHEITERT): "Ich sah das genauso", "immer schon", "noch überzeugter"
+   Wenn kein echter Kontrast → fail_reason: "PING-PONG: Kein echter Perspektiv-Wechsel in der Einleitung"` : ''}
+
+Zusätzlich: Nenne maximal 2 optionale Verbesserungsvorschläge (weaknesses), falls dir etwas auffällt.
 
 Antworte NUR als valides JSON:
 {
-  "naturalness": <0-10>,
-  "style_match": <0-10>,
-  "company_relevance": <0-10>,
-  "individuality": <0-10>,
-  "overall_score": 0,
-  "weaknesses": ["<Schwäche 1>", "<Schwäche 2>"]
+  "pass": true/false,
+  "fail_reasons": ["..."],
+  "weaknesses": ["..."]
 }`;
 
     try {
-        console.log('🔍 [Judge] Calling Haiku for quality assessment...');
+        console.log('🔍 [Judge] Calling Haiku for Pass/Fail check...');
 
         const message = await anthropic.messages.create({
             model: 'claude-3-haiku-20240307',
-            max_tokens: 300,
+            max_tokens: 200,
             temperature: 0.1,
-            system: 'You are a strict cover letter quality assessor. Respond only with valid JSON.',
+            system: 'You are a strict cover letter constraint checker. Respond only with valid JSON.',
             messages: [{ role: 'user', content: judgePrompt }]
         });
 
         const content = message.content[0].type === 'text' ? message.content[0].text : '';
 
-        let parsed: JudgeResult['scores'] & { weaknesses?: string[] };
+        let parsed: { pass?: boolean; fail_reasons?: string[]; weaknesses?: string[] };
         try {
             parsed = JSON.parse(content);
         } catch {
-            // Fallback: extract JSON from markdown code block
             const match = content.match(/\{[\s\S]*\}/);
             if (!match) throw new Error('No JSON in judge response');
             parsed = JSON.parse(match[0]);
         }
 
-        // Weighted overall_score (Batch 6: replaces Claude's self-calculated score)
-        const weightedOverall = Math.round(
-            (parsed.naturalness * 0.3 + parsed.style_match * 0.2 + parsed.company_relevance * 0.3 + parsed.individuality * 0.2) * 100
-        ) / 100;
+        const pass = parsed.pass ?? true;
+        const failReasons = parsed.fail_reasons || [];
+        const weaknesses = parsed.weaknesses || [];
 
-        console.log(`✅ [Judge] naturalness=${parsed.naturalness} style=${parsed.style_match} relevance=${parsed.company_relevance} individuality=${parsed.individuality} overall=${weightedOverall} (weighted)`);
+        console.log(`${pass ? '✅' : '❌'} [Judge] pass=${pass} failReasons=${failReasons.length} weaknesses=${weaknesses.length}`);
 
-        return {
-            scores: {
-                naturalness: parsed.naturalness,
-                style_match: parsed.style_match,
-                company_relevance: parsed.company_relevance,
-                individuality: parsed.individuality,
-                overall_score: weightedOverall,
-            },
-            weaknesses: parsed.weaknesses || []
-        };
+        return { pass, failReasons, weaknesses };
 
     } catch (err) {
         console.error('❌ [Judge] Failed to parse judge response:', err);
-        console.warn('⚠️ [Judge] Using fallback scores');
-        return FALLBACK_SCORES;
+        console.warn('⚠️ [Judge] Using fallback (pass)');
+        return FALLBACK;
     }
 }

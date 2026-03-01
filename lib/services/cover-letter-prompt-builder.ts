@@ -228,7 +228,12 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
     // hasQuote already declared above toneInstructions (needed for philosophisch preset)
     const hasHook = !!ctx?.selectedHook?.content;
     const hasNews = !!ctx?.selectedNews;
-    const enablePingPong = ctx?.optInModules?.pingPong ?? ctx?.enablePingPong ?? false;
+    // WHY: enablePingPong is used inside the quoteIntroBlock template literal (evaluated at declaration).
+    // It MUST respect ALL constraints here, not just the raw opt-in value, because the safety net
+    // at line ~363 operates on `modules` which is too late for template literal evaluation.
+    // CONFLICTS RESOLVED: Blind Spot #1 (introFocus) + #3 (formal preset)
+    const rawPingPong = ctx?.optInModules?.pingPong ?? ctx?.enablePingPong ?? false;
+    const enablePingPong = rawPingPong && focus === 'quote' && (ctx?.tone?.preset ?? 'formal') !== 'formal';
 
     // ─── Zitat-Block (wiederverwendbar für Intro oder Body) ────────────────────
     const quoteIntroBlock = hasQuote ? `[REGEL: EINLEITUNG — ZITAT-BRIDGING]:
@@ -236,20 +241,43 @@ Gewähltes Zitat: "${ctx!.selectedQuote!.quote}"
 (Autor: ${ctx!.selectedQuote!.author})
 
 FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
-- Leite das Zitat mit einer menschlichen Beobachtung ein (z.B. "Beim Lesen Ihrer Website dachte ich an ${ctx!.selectedQuote!.author}...").
-- Das Zitat MUSS auf einer EIGENEN Zeile stehen, in Anführungszeichen, gefolgt vom Autor:
+- Leite das Zitat mit einer menschlichen Beobachtung ein.
+- Das Zitat MUSS auf einer EIGENEN Zeile stehen, in Anführungszeichen.
 
-  [Einleitender Satz]
-
-  "${ctx!.selectedQuote!.quote}"
-  - ${ctx!.selectedQuote!.author}
+AUTOR-NENNUNG (WICHTIG — NUR EINMAL!):
+Der Autor (${ctx!.selectedQuote!.author}) darf NUR AN EINER STELLE genannt werden:
+  Variante A: Im Einleitungssatz den Autor nennen → Zitat OHNE Signatur danach.
+    Beispiel: "...erinnerte ich mich an einen Satz von ${ctx!.selectedQuote!.author}:"
+    "${ctx!.selectedQuote!.quote}"
+  Variante B: Neutrale Einleitung ohne Autorennamen → Zitat MIT Signatur.
+    Beispiel: "Da kam mir ein Gedanke in den Sinn:"
+    "${ctx!.selectedQuote!.quote}" – ${ctx!.selectedQuote!.author}
+Wähle frei zwischen A und B, aber NIEMALS den Autor an BEIDEN Stellen nennen!
 
   [Begründungssatz]
 
 - DIREKT NACH dem Zitat: Ein EIGENER Begründungssatz (1 Satz), der erklärt WARUM dieses Zitat zum Unternehmen UND zum Kandidaten passt.
 - Der Begründungssatz MUSS eine konkrete Brücke zu einer Erfahrung aus dem CV bauen.
 - KEINE leeren Floskeln wie 'Genau diese Haltung treibt mich an'.
-${enablePingPong ? '- PING-PONG (aktiv): Nach der Zitat-Brücke, füge einen kurzen Satz hinzu der eine kritische Gegenposition aufwirft.' : ''}` : '';
+${enablePingPong ? `
+[PING-PONG EINLEITUNG — DU BIST NOCH IN DER EINLEITUNG, NICHT in Absatz 2]
+Nach dem Zitat und dem Brückensatz fügst du ZWEI weitere Sätze hinzu (Antithese + Synthese):
+
+ANTITHESE (1 Satz): Beschreibe, wie du diesen Gedanken früher ANDERS gesehen hast.
+→ Formuliere es als Lernkurve oder Erkenntnisgewinn: "Bei [CV-Station] dachte ich zunächst, dass..."
+→ NIEMALS negativ über frühere Arbeitgeber klingen. Das ist VERBOTEN.
+→ KEIN echter Fehler, kein Versagen — eine Perspektiventwicklung.
+→ KEIN Pseudo-Kontrast wie "Ich sah das ähnlich, aber jetzt noch mehr so." — Das ist VERBOTEN.
+
+SYNTHESE (1 Satz): Verbinde die Erkenntnis DIREKT mit ${companyName} — baue eine konkrete Brücke.
+→ PFLICHT: Der Satz muss einen konkreten ${companyName}-Bezug enthalten (Website, Werte, Projekt).
+→ Beispiel: "Da ich gelesen habe, dass ${companyName} [konkreter Firmenbezug], möchte ich mich kurz vorstellen."
+→ KEINE abstrakte Reflexion ohne Firmenbezug. Der Leser muss verstehen WARUM genau DIESES Unternehmen.
+
+LIMITS:
+- EINLEITUNG darf aus MAX. 4 kurzen Abschnitten bestehen: Einleitungssatz + Zitat + Antithese + Synthese
+- MAXIMAL 100 Wörter für den gesamten Einleitungsblock (Zitat mitgezählt)
+- Dieser Block zählt NICHT als eigener der 4-5 Absätze des Anschreibens` : ''}` : '';
 
     const quoteBodyBlock = hasQuote ? `[REGEL: ZITAT IM HAUPTTEIL — STATION-1-EINLEITUNG]:
 Das folgende Zitat MUSS WORTWÖRTLICH im Text stehen. Lass es NICHT weg!
@@ -324,18 +352,65 @@ Aktuelle News: "${ctx!.selectedNews!.title}" (${ctx!.selectedNews!.date})
     }
 
     // ─── Opt-In Module Sections (B2.2) ────────────────────────────────────────
-    const modules = ctx?.optInModules ?? DEFAULT_OPT_IN_MODULES;
+    const modules = { ...(ctx?.optInModules ?? DEFAULT_OPT_IN_MODULES) };
+
+    // ─── Prompt-Level Safety Net (Defense-in-Depth) ────────────────────────────
+    // WHY: Even if UI guards are bypassed (auto-fill, direct API calls, persisted stale state),
+    // structurally/tonally incompatible modules MUST NOT generate prompt sections.
+    // CONFLICTS RESOLVED: Blind Spot #1 (Ping-Pong Ghost) + #3 (Formal Tension)
+    const preset = ctx?.tone?.preset ?? 'formal';
+    if (preset === 'formal') {
+        modules.first90DaysHypothesis = false;  // 5th paragraph breaks 4-paragraph structure
+        modules.vulnerabilityInjector = false;  // Breaks souveräner Ton mandate
+        modules.pingPong = false;               // Storytelling element in formal = forbidden
+    }
+    if (focus !== 'quote') {
+        modules.pingPong = false;  // Ping-Pong lives only in quoteIntroBlock
+    }
 
     let first90DaysSection = '';
     if (modules.first90DaysHypothesis) {
-        first90DaysSection = `[REGEL: FIRST 90 DAYS HYPOTHESIS — 1x VERWENDEN]
-Basierend auf den Stellenanforderungen und dem Firmenprofil:
-Formuliere in EINEM Absatz (nicht als Liste!) einen konkreten 90-Tage-Ausblick:
-"In den ersten 90 Tagen würde ich mich auf drei Dinge fokussieren:
-1. [Konkretes Problem der Firma + User-Lösungsansatz aus CV]
-2. [Zweites Thema mit Bezug zur Stelle]
-3. [Drittes Thema mit strategischem Blick]"
-Nur 3 Punkte, knapp formuliert. Kein Roman. Zeige dass du die Firma verstanden hast.`;
+        // ── Datenbasis: Echte Perplexity-Schmerzdaten ODER Job-Description-Fallback ──
+        const intelData = (company as any)?.intel_data || {};
+        const currentChallenges: string[] = intelData.current_challenges || [];
+        const roadmapSignals: string[] = intelData.roadmap_signals || [];
+        const hasRealData = currentChallenges.length > 0 || roadmapSignals.length > 0;
+
+        if (hasRealData) {
+            // Datengetriebener Pfad: Konkrete Firmenschmerzen aus Perplexity
+            const challengesText = currentChallenges.length > 0
+                ? `Aktuelle Herausforderungen der Firma: ${currentChallenges.map(c => `"${c}"`).join(', ')}`
+                : '';
+            const roadmapText = roadmapSignals.length > 0
+                ? `Strategische Roadmap-Signale: ${roadmapSignals.map(r => `"${r}"`).join(', ')}`
+                : '';
+
+            first90DaysSection = `[POSITION: VORLETZTER ABSATZ — VOR DEM SCHLUSS, NACH DEN STATIONEN]
+[REGEL: FIRST 90 DAYS HYPOTHESIS — 1x VERWENDEN, KEIN FLUFF]
+${challengesText}
+${roadmapText}
+Job-Anforderungen als Signal: ${JSON.stringify(job?.requirements?.slice(0, 3) || [])}
+
+INSTRUKTION: Formuliere einen knappen 90-Tage-Plan (max. 60 Wörter) mit EXAKT 3 Punkten.
+Jeder Punkt adressiert eines der oben genannten Firma-Probleme DIREKT, verknüpft mit einer konkreten Erfahrung aus dem CV.
+Format (als Fließtext mit Zeilenumbrüchen, KEINE Bullet-Point-Symbole):
+"In den ersten 90 Tagen würde ich drei Dinge priorisieren: Erstens [Problem der Firma → CV-Station]. Zweitens [zweites Problem → CV-Beweis]. Drittens [strategischer Ausblick]."
+VERBOTEN: "In den ersten 30 Tagen werde ich zuhören und verstehen" — das ist FLUFF.
+VERBOTEN: Mehr als 60 Wörter für diesen Block.`;
+        } else {
+            // Fallback-Pfad: Keine Perplexity-Daten → Plan basierend auf Job-Requirements
+            first90DaysSection = `[POSITION: VORLETZTER ABSATZ — VOR DEM SCHLUSS, NACH DEN STATIONEN]
+[REGEL: FIRST 90 DAYS HYPOTHESIS — FALLBACK (keine Firmendaten verfügbar) — 1x VERWENDEN]
+Nutze die Stellenanforderungen als Grundlage: ${JSON.stringify(job?.requirements?.slice(0, 3) || [])}
+
+INSTRUKTION: Formuliere einen knappen 90-Tage-Plan (max. 60 Wörter) mit EXAKT 3 Punkten.
+Leite aus den Job-Anforderungen die wahrscheinlichsten Aufgaben der ersten 90 Tage ab.
+Verknüpfe jeden Punkt mit einer konkreten Erfahrung aus dem CV.
+Format (Fließtext, KEINE Bullet-Point-Symbole):
+"In den ersten 90 Tagen würde ich drei Dinge priorisieren: Erstens [Anforderung → CV-Beweis]. Zweitens [zweite Anforderung → Beweis]. Drittens [strategischer Ausblick]."
+VERBOTEN: "In den ersten 30 Tagen werde ich zuhören und verstehen" — das ist FLUFF.
+VERBOTEN: Mehr als 60 Wörter für diesen Block.`;
+        }
     }
 
     let painPointSection = '';
@@ -399,7 +474,13 @@ OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
 - KEIN Datum, KEINE Adresszeilen, KEIN Betreff
 - KEIN Markdown: kein **bold**, kein *italic*, keine - Bullet-Points im Text
 - Sprache: ${lang} — keine einzige Ausnahme
-- Länge: 280–380 Wörter, 4–5 Absätze
+- Länge: ${modules.first90DaysHypothesis
+            // WHY: Der 90-Tage-Block kostete ~60 Wörter extra. Ohne Budget-Reduktion
+            // überschreitet das Anschreiben eine DIN-A4-Seite. Der Haupttext wird daher
+            // auf max. 340 Wörter begrenzt, sodass der Gesamtbrief bei 350-400 Wörtern bleibt.
+            ? '260–340 Wörter (exkl. 90-Tage-Block), 4–5 Absätze. Der 90-Tage-Plan ist ein eigener, kompakter Absatz (max. 60W) und zählt NICHT zum Haupttext.'
+            : '280–380 Wörter, 4–5 Absätze'
+        }
 - Absätze getrennt durch eine Leerzeile
 - Beginne direkt mit der Anrede: ${contactPersonGreeting}
 - Anrede-Form: ${isDuForm ? 'DU-FORM (du/dein/euch/dir). Wende diese Du-Form STRIKT auf das GESAMTE Anschreiben an. Kein "Sie" oder "Ihnen" — NIEMALS.' : 'SIE-FORM (Sie/Ihr/Ihnen). Wende diese Sie-Form STRIKT auf das GESAMTE Anschreiben an.'}
@@ -415,16 +496,18 @@ ${buildBlacklistPromptSection()}
 === SEKTION 3: AUFHÄNGER (KURZ & PRÄGNANT) ===
 ${introGuidance || `Beginne mit einem relevanten Aufhänger zu ${companyName}.`}
 
-${companyName} muss im ersten Absatz mindestens einmal fallen.
+${introGuidance && hasQuote && focus === 'quote' ? companyName + ' muss direkt am Anfang des Anschreibens mindestens einmal fallen.' : companyName + ' muss im ersten Absatz mindestens einmal fallen.'}
 ${introGuidance && hasQuote && focus === 'quote'
-            // WHY: quoteIntroBlock braucht: Einleitungssatz + Zitat + Autor + Begründungssatz + Übergangssatz.
-            // Das sind physisch 4+ Sätze. Das alte "MAX 2 SÄTZE"-Limit war unmöglich → Claude warf das Zitat weg.
-            // CONFLICTS RESOLVED: Red Flag #1 — hartes Satzzahl-Limit vs. strukturierter Block.
-            ? 'Der erste Absatz darf bis zu 5 SÄTZE lang sein (Einleitung, Zitat auf eigener Zeile, Begründung, Übergang). Halte trotzdem jeden einzelnen Satz kurz und knackig — kein Satz über 25 Wörter.'
+            // WHY: quoteIntroBlock braucht: Einleitungssatz + Zitat (eigene Zeile) + Begründungssatz + Übergangssatz.
+            // "Der erster Absatz" ist VERBOTEN als Begriff, weil Claude dann alle Quote-Zeilenumbrüche als
+            // eigene Absätze zählt, die gegen die "4-5 Absätze gesamt"-Regel verstoßen. Claude reagiert
+            // mit Kompression: Alles in einen einzigen Fließtext-Absatz ohne Leerzeilen.
+            // CONFLICTS RESOLVED: Red Flag #4 — Absatz-Zählung vs. Quote-Formatierung.
+            ? 'Die EINLEITUNG darf aus bis zu 3 kurzen Abschnitten bestehen (Einleitungssatz, Zitat auf EIGENER Zeile, Begründungssatz + Übergangssatz). Diese Abschnitte zählen zusammen als EIN Einheitenblock — sie gehören zur Einleitung und zählen NICHT als separate der 4-5 Absätze.'
             : 'Der gesamte erste Absatz (Aufhänger + Motivation) darf MAXIMAL 2 SÄTZE lang sein! Keine generischen Abhandlungen über Innovation. Kurz, knackig, direkt zum Punkt.'
         }
 
-[PFLICHT — ÜBERGANGSSATZ]: Der ERSTE Absatz MUSS zwingend mit diesem Satz enden:
+[PFLICHT — ÜBERGANGSSATZ]: ${introGuidance && hasQuote && focus === 'quote' ? 'Die EINLEITUNG (nach dem Zitat und dem Begründungssatz)' : 'Der ERSTE Absatz'} MUSS zwingend mit diesem Satz enden:
 ${isDuForm ? '"Daher möchte ich mich bei euch kurz vorstellen."' : '"Daher möchte ich mich bei Ihnen kurz vorstellen."'}
 Dieser Satz ist NICHT optional. Er bildet die Brücke zum Hauptteil.
 
@@ -432,6 +515,12 @@ ${newsSection}
 
 === SEKTION 4: KARRIERE-BEWEISE (FOLGENDE ABSÄTZE) ===
 Integriere diese Stationen als fließende Prosa — WICHTIG: Erstelle für jede gewählte Station einen eigenen Absatz.
+
+ANTI-REPETITIONS-REGEL (KRITISCH):
+Jeder Stations-Absatz MUSS mit einem ANDEREN Einleitungssatz beginnen.
+VERBOTEN: Denselben Einleitungstyp oder dieselbe Satzstruktur für zwei aufeinanderfolgende Absätze zu verwenden.
+Beispiel VERBOTEN: „Die Verbindung von X und Y bei Firma A..." gefolgt von „Die Verbindung von X und Y bei Firma B..."
+Jeder Absatz muss einen eigenen Einstieg haben: Mal ein konkretes Ergebnis, mal ein Kontext-Setting, mal eine Problemstellung.
 
 ${bodyIntegrationGuidance}
 

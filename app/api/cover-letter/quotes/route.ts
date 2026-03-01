@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { suggestRelevantQuotes } from '@/lib/services/quote-matcher';
 
 // validateUrl removed for Batch 7 — Quotes use text-based sources (books, speeches), not live URLs.
+
+const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+);
 
 export async function POST(req: NextRequest) {
     try {
@@ -42,6 +49,20 @@ export async function POST(req: NextRequest) {
             relevanceScore: q.match_score ?? q.relevance_score ?? 0,
         }));
 
+        // ✅ Persist generated quotes to DB so they survive page reloads
+        if (mapped.length > 0) {
+            const { error: dbError } = await supabaseAdmin
+                .from('company_research')
+                .update({ suggested_quotes: quotes.slice(0, 3) })
+                .ilike('company_name', companyName.trim());
+
+            if (dbError) {
+                console.error('⚠️ [Quotes] Failed to persist quotes to DB:', dbError.message);
+            } else {
+                console.log(`💾 [Quotes] Persisted ${mapped.length} quotes for "${companyName}"`);
+            }
+        }
+
         // ✅ Batch 7: validateUrl removed. LLM handles source attribution as text.
         console.log(`✅ [Quotes] Returned ${mapped.length} quotes for ${companyName}`);
         return NextResponse.json({ success: true, quotes: mapped });
@@ -52,3 +73,4 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: msg }, { status: 500 });
     }
 }
+

@@ -69,11 +69,22 @@ export const DEFAULT_OPT_IN_MODULES: OptInModules = {
     stationsSelector: true,
 };
 
-// ─── B3.1: X-Ray Annotation Type ──────────────────────────────────
-export interface SentenceAnnotation {
-    text: string;
-    source: 'user_style' | 'company_research' | 'job_fit';
-    reference: string;
+// ─── X-Ray Audit Trail Card ──────────────────────────────────────
+export interface AuditTrailCard {
+    category: 'user_voice' | 'company_insight' | 'job_fit' | 'module_trace';
+    icon: '🟢' | '🔵' | '🟣' | '🟠';
+    title: string;
+    detail: string;
+    reference?: string;
+    moduleName?: string;
+}
+
+// ─── Hiring Manager Critique ──────────────────────────────────────
+export interface HiringManagerCritique {
+    persona: string;
+    role: string;
+    critique: string;
+    fixSuggestion: string;
 }
 
 // ─── Gesamt-Vertrag (wird an buildSystemPrompt() übergeben) ───────

@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function StepHookSelection({ jobId, companyName, setupData, onNext, onReloadData }: Props) {
-    const { selectedHook, selectedQuote, fetchedQuotes, introFocus, setHook, setQuote, setFetchedQuotes, setIntroFocus, setStep } = useCoverLetterSetupStore();
+    const { selectedHook, selectedQuote, fetchedQuotes, introFocus, optInModules, setHook, setQuote, setFetchedQuotes, setIntroFocus, setOptInModule, setStep } = useCoverLetterSetupStore();
     const [manualText, setManualText] = useState('');
     const [quoteError, setQuoteError] = useState<string | null>(null);
     const [openAccordion, setOpenAccordion] = useState<string | null>(null);
@@ -27,10 +27,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     // ─── State Machine: resume at correct phase ────────────────────
     const getInitialPhase = (): Phase => {
         // If user already selected a hook (returning from Step 2), show results
-        if (selectedHook) {
-            if (fetchedQuotes.length > 0) return 'quoteResults';
-            return 'results';
-        }
+        if (selectedHook) return 'results';
         // If data already loaded, skip to results
         if (setupData.hasPerplexityData) return 'results';
         return 'idle';
@@ -313,8 +310,8 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 />
             )}
 
-            {/* ─── Phase B: Quote Selection ──────────────────────── */}
-            {canProceed && phase === 'results' && (
+            {/* ─── Phase B: Quote Selection (always in results phase) ── */}
+            {canProceed && (phase === 'results' || phase === 'quoteResults') && fetchedQuotes.length === 0 && (
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -363,7 +360,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
             )}
 
             {/* Quote Results */}
-            {phase === 'quoteResults' && (
+            {(phase === 'results' || phase === 'quoteResults') && fetchedQuotes.length > 0 && (
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -427,27 +424,6 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                         ))}
                     </div>
 
-                    {/* Proceed */}
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button
-                            onClick={() => { setQuote(null); handleProceedToStep2(); }}
-                            className="text-xs text-[#73726E] px-3 py-1.5 hover:underline"
-                        >
-                            Ohne Zitat fortfahren
-                        </button>
-                        <button
-                            onClick={handleProceedToStep2}
-                            disabled={!canProceed}
-                            className={[
-                                'flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all',
-                                canProceed
-                                    ? 'bg-[#002e7a] text-white hover:bg-[#001e5a]'
-                                    : 'bg-[#E7E7E5] text-[#A8A29E] cursor-not-allowed',
-                            ].join(' ')}
-                        >
-                            Weiter <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                    </div>
                 </motion.div>
             )}
 
@@ -498,7 +474,15 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                 type="radio"
                                 name="introFocus"
                                 checked={introFocus === 'hook'}
-                                onChange={() => setIntroFocus('hook')}
+                                onChange={() => {
+                                    setIntroFocus('hook');
+                                    // WHY: Ping-Pong logic lives exclusively in quoteIntroBlock.
+                                    // When quote moves to body, there's nothing to ping-pong against.
+                                    // CONFLICTS RESOLVED: Ping-Pong Ghost (Blind Spot #1, QA Report 2026-02-28)
+                                    if (optInModules.pingPong) {
+                                        setOptInModule('pingPong', false);
+                                    }
+                                }}
                                 className="mt-0.5 accent-[#002e7a]"
                             />
                             <div>
@@ -510,8 +494,83 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 </motion.div>
             )}
 
-            {/* Simple Weiter button when no quote section shown yet */}
-            {phase === 'results' && !canProceed && (
+            {/* ─── Ping-Pong Toggle (nur wenn Zitat ausgewählt) ─── */}
+            {selectedQuote && (() => {
+                // WHY: Ping-Pong logic lives exclusively in quoteIntroBlock.
+                // When introFocus === 'hook', the quote goes to quoteBodyBlock which has NO Ping-Pong.
+                // CONFLICTS RESOLVED: Ping-Pong Ghost (Blind Spot #1, QA Report 2026-02-28)
+                const pingPongDisabled = selectedHook && introFocus === 'hook';
+                return (
+                    <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`border border-[#E7E7E5] rounded-lg p-4 bg-[#fafaf9] ${pingPongDisabled ? 'opacity-50' : ''}`}
+                    >
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-[#002e7a] shrink-0" />
+                                    <span className="text-sm font-semibold text-[#37352F]">Eigene Meinung zeigen</span>
+                                </div>
+                                <p className="text-xs text-[#73726E] leading-relaxed">
+                                    {pingPongDisabled
+                                        ? 'Ping-Pong ist nur verfügbar wenn das Zitat in der Einleitung erscheint. Wähle "Zitat in die Einleitung" um diese Option zu aktivieren.'
+                                        : <>Statt dem Zitat nur zuzustimmen, baut Claude eine <strong className="text-[#37352F]">kritische Gegenperspektive</strong> ein — Thesis, Antithese, Synthese. Beweist echtes Selbstbewusstsein.</>}
+                                </p>
+                            </div>
+                            <button
+                                id="toggle-pingpong"
+                                role="switch"
+                                aria-checked={optInModules.pingPong}
+                                disabled={!!pingPongDisabled}
+                                onClick={() => { if (!pingPongDisabled) setOptInModule('pingPong', !optInModules.pingPong); }}
+                                style={{
+                                    minWidth: '2.75rem', width: '2.75rem', height: '1.5rem',
+                                    borderRadius: '9999px', position: 'relative', flexShrink: 0,
+                                    transition: 'background-color 0.2s',
+                                    backgroundColor: optInModules.pingPong && !pingPongDisabled ? '#002e7a' : '#D1D5DB',
+                                    border: 'none', cursor: pingPongDisabled ? 'not-allowed' : 'pointer', padding: 0
+                                }}
+                            >
+                                <span style={{
+                                    position: 'absolute', top: '3px',
+                                    left: optInModules.pingPong && !pingPongDisabled ? 'calc(100% - 19px)' : '3px',
+                                    width: '18px', height: '18px', backgroundColor: 'white',
+                                    borderRadius: '9999px', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                    transition: 'left 0.2s',
+                                }} />
+                            </button>
+                        </div>
+                    </motion.div>
+                );
+            })()}
+
+            {/* ─── Weiter / Ohne Zitat — IMMER ganz unten in results ─── */}
+            {(phase === 'results' || phase === 'quoteResults') && canProceed && (
+                <div className="flex justify-end gap-2 pt-3">
+                    <button
+                        onClick={() => { setQuote(null); handleProceedToStep2(); }}
+                        className="text-xs text-[#73726E] px-3 py-1.5 hover:underline"
+                    >
+                        Ohne Zitat fortfahren
+                    </button>
+                    <button
+                        onClick={handleProceedToStep2}
+                        disabled={!canProceed}
+                        className={[
+                            'flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all',
+                            canProceed
+                                ? 'bg-[#002e7a] text-white hover:bg-[#001e5a]'
+                                : 'bg-[#E7E7E5] text-[#A8A29E] cursor-not-allowed',
+                        ].join(' ')}
+                    >
+                        Weiter <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            )}
+
+            {/* Simple Weiter button when hook not yet selected */}
+            {(phase === 'results' || phase === 'quoteResults') && !canProceed && (
                 <div className="flex justify-end pt-2">
                     <button
                         disabled

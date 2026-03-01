@@ -137,12 +137,10 @@ Implementierung des kompletten Workflows: Von **Trainingsdaten-Upload** bis **Co
 - [x] Auto-Fill Magic Button
 - [x] Wizard State persisted in localStorage
 - [x] Stage 2: Judge (Claude Haiku 4) - **Phase 2 ✅**
-  - [x] Naturalness Score (1-10)
-  - [x] Style Match Score
-  - [x] Company Relevance Score
-  - [x] Individuality Score
+  - [x] Pass/Fail Hard Constraint Logic (Blacklist, Word Count, PingPong)
+  - [x] Reduced Token Usage (~50% optimization)
 - [x] Stage 3: Iteration Loop (max 3x) - **Phase 2 ✅**
-  - [x] Score Threshold (≥8)
+  - [x] Loop break on `pass === true`
   - [x] Feedback Integration (weaknesses[] in next prompt)
   - [x] Generation Logs
 
@@ -156,7 +154,8 @@ Implementierung des kompletten Workflows: Von **Trainingsdaten-Upload** bis **Co
 - [x] Cover Letter Preview Komponente
 - [x] DEMO_MODE entfernt
 - [x] Wizard als Pre-Generation Gate integriert
-- [x] Quality Score Display
+- [x] X-Ray Audit Trail (Explainability Cards)
+- [x] Hiring Manager Simulator (Skepsis-Kritik & Auto-Fix)
 - [x] Regenerate Option
 - [x] Inline Editing & Targeted Paragraph Fixes
 - [x] Download als PDF

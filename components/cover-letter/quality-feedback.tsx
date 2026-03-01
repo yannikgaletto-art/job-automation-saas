@@ -2,7 +2,16 @@
 
 import { useState } from "react"
 import { ChevronDown, ChevronUp, CheckCircle2, XCircle, AlertCircle, RefreshCw } from "lucide-react"
-import type { QualityScores } from "./types" // Use local types
+// Local type — original types.ts was deleted (scores replaced by Pass/Fail judge)
+interface QualityScores {
+    naturalness_score: number;
+    style_match_score: number;
+    company_relevance_score: number;
+    individuality_score: number;
+    overall_score: number;
+    issues: string[];
+    suggestions: string[];
+}
 import type { ValidationResult } from "@/lib/services/cover-letter-validator"
 
 interface QualityFeedbackProps {

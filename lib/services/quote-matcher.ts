@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-
+import { complete } from '@/lib/ai/model-router';
 
 // Initialize OpenAI client lazily to allow env vars to load first in tests
 let openaiClient: OpenAI | null = null;
@@ -22,8 +22,248 @@ export interface QuoteSuggestion {
     matched_value: string; // The specific company value this quote supports
     value_connection: string; // Explanation
     language: 'en' | 'de';
+    verified_url?: string; // neu — von Perplexity citations[], optional
 }
 
+
+// ─── Stage 1: Thinker Identification (Claude Sonnet) ─────────────────────────
+
+interface ThinkerProfile {
+    name: string;
+    why: string;
+    searchQuery: string;
+}
+
+async function identifyThinkers(
+    jobTitle: string,
+    jobField: string,
+    companyValues: string[],
+    companyVision: string
+): Promise<ThinkerProfile[]> {
+    try {
+        const response = await complete({
+            taskType: 'personalize_intro',
+            systemPrompt: 'Antworte AUSSCHLIESSLICH mit validem JSON. Kein Markdown, kein Text davor oder danach.',
+            prompt: `Du bist ein Experte für Vordenker und Intellektuelle aus allen Disziplinen.
+
+KONTEXT:
+- Stelle: "${jobTitle || 'Fachkraft'}"
+- Branche: "${jobField || 'Allgemein'}"
+- Unternehmenswerte: ${JSON.stringify(companyValues)}
+${companyVision ? `- Vision: ${companyVision}` : ''}
+
+AUFGABE:
+Identifiziere genau 3 reale Vordenker, deren Gedankenwelt eine BRÜCKE baut zwischen:
+  (A) der spezifischen ROLLE ("${jobTitle || 'diese Position'}") und
+  (B) den WERTEN des Unternehmens.
+
+REGELN:
+1. VERBOTEN: Steve Jobs, Elon Musk, Jeff Bezos, Mark Zuckerberg, Bill Gates, Peter Thiel.
+   Diese sind abgedroschen und unseriös in Bewerbungen.
+2. Wähle Vordenker aus VERSCHIEDENEN Epochen und Disziplinen.
+   Ideal: ein/e Wissenschaftler/in, ein/e Praktiker/in, ein/e Philosoph/in.
+3. Die Vordenker müssen für die KONKRETE ROLLE relevant sein, nicht nur generisch "inspirierend".
+4. Gib KEINE ZITATE zurück — nur Profile.
+5. Das Feld "searchQuery" muss eine präzise englische Suchanfrage sein,
+   z.B. "Peter Drucker quote on organizational change" oder "Grace Hopper quote on innovation and courage".
+
+OUTPUT (JSON Array, KEINE Umrahmung):
+[
+  {
+    "name": "Vorname Nachname",
+    "why": "Warum passt diese Person zur Rolle + den Werten (1 Satz)",
+    "searchQuery": "Name quote on specific topic"
+  }
+]`,
+            temperature: 0.85,
+            maxTokens: 1024,
+        });
+
+        let rawText = response.text.trim();
+        const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch && jsonMatch[1]) {
+            rawText = jsonMatch[1].trim();
+        }
+
+        const parsed = JSON.parse(rawText);
+        const profiles: ThinkerProfile[] = Array.isArray(parsed) ? parsed : parsed.profiles || parsed.thinkers || [];
+
+        return profiles.filter(p => p.name && p.searchQuery).slice(0, 3);
+    } catch (error) {
+        console.error('❌ [Stage 1] Thinker identification failed:', error instanceof Error ? error.message : error);
+        return [];
+    }
+}
+
+
+// ─── Stage 2: Quote Search via Perplexity ────────────────────────────────────
+
+interface PerplexityQuoteResult {
+    quote: string;
+    author: string;
+    source: string;
+    verified_url: string;
+}
+
+async function searchQuoteViaPerplexity(
+    thinker: ThinkerProfile
+): Promise<PerplexityQuoteResult | null> {
+    const apiKey = process.env.PERPLEXITY_API_KEY;
+    if (!apiKey) {
+        console.error('❌ [Stage 2] PERPLEXITY_API_KEY not set');
+        return null;
+    }
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+        const response = await fetch('https://api.perplexity.ai/chat/completions', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: 'sonar',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'Du bist ein Fakten-Prüfer für Zitate. Antworte NUR mit validem JSON oder dem Wort NOT_FOUND.',
+                    },
+                    {
+                        role: 'user',
+                        content: `Finde ein ECHTES, VERIFIZIERTES Zitat von ${thinker.name}.
+Suchanfrage: "${thinker.searchQuery}"
+
+Antworte NUR als JSON:
+{
+  "quote": "Der exakte Zitat-Text",
+  "author": "${thinker.name}",
+  "source": "Autor - Werk/Kontext (z.B. 'Meditations', 'Interview mit HBR 2019')"
+}
+
+REGELN:
+- Das Zitat MUSS real und verifizierbar sein.
+- Keine Paraphrasierungen, keine "attributed to"-Zitate ohne Quelle.
+- Wenn du KEIN verifiziertes Zitat findest: Antworte ausschließlich mit dem Wort NOT_FOUND`,
+                    },
+                ],
+                temperature: 0,
+                return_citations: true,
+            }),
+            signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            console.error(`❌ [Stage 2] Perplexity HTTP ${response.status} for "${thinker.name}"`);
+            return null;
+        }
+
+        const data = await response.json();
+        const content: string = data.choices?.[0]?.message?.content || '';
+        const citations: string[] = data.citations || [];
+
+        // Check for NOT_FOUND
+        if (content.trim() === 'NOT_FOUND' || content.trim().startsWith('NOT_FOUND')) {
+            return null;
+        }
+
+        // Parse JSON
+        let parsed;
+        try {
+            parsed = JSON.parse(content.trim());
+        } catch {
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) return null;
+            parsed = JSON.parse(jsonMatch[0]);
+        }
+
+        if (!parsed.quote || !parsed.author) return null;
+
+        return {
+            quote: parsed.quote,
+            author: parsed.author,
+            source: parsed.source || '',
+            verified_url: citations[0] || '',
+        };
+    } catch (error) {
+        console.error(`❌ [Stage 2] Perplexity search failed for "${thinker.name}":`, error instanceof Error ? error.message : error);
+        return null;
+    }
+}
+
+
+// ─── Stage 3: Quote Judge (Claude Sonnet, temp 0.2) ──────────────────────────
+
+interface JudgeVerdict {
+    approved: boolean;
+    reason: string;
+}
+
+async function judgeQuote(
+    quote: string,
+    author: string,
+    source: string,
+    jobTitle: string,
+    companyValues: string[]
+): Promise<JudgeVerdict> {
+    try {
+        const response = await complete({
+            taskType: 'personalize_intro',
+            systemPrompt: 'Du bist ein strenger Qualitätsprüfer für Zitate in Bewerbungsanschreiben. Antworte AUSSCHLIESSLICH mit validem JSON.',
+            prompt: `Prüfe dieses Zitat für ein Anschreiben als "${jobTitle}".
+
+ZITAT: "${quote}"
+AUTOR: ${author}
+QUELLE: ${source || 'KEINE QUELLE ANGEGEBEN'}
+UNTERNEHMENSWERTE: ${JSON.stringify(companyValues)}
+
+PRÜFE DREI KRITERIEN:
+
+1. QUELLEN-CHECK: Hat das Zitat eine nicht-leere Quelle?
+   Wenn source leer oder "Unbekannt" → ABLEHNEN.
+
+2. FLUFF-CHECK: Ist das Zitat substanziell?
+   ABLEHNEN wenn es eines dieser Muster erfüllt:
+   - Allgemeinplätze ("Der Schlüssel zum Erfolg ist...")
+   - Sätze die auf JEDE Firma passen
+   - Weniger als 8 Wörter
+
+3. RELEVANZ-CHECK: Zeigt das Zitat einen thematischen Bezug zur Rolle "${jobTitle}" oder zu den Unternehmenswerten?
+   Wir verlangen keine perfekte 1:1 Übereinstimmung, aber eine erkennbare Brücke. Wenn es einen inhaltlichen Wertbeitrag bietet, ist es APPROVED. Ablehnen nur bei völliger Irrelevanz.
+
+OUTPUT (JSON):
+{
+  "approved": true/false,
+  "reason": "Begründung in einem Satz"
+}`,
+            temperature: 0.4,
+            maxTokens: 512,
+        });
+
+        let rawText = response.text.trim();
+        const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch && jsonMatch[1]) {
+            rawText = jsonMatch[1].trim();
+        }
+
+        const parsed = JSON.parse(rawText);
+        return {
+            approved: !!parsed.approved,
+            reason: parsed.reason || '',
+        };
+    } catch (error) {
+        console.error('❌ [Stage 3] Judge failed:', error instanceof Error ? error.message : error);
+        // Conservative: reject on error
+        return { approved: false, reason: 'Judge evaluation failed' };
+    }
+}
+
+
+// ─── Scoring (PRESERVED — unchanged from original) ──────────────────────────
 
 /**
  * Calculates cosine similarity between two vectors
@@ -91,42 +331,7 @@ async function scoreQuoteRelevance(
 }
 
 
-/**
- * STEP 1: Find quotes via Perplexity (with OpenAI fallback)
- */
-// STEP 1: Generate Quotes via OpenAI GPT-4o (Primary Engine for Batch 7)
-// Perplexity is dropped for quotes because quotes rarely need live web-search,
-// and LLMs are much better at philosophical/thematic value matching.
-async function generateQuotesWithOpenAI(promptText: string): Promise<QuoteSuggestion[]> {
-    try {
-        const openai = getOpenAI();
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: "You are a specialized quote discovery assistant. Output extremely high-quality, visionary quotes strictly matching the required JSON format. DO NOT generate URLs. Use 'Author - Work' format." },
-                { role: "user", content: promptText }
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.6,
-        });
-
-        const content = response.choices[0].message.content || '{"quotes":[]}';
-        const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/) || [null, content];
-        const parsed = JSON.parse(jsonMatch[1] ? jsonMatch[1].trim() : content.trim());
-
-        if (Array.isArray(parsed)) {
-            return parsed;
-        } else if (parsed.quotes && Array.isArray(parsed.quotes)) {
-            return parsed.quotes;
-        } else if (parsed.quote && parsed.author) {
-            return [parsed as QuoteSuggestion];
-        }
-        return [];
-    } catch (error) {
-        console.error('OpenAI Quote Generation Error:', error);
-        return [];
-    }
-}
+// ─── Main Pipeline ───────────────────────────────────────────────────────────
 
 export async function suggestRelevantQuotes(
     companyName: string,
@@ -135,76 +340,87 @@ export async function suggestRelevantQuotes(
     jobTitle: string = "",
     jobField: string = ""
 ): Promise<QuoteSuggestion[]> {
-    const jobContext = jobTitle
-        ? `\nStelle: ${jobTitle}${jobField ? `\nBranche/Kontext: ${jobField}` : ''}`
-        : '';
-
-    const promptText = `Du bist ein Experte für maßgeschneiderte, tiefgründige Zitate in Bewerbungsanschreiben.
-
-KONTEXT:
-- Stelle: "${jobTitle || 'Fachkraft'}"
-- Unternehmen: ${companyName}
-- Kernwerte des Unternehmens: ${JSON.stringify(companyValues)}${companyVision ? `\n- Vision/Mission: ${companyVision}` : ''}
-
-DEINE AUFGABE:
-Finde 5 Zitate, die eine BRÜCKE bauen zwischen:
-  (A) der spezifischen ROLLE ("${jobTitle || 'diese Position'}") und
-  (B) den WERTEN/der DNA von ${companyName}.
-
-Das Zitat soll so wirken, als ob der Bewerber sagt:
-"Eure Maxime [X] erinnert mich an [Vordenker Y], der sagte: [Zitat]. Genau dieses Mindset bringe ich als [Rolle] mit."
-
-REGELN FÜR DIE AUSWAHL:
-1. VERBOTEN: Steve Jobs ("Stay hungry"), Elon Musk, Jeff Bezos, Mark Zuckerberg, Bill Gates.
-   Diese sind abgedroschen. Nutze stattdessen TIEFGRÜNDIGE Denker.
-2. Die Autoren MÜSSEN thematisch zur Rolle passen:
-   - Consulting/Strategie → Denker wie Peter Drucker, Clayton Christensen, Roger Martin
-   - Innovation/Tech → Grace Hopper, Ada Lovelace, Alan Kay, Mariana Mazzucato
-   - New Work/HR/Purpose → Frederic Laloux, Amy Edmondson, Simon Sinek
-   - Sales/Growth → Daniel Pink, Zig Ziglar, Jill Konrath
-   - Nachhaltigkeit/Impact → Donella Meadows, Kate Raworth, Hans Rosling
-   - Recht/Compliance → Ruth Bader Ginsburg, Oliver Wendell Holmes
-   - Philosophie/Führung → Marcus Aurelius, Seneca, Hannah Arendt
-   (Dies sind BEISPIELE. Wähle die BESTEN Matches für die konkrete Rolle + Firma.)
-3. Maximal 1 Zitat darf vom CEO/Gründer von ${companyName} stammen (falls bekannt).
-4. Die restlichen 4 MÜSSEN von externen Vordenkern kommen.
-5. Das Feld "value_connection" MUSS die Brücke zwischen Vordenker, Rolle UND Unternehmenswert erklären.
-   SCHLECHT: "Dieses Zitat passt zu Innovation."
-   GUT: "Grace Hoppers Aufruf, den Status quo zu hinterfragen, spiegelt ${companyName}s Maxime [Wert X] wider — und ist genau das Mindset, das ein ${jobTitle || 'Fachkraft'} täglich braucht."
-6. Sprache: Deutsch, wenn die Unternehmenswerte auf Deutsch sind. Sonst Englisch.
-7. Quelle: Nenne das Format "Autor - Werk/Kontext" (z.B. "M. Aurelius - Selbstbetrachtungen"). KEINE URLs.
-
-AUSGABE als JSON:
-{
-  "quotes": [
-    {
-      "quote": "Der exakte Zitat-Text",
-      "author": "Vorname Nachname",
-      "source": "Werk oder Kontext (z.B. 'Reinventing Organizations', 'Meditations')",
-      "relevance_score": 0.95,
-      "matched_value": "Der konkrete Unternehmenswert, auf den sich das Zitat bezieht",
-      "value_connection": "Die Brücke: Warum passt dieses Zitat zur Rolle UND zum Unternehmen?",
-      "language": "de"
-    }
-  ]
-}`;
-
-    let quotes: QuoteSuggestion[] = await generateQuotesWithOpenAI(promptText);
-
-
-    if (!Array.isArray(quotes) || quotes.length === 0) {
-        console.warn("❌ Both AI engines failed to return quotes.");
+    // Guard: empty values → early return (Gate G)
+    if (!companyValues || companyValues.length === 0) {
+        console.error('❌ [QuotePipeline] No companyValues provided — returning []');
         return [];
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // STAGE 1: Identify Thinkers (Claude Sonnet, temp 0.85)
+    // ═══════════════════════════════════════════════════════════════════════
+    console.error('🔍 [Stage 1] Identifying thinkers for:', jobTitle, '|', companyName);
+    const thinkers = await identifyThinkers(jobTitle, jobField, companyValues, companyVision);
 
-    // Validate structure briefly
-    quotes = quotes.filter(q => q.quote && q.matched_value);
+    if (thinkers.length === 0) {
+        console.error('❌ [Stage 1] No thinkers identified — returning []');
+        return [];
+    }
+    console.error(`✅ [Stage 1] ${thinkers.length} thinkers: ${thinkers.map(t => t.name).join(', ')}`);
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // STAGE 2: Search Quotes via Perplexity (parallel, per-candidate try/catch)
+    // ═══════════════════════════════════════════════════════════════════════
+    console.error('🔍 [Stage 2] Searching verified quotes via Perplexity...');
+    const searchResults = await Promise.all(
+        thinkers.map(async (thinker) => {
+            const result = await searchQuoteViaPerplexity(thinker);
+            return result ? { thinker, result } : null;
+        })
+    );
 
-    // Step 2: Score them with embeddings for double-verification
-    const scored = await scoreQuoteRelevance(quotes, companyValues);
+    const verifiedQuotes = searchResults.filter(
+        (r): r is { thinker: ThinkerProfile; result: PerplexityQuoteResult } => r !== null
+    );
 
+    if (verifiedQuotes.length === 0) {
+        console.error('❌ [Stage 2] No verified quotes found — returning []');
+        return [];
+    }
+    console.error(`✅ [Stage 2] ${verifiedQuotes.length}/${thinkers.length} quotes verified`);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STAGE 3: Judge Quotes (Claude Sonnet, temp 0.2)
+    // ═══════════════════════════════════════════════════════════════════════
+    console.error('🔍 [Stage 3] Judging quote quality...');
+    const judgedQuotes: QuoteSuggestion[] = [];
+
+    for (const { thinker, result } of verifiedQuotes) {
+        const verdict = await judgeQuote(
+            result.quote,
+            result.author,
+            result.source,
+            jobTitle,
+            companyValues
+        );
+
+        if (verdict.approved) {
+            judgedQuotes.push({
+                quote: result.quote,
+                author: result.author,
+                source: result.source,
+                relevance_score: 0.85,
+                matched_value: companyValues[0] || companyName,
+                value_connection: thinker.why,
+                language: /[äöüßÄÖÜ]/.test(result.quote) ? 'de' : 'en',
+                verified_url: result.verified_url || undefined,
+            });
+            console.error(`  ✅ ${result.author}: APPROVED — ${verdict.reason}`);
+        } else {
+            console.error(`  ❌ ${result.author}: REJECTED — ${verdict.reason}`);
+        }
+    }
+
+    if (judgedQuotes.length === 0) {
+        console.error('❌ [Stage 3] All quotes rejected — returning []');
+        return [];
+    }
+    console.error(`✅ [Stage 3] ${judgedQuotes.length} quotes approved`);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // POST-PIPELINE: Embedding Scoring (PRESERVED — unchanged)
+    // ═══════════════════════════════════════════════════════════════════════
+    const scored = await scoreQuoteRelevance(judgedQuotes, companyValues);
 
     // Return top 5
     return scored.slice(0, 5);

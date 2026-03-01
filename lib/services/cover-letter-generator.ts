@@ -9,14 +9,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { validateCoverLetter, logValidation } from './cover-letter-validator';
 import { enrichCompany, linkEnrichmentToJob } from './company-enrichment';
-import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
+import type { CoverLetterSetupContext, AuditTrailCard } from '@/types/cover-letter-setup';
 import type { StyleAnalysis } from './writing-style-analyzer';
 import { scanForFluff } from './anti-fluff-blacklist';
 import { runMultiAgentPipeline } from './multi-agent-pipeline';
 import { buildSystemPrompt, type UserProfileData, type JobData, type CompanyResearchData } from './cover-letter-prompt-builder';
 import { judgeCoverLetter, type JudgeResult } from './cover-letter-judge';
-import type { SentenceAnnotation } from '@/types/cover-letter-setup';
-import type { HiringPersona } from './hiring-manager-resolver';
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
@@ -42,13 +40,8 @@ export interface CoverLetterGenerationParams {
 
 export interface CoverLetterResult {
     coverLetter: string;
-    finalScores: {
-        naturalness: number;
-        style_match: number;
-        company_relevance: number;
-        individuality: number;
-        overall_score: number;
-    };
+    judgePassed: boolean;
+    judgeFailReasons: string[];
     finalValidation: {
         isValid: boolean;
         issues: string[];
@@ -57,7 +50,8 @@ export interface CoverLetterResult {
     iterationLog?: Array<{
         iteration: number;
         letterVersion: string;
-        scores: JudgeResult['scores'];
+        judgePassed: boolean;
+        judgeFailReasons: string[];
         validation: { isValid: boolean; issues: string[] };
         timestamp: string;
     }>;
@@ -65,9 +59,7 @@ export interface CoverLetterResult {
     fluffWarning?: boolean;
     pipelineWarnings?: string[];
     pipelineImproved?: boolean;
-    // B4.1: xray_annotations persisted in draft metadata via generate/route.ts
-    annotatedSentences?: SentenceAnnotation[];  // B3.1: Only in live response, not persisted
-    hiringPersonas?: HiringPersona[];           // B3.2: Available personas for frontend panel
+    auditTrail?: AuditTrailCard[];
 }
 
 const MAX_ITERATIONS = 3;
@@ -126,7 +118,6 @@ export async function generateCoverLetterWithQuality(
                 jobData.company_name,
                 false,
                 {
-                    // Stufe 0: take from job metadata if Steckbrief was filled
                     website: jobData.metadata?.company_url || undefined,
                     industry: jobData.field || jobData.metadata?.field || undefined,
                     description: jobData.job_description?.substring(0, 200) || undefined,
@@ -192,11 +183,17 @@ REGELN:
             messages: [{ role: 'user', content: prompt }]
         });
 
-        const fixedText = message.content[0].type === 'text' ? message.content[0].text.trim() : currentLetter;
+        let fixedText = message.content[0].type === 'text' ? message.content[0].text.trim() : currentLetter;
+
+        // WHY: Prompt-Builder injiziert [VUL]...[/VUL] Tags als Tracking-Marker.
+        // Diese Tags MÜSSEN vor der Ausgabe entfernt werden.
+        // Der Text INNERHALB der Tags bleibt erhalten (authentischer Bewerbungstext).
+        fixedText = fixedText.replace(/\[VUL\](.*?)\[\/VUL\]/gs, '$1');
 
         return {
             coverLetter: fixedText,
-            finalScores: { naturalness: 0, style_match: 0, company_relevance: 0, individuality: 0, overall_score: 0 },
+            judgePassed: true,
+            judgeFailReasons: [],
             finalValidation: { isValid: true, issues: [] },
             iterations: 1,
             costCents: 2.5,
@@ -205,7 +202,8 @@ REGELN:
         console.error('[CoverLetterGen] Targeted fix failed:', err);
         return {
             coverLetter: currentLetter,
-            finalScores: { naturalness: 0, style_match: 0, company_relevance: 0, individuality: 0, overall_score: 0 },
+            judgePassed: false,
+            judgeFailReasons: ['Targeted fix failed'],
             finalValidation: { isValid: false, issues: ['Targeted fix failed'] },
             iterations: 0,
             costCents: 0,
@@ -220,7 +218,8 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
     const companyName = jobData?.company_name || setupContext?.companyName || 'das Unternehmen';
     let coverLetter = '';
     let iteration = 0;
-    let scores: JudgeResult['scores'] = { naturalness: 0, style_match: 0, company_relevance: 0, individuality: 0, overall_score: 0 };
+    let judgePassed = false;
+    let judgeFailReasons: string[] = [];
     let validation: { isValid: boolean; issues: string[] } = { isValid: false, issues: [] };
     let feedback: string[] = [];
     let lastWordCount = 0;
@@ -244,7 +243,8 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
         if (!process.env.ANTHROPIC_API_KEY) {
             console.warn('⚠️ MOCKING GENERATION (No API Key) ⚠️');
             generatedText = 'Dies ist ein generiertes Anschreiben (MOCK). API Key fehlt.';
-            scores = { naturalness: 5, style_match: 5, company_relevance: 5, individuality: 5, overall_score: 5 };
+            judgePassed = true;
+            judgeFailReasons = [];
             validation = { isValid: true, issues: [] };
             break;
         }
@@ -271,11 +271,13 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
         let judgment: JudgeResult;
         if (validationResult.isValid) {
             judgment = await judgeCoverLetter(generatedText, jobData ?? {}, setupContext, styleAnalysis ?? null);
-            scores = judgment.scores;
-            validation = { isValid: true, issues: judgment.weaknesses };
+            judgePassed = judgment.pass;
+            judgeFailReasons = judgment.failReasons;
+            validation = { isValid: true, issues: [...judgment.failReasons, ...judgment.weaknesses] };
         } else {
-            judgment = { scores: { naturalness: 0, style_match: 0, company_relevance: 0, individuality: 0, overall_score: 0 }, weaknesses: [] };
-            scores = judgment.scores;
+            judgment = { pass: false, failReasons: [], weaknesses: [] };
+            judgePassed = false;
+            judgeFailReasons = validationResult.errors;
             validation = { isValid: false, issues: validationResult.errors };
             console.log(`❌ Iteration ${iteration + 1}: Validation failed, skipping judge`);
         }
@@ -283,14 +285,15 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
         iterationLog.push({
             iteration: iteration + 1,
             letterVersion: generatedText,
-            scores,
+            judgePassed,
+            judgeFailReasons,
             validation,
             timestamp: new Date().toISOString()
         });
 
-        if (validationResult.isValid && scores.overall_score >= 8.0) {
+        if (validationResult.isValid && judgePassed) {
             coverLetter = generatedText;
-            console.log(`✅ Quality target reached! Score: ${scores.overall_score}/10`);
+            console.log(`✅ Quality target reached (Judge: PASS)`);
             break;
         }
 
@@ -300,6 +303,9 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
         }
         if (validationResult.warnings.length > 0) {
             feedback.push(...validationResult.warnings.map(w => `WARNING: ${w}`));
+        }
+        if (judgment.failReasons.length > 0) {
+            feedback.push(...judgment.failReasons.map(r => `JUDGE FAIL: ${r}`));
         }
         if (judgment.weaknesses.length > 0) {
             feedback.push(...judgment.weaknesses.map(w => `QUALITÄT: ${w}`));
@@ -311,13 +317,16 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
             console.warn('⚠️ Max iterations reached. Picking best valid version.');
             const validAttempts = iterationLog.filter(log => log.validation.isValid);
             if (validAttempts.length > 0) {
-                const best = validAttempts.reduce((a, b) =>
-                    b.scores.overall_score > a.scores.overall_score ? b : a
-                );
+                // Prefer passed attempts, otherwise take the last valid one
+                const passedAttempts = validAttempts.filter(log => log.judgePassed);
+                const best = passedAttempts.length > 0
+                    ? passedAttempts[passedAttempts.length - 1]
+                    : validAttempts[validAttempts.length - 1];
                 coverLetter = best.letterVersion;
-                scores = best.scores;
+                judgePassed = best.judgePassed;
+                judgeFailReasons = best.judgeFailReasons;
                 validation = best.validation;
-                console.log(`✅ Best-of-N: Iteration ${best.iteration} (Score: ${scores.overall_score}/10)`);
+                console.log(`✅ Best-of-N: Iteration ${best.iteration} (Judge: ${judgePassed ? 'PASS' : 'FAIL'})`);
             } else {
                 console.error('❌ No valid cover letter after 3 iterations — returning last attempt.');
                 coverLetter = generatedText;
@@ -383,13 +392,17 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
         }
     }
 
-    // ─── B2.2: VUL-Tag Enforcement (Vulnerability Injector Post-Gen) ───────
-    if (setupContext?.optInModules?.vulnerabilityInjector && coverLetter.includes('[VUL]')) {
+    // ─── VUL-Tag Stripper (UNCONDITIONAL — always strip before output) ──────
+    // WHY: Prompt-Builder injiziert [VUL]...[/VUL] Tags als Tracking-Marker.
+    // Diese Tags MÜSSEN vor der Ausgabe entfernt werden.
+    // Der Text INNERHALB der Tags bleibt erhalten (authentischer Bewerbungstext).
+    // CONFLICTS RESOLVED: VUL-Tag Leak (Blind Spot #2, QA Report 2026-02-28)
+    if (coverLetter.includes('[VUL]')) {
         const vulMatches = coverLetter.match(/\[VUL\][\s\S]*?\[\/VUL\]/g) || [];
-        console.log(`[VUL-Check] Found ${vulMatches.length} vulnerability tags`);
+        console.log(`[VUL-Check] Found ${vulMatches.length} vulnerability tags — stripping all`);
 
-        if (vulMatches.length > 2) {
-            console.warn(`⚠️ [VUL-Check] ${vulMatches.length} > 2 — removing excess`);
+        if (setupContext?.optInModules?.vulnerabilityInjector && vulMatches.length > 2) {
+            console.warn(`⚠️ [VUL-Check] ${vulMatches.length} > 2 — removing excess before stripping`);
             let vulCount = 0;
             coverLetter = coverLetter.replace(/\[VUL\][\s\S]*?\[\/VUL\]/g, (match) => {
                 vulCount++;
@@ -398,7 +411,7 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
             });
         }
 
-        coverLetter = coverLetter.replace(/\[VUL\]/g, '').replace(/\[\/VUL\]/g, '');
+        coverLetter = coverLetter.replace(/\[VUL\](.*?)\[\/VUL\]/gs, '$1');
         coverLetter = coverLetter.replace(/\n{3,}/g, '\n\n').trim();
     }
 
@@ -424,17 +437,15 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
         }
     }
 
-    // ─── B3.1: X-Ray Annotations (after pipeline, before return) ─────────
-    // B3.1 X-Ray: Separate Haiku call outside generation loop (Correction #2)
-    // B4.1: xray_annotations persisted in draft metadata
-    let annotatedSentences: SentenceAnnotation[] | undefined;
-    if (setupContext?.xRayMode && coverLetter.length > 0) {
+    // ─── X-Ray Audit Trail (after pipeline, before return) ───────────────
+    let auditTrail: AuditTrailCard[] | undefined;
+    if (coverLetter.length > 0 && setupContext) {
         try {
-            annotatedSentences = await generateXRayAnnotations(coverLetter, setupContext);
-            console.log(`✅ [X-Ray] Generated ${annotatedSentences?.length ?? 0} annotations`);
-        } catch (xrayErr) {
-            console.warn('⚠️ [X-Ray] Annotation generation failed — returning without annotations:', xrayErr);
-            annotatedSentences = undefined;
+            auditTrail = await generateAuditTrail(coverLetter, setupContext);
+            console.log(`✅ [AuditTrail] Generated ${auditTrail?.length ?? 0} cards`);
+        } catch (auditErr) {
+            console.warn('⚠️ [AuditTrail] Generation failed — returning without audit trail:', auditErr);
+            auditTrail = undefined;
         }
     }
 
@@ -442,12 +453,13 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
     const judgeCallCount = iterationLog.filter(l => l.validation.isValid).length;
     const gptCost = process.env.OPENAI_API_KEY ? 0.5 : 0;
     const perplexityCost = process.env.PERPLEXITY_API_KEY ? 0.3 : 0;
-    const xrayCost = setupContext?.xRayMode ? 0.1 : 0; // Haiku ~$0.001
-    const costCents = iterationLog.length * 2.5 + judgeCallCount * 0.3 + fluffRetries * 2.5 + gptCost + perplexityCost + xrayCost;
+    const auditCost = auditTrail ? 0.1 : 0;
+    const costCents = iterationLog.length * 2.5 + judgeCallCount * 0.3 + fluffRetries * 2.5 + gptCost + perplexityCost + auditCost;
 
     return {
         coverLetter,
-        finalScores: scores,
+        judgePassed,
+        judgeFailReasons,
         finalValidation: validation,
         iterations: iterationLog.length,
         iterationLog,
@@ -455,46 +467,68 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
         fluffWarning,
         pipelineWarnings,
         pipelineImproved,
-        annotatedSentences,
-        hiringPersonas: undefined, // B4.0: Personas kommen vom /resolve-personas Endpoint, nie aus dem Generator
+        auditTrail,
     };
 }
 
-// ─── B3.1: X-Ray Annotation Generator (separate Haiku call) ──────────────────
-async function generateXRayAnnotations(
+// ─── X-Ray Audit Trail Generator (separate Haiku call) ────────────────────────
+async function generateAuditTrail(
     coverLetter: string,
     ctx: CoverLetterSetupContext
-): Promise<SentenceAnnotation[]> {
+): Promise<AuditTrailCard[]> {
     if (!process.env.ANTHROPIC_API_KEY) {
-        console.warn('⚠️ [X-Ray] No API Key — skipping annotations');
+        console.warn('⚠️ [AuditTrail] No API Key — skipping');
         return [];
     }
 
-    const prompt = `Analysiere dieses fertige Anschreiben und zerlege es in Sätze mit Quellenangabe.
+    // Build module context for the prompt
+    const activeModules: string[] = [];
+    if (ctx.optInModules?.vulnerabilityInjector) activeModules.push('Vulnerability Injector (strategische Schwäche)');
+    if (ctx.optInModules?.first90DaysHypothesis) activeModules.push('Erste-90-Tage-Plan');
+    if (ctx.optInModules?.pingPong) activeModules.push('Ping-Pong (Zitatkontrast in Einleitung)');
+    if (ctx.selectedNews) activeModules.push(`News-Einbau: "${ctx.selectedNews.title}"`);
+    if (ctx.selectedQuote) activeModules.push(`Zitat: "${ctx.selectedQuote.quote}" — ${ctx.selectedQuote.author}`);
 
-Anschreiben:
+    const modulesBlock = activeModules.length > 0
+        ? `\nAKTIVE MODULE (vom User gewählt — erstelle für JEDES Modul eine eigene module_trace Karte):\n${activeModules.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
+        : '';
+
+    const stationsBlock = ctx.cvStations?.length > 0
+        ? `\nGEWÄHLTE CV-STATIONEN:\n${ctx.cvStations.map(s => `- ${s.company} (${s.role}): "${s.keyBullet}" → gematcht mit: "${s.matchedRequirement}"`).join('\n')}`
+        : '';
+
+    const prompt = `Analysiere dieses Anschreiben und erstelle einen "Audit Trail" — eine Erklärung, WARUM jeder Teil des Briefes so geschrieben wurde.
+
+ANSCHREIBEN:
 ---
 ${coverLetter}
 ---
+${stationsBlock}
+${modulesBlock}
 
-Für JEDEN Satz: Bestimme die Hauptquelle:
-- "user_style": Satz stammt primär aus dem Schreibstil/der Persönlichkeit des Kandidaten
-- "company_research": Satz bezieht sich auf Firmendaten, News, Zitate, Werte des Unternehmens
-- "job_fit": Satz verbindet CV-Erfahrung mit einer Job-Anforderung
+Erstelle GENAU diese Karten (JSON-Array):
 
-Antwort NUR als valides JSON-Array:
+1. PFLICHT: Eine "user_voice" Karte — Welcher Schreibstil-Aspekt wurde beibehalten? (z.B. kurze Sätze, analytischer Ton, lockere Sprache)
+2. PFLICHT: Eine "company_insight" Karte — Welche Firmen-Information (News, Werte, Zitat) wurde wo eingebaut?
+3. PFLICHT: Eine "job_fit" Karte — Welche Job-Anforderung wurde mit welcher CV-Station gematcht?
+${activeModules.length > 0 ? `4. PFLICHT: Für JEDES aktive Modul oben eine "module_trace" Karte — Wo genau im Brief wurde es eingebaut?` : ''}
+
+Format — NUR valides JSON-Array:
 [
-  { "text": "Der erste Satz.", "source": "company_research", "reference": "Firmenwerte: Innovation" },
-  { "text": "Der zweite Satz.", "source": "job_fit", "reference": "Anforderung: Python-Erfahrung" }
+  { "category": "user_voice", "title": "Schreibstil beibehalten", "detail": "Dein analytischer, direkter Satzbau wurde durchgängig beibehalten.", "reference": "Gesamter Brief" },
+  { "category": "company_insight", "title": "Firmen-News integriert", "detail": "Der Fokus auf Life Sciences wurde in Absatz 2 eingebaut.", "reference": "Absatz 2" },
+  { "category": "job_fit", "title": "Job-Anforderung gematcht", "detail": "Die Anforderung 'Stakeholder Management' wurde mit deinem KPMG-Praktikum gematcht.", "reference": "Absatz 3" }
 ]
+
+Für module_trace Karten zusätzlich: "moduleName": "vulnerabilityInjector" (exakter Key)
 
 Kein Freitext, nur das JSON-Array.`;
 
-    console.log('🔍 [X-Ray] Generating annotations via Haiku...');
+    console.log('🔍 [AuditTrail] Generating audit trail via Haiku...');
 
     const message = await anthropic.messages.create({
         model: 'claude-3-haiku-20240307',
-        max_tokens: 2000,
+        max_tokens: 1500,
         temperature: 0.1,
         system: 'You are a text analysis assistant. Respond ONLY with a valid JSON array.',
         messages: [{ role: 'user', content: prompt }]
@@ -502,25 +536,32 @@ Kein Freitext, nur das JSON-Array.`;
 
     const content = message.content[0].type === 'text' ? message.content[0].text : '';
 
-    // Try to parse JSON — graceful degradation on failure
-    let parsed: SentenceAnnotation[];
+    let parsed: AuditTrailCard[];
     try {
         const jsonMatch = content.match(/\[\s*\{[\s\S]*\}\s*\]/);
-        if (!jsonMatch) throw new Error('No JSON array found in X-Ray response');
+        if (!jsonMatch) throw new Error('No JSON array found in audit trail response');
         parsed = JSON.parse(jsonMatch[0]);
     } catch {
-        console.warn('⚠️ [X-Ray] Could not parse JSON response — skipping annotations');
+        console.warn('⚠️ [AuditTrail] Could not parse JSON response — returning empty');
         return [];
     }
 
-    // Validate each entry
+    const validCategories = ['user_voice', 'company_insight', 'job_fit', 'module_trace'];
+    const iconMap: Record<string, AuditTrailCard['icon']> = {
+        user_voice: '🟢',
+        company_insight: '🔵',
+        job_fit: '🟣',
+        module_trace: '🟠',
+    };
+
     return parsed
-        .filter(s => s.text && s.source && s.reference)
-        .map(s => ({
-            text: s.text,
-            source: (['user_style', 'company_research', 'job_fit'].includes(s.source)
-                ? s.source
-                : 'job_fit') as SentenceAnnotation['source'],
-            reference: s.reference,
+        .filter(c => c.category && c.title && c.detail)
+        .map(c => ({
+            category: (validCategories.includes(c.category) ? c.category : 'job_fit') as AuditTrailCard['category'],
+            icon: iconMap[c.category] || '🟣',
+            title: c.title,
+            detail: c.detail,
+            reference: c.reference,
+            moduleName: c.moduleName,
         }));
 }

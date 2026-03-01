@@ -28,7 +28,7 @@ function generateRecommendation(
     if (!bullets || bullets.length === 0) {
         return {
             requirement: requirements[0],
-            reasoning: `Dieser Hintergrund unterstützt dein Profil als ${role}.`,
+            reasoning: `Match: Aufgrund der Jobbeschreibung und deinem Hintergrund passt diese Station sehr gut.`,
             _score: 0
         };
     }
@@ -55,7 +55,7 @@ function generateRecommendation(
         // Fallback: just use the first requirement
         return {
             requirement: requirements[0],
-            reasoning: `Dieser Hintergrund unterstützt dein Profil als ${role}.`,
+            reasoning: `Match: Aufgrund der Jobbeschreibung und deinem Hintergrund passt diese Station sehr gut.`,
             _score: 0
         };
     }

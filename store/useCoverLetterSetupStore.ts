@@ -6,7 +6,9 @@ import type {
     SelectedCVStation,
     SelectedQuote,
     ToneConfig,
+    OptInModules,
 } from '@/types/cover-letter-setup';
+import { DEFAULT_OPT_IN_MODULES } from '@/types/cover-letter-setup';
 
 interface SetupStore {
     currentStep: 1 | 2 | 3;
@@ -17,6 +19,7 @@ interface SetupStore {
     cvStations: SelectedCVStation[];
     tone: ToneConfig | null;
     introFocus: 'quote' | 'hook';
+    optInModules: OptInModules;
 
     // Actions
     setStep: (step: 1 | 2 | 3) => void;
@@ -27,6 +30,7 @@ interface SetupStore {
     toggleStation: (station: Omit<SelectedCVStation, 'stationIndex'>) => void;
     setTone: (tone: ToneConfig) => void;
     setIntroFocus: (focus: 'quote' | 'hook') => void;
+    setOptInModule: <K extends keyof OptInModules>(key: K, value: OptInModules[K]) => void;
     reset: () => void;
 
     // Computed
@@ -46,6 +50,7 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
             cvStations: [],
             tone: null,
             introFocus: 'quote',
+            optInModules: { ...DEFAULT_OPT_IN_MODULES },
 
             setStep: (step) => set({ currentStep: step }),
 
@@ -53,7 +58,22 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 const current = get().jobId;
                 // Reset only if switching to a different job
                 if (current !== jobId) {
-                    set({ jobId, currentStep: 1, selectedHook: null, selectedQuote: null, fetchedQuotes: [], cvStations: [], tone: null, introFocus: 'quote' });
+                    set({
+                        jobId,
+                        currentStep: 1,
+                        selectedHook: null,
+                        selectedQuote: null,
+                        fetchedQuotes: [],
+                        cvStations: [],
+                        tone: null,
+                        introFocus: 'quote',
+                        // WHY: optInModules (pingPong, vulnerabilityInjector, first90Days etc.)
+                        // müssen bei jedem neuen Job vollständig zurückgesetzt werden.
+                        // Ohne Reset: Silent feature carry-over von Job A zu Job B.
+                        // CRITICAL: Spread-Operator ist Pflicht (kein Reference Sharing).
+                        // CONFLICTS RESOLVED: State Store Residues (Blind Spot #4, QA Report 2026-02-28)
+                        optInModules: { ...DEFAULT_OPT_IN_MODULES },
+                    });
                     console.log(`✅ [WizardSetup] Initialized for job: ${jobId}`);
                 }
             },
@@ -103,6 +123,13 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 console.log(`✅ [WizardSetup] Intro focus set: ${focus}`);
             },
 
+            setOptInModule: (key, value) => {
+                set((state) => ({
+                    optInModules: { ...state.optInModules, [key]: value },
+                }));
+                console.log(`✅ [WizardSetup] OptIn module set: ${String(key)} = ${value}`);
+            },
+
             reset: () => set({
                 currentStep: 1,
                 jobId: null,
@@ -112,6 +139,7 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 cvStations: [],
                 tone: null,
                 introFocus: 'quote',
+                optInModules: { ...DEFAULT_OPT_IN_MODULES },
             }),
 
             isStepComplete: (step) => {
@@ -140,6 +168,8 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                     autoFilled: false,
                     completedAt: new Date().toISOString(),
                     introFocus: s.introFocus,
+                    optInModules: s.optInModules,
+                    enablePingPong: s.optInModules.pingPong,
                 };
             },
         }),

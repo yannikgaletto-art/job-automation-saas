@@ -4,7 +4,12 @@ import { useState, useRef } from "react"
 import { Search, X } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
-import type { SentenceAnnotation } from "@/types/cover-letter-setup"
+// Local type — original SentenceAnnotation was replaced by AuditTrailCard in the active flow
+interface SentenceAnnotation {
+    text: string;
+    source: 'user_style' | 'company_research' | 'job_fit';
+    reference: string;
+}
 import { cn } from "@/lib/utils"
 
 // ─── Color Map (from QUALITY_CV_COVER_LETTER.md) ─────────────────────────────

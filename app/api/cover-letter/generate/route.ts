@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
         const result = await generateCoverLetterWithQuality(jobId, userId, setupContext, fixMode, targetFix, currentLetter);
 
-        console.log(`[${requestId}] step=complete iterations=${result.iterations} score=${result.finalScores?.overall_score ?? 'N/A'} cost=${result.costCents}¢`);
+        console.log(`[${requestId}] step=complete iterations=${result.iterations} judge=${result.judgePassed ? 'PASS' : 'FAIL'} cost=${result.costCents}¢`);
 
         // ─── B1.4: Auto-Save as Draft ─────────────────────────────────────────
         // Contract 2 (Document Storage Safety): Write → Read-Back → Validate
@@ -43,18 +43,19 @@ export async function POST(request: NextRequest) {
             document_type: 'cover_letter',
             file_url_encrypted: 'dummy_url', // B1.4 fix: required by DB constraint for generated texts
             metadata: {
-                status: 'draft', // B1.4: Every generated CL starts as draft
+                status: 'draft',
                 job_id: jobId,
                 generated_content: result.coverLetter,
-                quality_scores: result.finalScores,
+                judge_passed: result.judgePassed,
+                judge_fail_reasons: result.judgeFailReasons,
                 validation: result.finalValidation,
                 iterations: result.iterations,
                 setup_context: setupContext ?? null,
                 cost_cents: result.costCents,
                 fluff_warning: result.fluffWarning ?? false,
-                xray_annotations: result.annotatedSentences ?? null,     // B4.1
-                pipeline_warnings: result.pipelineWarnings ?? [],        // B4.1 (Correction #2)
-                pipeline_improved: result.pipelineImproved ?? false,     // B4.1 (Correction #2)
+                audit_trail: result.auditTrail ?? null,
+                pipeline_warnings: result.pipelineWarnings ?? [],
+                pipeline_improved: result.pipelineImproved ?? false,
             },
             pii_encrypted: {}
         }).select('id').single();
@@ -87,16 +88,15 @@ export async function POST(request: NextRequest) {
             requestId,
             draft_id: draftId,
             cover_letter: result.coverLetter,
-            quality_scores: result.finalScores,
+            judge_passed: result.judgePassed,
+            judge_fail_reasons: result.judgeFailReasons,
             validation: result.finalValidation,
             iterations: result.iterations,
             iteration_log: result.iterationLog,
             fluff_warning: result.fluffWarning ?? false,
             pipeline_warnings: result.pipelineWarnings ?? [],
             pipeline_improved: result.pipelineImproved ?? false,
-            // B4.1: xray_annotations persisted in draft metadata
-            annotated_sentences: result.annotatedSentences ?? [],  // B3.1
-            hiring_personas: result.hiringPersonas ?? [],          // B3.2
+            audit_trail: result.auditTrail ?? [],
         });
 
     } catch (error: unknown) {

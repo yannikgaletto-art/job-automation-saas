@@ -110,7 +110,7 @@ export async function POST(request: Request) {
             .update({
                 status: 'ready_for_review',
                 cover_letter: coverLetterResult.coverLetter,
-                cover_letter_quality_score: coverLetterResult.finalScores?.overall_score || 0,
+                cover_letter_quality_score: coverLetterResult.judgePassed ? 10 : 0,
                 ai_cost_cents: coverLetterResult.costCents,
             })
             .eq('id', jobId);

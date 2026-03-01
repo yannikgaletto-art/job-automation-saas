@@ -55,7 +55,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
                 company: s.company,
                 role: s.role,
                 period: s.period,
-                keyBullet: s.bullets[0] || '',
+                keyBullet: s.bullets?.[0] || '',
                 matchedRequirement: req,
                 intent: `Beweis für: ${req || 'Berufserfahrung'}`,
                 bullets: s.bullets || [],

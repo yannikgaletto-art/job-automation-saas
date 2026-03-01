@@ -1,16 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { LetterEditor } from "./LetterEditor"
-import { SuggestionsList } from "./SuggestionsList"
-import { ScoreBadges } from "./ScoreBadges"
-import type { QualityScores } from "@/components/cover-letter/types"
-import type { CoverLetterSetupContext } from "@/types/cover-letter-setup"
+import { XRayAuditTrail } from "./XRayAuditTrail"
+import { HiringManagerCritique } from "./HiringManagerCritique"
+import type { AuditTrailCard, HiringManagerCritique as CritiqueType, CoverLetterSetupContext } from "@/types/cover-letter-setup"
 
 interface GenerationResult {
     coverLetter: string
-    qualityScores: QualityScores
     iterations: number
+    auditTrail?: AuditTrailCard[]
     validation?: {
         isValid: boolean
         stats: { wordCount: number; companyMentions: number; paragraphCount: number; forbiddenPhraseCount: number }
@@ -28,17 +27,47 @@ interface CoverLetterResultViewProps {
 }
 
 export function CoverLetterResultView({ initialResult, userId, jobId, setupContext }: CoverLetterResultViewProps) {
-    const [result, setResult] = useState<GenerationResult>(initialResult)
     const [currentLetter, setCurrentLetter] = useState(initialResult.coverLetter)
-    const [fixingWeakness, setFixingWeakness] = useState<string | null>(null)
-    const [fixingIndex, setFixingIndex] = useState<number | null>(null)
+    const [fixingParagraphIndex, setFixingParagraphIndex] = useState<number | null>(null)
+    const [isFixing, setIsFixing] = useState(false)
     const [isApplied, setIsApplied] = useState(false)
 
-    // Extract latest weaknesses from the log or scores
-    const lastLog = result.iteration_log?.[result.iteration_log.length - 1]
-    const weaknesses: string[] = lastLog?.scores?.weaknesses || result.qualityScores.issues || []
+    // ─── Hiring Manager Critique State ───────────────────────────────
+    const [critique, setCritique] = useState<CritiqueType | null>(null)
+    const [critiqueLoading, setCritiqueLoading] = useState(true)
+    const [critiqueError, setCritiqueError] = useState(false)
+    const [critiqueResolved, setCritiqueResolved] = useState(false)
 
+    // ─── Fetch Critique on Mount (one-shot, no re-fetch after fix) ───
+    useEffect(() => {
+        if (critiqueResolved) return
+        const fetchCritique = async () => {
+            try {
+                const res = await fetch('/api/cover-letter/critique', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        coverLetter: initialResult.coverLetter,
+                        jobTitle: setupContext?.selectedHook?.label || '',
+                        companyName: setupContext?.companyName || '',
+                    })
+                })
+                if (!res.ok) throw new Error('Critique fetch failed')
+                const data = await res.json()
+                setCritique(data.critique ?? null)
+            } catch {
+                setCritiqueError(true)
+            } finally {
+                setCritiqueLoading(false)
+            }
+        }
+        fetchCritique()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []) // One-shot: only on mount
+
+    // ─── Fix API (shared between critique and custom input) ──────────
     const callFixAPI = async (instruction: string) => {
+        setIsFixing(true)
         try {
             const response = await fetch('/api/cover-letter/generate', {
                 method: 'POST',
@@ -61,57 +90,23 @@ export function CoverLetterResultView({ initialResult, userId, jobId, setupConte
             console.error(e)
             alert("Fix fehlgeschlagen — bitte manuell bearbeiten")
         } finally {
-            setFixingWeakness(null)
-            setFixingIndex(null)
+            setIsFixing(false)
+            setFixingParagraphIndex(null)
         }
     }
 
-    const handleFixWeakness = async (weakness: string) => {
-        setFixingWeakness(weakness)
-        // Find the paragraph most related to this weakness for the spinner
-        const paragraphs = currentLetter.split(/\n\n+/).filter(p => p.trim().length > 0)
-        const targetWords = weakness.toLowerCase().split(/\s+/).filter(w => w.length > 3)
-        let bestMatchIdx = 0
-        let maxMatches = -1
-        paragraphs.forEach((p, idx) => {
-            let matches = 0
-            const pLower = p.toLowerCase()
-            targetWords.forEach(w => { if (pLower.includes(w)) matches++ })
-            if (matches > maxMatches) { maxMatches = matches; bestMatchIdx = idx }
-        })
-        setFixingIndex(bestMatchIdx)
-        // Remove fixed weakness from list on success
-        const prevLog = lastLog
-        const prevWeaknesses = weaknesses
-        try {
-            await callFixAPI(weakness)
-            setResult(prev => ({
-                ...prev,
-                iteration_log: [
-                    ...(prev.iteration_log || []),
-                    {
-                        ...prevLog,
-                        scores: {
-                            ...prevLog?.scores,
-                            weaknesses: prevWeaknesses.filter(w => w !== weakness)
-                        }
-                    }
-                ]
-            }))
-        } catch {
-            // already handled in callFixAPI
-        }
+    const handleApplyCritiqueFix = async (fixSuggestion: string) => {
+        await callFixAPI(fixSuggestion)
+        setCritiqueResolved(true) // Switch to success state, no re-fetch
     }
 
     const handleCustomFix = async (instruction: string) => {
-        setFixingWeakness(instruction)
-        setFixingIndex(null) // No specific paragraph for custom instructions
+        setFixingParagraphIndex(null)
         await callFixAPI(instruction)
     }
 
     const handleCopy = () => {
         navigator.clipboard.writeText(currentLetter)
-        // Optional: show toast
     }
 
     const handleDownloadPdf = () => {
@@ -190,7 +185,7 @@ export function CoverLetterResultView({ initialResult, userId, jobId, setupConte
                     <LetterEditor
                         letter={currentLetter}
                         onLetterChange={setCurrentLetter}
-                        fixingParagraphIndex={fixingIndex}
+                        fixingParagraphIndex={fixingParagraphIndex}
                     />
 
                     <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-[#E7E7E5]">
@@ -198,55 +193,51 @@ export function CoverLetterResultView({ initialResult, userId, jobId, setupConte
                             onClick={handleCopy}
                             className="bg-white border border-[#E7E7E5] px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
                         >
-                            📋 Kopieren
+                            Kopieren
                         </button>
                         <button
                             onClick={handleDownloadPdf}
                             className="bg-white border border-[#E7E7E5] px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
                         >
-                            📥 PDF
+                            PDF
                         </button>
                         <button
                             onClick={handleDownloadDocx}
                             className="bg-white border border-[#E7E7E5] px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
                         >
-                            📝 Word (.doc)
+                            Word (.doc)
                         </button>
 
                         <div className="flex-1" />
 
                         {isApplied ? (
                             <div className="text-[#2e7d32] bg-[#e8f5e9] rounded px-3 py-2 text-sm font-medium flex items-center gap-2">
-                                ✅ Bewerbung gespeichert
+                                Bewerbung gespeichert
                             </div>
                         ) : (
                             <button
                                 onClick={handleMarkApplied}
                                 className="bg-[#002e7a] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#001f5c] transition-colors flex items-center gap-2"
                             >
-                                ✓ Als beworben markieren
+                                Als beworben markieren
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* Right Column: Feedback */}
-                <div className="space-y-6">
-                    <ScoreBadges scores={result.qualityScores} />
+                {/* Right Column: X-Ray Audit Trail + Hiring Manager Critique */}
+                <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:pr-1">
+                    <XRayAuditTrail cards={initialResult.auditTrail ?? []} />
 
-                    <SuggestionsList
-                        weaknesses={weaknesses}
-                        onFix={handleFixWeakness}
+                    <HiringManagerCritique
+                        critique={critique}
+                        isLoading={critiqueLoading}
+                        isError={critiqueError}
+                        critiqueResolved={critiqueResolved}
+                        onApplyFix={handleApplyCritiqueFix}
                         onCustomFix={handleCustomFix}
-                        fixingWeakness={fixingWeakness}
+                        isFixing={isFixing}
                     />
-
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-[#73726E] space-y-1">
-                        <div className="font-semibold text-gray-700 mb-2">Statistiken</div>
-                        <div>Wörter: {result.validation?.stats?.wordCount ?? 0}</div>
-                        <div>Absätze: {result.validation?.stats?.paragraphCount ?? 0}</div>
-                        <div>Unternehmensnennungen: {result.validation?.stats?.companyMentions ?? 0}</div>
-                    </div>
                 </div>
             </div>
 

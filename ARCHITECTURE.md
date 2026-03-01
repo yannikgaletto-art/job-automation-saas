@@ -66,6 +66,11 @@ Die Anwendung basiert auf dem Next.js App Router (`app/` Verzeichnis):
 - `/demo` (Allgemeine Component Demo)
 - `/template-demo` (UI Demo für Templates)
 
+### API Routes (Internal Auth)
+- `/api/cover-letter/generate` (Zentrale Generierung)
+- `/api/cover-letter/critique` (Hiring Manager Simulator)
+- `/api/cover-letter/setup-data` (Wizard Daten-Enrichment)
+
 ---
 
 ## 3. SCRAPING PIPELINE (AKTUELL)

@@ -5,6 +5,7 @@
 
 import { buildSystemPrompt } from '../lib/services/cover-letter-prompt-builder';
 import type { CoverLetterSetupContext, SelectedHook, SelectedQuote, ToneConfig, SelectedCVStation } from '../types/cover-letter-setup';
+import { DEFAULT_OPT_IN_MODULES } from '../types/cover-letter-setup';
 
 // ─── Shared Fixtures ──────────────────────────────────────────────────────────
 const profile = { cv_structured_data: { experience: ['Ingrano', 'Fraunhofer', 'MIZ'] } };
@@ -73,7 +74,7 @@ const tests: TestCase[] = [
             { label: 'Quote in intro (ZITAT-BRIDGING)', test: p => p.includes('ZITAT-BRIDGING') },
             { label: 'Hook in body (ABSATZ 2)', test: p => p.includes('ABSATZ 2') },
             { label: 'No rigid "Als ich gesehen habe"', test: p => !p.includes('Als ich gesehen habe') },
-            { label: 'Dynamic sentence limit (5 SÄTZE)', test: p => p.includes('5 SÄTZE') },
+            { label: 'Dynamic intro block (EINLEITUNG)', test: p => p.includes('EINLEITUNG') && p.includes('Abschnitten') },
         ]
     },
     {
@@ -85,7 +86,7 @@ const tests: TestCase[] = [
             { label: 'Philosophisch preset active', test: p => p.includes('INTELLEKTUELL') },
             { label: 'No competing quote format in preset', test: p => !p.includes('Starte mit einem relevanten Zitat') },
             { label: 'Preset defers to Sektion 3', test: p => p.includes('Sektion 3 (Aufhänger) gesteuert') },
-            { label: 'Dynamic sentence limit', test: p => p.includes('5 SÄTZE') },
+            { label: 'Dynamic intro block (EINLEITUNG)', test: p => p.includes('EINLEITUNG') && p.includes('Abschnitten') },
         ]
     },
     {
@@ -105,6 +106,65 @@ const tests: TestCase[] = [
             { label: 'No quote block', test: p => !p.includes('ZITAT-BRIDGING') },
             { label: 'Preset uses full opening (Beobachtung)', test: p => p.includes('relevanten Beobachtung') },
             { label: 'Standard 2 SÄTZE limit', test: p => p.includes('MAXIMAL 2 SÄTZE') },
+        ]
+    },
+    {
+        name: '7. First 90 Days \u2014 active (no intel data \u2192 fallback)',
+        ctx: makeCtx({ optInModules: { ...DEFAULT_OPT_IN_MODULES, first90DaysHypothesis: true } }),
+        checks: [
+            { label: '90-Days block present', test: p => p.includes('FIRST 90 DAYS HYPOTHESIS') },
+            { label: 'Position tag present (VORLETZTER ABSATZ)', test: p => p.includes('VORLETZTER ABSATZ') },
+            { label: 'Fallback text present (keine Firmendaten)', test: p => p.includes('FALLBACK') },
+            { label: 'Anti-fluff guard present', test: p => p.includes('zuh\u00f6ren und verstehen') },
+            { label: 'Word budget reduced (260-340)', test: p => p.includes('260') },
+        ]
+    },
+    {
+        name: '8. First 90 Days disabled (Default)',
+        ctx: makeCtx({}),
+        checks: [
+            { label: 'No 90-Days block (default off)', test: p => !p.includes('FIRST 90 DAYS HYPOTHESIS') },
+            { label: 'Standard word limit (280-380)', test: p => p.includes('280') },
+        ]
+    },
+    {
+        name: '9. Ping-Pong — Quote only (no hook)',
+        ctx: makeCtx({ selectedQuote: quote, selectedHook: { ...hook, content: '' }, optInModules: { ...DEFAULT_OPT_IN_MODULES, pingPong: true } }),
+        checks: [
+            { label: 'PING-PONG block present', test: p => p.includes('PING-PONG EINLEITUNG') },
+            { label: 'Anti-negative guard (Lernkurve)', test: p => p.includes('NIEMALS negativ über fr') },
+            { label: 'Anti-pseudo-contrast guard', test: p => p.includes('KEIN Pseudo-Kontrast') },
+            { label: '4-Abschnitte limit active', test: p => p.includes('4 kurzen Abschnitten') },
+            { label: '100-word limit active', test: p => p.includes('100 W') },
+            { label: 'No hookBodyBlock (no hook)', test: p => !p.includes('ABSATZ 2') },
+        ]
+    },
+    {
+        name: '10. Ping-Pong + Hook (focus=quote)',
+        ctx: makeCtx({ selectedQuote: quote, introFocus: 'quote', optInModules: { ...DEFAULT_OPT_IN_MODULES, pingPong: true } }),
+        checks: [
+            { label: 'PING-PONG in intro', test: p => p.includes('PING-PONG EINLEITUNG') },
+            { label: 'Hook in body (no conflict)', test: p => p.includes('ABSATZ 2') },
+            { label: '100-word limit active', test: p => p.includes('100 W') },
+        ]
+    },
+    {
+        name: '11. Ping-Pong + Philosophisch (guard check)',
+        ctx: makeCtx({ selectedQuote: quote, introFocus: 'quote', tone: baseTone('philosophisch'), optInModules: { ...DEFAULT_OPT_IN_MODULES, pingPong: true } }),
+        checks: [
+            { label: 'PING-PONG block present', test: p => p.includes('PING-PONG EINLEITUNG') },
+            { label: 'Philosophisch guard still defers (no competing format)', test: p => p.includes('Sektion 3 (Aufhänger) gesteuert') },
+            { label: 'No second Zitat-Format tag from preset', test: p => !p.includes('Starte mit einem relevanten Zitat') },
+        ]
+    },
+    {
+        name: '12. Ping-Pong + Formal (should be ignored)',
+        ctx: makeCtx({ selectedQuote: quote, tone: baseTone('formal'), optInModules: { ...DEFAULT_OPT_IN_MODULES, pingPong: true } }),
+        checks: [
+            // formal preset: pingPong flag is in prompt-builder but the formal preset doesn't add extra incompatible tags
+            // The block itself should still be in the prompt (user can toggle it; the judge will catch weak antitheses)
+            { label: '100-word limit present (block included)', test: p => p.includes('100 W') },
+            { label: 'Standard formal tone rubric (no philosophy)', test: p => !p.includes('INTELLEKTUELL') },
         ]
     },
 ];

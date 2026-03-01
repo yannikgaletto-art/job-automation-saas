@@ -1,9 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { CoverLetterWizard } from "./cover-letter-wizard/CoverLetterWizard"
-import type { CoverLetterSetupContext } from "@/types/cover-letter-setup"
-import { QualityScores } from "@/components/cover-letter/types"
+import type { CoverLetterSetupContext, AuditTrailCard } from "@/types/cover-letter-setup"
 import { createClient } from "@/lib/supabase/client"
 import { CoverLetterResultView } from "./cover-letter-result/CoverLetterResultView"
 import { useCoverLetterSetupStore } from "@/store/useCoverLetterSetupStore"
@@ -18,8 +17,8 @@ interface Step4CoverLetterProps {
 
 interface GenerationResult {
     coverLetter: string
-    qualityScores: QualityScores
     iterations: number
+    auditTrail?: AuditTrailCard[]
     iteration_log?: any[]
     validation?: {
         isValid: boolean
@@ -28,6 +27,96 @@ interface GenerationResult {
         warnings: string[]
     }
 }
+
+// ─── AI Generation Progress View ─────────────────────────────────────────────
+const AI_STEPS = [
+    { label: 'Firmendaten abrufen', detail: 'Perplexity durchsucht aktuelle Firmen-Infos', pct: 15 },
+    { label: 'Profil analysieren', detail: 'Claude liest deinen Lebenslauf & die Stellenanzeige', pct: 35 },
+    { label: 'Anschreiben verfassen', detail: 'Claude Sonnet schreibt den ersten Entwurf', pct: 70 },
+    { label: 'Qualitätsprüfung', detail: 'AI-Judge prüft Constraints & Stil', pct: 92 },
+];
+
+function GenerationProgressView() {
+    const [progress, setProgress] = useState(0);
+    const [activeStep, setActiveStep] = useState(0);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    useEffect(() => {
+        // Smooth progress fill over ~22 seconds
+        const TOTAL_MS = 22000;
+        const TICK_MS = 120;
+        let elapsed = 0;
+
+        intervalRef.current = setInterval(() => {
+            elapsed += TICK_MS;
+            // Ease-out: fast at start, slows to ~95%
+            const raw = Math.min(95, (elapsed / TOTAL_MS) * 100);
+            setProgress(Math.round(raw));
+
+            // Advance step label based on thresholds
+            const nextStep = AI_STEPS.reduce((last, s, i) => raw >= s.pct ? i : last, 0);
+            setActiveStep(Math.max(0, nextStep));
+        }, TICK_MS);
+
+        return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    }, []);
+
+    const current = AI_STEPS[activeStep];
+
+    return (
+        <div className="flex flex-col items-center justify-center gap-3 px-6 py-4">
+            {/* Skeleton shimmer */}
+            <div className="w-full space-y-3">
+                {[1, 0.85, 1, 0.72, 0.9, 0.6].map((w, i) => (
+                    <div
+                        key={i}
+                        className="h-3.5 rounded-full bg-gradient-to-r from-[#E7E7E5] via-[#F0F0EE] to-[#E7E7E5] animate-pulse"
+                        style={{ width: `${w * 100}%`, animationDelay: `${i * 80}ms` }}
+                    />
+                ))}
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full">
+                <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs font-semibold text-[#002e7a]">{current.label}</span>
+                    <span className="text-xs text-[#A8A29E]">{progress}%</span>
+                </div>
+                <div className="h-2 w-full bg-[#E7E7E5] rounded-full overflow-hidden">
+                    <div
+                        className="h-full bg-gradient-to-r from-[#002e7a] to-[#3B82F6] rounded-full"
+                        style={{ width: `${progress}%`, transition: 'width 120ms linear' }}
+                    />
+                </div>
+                <p className="text-[11px] text-[#73726E] mt-1.5 text-center">{current.detail}</p>
+            </div>
+
+            {/* Step indicators */}
+            <div className="flex items-center gap-1.5 w-full justify-center">
+                {AI_STEPS.map((step, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                        <div className={[
+                            'w-2 h-2 rounded-full transition-all duration-300',
+                            i < activeStep ? 'bg-[#22C55E]' :
+                                i === activeStep ? 'bg-[#002e7a] scale-125' :
+                                    'bg-[#E7E7E5]',
+                        ].join(' ')} />
+                        {i < AI_STEPS.length - 1 && (
+                            <div className={[
+                                'h-px w-5 transition-colors duration-500',
+                                i < activeStep ? 'bg-[#22C55E]' : 'bg-[#E7E7E5]',
+                            ].join(' ')} />
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <p className="text-[11px] text-[#A8A29E]">Dauert ca. 20–30 Sekunden</p>
+        </div>
+    );
+}
+
+
 
 export function Step4CoverLetter({
     jobId,
@@ -83,22 +172,10 @@ export function Step4CoverLetter({
 
             const data = await response.json()
 
-            const scores = data.quality_scores || {}
-
-            const qualityScores: QualityScores = {
-                naturalness_score: scores.naturalness || scores.naturalness_score || 8,
-                style_match_score: scores.style_match || scores.style_match_score || 8,
-                company_relevance_score: scores.company_relevance || scores.company_relevance_score || 8,
-                individuality_score: scores.individuality || scores.individuality_score || 8,
-                overall_score: scores.overall_score || 8,
-                issues: scores.issues || [],
-                suggestions: scores.suggestions || []
-            }
-
             const rawValidation = data.validation || {};
             const coverLetterText: string = data.cover_letter || data.coverLetter || '';
             const wordCount = coverLetterText.trim().split(/\s+/).filter(Boolean).length;
-            const paragraphCount = coverLetterText.split(/\n\n+/).filter(p => p.trim()).length;
+            const paragraphCount = coverLetterText.split(/\n\n+/).filter((p: string) => p.trim()).length;
             const companyNamesToMatch = companyName ? [companyName] : [];
             const companyMentions = companyNamesToMatch.length > 0
                 ? (coverLetterText.match(new RegExp(companyName, 'gi')) || []).length
@@ -106,8 +183,8 @@ export function Step4CoverLetter({
 
             const mappedResult: GenerationResult = {
                 coverLetter: coverLetterText,
-                qualityScores,
                 iterations: data.iterations || 1,
+                auditTrail: data.audit_trail || [],
                 iteration_log: data.iteration_log,
                 validation: {
                     isValid: rawValidation.isValid ?? true,
@@ -160,26 +237,9 @@ export function Step4CoverLetter({
         )
     }
 
-    // Loading skeleton
+    // AI Progress loading view
     if (isLoading && !result) {
-        return (
-            <div className="space-y-6 p-6">
-                <div className="animate-pulse space-y-4">
-                    <div className="h-6 bg-[#E7E7E5] rounded w-1/3 mb-4"></div>
-                    <div className="space-y-3">
-                        <div className="h-4 bg-[#E7E7E5] rounded w-full"></div>
-                        <div className="h-4 bg-[#E7E7E5] rounded w-full"></div>
-                        <div className="h-4 bg-[#E7E7E5] rounded w-5/6"></div>
-                        <div className="h-4 bg-[#E7E7E5] rounded w-full"></div>
-                        <div className="h-4 bg-[#E7E7E5] rounded w-4/5"></div>
-                    </div>
-                </div>
-                <p className="text-sm text-[#73726E] text-center flex items-center justify-center gap-2">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
-                    ✨ Generiere personalisiertes Anschreiben...
-                </p>
-            </div>
-        )
+        return <GenerationProgressView />;
     }
 
     // Error state
