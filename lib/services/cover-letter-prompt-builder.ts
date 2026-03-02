@@ -109,7 +109,7 @@ ${JSON.stringify(profile?.cv_structured_data || {}, null, 2)}`;
     // ─── Tone Instructions (B1.5: Jeder Stil verändert GESAMTE Prompt-Struktur) ─
     const toneInstructions: Record<string, string> = {
         'data-driven': `STIL: DATENGETRIEBEN & PRÄZISE
-ÖFFNUNG: Starte mit einem konkreten, quantifizierbaren Fakt über das Unternehmen ODER einem eigenen messbaren Ergebnis. Kein allgemeines Statement.
+${hasQuote ? 'ÖFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhänger) gesteuert. Starte NACH dem Zitat-Block mit einem konkreten, quantifizierbaren Fakt oder messbaren Ergebnis — ohne nochmal auf das Zitat zurückzugreifen.' : 'ÖFFNUNG: Starte mit einem konkreten, quantifizierbaren Fakt über das Unternehmen ODER einem eigenen messbaren Ergebnis. Kein allgemeines Statement.'}
 ABSATZ-STRUKTUR: Jeder Hauptabsatz folgt dem Schema: Claim → Beweis (Zahl/KPI/Ergebnis) → Implikation für den neuen Arbeitgeber.
 BEWEISFÜHRUNG:
 - Nutze konkrete Zahlen, Prozentsätze und messbare Resultate in JEDEM Absatz
@@ -121,7 +121,7 @@ SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Adjektive ohne Beleg, Superlative ohne Beweis, "leidenschaftlich", "motiviert", "engagiert" ohne konkretes Beispiel.`,
 
         'storytelling': `STIL: NARRATIV & PERSÖNLICH
-ÖFFNUNG: Beginne mit einer kurzen persönlichen Situation oder einem Schlüsselmoment deiner Karriere (max. 2 Sätze). Kein "Es war einmal", sondern ein konkreter Moment: "Als ich bei [Firma] zum ersten Mal [Situation erlebte], wusste ich..."
+${hasQuote ? 'ÖFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhänger) gesteuert. Starte NACH dem Zitat-Block — beginne direkt mit der Brücke zwischen dem Zitat und deiner persönlichen Erfahrung, ohne nochmals ein Zitat zu eröffnen.' : 'ÖFFNUNG: Beginne mit einer kurzen persönlichen Situation oder einem Schlüsselmoment deiner Karriere (max. 2 Sätze). Kein "Es war einmal", sondern ein konkreter Moment: "Als ich bei [Firma] zum ersten Mal [Situation erlebte], wusste ich..."'}
 ABSATZ-STRUKTUR: Jede CV-Station wird als Mini-Geschichte erzählt:
 - Situation (1 Satz): Was war der Kontext/die Herausforderung?
 - Handlung (1 Satz): Was hast du konkret getan?
@@ -136,7 +136,7 @@ SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Aufzählungen, Bullet-Points-Stil, trockene Fakten ohne Kontext, "Mein Werdegang zeigt..."`,
 
         'formal': `STIL: KLASSISCH-FORMELL
-ÖFFNUNG: Direkte, höfliche Bezugnahme auf die Stelle. Keine Überraschungen, kein Storytelling. Sachlich und präzise. (z.B. "Die ausgeschriebene Position als [Titel] bei [Firma] verbindet [Kompetenzfeld A] mit [Kompetenzfeld B] — eine Schnittstelle, die meine bisherige Laufbahn durchzieht.")
+${hasQuote ? 'ÖFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhänger) gesteuert. Starte NACH dem Zitat-Block mit einer direkten, sachlichen Bezügnahme auf die Stelle.' : 'ÖFFNUNG: Direkte, höfliche Bezügnahme auf die Stelle. Keine Überraschungen, kein Storytelling. Sachlich und präzise. (z.B. "Die ausgeschriebene Position als [Titel] bei [Firma] verbindet [Kompetenzfeld A] mit [Kompetenzfeld B] — eine Schnittstelle, die meine bisherige Laufbahn durchzieht.")'}
 ABSATZ-STRUKTUR: Konservative 4-Absatz-Struktur:
 1. Einstieg + Motivation (2-3 Sätze)
 2. Fachliche Qualifikation mit Belegen (3-4 Sätze)

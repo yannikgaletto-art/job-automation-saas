@@ -7,7 +7,8 @@
  * - Anforderungs-Check: 2fr_3fr_4fr columns with clear headers and full badge status.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CVMatchResult } from '@/lib/services/cv-match-analyzer';
 import { Button } from '@/components/motion/button';
@@ -145,7 +146,8 @@ function ExpandableCell({ text, boldFn }: { text: string; boldFn: (s: string) =>
 }
 
 export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, onNextStep }: CVMatchTabProps) {
-    const [state, setState] = useState<'idle' | 'loading' | 'complete' | 'error'>('idle');
+    const [state, setState] = useState<'idle' | 'loading' | 'complete' | 'error' | 'no-cv'>('idle');
+    const router = useRouter();
     const [matchData, setMatchData] = useState<CVMatchResult | null>(null);
     const [loadingStep, setLoadingStep] = useState(0);
     const [progressText, setProgressText] = useState("Profil wird mit Stellenausschreibung abgeglichen...");
@@ -195,6 +197,15 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     const [cvOptions, setCvOptions] = useState<CVOption[]>([]);
     const [selectedCvId, setSelectedCvId] = useState<string | undefined>(undefined);
 
+    const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Cleanup polling on unmount
+    useEffect(() => {
+        return () => {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+        };
+    }, []);
+
     const runAnalysis = useCallback(async (cvDocumentId?: string) => {
         setState('loading');
         setLoadingStep(1);
@@ -205,23 +216,56 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
             await new Promise(r => setTimeout(r, 800));
             setLoadingStep(2);
 
+            // POST triggers the Inngest pipeline — returns immediately
             const res = await fetch('/api/cv/match', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ jobId, cvDocumentId })
             });
 
-            setLoadingStep(3);
             const data = await res.json();
 
             if (!res.ok || !data.success) {
+                if (data.code === 'CV_NOT_FOUND') {
+                    setState('no-cv');
+                    return;
+                }
                 throw new Error(data.error || 'Fehler bei der Analyse');
             }
 
-            setMatchData(data.data);
-            setState('complete');
-            onMatchComplete?.(data.data);
-            toast.success('CV Analyse erfolgreich');
+            // Poll for results (Inngest processes in background)
+            let attempts = 0;
+            const maxAttempts = 20; // 20 × 3s = 60s max
+
+            pollingRef.current = setInterval(async () => {
+                attempts++;
+                try {
+                    const pollRes = await fetch(`/api/cv/match/cached?jobId=${jobId}`);
+                    const pollData = await pollRes.json();
+
+                    if (pollData.success && pollData.cached?.analyzed_at) {
+                        // Result arrived!
+                        if (pollingRef.current) clearInterval(pollingRef.current);
+                        pollingRef.current = null;
+                        setLoadingStep(3);
+                        setMatchData(pollData.cached);
+                        setState('complete');
+                        onMatchComplete?.(pollData.cached);
+                        toast.success('CV Analyse erfolgreich');
+                    } else if (attempts >= maxAttempts) {
+                        if (pollingRef.current) clearInterval(pollingRef.current);
+                        pollingRef.current = null;
+                        throw new Error('Analyse-Timeout — bitte erneut versuchen');
+                    }
+                } catch (pollError) {
+                    if (pollingRef.current) clearInterval(pollingRef.current);
+                    pollingRef.current = null;
+                    const errMsg = pollError instanceof Error ? pollError.message : String(pollError);
+                    setState('error');
+                    toast.error('Analyse fehlgeschlagen', { description: errMsg });
+                }
+            }, 3000);
+
         } catch (error: unknown) {
             const errMsg = error instanceof Error ? error.message : String(error);
             console.error(error);
@@ -258,6 +302,28 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
             runAnalysis();
         }
     }, [runAnalysis]);
+
+    // ── NO CV — Blocking State ──────────────────────────────────
+    if (state === 'no-cv') {
+        return (
+            <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
+                <div className="bg-amber-50 p-4 rounded-full shadow-sm mb-4 border border-amber-200">
+                    <AlertCircle className="w-8 h-8 text-amber-500" />
+                </div>
+                <h3 className="text-xl font-semibold text-[#37352F] mb-2">Kein Lebenslauf gefunden</h3>
+                <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
+                    Um den CV Match zu starten, musst du zuerst deinen Lebenslauf hochladen.
+                    Das dauert nur 30 Sekunden.
+                </p>
+                <Button
+                    variant="primary"
+                    onClick={() => router.push('/dashboard/settings')}
+                >
+                    CV in Einstellungen hochladen →
+                </Button>
+            </div>
+        );
+    }
 
     // ── IDLE / ERROR ────────────────────────────────────────────
     if (state === 'idle' || state === 'error') {

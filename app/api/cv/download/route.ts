@@ -4,6 +4,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { ModernTemplate } from '@/components/cv-templates/ModernTemplate';
 import { ClassicTemplate } from '@/components/cv-templates/ClassicTemplate';
 import { TechTemplate } from '@/components/cv-templates/TechTemplate';
+import { ValleyTemplate } from '@/components/cv-templates/ValleyTemplate';
 import { CvStructuredData } from '@/types/cv';
 import { Font, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import React from 'react';
@@ -50,6 +51,8 @@ function resolveTemplate(templateId: string, data: CvStructuredData) {
     switch (templateId) {
         case 'classic': return React.createElement(ClassicTemplate, { data });
         case 'tech': return React.createElement(TechTemplate, { data });
+        case 'valley': return React.createElement(ValleyTemplate, { data });
+        case 'modern':
         default: return React.createElement(ModernTemplate, { data });
     }
 }
@@ -69,7 +72,7 @@ export async function GET(req: NextRequest) {
 
 
         const type = req.nextUrl.searchParams.get('type') || 'cv';
-        const templateId = req.nextUrl.searchParams.get('template') || 'modern';
+        const templateId = req.nextUrl.searchParams.get('template') || 'valley';
 
         // Fetch job (user-scoped — Contract 2)
         const { data: job, error: jobError } = await supabase

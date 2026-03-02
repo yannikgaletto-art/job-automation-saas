@@ -2,52 +2,48 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { complete } from '@/lib/ai/model-router';
+import { inngest } from '@/lib/inngest/client';
+
+/**
+ * POST /api/jobs/extract — Smart Trigger
+ *
+ * DEV:  Runs synchronously (no Inngest CLI needed locally).
+ * PROD: Fires Inngest background event (no Vercel timeout risk).
+ *
+ * Contracts: §8 (Auth Guard), §3 (user-scoped)
+ */
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
 );
+
 const Schema = z.object({ jobId: z.string().uuid() });
 
 /**
- * Robust JSON parser: handles markdown blocks, truncated arrays, etc.
+ * Robust JSON parser — handles markdown blocks, truncated arrays, etc.
  */
 function safeParseJSON(raw: string): Record<string, unknown> {
-    // Step 1: Strip markdown code blocks
     let cleaned = raw.trim();
     const mdMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (mdMatch && mdMatch[1]) {
-        cleaned = mdMatch[1].trim();
-    }
+    if (mdMatch && mdMatch[1]) cleaned = mdMatch[1].trim();
 
-    // Step 2: Try direct parse
-    try {
-        return JSON.parse(cleaned);
-    } catch {
-        // Step 3: Extract first { ... } block
-        const firstOpen = cleaned.indexOf('{');
-        const lastClose = cleaned.lastIndexOf('}');
-        if (firstOpen !== -1 && lastClose > firstOpen) {
-            try {
-                return JSON.parse(cleaned.substring(firstOpen, lastClose + 1));
-            } catch {
-                // Step 4: Fix truncated arrays by closing them
-                let fixable = cleaned.substring(firstOpen, lastClose + 1);
-                // Close unclosed arrays: count [ vs ]
-                const opens = (fixable.match(/\[/g) || []).length;
-                const closes = (fixable.match(/\]/g) || []).length;
-                if (opens > closes) {
-                    // Remove trailing comma if present, then close arrays
-                    fixable = fixable.replace(/,\s*$/, '');
-                    for (let i = 0; i < opens - closes; i++) {
-                        fixable = fixable.replace(/}\s*$/, ']}');
-                    }
-                    try {
-                        return JSON.parse(fixable);
-                    } catch { /* fall through */ }
-                }
+    try { return JSON.parse(cleaned); } catch { /* continue */ }
+
+    const firstOpen = cleaned.indexOf('{');
+    const lastClose = cleaned.lastIndexOf('}');
+    if (firstOpen !== -1 && lastClose > firstOpen) {
+        try {
+            return JSON.parse(cleaned.substring(firstOpen, lastClose + 1));
+        } catch {
+            let fixable = cleaned.substring(firstOpen, lastClose + 1);
+            const opens = (fixable.match(/\[/g) || []).length;
+            const closes = (fixable.match(/\]/g) || []).length;
+            if (opens > closes) {
+                fixable = fixable.replace(/,\s*$/, '');
+                for (let i = 0; i < opens - closes; i++) fixable = fixable.replace(/}\s*$/, ']}');
+                try { return JSON.parse(fixable); } catch { /* fall through */ }
             }
         }
     }
@@ -58,47 +54,73 @@ function safeParseJSON(raw: string): Record<string, unknown> {
 
 export async function POST(request: NextRequest) {
     try {
+        // §8: Auth Guard
         const supabase = await createClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
+        if (authError || !user) {
+            return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
+        }
 
         const { jobId } = Schema.parse(await request.json());
 
+        // §3: Ownership check (user-scoped)
         const { data: job } = await supabaseAdmin
             .from('job_queue')
-            .select('id, description')
+            .select('id, description, metadata')
             .eq('id', jobId)
             .eq('user_id', user.id)
             .single();
 
-        if (!job?.description || job.description.length < 100)
+        if (!job?.description || job.description.length < 100) {
             return NextResponse.json({ success: false, error: 'Beschreibung zu kurz' }, { status: 400 });
+        }
 
-        if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY)
+        if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
             return NextResponse.json({ success: false, error: 'KI nicht konfiguriert' }, { status: 503 });
+        }
 
-        const response = await complete({
-            taskType: 'parse_html',
-            systemPrompt: `Extrahiere aus der Stellenbeschreibung diese JSON-Struktur. NUR JSON zurückgeben, kein Markdown, keine Erklärungen:
+        const isDev = process.env.NODE_ENV === 'development';
+
+        if (isDev) {
+            // ─── DEV MODE: Run synchronously (no Inngest CLI needed) ─────────────
+            console.log('🔧 [Extract] DEV MODE — running synchronously');
+            const { complete } = await import('@/lib/ai/model-router');
+
+            const response = await complete({
+                taskType: 'parse_html',
+                systemPrompt: `Extrahiere aus der Stellenbeschreibung diese JSON-Struktur. NUR JSON zurückgeben, kein Markdown, keine Erklärungen:
 {"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben"],"qualifications":["max 8 Anforderungen"],"benefits":["max 5"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["max 12 ATS Keywords"]}`,
-            prompt: job.description,
-            temperature: 0,
-            maxTokens: 1500,
-        });
+                prompt: job.description,
+                temperature: 0,
+                maxTokens: 1500,
+            });
 
-        const extracted = safeParseJSON(response.text);
+            const extracted = safeParseJSON(response.text);
+            const currentMetadata = (job.metadata as Record<string, unknown>) || {};
 
-        await supabaseAdmin.from('job_queue').update({
-            summary: (extracted.summary as string) || null,
-            responsibilities: Array.isArray(extracted.responsibilities) && extracted.responsibilities.length > 0 ? extracted.responsibilities : null,
-            requirements: Array.isArray(extracted.qualifications) && extracted.qualifications.length > 0 ? extracted.qualifications : null,
-            benefits: Array.isArray(extracted.benefits) ? extracted.benefits : [],
-            location: (extracted.location as string) || null,
-            seniority: (extracted.seniority as string) || 'unknown',
-            buzzwords: Array.isArray(extracted.buzzwords) ? extracted.buzzwords : null,
-        }).eq('id', jobId);
+            await supabaseAdmin.from('job_queue').update({
+                summary: (extracted.summary as string) || null,
+                responsibilities: Array.isArray(extracted.responsibilities) && extracted.responsibilities.length > 0 ? extracted.responsibilities : null,
+                requirements: Array.isArray(extracted.qualifications) && extracted.qualifications.length > 0 ? extracted.qualifications : null,
+                benefits: Array.isArray(extracted.benefits) ? extracted.benefits : [],
+                location: (extracted.location as string) || null,
+                seniority: (extracted.seniority as string) || 'unknown',
+                buzzwords: Array.isArray(extracted.buzzwords) ? extracted.buzzwords : null,
+                metadata: { ...currentMetadata, extract_error: null, extract_completed_at: new Date().toISOString() },
+            }).eq('id', jobId).eq('user_id', user.id);
 
-        return NextResponse.json({ success: true });
+            console.log(`✅ [Extract DEV] Job ${jobId} extracted successfully`);
+            return NextResponse.json({ success: true, status: 'processing' });
+
+        } else {
+            // ─── PROD MODE: Fire Inngest event (background, retry-safe) ──────────
+            console.log('🚀 [Extract] PROD MODE — sending to Inngest');
+            await inngest.send({
+                name: 'job/extract',
+                data: { jobId, userId: user.id },
+            });
+            return NextResponse.json({ success: true, status: 'processing' });
+        }
 
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);

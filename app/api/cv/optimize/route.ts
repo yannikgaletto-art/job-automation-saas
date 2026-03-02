@@ -81,11 +81,28 @@ function applyCvChanges(cv: CvStructuredData, changes: CvChange[]): CvStructured
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { cv_structured_data, cv_match_result, template_id, job_id, user_id } = body;
+        const { cv_structured_data, cv_match_result, template_id, job_id, user_id, station_metrics, cv_opt_settings } = body;
 
         if (!cv_structured_data || !cv_match_result || !job_id || !user_id) {
             return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
         }
+
+        const summaryInstruction = cv_opt_settings?.summaryMode === 'compact'
+            ? `\nSUMMARY-INSTRUKTION: Schreibe die Zusammenfassung in MAXIMAL 2 Sätzen.
+Kein Fließtext. Format strikt: "[Rolle] mit [konkreter Erfahrung], fokussiert auf [Wert für Arbeitgeber]."
+Keine Adjektive ohne Beleg. Kein "motiviert", "leidenschaftlich", "engagiert".\n`
+            : '';
+
+        // Build structured metrics context from station_metrics
+        const metricsContext = station_metrics
+            ?.filter((s: { metrics: string }) => s.metrics?.trim()?.length > 0)
+            ?.map((s: { company: string; role: string; metrics: string }) =>
+                `- Bei "${s.company}"${s.role ? ` (${s.role})` : ''}: ${s.metrics}`)
+            ?.join('\n');
+
+        const metricsBlock = metricsContext
+            ? `\n4. NUTZER-METRIKEN (vom Nutzer bereitgestellt — nur einbauen, wenn sachlich passend zur jeweiligen Station):\n${metricsContext}\n`
+            : '';
 
         const prompt = `
 Du bist ein erstklassiger Karriere-Berater und CV-Optimierer.
@@ -105,7 +122,7 @@ Deine Aufgabe ist es, einen Lebenslauf-JSON (CV SSoT) und eine Analyse (CV Match
    - "before" / "after": MUSS EIN EINFACHER STRING SEIN. GIB NIEMALS EIN ARRAY ZURÜCK! (Bei Bulletpoints nur den reinen Text)
    - "reason": WARUM
    - "requirementRef.requirement": Aus welchem "requirement" des CV Match abgeleitet.
-
+${summaryInstruction}
 **EINGABEDATEN:**
 
 1. CV SSoT (AKTUELLER LEBENSLAUF):
@@ -116,6 +133,7 @@ ${JSON.stringify(cv_match_result.requirementRows, null, 2)}
 
 3. GEWÄHLTES TEMPLATE ID:
 ${template_id}
+${metricsBlock}
 
 **CRITICAL OUTPUT RULES:**
 - "before" and "after" fields MUST be plain strings, never arrays.

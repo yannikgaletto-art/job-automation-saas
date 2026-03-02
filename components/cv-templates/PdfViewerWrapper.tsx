@@ -6,6 +6,7 @@ import { CvStructuredData } from '@/types/cv';
 import { ModernTemplate } from './ModernTemplate';
 import { ClassicTemplate } from './ClassicTemplate';
 import { TechTemplate } from './TechTemplate';
+import { ValleyTemplate } from './ValleyTemplate';
 import { Download, Loader2 } from 'lucide-react';
 
 interface PdfViewerWrapperProps {
@@ -19,6 +20,8 @@ function resolveTemplate(data: CvStructuredData, templateId: string) {
             return <ClassicTemplate data={data} />;
         case 'tech':
             return <TechTemplate data={data} />;
+        case 'valley':
+            return <ValleyTemplate data={data} />;
         case 'modern':
         default:
             return <ModernTemplate data={data} />;

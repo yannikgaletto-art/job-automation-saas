@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, FileText, Check, Sparkles, Mail, Info, Trash2, ChevronDown } from 'lucide-react';
+import { ChevronRight, FileText, Check, Sparkles, Mail, Info, Trash2, ChevronDown, GraduationCap } from 'lucide-react';
 import { ProgressWorkflow } from './progress-workflow';
 import { Button } from '@/components/motion/button';
 
@@ -12,6 +12,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { CustomDialog } from "@/components/ui/custom-dialog";
 import { CVMatchTab } from './cv-match/cv-match-tab';
 import { OptimizerWizard } from '@/components/cv-optimizer/OptimizerWizard';
+import { CertificateKanbanBoard } from '@/components/certificates/certificate-kanban-board';
 
 export interface Job {
     id: string;
@@ -27,6 +28,7 @@ export interface Job {
     metadata?: any;
     matchScore: number;
     workflowStep: number; // 0-4
+    dbStatus: string; // Raw DB status (e.g. 'steckbrief_confirmed') — used by getNextAction
     status: 'NEW' | 'JOB_REVIEWED' | 'CV_CHECKED' | 'CV_OPTIMIZED' | 'CL_GENERATED' | 'READY';
     company_research?: any[];
 }
@@ -48,6 +50,44 @@ const formatLevel = (level?: string | null): string | null => {
     if (!level || level.toLowerCase() === 'unknown') return null;
     return level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
 };
+
+/**
+ * Maps raw DB status to the next user-facing CTA.
+ * Receives raw DB strings (e.g. 'steckbrief_confirmed') — NOT the mapped UI status.
+ * §9: status strings match SICHERHEITSARCHITEKTUR.md canonical mapping.
+ */
+function getNextAction(
+    dbStatus: string,
+    onToggle: () => void,
+    setActiveTab: (tab: number) => void,
+): {
+    label: string;
+    targetTab: number;
+    icon: React.ReactNode;
+    variant: 'outline' | 'primary';
+    action: () => void;
+} {
+    const open = (tab: number) => () => { setActiveTab(tab); onToggle(); };
+
+    switch (dbStatus?.toLowerCase()) {
+        case 'pending':
+            return { label: 'Steckbrief prüfen', targetTab: 0, icon: <FileText className="w-4 h-4" />, variant: 'outline', action: open(0) };
+        case 'processing':
+        case 'steckbrief_confirmed':
+            return { label: 'CV Match starten', targetTab: 1, icon: <Check className="w-4 h-4" />, variant: 'outline', action: open(1) };
+        case 'cv_match_done':
+        case 'cv_matched':
+            return { label: 'CV optimieren', targetTab: 2, icon: <Sparkles className="w-4 h-4" />, variant: 'primary', action: open(2) };
+        case 'cv_optimized':
+            return { label: 'Cover Letter generieren', targetTab: 3, icon: <Mail className="w-4 h-4" />, variant: 'outline', action: open(3) };
+        case 'cover_letter_done':
+        case 'ready_for_review':
+        case 'ready_to_apply':
+            return { label: 'Weiterbildung ansehen', targetTab: 4, icon: <GraduationCap className="w-4 h-4" />, variant: 'primary', action: open(4) };
+        default:
+            return { label: 'Öffnen', targetTab: 0, icon: <FileText className="w-4 h-4" />, variant: 'outline', action: open(0) };
+    }
+}
 
 /**
  * Bold the first noun/verb phrase of a bullet point.
@@ -199,30 +239,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
         }
     };
 
-    const getNextAction = () => {
-        switch (job.status) {
-            case 'NEW':
-                return { icon: <FileText className="w-4 h-4" />, label: 'View Job', variant: 'outline' as const, action: onToggle };
-            case 'JOB_REVIEWED':
-                return { icon: <Check className="w-4 h-4" />, label: 'Check CV Match', variant: 'outline' as const, action: onToggle };
-            case 'CV_CHECKED':
-                return {
-                    icon: <Sparkles className="w-4 h-4" />,
-                    label: 'Optimize CV',
-                    variant: 'primary' as const,
-                    action: () => onOptimize?.(job.id)
-                };
-            case 'CV_OPTIMIZED':
-                return { icon: <Mail className="w-4 h-4" />, label: 'Generate Cover Letter', variant: 'outline' as const, action: onToggle };
-            case 'CL_GENERATED':
-            case 'READY':
-                return { icon: <Check className="w-4 h-4" />, label: 'Review & Apply', variant: 'primary' as const, action: onToggle };
-            default:
-                return { icon: <FileText className="w-4 h-4" />, label: 'View Job', variant: 'outline' as const, action: onToggle };
-        }
-    };
-
-    const nextAction = getNextAction();
+    const nextAction = getNextAction(job.dbStatus, onToggle, setActiveTab);
 
     return (
         <motion.div className="border-b border-[#d6d6d6] last:border-b-0">
@@ -300,6 +317,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                 { index: 1, label: 'CV Match', icon: <Check className="w-3.5 h-3.5" /> },
                                 { index: 2, label: 'CV Opt.', icon: <Sparkles className="w-3.5 h-3.5" /> },
                                 { index: 3, label: 'Cover Letter', icon: <Mail className="w-3.5 h-3.5" /> },
+                                { index: 4, label: 'Weiterbildung', icon: <GraduationCap className="w-3.5 h-3.5" /> },
                             ].map((tab) => (
                                 <button
                                     key={tab.index}
@@ -458,6 +476,25 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                     console.log('Cover letter flow complete');
                                     setOptimisticStep(4);
                                 }}
+                            />
+                        )}
+
+                        {/* ===== TAB 4: WEITERBILDUNG & ZERTIFIZIERUNG ===== */}
+                        {displayTab === 4 && (
+                            <CertificateKanbanBoard
+                                jobId={job.id}
+                                jobStatus={(() => {
+                                    // Map UI status back to DB status for blocking checks
+                                    switch (job.status) {
+                                        case 'NEW': return 'pending';
+                                        case 'JOB_REVIEWED': return 'steckbrief_confirmed';
+                                        case 'CV_CHECKED': return 'cv_match_done';
+                                        case 'CV_OPTIMIZED': return 'cv_optimized';
+                                        case 'CL_GENERATED': return 'cover_letter_done';
+                                        case 'READY': return 'ready_to_apply';
+                                        default: return 'pending';
+                                    }
+                                })()}
                             />
                         )}
                     </motion.div>

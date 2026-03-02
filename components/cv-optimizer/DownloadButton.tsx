@@ -6,6 +6,7 @@ import { CvStructuredData } from '@/types/cv';
 import { ModernTemplate } from '../cv-templates/ModernTemplate';
 import { ClassicTemplate } from '../cv-templates/ClassicTemplate';
 import { TechTemplate } from '../cv-templates/TechTemplate';
+import { ValleyTemplate } from '../cv-templates/ValleyTemplate';
 import { Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -20,6 +21,8 @@ function resolveDocument(data: CvStructuredData, templateId: string) {
             return <ClassicTemplate data={data} />;
         case 'tech':
             return <TechTemplate data={data} />;
+        case 'valley':
+            return <ValleyTemplate data={data} />;
         case 'modern':
         default:
             return <ModernTemplate data={data} />;

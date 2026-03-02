@@ -14,7 +14,7 @@ import OpenAI from 'openai';
 
 export const MODELS = {
     CLAUDE_SONNET: {
-        id: 'claude-sonnet-4-5',
+        id: 'claude-3-5-sonnet-20241022',
         provider: 'anthropic' as const,
         cost_per_1m_tokens: 3.0,
         strengths: ['creative_writing', 'complex_reasoning'],
@@ -26,7 +26,7 @@ export const MODELS = {
         strengths: ['parsing', 'classification', 'summarization'],
     },
     CLAUDE_HAIKU: {
-        id: 'claude-haiku-4-5',
+        id: 'claude-3-5-haiku-20241022',
         provider: 'anthropic' as const,
         cost_per_1m_tokens: 0.25,
         strengths: ['parsing', 'classification', 'fast_execution'],
@@ -50,7 +50,10 @@ export type TaskType =
     | 'generate_motivation_text'
     | 'optimize_cv'
     | 'cv_match'
-    | 'cv_parse';
+    | 'cv_parse'
+    // Certificate pipeline
+    | 'analyze_skill_gaps'
+    | 'synthesize_certificates';
 
 // ============================================================================
 // ROUTING LOGIC
@@ -71,6 +74,9 @@ export function selectModel(taskType: TaskType) {
         optimize_cv: 'CLAUDE_SONNET',
         cv_match: 'CLAUDE_HAIKU',
         cv_parse: 'CLAUDE_SONNET',
+        // Certificate pipeline
+        analyze_skill_gaps: 'CLAUDE_SONNET',
+        synthesize_certificates: 'CLAUDE_HAIKU',
     };
 
     return MODELS[routingMap[taskType]];

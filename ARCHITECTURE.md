@@ -70,6 +70,10 @@ Die Anwendung basiert auf dem Next.js App Router (`app/` Verzeichnis):
 - `/api/cover-letter/generate` (Zentrale Generierung)
 - `/api/cover-letter/critique` (Hiring Manager Simulator)
 - `/api/cover-letter/setup-data` (Wizard Daten-Enrichment)
+- `/api/certificates/generate` (Zertifikats-Empfehlungen generieren — POST)
+- `/api/certificates/[jobId]` (Zertifikats-Empfehlungen abrufen — GET)
+- `/api/jobs/extract` (Slim Trigger → Inngest `job/extract` — POST)
+- `/api/cv/match` (Slim Trigger → Inngest `cv-match/analyze` — POST)
 
 ---
 
@@ -100,6 +104,7 @@ Das DB-Schema basiert auf PostgreSQL und wird exklusiv über `supabase/migration
 - `application_history` (Manuelles & Auto Tracking. Jobs werden über `company_name` identifiziert, `company_slug` wird operativ nicht mehr genutzt)
 - `form_selectors` (Lernsystem für externe Bewerbungsformulare)
 - `generation_logs` (AI Audit: Token usage & Scores)
+- `job_certificates` (KI-generierte Zertifikats-Empfehlungen pro Job, Kanban-Board)
 - `schema_version` (Interne Versionierung)
 
 ---

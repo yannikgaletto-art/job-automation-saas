@@ -6,11 +6,13 @@ import { TemplateSelector } from "./TemplateSelector"
 import { DiffReview } from "./DiffReview"
 import { InlineCvEditor } from "./InlineCvEditor"
 import { CvStructuredData, CvOptimizationProposal, UserDecisions } from "@/types/cv"
+import { CVOptSettings, DEFAULT_CV_OPT_SETTINGS, StationMetrics } from "@/types/cv-opt-settings"
+import { applyCVOptSettings } from "@/lib/utils/cv-settings-filter"
 import { saveCvDecisions } from "@/app/actions/save-cv-decisions"
 import { createClient } from '@/lib/supabase/client'
 import { toast } from "sonner"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { Check, Settings, Sparkles, FileText, Layout, Pencil, CheckCheck } from "lucide-react"
+import { Check, Settings, Sparkles, FileText, Layout, Pencil, CheckCheck, ToggleLeft, ToggleRight } from "lucide-react"
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
@@ -48,6 +50,11 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     const [isEditing, setIsEditing] = useState(false);
     const [editablePdfData, setEditablePdfData] = useState<CvStructuredData | null>(null);
 
+    // Numbers Check Flow (Batch B1 → Patch v2: station-based)
+    const [showMetricsPrompt, setShowMetricsPrompt] = useState(false);
+    const [stationMetrics, setStationMetrics] = useState<StationMetrics[]>([]);
+    const [metricsInput, setMetricsInput] = useState(''); // freetext fallback
+
     useEffect(() => {
         if (isOptimizing) {
             const messages = [
@@ -71,7 +78,10 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
 
     const [cvData, setCvData] = useState<CvStructuredData | null>(null);
     const [jobData, setJobData] = useState<any>(null);
-    const [templateId, setTemplateId] = useState<string>("modern");
+    const [templateId, setTemplateId] = useState<string>("clean");
+
+    // CVOptSettings — client-side only, not persisted to DB
+    const [cvOptSettings, setCvOptSettings] = useState<CVOptSettings>(DEFAULT_CV_OPT_SETTINGS);
 
     const [proposal, setProposal] = useState<CvOptimizationProposal | null>(null);
     const [finalCv, setFinalCv] = useState<CvStructuredData | null>(null);
@@ -142,7 +152,70 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     }, [jobId]);
 
     // -- Step 1 Actions --
-    const runOptimizer = async () => {
+
+    /** Check if CV text contains real performance metrics (NOT dates/years) */
+    const hasPerformanceMetrics = (cv: CvStructuredData): boolean => {
+        const allText = [
+            cv.personalInfo?.summary || '',
+            ...cv.experience.flatMap(e => e.description.map(d => d.text)),
+        ].join(' ');
+        return /(\d+\s*%|\d+\+\s*(Mitarbeiter|Stakeholder|Kunden|Teams?|Projekte?)|[\d]+\s*(Mio|k€|€))/i.test(allText);
+    };
+
+    /** Intercept optimizer start to check for metrics first */
+    const handleOptimizeClick = () => {
+        if (!cvData) {
+            toast.error("Keine CV-Daten gefunden. Bitte lade zuerst deinen Lebenslauf in den Einstellungen hoch.");
+            return;
+        }
+
+        const alreadyShown = typeof window !== 'undefined' && localStorage.getItem('cv_metrics_prompt_shown');
+        if (!hasPerformanceMetrics(cvData) && !alreadyShown) {
+            // Initialize station metrics from CV experience (max 5, most recent first)
+            if (cvData.experience && cvData.experience.length > 0) {
+                const stations = cvData.experience.slice(0, 5).map(exp => ({
+                    company: exp.company || 'Unbekannt',
+                    role: exp.role || '',
+                    metrics: '',
+                }));
+                setStationMetrics(stations);
+            }
+            setShowMetricsPrompt(true);
+            return;
+        }
+
+        runOptimizer();
+    };
+
+    /** Skip metrics prompt and proceed */
+    const handleSkipMetrics = () => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('cv_metrics_prompt_shown', 'true');
+        }
+        setShowMetricsPrompt(false);
+        runOptimizer();
+    };
+
+    /** Submit metrics and proceed */
+    const handleSubmitMetrics = () => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('cv_metrics_prompt_shown', 'true');
+        }
+        setShowMetricsPrompt(false);
+
+        // Station-based path
+        const filledStations = stationMetrics.filter(s => s.metrics.trim().length > 0);
+        if (filledStations.length > 0) {
+            runOptimizer(filledStations);
+        } else if (metricsInput.trim()) {
+            // Freetext fallback
+            runOptimizer([{ company: 'Allgemein', role: '', metrics: metricsInput.trim() }]);
+        } else {
+            runOptimizer();
+        }
+    };
+
+    const runOptimizer = async (metricsOverride?: StationMetrics[]) => {
         if (!cvData) {
             toast.error("Keine CV-Daten gefunden. Bitte lade zuerst deinen Lebenslauf in den Einstellungen hoch.");
             return;
@@ -171,6 +244,8 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
 
             setJobData(freshJob);
 
+            const metricsToSend = metricsOverride?.filter(s => s.metrics.trim().length > 0);
+
             const res = await fetch('/api/cv/optimize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -180,6 +255,8 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                     template_id: templateId,
                     job_id: jobId,
                     user_id: userId,
+                    ...(metricsToSend && metricsToSend.length > 0 ? { station_metrics: metricsToSend } : {}),
+                    cv_opt_settings: { summaryMode: cvOptSettings.summaryMode },
                 }),
             });
 
@@ -238,11 +315,12 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
         }
     };
 
-    // Compute clean PDF data from finalCv + decisions
+    // Compute clean PDF data from finalCv + decisions + CVOptSettings
     const pdfData = useMemo(() => {
         if (!finalCv) return null;
-        return stripTodoItems(finalCv);
-    }, [finalCv]);
+        const stripped = stripTodoItems(finalCv);
+        return applyCVOptSettings(stripped, cvOptSettings);
+    }, [finalCv, cvOptSettings]);
 
     // Sync editablePdfData when pdfData changes
     useEffect(() => {
@@ -271,7 +349,7 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     }
 
     const TEMPLATES = [
-        { id: 'modern', label: 'Modern', icon: <Layout className="w-4 h-4" /> },
+        { id: 'valley', label: 'Valley', icon: <Layout className="w-4 h-4" /> },
         { id: 'classic', label: 'Classic', icon: <FileText className="w-4 h-4" /> },
         { id: 'tech', label: 'Tech', icon: <Settings className="w-4 h-4" /> },
     ];
@@ -335,13 +413,163 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                                 <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
                                     <Settings className="w-8 h-8" />
                                 </div>
-                                <div className="text-center max-w-md">
+                                <div className="text-center max-w-md w-full">
                                     <h3 className="text-xl font-semibold text-gray-900 mb-2">Bereit zur Optimierung</h3>
-                                    <p className="text-gray-500 mb-6">
+                                    <p className="text-gray-500 mb-4">
                                         Die KI gleicht deinen Lebenslauf mit den Match-Ergebnissen ab und formuliert Bullet Points neu, um deinen ATS-Score zu maximieren.
                                     </p>
+
+                                    {/* CVOptSettings Toggle Group */}
+                                    <div className="w-full bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6 text-left space-y-3">
+                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Anzeigeoptionen</p>
+
+                                        {/* Summary toggle — disabled when Clean template is selected */}
+                                        {(() => {
+                                            const isSummaryDisabled = templateId === 'valley';
+                                            return (
+                                                <>
+                                                    <div className={`flex items-center justify-between ${isSummaryDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                                                        <span className="text-sm text-gray-700">Zusammenfassung anzeigen</span>
+                                                        <button
+                                                            onClick={() => !isSummaryDisabled && setCvOptSettings(s => ({ ...s, showSummary: !s.showSummary }))}
+                                                            className={`transition ${isSummaryDisabled ? 'cursor-not-allowed' : 'text-gray-500 hover:text-blue-600'}`}
+                                                            aria-label="Zusammenfassung umschalten"
+                                                            disabled={isSummaryDisabled}
+                                                            title={isSummaryDisabled ? 'Im Clean-Template nicht verfuegbar — dieses Format verzichtet bewusst auf einen Summary-Block.' : undefined}
+                                                        >
+                                                            {cvOptSettings.showSummary && !isSummaryDisabled
+                                                                ? <ToggleRight className="w-7 h-7 text-blue-600" />
+                                                                : <ToggleLeft className="w-7 h-7 text-gray-400" />}
+                                                        </button>
+                                                    </div>
+                                                    {cvOptSettings.showSummary && !isSummaryDisabled && (
+                                                        <div className="ml-4 flex gap-3">
+                                                            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                                                                <input
+                                                                    type="radio"
+                                                                    name="summaryMode"
+                                                                    checked={cvOptSettings.summaryMode === 'full'}
+                                                                    onChange={() => setCvOptSettings(s => ({ ...s, summaryMode: 'full' }))}
+                                                                    className="accent-blue-600"
+                                                                />
+                                                                Vollstaendig
+                                                            </label>
+                                                            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                                                                <input
+                                                                    type="radio"
+                                                                    name="summaryMode"
+                                                                    checked={cvOptSettings.summaryMode === 'compact'}
+                                                                    onChange={() => setCvOptSettings(s => ({ ...s, summaryMode: 'compact' }))}
+                                                                    className="accent-blue-600"
+                                                                />
+                                                                Kompakt (max. 2 Saetze)
+                                                            </label>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
+
+                                        {/* Certificates toggle */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-700">Zertifikate anzeigen</span>
+                                            <button
+                                                onClick={() => setCvOptSettings(s => ({ ...s, showCertificates: !s.showCertificates }))}
+                                                className="text-gray-500 hover:text-blue-600 transition"
+                                                aria-label="Zertifikate umschalten"
+                                            >
+                                                {cvOptSettings.showCertificates
+                                                    ? <ToggleRight className="w-7 h-7 text-blue-600" />
+                                                    : <ToggleLeft className="w-7 h-7 text-gray-400" />}
+                                            </button>
+                                        </div>
+
+                                        {/* Languages toggle */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-700">Sprachen anzeigen</span>
+                                            <button
+                                                onClick={() => setCvOptSettings(s => ({ ...s, showLanguages: !s.showLanguages }))}
+                                                className="text-gray-500 hover:text-blue-600 transition"
+                                                aria-label="Sprachen umschalten"
+                                            >
+                                                {cvOptSettings.showLanguages
+                                                    ? <ToggleRight className="w-7 h-7 text-blue-600" />
+                                                    : <ToggleLeft className="w-7 h-7 text-gray-400" />}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Numbers Check Flow — station-based metrics prompt */}
+                                    {showMetricsPrompt && (
+                                        <div className="w-full bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4 text-left">
+                                            <p className="text-sm font-medium text-amber-900 mb-1">Hast du konkrete Zahlen?</p>
+                                            <p className="text-xs text-amber-700 mb-3">
+                                                CVs mit Metriken erzielen deutlich bessere ATS-Scores. Ordne Zahlen direkt deinen Stationen zu.
+                                            </p>
+
+                                            {stationMetrics.length > 0 ? (
+                                                <div className="space-y-3 mb-3">
+                                                    {stationMetrics.map((station, idx) => (
+                                                        <div key={idx} className="bg-white border border-amber-200 rounded-md p-3">
+                                                            <div className="flex items-center gap-2 mb-1.5">
+                                                                <span className="text-xs">🏢</span>
+                                                                <span className="text-sm font-medium text-gray-900">{station.company}</span>
+                                                            </div>
+                                                            {station.role && (
+                                                                <p className="text-xs text-gray-500 mb-2 ml-5">{station.role}</p>
+                                                            )}
+                                                            <input
+                                                                type="text"
+                                                                value={station.metrics}
+                                                                onChange={(e) => {
+                                                                    const updated = [...stationMetrics];
+                                                                    updated[idx] = { ...updated[idx], metrics: e.target.value.slice(0, 150) };
+                                                                    setStationMetrics(updated);
+                                                                }}
+                                                                placeholder="z.B. 30% Umsatzsteigerung, Team von 12..."
+                                                                className="w-full border border-gray-200 rounded px-2.5 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                                                maxLength={150}
+                                                            />
+                                                            <p className="text-[10px] text-gray-400 mt-0.5 text-right">{station.metrics.length}/150</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                /* Freetext fallback when no experience data */
+                                                <>
+                                                    <textarea
+                                                        value={metricsInput}
+                                                        onChange={(e) => setMetricsInput(e.target.value.slice(0, 300))}
+                                                        placeholder="z.B. 5 Jahre Erfahrung, 30% Umsatzsteigerung, Team von 12..."
+                                                        className="w-full border border-amber-300 rounded-md p-2.5 text-sm text-gray-800 resize-none h-20 focus:outline-none focus:ring-2 focus:ring-amber-400 mb-1"
+                                                        maxLength={300}
+                                                    />
+                                                    <p className="text-[10px] text-amber-600 text-right mb-2">{metricsInput.length}/300</p>
+                                                </>
+                                            )}
+
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={handleSubmitMetrics}
+                                                    disabled={stationMetrics.length > 0
+                                                        ? !stationMetrics.some(s => s.metrics.trim())
+                                                        : !metricsInput.trim()}
+                                                    className="flex-1 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50"
+                                                >
+                                                    Zahlen hinzufuegen
+                                                </button>
+                                                <button
+                                                    onClick={handleSkipMetrics}
+                                                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition"
+                                                >
+                                                    Ueberspringen
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <button
-                                        onClick={runOptimizer}
+                                        onClick={handleOptimizeClick}
                                         className="px-6 py-3 bg-blue-600 hover:bg-blue-700 transition flex items-center gap-2 font-medium text-white rounded-lg shadow-sm w-full justify-center"
                                     >
                                         <Sparkles className="w-5 h-5" />

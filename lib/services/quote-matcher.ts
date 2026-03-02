@@ -32,6 +32,7 @@ interface ThinkerProfile {
     name: string;
     why: string;
     searchQuery: string;
+    matchedValue?: string; // Which specific company value triggered this thinker
 }
 
 async function identifyThinkers(
@@ -72,7 +73,8 @@ OUTPUT (JSON Array, KEINE Umrahmung):
   {
     "name": "Vorname Nachname",
     "why": "Warum passt diese Person zur Rolle + den Werten (1 Satz)",
-    "searchQuery": "Name quote on specific topic"
+    "searchQuery": "Name short quote under 20 words on specific topic",
+    "matchedValue": "Exakter Text des Unternehmenswertes aus der Liste, der am besten passt"
   }
 ]`,
             temperature: 0.85,
@@ -400,7 +402,7 @@ export async function suggestRelevantQuotes(
                 author: result.author,
                 source: result.source,
                 relevance_score: 0.85,
-                matched_value: companyValues[0] || companyName,
+                matched_value: thinker.matchedValue || companyValues[0] || companyName,
                 value_connection: thinker.why,
                 language: /[äöüßÄÖÜ]/.test(result.quote) ? 'de' : 'en',
                 verified_url: result.verified_url || undefined,
@@ -418,9 +420,28 @@ export async function suggestRelevantQuotes(
     console.error(`✅ [Stage 3] ${judgedQuotes.length} quotes approved`);
 
     // ═══════════════════════════════════════════════════════════════════════
+    // POST-PROCESSING: Längen-Filter (max. 25 Wörter)
+    // Kurze, prägnante Zitate sind in Anschreiben deutlich wirkungsvoller.
+    // ═══════════════════════════════════════════════════════════════════════
+    const lengthFiltered = judgedQuotes.filter(q => {
+        const wordCount = q.quote.trim().split(/\s+/).length;
+        if (wordCount > 25) {
+            console.error(`  ⚠️ [Post-Filter] Zu lang (${wordCount}W), entfernt: "${q.quote.substring(0, 50)}..."`);
+            return false;
+        }
+        return true;
+    });
+
+    if (lengthFiltered.length === 0) {
+        console.error('❌ [Post-Filter] Alle Zitate zu lang — returning []');
+        return [];
+    }
+    console.error(`✅ [Post-Filter] ${lengthFiltered.length} Zitate nach Längen-Filter`);
+
+    // ═══════════════════════════════════════════════════════════════════════
     // POST-PIPELINE: Embedding Scoring (PRESERVED — unchanged)
     // ═══════════════════════════════════════════════════════════════════════
-    const scored = await scoreQuoteRelevance(judgedQuotes, companyValues);
+    const scored = await scoreQuoteRelevance(lengthFiltered, companyValues);
 
     // Return top 5
     return scored.slice(0, 5);

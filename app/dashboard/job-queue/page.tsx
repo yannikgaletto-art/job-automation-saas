@@ -72,6 +72,7 @@ export default function JobQueuePage() {
                     buzzwords: (j.buzzwords as string[]) || null,
                     matchScore: (j.match_score as number) || ((j.status !== 'pending' || (j.responsibilities && (j.responsibilities as string[]).length > 0)) ? 10 : 0),
                     workflowStep: mapDbStatusToStep(j.status as string),
+                    dbStatus: (j.status as string) || 'pending', // Raw DB status for getNextAction
                     status: mapDbStatusToUi(j.status as string),
                     // ✅ Pass through metadata so cv_match cache is available in CVMatchTab
                     metadata: (j.metadata as Record<string, unknown>) || null,
@@ -89,7 +90,7 @@ export default function JobQueuePage() {
     }, []);
 
     const handleReanalyze = async (jobId: string) => {
-        showSafeToast('Analysiere Job-Beschreibung...', `reanalyze_start:${jobId}`, 'info');
+        showSafeToast('Analyse läuft im Hintergrund...', `reanalyze_start:${jobId}`, 'info');
         try {
             const res = await fetch('/api/jobs/extract', {
                 method: 'POST',
@@ -98,8 +99,27 @@ export default function JobQueuePage() {
             });
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
-            await fetchJobs();
-            showSafeToast('Steckbrief erfolgreich extrahiert ✓', `extract_success:${jobId}`);
+
+            // Poll for results (Inngest processes in background)
+            let attempts = 0;
+            const maxAttempts = 20; // 20 × 3s = 60s max
+            const pollInterval = setInterval(async () => {
+                attempts++;
+                try {
+                    await fetchJobs();
+                    const updatedJob = jobs.find(j => j.id === jobId);
+                    if (updatedJob?.summary) {
+                        clearInterval(pollInterval);
+                        showSafeToast('Steckbrief erfolgreich extrahiert ✓', `extract_success:${jobId}`);
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(pollInterval);
+                        showSafeToast('Analyse dauert länger als erwartet — bitte Seite neu laden', `extract_timeout:${jobId}`, 'info');
+                    }
+                } catch {
+                    clearInterval(pollInterval);
+                }
+            }, 3000);
+
         } catch (err) {
             showSafeToast('Extraktion fehlgeschlagen', `extract_error:${jobId}`, 'error', String(err));
         }
