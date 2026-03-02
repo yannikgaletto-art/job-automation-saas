@@ -65,7 +65,15 @@ export function ApplicationHistory() {
                 return
             }
 
-            if (!res.ok) throw new Error("Failed to fetch history")
+            if (!res.ok) {
+                console.warn(`[ApplicationHistory] API ${res.status} — showing empty state`)
+                setData({
+                    applications: [],
+                    pagination: { page: 1, limit: 10, total: 0, hasMore: false }
+                })
+                setLoading(false)
+                return
+            }
 
             const json = await res.json()
             setData(json)

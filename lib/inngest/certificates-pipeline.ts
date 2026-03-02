@@ -12,6 +12,7 @@
  */
 
 import { inngest } from './client';
+import { NonRetriableError } from 'inngest';
 import { createClient } from '@supabase/supabase-js';
 import { complete } from '@/lib/ai/model-router';
 import type { CertificateRecommendation } from '@/types/certificates';
@@ -118,6 +119,7 @@ export const generateCertificates = inngest.createFunction(
     {
         id: 'generate-certificates',
         name: 'Generate Certificate Recommendations',
+        retries: 2,
         rateLimit: {
             key: 'event.data.userId',
             limit: 5,
@@ -149,7 +151,7 @@ export const generateCertificates = inngest.createFunction(
                     .eq('user_id', userId)
                     .single();
 
-                if (jobErr || !job) throw new Error(`Job not found: ${jobErr?.message}`);
+                if (jobErr || !job) throw new NonRetriableError(`Job not found: ${jobErr?.message}`);
 
                 // Get CV text
                 const { data: cvDoc } = await supabase
@@ -196,13 +198,21 @@ REGELN:
 Antworte NUR mit einem JSON-Array von Strings:
 ["Keyword 1", "Keyword 2"]`;
 
-                const response = await complete({
-                    taskType: 'analyze_skill_gaps',
-                    prompt,
-                    systemPrompt: 'Du bist ein Karriereberater, spezialisiert auf den deutschen Arbeitsmarkt. Antworte ausschließlich mit validem JSON.',
-                    temperature: 0.3,
-                    maxTokens: 256,
-                });
+                let response;
+                try {
+                    response = await complete({
+                        taskType: 'analyze_skill_gaps',
+                        prompt,
+                        systemPrompt: 'Du bist ein Karriereberater, spezialisiert auf den deutschen Arbeitsmarkt. Antworte ausschließlich mit validem JSON.',
+                        temperature: 0.3,
+                        maxTokens: 256,
+                    });
+                } catch (err: any) {
+                    if (err?.status === 400 || err?.status === 401 || err?.status === 404) {
+                        throw new NonRetriableError(`AI API permanent error (Phase 1): ${err.message}`);
+                    }
+                    throw err;
+                }
 
                 try {
                     const parsed = JSON.parse(response.text.trim());
@@ -282,13 +292,21 @@ REGELN:
 - Deutsche Sprache in allen Textfeldern
 - Antworte NUR mit dem JSON-Array — KEIN Fließtext`;
 
-                const response = await complete({
-                    taskType: 'synthesize_certificates',
-                    prompt,
-                    systemPrompt: 'Du bist ein strukturierter Daten-Extraktor. Antworte ausschließlich mit dem geforderten JSON-Format. Kein Markdown, kein Fließtext.',
-                    temperature: 0,
-                    maxTokens: 2048,
-                });
+                let response;
+                try {
+                    response = await complete({
+                        taskType: 'synthesize_certificates',
+                        prompt,
+                        systemPrompt: 'Du bist ein strukturierter Daten-Extraktor. Antworte ausschließlich mit dem geforderten JSON-Format. Kein Markdown, kein Fließtext.',
+                        temperature: 0,
+                        maxTokens: 2048,
+                    });
+                } catch (err: any) {
+                    if (err?.status === 400 || err?.status === 401 || err?.status === 404) {
+                        throw new NonRetriableError(`AI API permanent error (Phase 3): ${err.message}`);
+                    }
+                    throw err;
+                }
 
                 try {
                     let text = response.text.trim();
@@ -310,7 +328,7 @@ REGELN:
             console.log(`[Certificates] Phase 3 complete — ${recommendations.length} recommendations`);
 
             if (recommendations.length === 0) {
-                throw new Error('Pipeline produced 0 recommendations');
+                throw new NonRetriableError('Pipeline produced 0 recommendations after synthesis');
             }
 
             // ── Link Validation (Contract §10) ──────────────────────────

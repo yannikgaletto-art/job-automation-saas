@@ -54,79 +54,36 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        const isDev = process.env.NODE_ENV === 'development';
-
-        if (isDev) {
-            // ─── DEV MODE: Run synchronously (no Inngest CLI needed) ─────────────
-            console.log('🔧 [CV Match] DEV MODE — running synchronously');
-            const { runCVMatchAnalysis } = await import('@/lib/services/cv-match-analyzer');
-
-            const matchResult = await runCVMatchAnalysis({
-                userId: user.id,
-                jobId: job.id,
-                cvText: cvData.text,
-                jobTitle: job.job_title || 'Unknown Title',
-                company: job.company_name || 'Unknown Company',
-                jobDescription: job.description || '',
-                requirements: job.requirements || [],
-                atsKeywords: job.buzzwords || [],
-                level: job.seniority || '',
-            });
-
-            const currentMetadata = (job.metadata as Record<string, unknown>) || {};
-            await supabaseAdmin
-                .from('job_queue')
-                .update({
-                    metadata: {
-                        ...currentMetadata,
-                        cv_match: {
-                            analyzed_at: new Date().toISOString(),
-                            cv_document_id: cvData.documentId,
-                            ...matchResult,
-                        },
-                        cv_match_error: null,
-                        cv_match_status: 'done',
-                    },
-                    status: 'cv_matched',
-                })
-                .eq('id', jobId)
-                .eq('user_id', user.id);
-
-            console.log(`✅ [CV Match DEV] Job ${jobId} analyzed and saved`);
-            return NextResponse.json({ success: true, status: 'processing' });
-
-        } else {
-            // ─── PROD MODE: Fire Inngest event (background, retry-safe) ──────────
-            console.log('🚀 [CV Match] PROD MODE — sending to Inngest');
-
-            // Set processing status in metadata (JSONB Merge!)
-            const currentMetadata = (job.metadata as Record<string, unknown>) || {};
-            await supabaseAdmin
-                .from('job_queue')
-                .update({
-                    metadata: {
-                        ...currentMetadata,
-                        cv_match_status: 'processing',
-                    },
-                })
-                .eq('id', jobId)
-                .eq('user_id', user.id);
-
-            await inngest.send({
-                name: 'cv-match/analyze',
-                data: {
-                    jobId,
-                    userId: user.id,
-                    cvDocumentId: cvData.documentId,
+        // Set processing status in metadata (JSONB Merge!)
+        const currentMetadata = (job.metadata as Record<string, unknown>) || {};
+        await supabaseAdmin
+            .from('job_queue')
+            .update({
+                metadata: {
+                    ...currentMetadata,
+                    cv_match_status: 'processing',
                 },
-            });
+            })
+            .eq('id', jobId)
+            .eq('user_id', user.id);
 
-            return NextResponse.json({ success: true, status: 'processing' });
-        }
+        console.log('🚀 [CV Match] About to fire Inngest event...');
+        const sendResult = await inngest.send({
+            name: 'cv-match/analyze',
+            data: {
+                jobId,
+                userId: user.id,
+                cvDocumentId: cvData.documentId,
+            },
+        });
+        console.log('🚀 [CV Match] Inngest event fired successfully!', sendResult);
 
-    } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('❌ CV Match failed:', msg);
-        return NextResponse.json({ error: msg }, { status: 500 });
+        return NextResponse.json({ success: true, status: 'processing' });
+
+    } catch (error: any) {
+        const msg = error?.message || String(error);
+        console.error('❌ CV Match FATAL ERROR:', error);
+        console.error('❌ Stack:', error?.stack);
+        return NextResponse.json({ error: msg, success: false }, { status: 500 });
     }
 }

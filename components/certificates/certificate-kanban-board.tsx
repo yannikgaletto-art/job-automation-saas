@@ -12,7 +12,7 @@
  * - CV Match fehlt ➝ Blocking: "Berechne zuerst den CV Match"
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { GraduationCap, Loader2, AlertCircle, CheckCircle2, FileText, BarChart3 } from 'lucide-react';
 import { CertificateCard } from './certificate-card';
@@ -70,6 +70,8 @@ export function CertificateKanbanBoard({ jobId, jobStatus }: CertificateKanbanBo
     const [summaryText, setSummaryText] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
+    // Persists across re-renders — survives tab switches without resetting timer
+    const pollStartTimeRef = useRef<number | null>(null);
 
     // ── Blocking states ─────────────────────────────────────────────
     const cvMatchStatuses = ['cv_match_done', 'cv_optimized', 'cover_letter_done', 'ready_for_review', 'ready_to_apply'];
@@ -99,11 +101,28 @@ export function CertificateKanbanBoard({ jobId, jobStatus }: CertificateKanbanBo
         fetchCertificates();
     }, [fetchCertificates]);
 
-    // ── Polling while processing ────────────────────────────────────
+    // ── Polling while processing (with 90s timeout) ───────────────
     useEffect(() => {
-        if (status !== 'pending' && status !== 'processing') return;
+        if (status !== 'pending' && status !== 'processing') {
+            pollStartTimeRef.current = null; // Reset when not polling
+            return;
+        }
+        // Only record start time once — not on every re-render
+        if (pollStartTimeRef.current === null) {
+            pollStartTimeRef.current = Date.now();
+        }
 
         const interval = setInterval(async () => {
+            // Timeout after 90s — stop polling, show error
+            if (Date.now() - (pollStartTimeRef.current ?? Date.now()) > 90_000) {
+                clearInterval(interval);
+                pollStartTimeRef.current = null;
+                setStatus('failed');
+                setSummaryText('Die Generierung hat zu lange gedauert. Bitte versuche es erneut.');
+                setIsGenerating(false);
+                return;
+            }
+
             const res = await fetch(`/api/certificates/${jobId}`);
             if (!res.ok) return;
             const data = await res.json();
@@ -112,6 +131,7 @@ export function CertificateKanbanBoard({ jobId, jobStatus }: CertificateKanbanBo
                 setRecommendations(data.recommendations);
                 setSummaryText(data.summary_text);
                 setIsGenerating(false);
+                pollStartTimeRef.current = null;
                 clearInterval(interval);
             }
         }, 3000);

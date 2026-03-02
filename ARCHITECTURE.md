@@ -88,6 +88,20 @@ Die Job-Daten-Extraktion ist in `lib/services/job-search-pipeline.ts` als mehrst
 
 ---
 
+## 3.1 INNGEST RESILIENCE
+
+Alle Inngest-Funktionen sind gegen "Silent Hangs" abgesichert:
+
+| Function              | retries | NonRetriableError triggers                     |
+|-----------------------|---------|------------------------------------------------|
+| `generate-certificates` | 2     | Job not found, 0 recs, Anthropic 400/401/404   |
+| `analyze-cv-match`      | 2     | Job/CV not found (via thrown Error)             |
+| `extract-job`            | 2     | Job desc missing/too short (via thrown Error)   |
+
+Frontend-Polling (`certificate-kanban-board.tsx`) hat einen **90s Timeout** — danach wird der Spinner durch einen Fehlertext ersetzt.
+
+---
+
 ## 4. DATENBANKSTRUKTUR
 
 Das DB-Schema basiert auf PostgreSQL und wird exklusiv über `supabase/migrations/` versioniert (**Klarstellung: `supabase/migrations/` ist das autoritative Migrationsverzeichnis!** Das alte Verzeichnis `database/migrations/` ist veraltet).

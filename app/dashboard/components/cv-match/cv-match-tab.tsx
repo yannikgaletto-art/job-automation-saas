@@ -223,14 +223,21 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 body: JSON.stringify({ jobId, cvDocumentId })
             });
 
-            const data = await res.json();
+            let data;
+            const resText = await res.text();
+            try {
+                data = JSON.parse(resText);
+            } catch (err) {
+                console.error("❌ CV Match API returned non-JSON response:", resText.substring(0, 500));
+                throw new Error("Server antwortet nicht korrekt (HTML statt JSON). Bitte lade die Seite neu oder prüfe die Konsole.");
+            }
 
-            if (!res.ok || !data.success) {
-                if (data.code === 'CV_NOT_FOUND') {
+            if (!res.ok || !data?.success) {
+                if (data?.code === 'CV_NOT_FOUND') {
                     setState('no-cv');
                     return;
                 }
-                throw new Error(data.error || 'Fehler bei der Analyse');
+                throw new Error(data?.error || 'Fehler bei der Analyse');
             }
 
             // Poll for results (Inngest processes in background)
@@ -241,7 +248,14 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 attempts++;
                 try {
                     const pollRes = await fetch(`/api/cv/match/cached?jobId=${jobId}`);
-                    const pollData = await pollRes.json();
+                    const pollText = await pollRes.text();
+                    let pollData;
+                    try {
+                        pollData = JSON.parse(pollText);
+                    } catch (e) {
+                        console.error("❌ Polling API non-JSON response:", pollText.substring(0, 200));
+                        throw new Error("Verbindungsabbruch während der Analyse (HTML statt JSON).");
+                    }
 
                     if (pollData.success && pollData.cached?.analyzed_at) {
                         // Result arrived!
@@ -278,7 +292,14 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     const handleStartAnalysis = useCallback(async () => {
         try {
             const res = await fetch('/api/documents/list-cvs');
-            const data = await res.json();
+            const resText = await res.text();
+            let data;
+            try {
+                data = JSON.parse(resText);
+            } catch (e) {
+                console.error("❌ list-cvs API non-JSON response:", resText.substring(0, 500));
+                throw new Error("Konnte Lebensläufe nicht laden (Server sendet HTML).");
+            }
             const cvs: CVOption[] = data.cvs || [];
 
             if (cvs.length === 0) {

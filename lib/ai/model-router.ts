@@ -26,7 +26,7 @@ export const MODELS = {
         strengths: ['parsing', 'classification', 'summarization'],
     },
     CLAUDE_HAIKU: {
-        id: 'claude-3-5-haiku-20241022',
+        id: 'claude-3-haiku-20240307',
         provider: 'anthropic' as const,
         cost_per_1m_tokens: 0.25,
         strengths: ['parsing', 'classification', 'fast_execution'],
@@ -72,7 +72,7 @@ export function selectModel(taskType: TaskType) {
         personalize_intro: 'CLAUDE_SONNET',
         generate_motivation_text: 'CLAUDE_SONNET',
         optimize_cv: 'CLAUDE_SONNET',
-        cv_match: 'CLAUDE_HAIKU',
+        cv_match: 'CLAUDE_SONNET',
         cv_parse: 'CLAUDE_SONNET',
         // Certificate pipeline
         analyze_skill_gaps: 'CLAUDE_SONNET',

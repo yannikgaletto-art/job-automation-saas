@@ -51,6 +51,22 @@ export async function GET(request: Request) {
 
     } catch (error: any) {
         console.error("Error in /api/applications/history:", error)
-        return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 })
+
+        // Tabelle existiert noch nicht oder ist leer → kein 500, sondern leerer State
+        if (
+            error?.code === '42P01' ||          // PostgreSQL: table does not exist
+            error?.message?.includes('relation') ||
+            error?.message?.includes('does not exist')
+        ) {
+            return NextResponse.json({
+                applications: [],
+                pagination: { page: 1, limit: 10, total: 0, hasMore: false }
+            })
+        }
+
+        return NextResponse.json(
+            { error: error.message || "Internal Server Error" },
+            { status: 500 }
+        )
     }
 }
