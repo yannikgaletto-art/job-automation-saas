@@ -149,7 +149,7 @@ export const generateCertificates = inngest.createFunction(
                 // Get job data (Contract §3: user_id scoped)
                 const { data: job, error: jobErr } = await supabase
                     .from('job_queue')
-                    .select('job_title, description, requirements, metadata, company, seniority, location')
+                    .select('job_title, description, requirements, metadata, company_name, seniority, location')
                     .eq('id', jobId)
                     .eq('user_id', userId)
                     .single();
@@ -173,7 +173,7 @@ export const generateCertificates = inngest.createFunction(
                 return {
                     jobTitle: job.job_title || '',
                     jobDescription: job.description || '',
-                    company: (job.company as string) || '',
+                    company: (job.company_name as string) || '',
                     seniority: (job.seniority as string) || '',
                     location: (job.location as string) || '',
                     steckbrief: job.requirements || {},
