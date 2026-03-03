@@ -21,6 +21,16 @@ import type { CertificateRecommendation, CertificateStatus } from '@/types/certi
 interface CertificateKanbanBoardProps {
     jobId: string;
     jobStatus?: string; // raw DB status from job_queue
+    initialData?: {
+        status: 'idle' | 'pending' | 'processing' | 'done' | 'failed';
+        recommendations: CertificateRecommendation[];
+        summaryText: string;
+    } | null;
+    onDataLoaded?: (data: {
+        status: 'idle' | 'pending' | 'processing' | 'done' | 'failed';
+        recommendations: CertificateRecommendation[];
+        summaryText: string;
+    }) => void;
 }
 
 const COLUMN_CONFIG = [
@@ -64,7 +74,7 @@ function SkeletonCard() {
     );
 }
 
-export function CertificateKanbanBoard({ jobId, jobStatus }: CertificateKanbanBoardProps) {
+export function CertificateKanbanBoard({ jobId, jobStatus, initialData, onDataLoaded }: CertificateKanbanBoardProps) {
     const [status, setStatus] = useState<CertificateStatus | 'idle' | 'loading'>('loading');
     const [recommendations, setRecommendations] = useState<CertificateRecommendation[] | null>(null);
     const [summaryText, setSummaryText] = useState<string | null>(null);
@@ -92,14 +102,29 @@ export function CertificateKanbanBoard({ jobId, jobStatus }: CertificateKanbanBo
             setStatus(data.status);
             setRecommendations(data.recommendations);
             setSummaryText(data.summary_text);
+            // Cache data in parent for tab-switch persistence
+            if (data.status === 'done' && data.recommendations) {
+                onDataLoaded?.({
+                    status: 'done',
+                    recommendations: data.recommendations,
+                    summaryText: data.summary_text || '',
+                });
+            }
         } catch {
             setStatus('idle');
         }
     }, [jobId]);
 
     useEffect(() => {
+        // If we have cached done data, use it immediately — no API call needed
+        if (initialData?.status === 'done') {
+            setStatus('done');
+            setRecommendations(initialData.recommendations);
+            setSummaryText(initialData.summaryText);
+            return;
+        }
         fetchCertificates();
-    }, [fetchCertificates]);
+    }, [fetchCertificates, initialData]);
 
     // ── Polling while processing (with 90s timeout) ───────────────
     useEffect(() => {
@@ -136,6 +161,14 @@ export function CertificateKanbanBoard({ jobId, jobStatus }: CertificateKanbanBo
                 setIsGenerating(false);
                 pollStartTimeRef.current = null;
                 clearInterval(interval);
+                // Cache done data in parent for tab-switch persistence
+                if (data.status === 'done' && data.recommendations) {
+                    onDataLoaded?.({
+                        status: 'done',
+                        recommendations: data.recommendations,
+                        summaryText: data.summary_text || '',
+                    });
+                }
             }
         }, 3000);
 

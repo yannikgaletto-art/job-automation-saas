@@ -13,6 +13,7 @@ import { CustomDialog } from "@/components/ui/custom-dialog";
 import { CVMatchTab } from './cv-match/cv-match-tab';
 import { OptimizerWizard } from '@/components/cv-optimizer/OptimizerWizard';
 import { CertificateKanbanBoard } from '@/components/certificates/certificate-kanban-board';
+import type { CertificateRecommendation } from '@/types/certificates';
 
 export interface Job {
     id: string;
@@ -229,6 +230,12 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [liveMatchResult, setLiveMatchResult] = useState<any | null>(null);
     const [optimisticStep, setOptimisticStep] = useState<number | null>(null);
+    // Persist certificates data across tab switches (Problem 3 fix)
+    const [cachedCertificates, setCachedCertificates] = useState<{
+        status: 'idle' | 'pending' | 'processing' | 'done' | 'failed';
+        recommendations: CertificateRecommendation[];
+        summaryText: string;
+    } | null>(null);
 
     const displayTab = activeTab ?? 0;
 
@@ -498,6 +505,8 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                             }
                                         })()
                                 }
+                                initialData={cachedCertificates}
+                                onDataLoaded={setCachedCertificates}
                             />
                         )}
                     </motion.div>
