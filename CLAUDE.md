@@ -66,13 +66,19 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 
 ---
 
-## 🚀 RECENT BATCH 3 FIXES
+## 🚀 RECENT FIXES
 | Feature | Fix / Implementation |
 |---------|----------------------|
 | PDF Download | New API route `/api/documents/download` |
 | Stepper | Fixed status mapping for active-cv-card |
 | Company Research | URL validation in research route |
 | Quote Quality | Enhanced quote matching prompt logic |
+| CV Match | Null guards (Array.isArray) + safeResult normalization in pipeline |
+| Certificates | `company` → `company_name` DB column fix |
+| Certificates | Sequential → Parallel Perplexity (Promise.allSettled) |
+| Certificates | Provider URL Fallback Map (14 Anbieter) |
+| Certificates | Tab-switch state persist (initialData + onDataLoaded props) |
+| Certificates | Stale processing detection (5min threshold → failed response) |
 
 ---
 
@@ -460,9 +466,24 @@ const fillApplication = async () => {
    - Test again
    - Only ask user after 3 failures
 
+6. **DB Column Alignment Check:**
+    ```sql
+    -- Before using .select() in Supabase, verify column names:
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'job_queue';
+    ```
+    - Common trap: `company` vs `company_name` in `job_queue`
+    - Always verify `.select()` column names match actual schema
+    - Pipeline errors like `column X does not exist` → column name mismatch
+
+7. **Stale Processing Detection:**
+    - Inngest pipelines can die on server restart → DB status stuck at `processing`
+    - GET endpoints should check `updated_at` vs threshold (5 min)
+    - Return `failed` response (not DB write) for stale records
+
 ---
 
-## 7. DEPLOYMENT
+## 8. DEPLOYMENT
 
 ### Pre-Deployment Checklist
 

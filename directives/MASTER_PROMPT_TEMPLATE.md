@@ -78,8 +78,26 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via explizite
 8. **`database/schema.sql`** — Database Schema
    - Verify all table columns match your code
    - Check RLS policies and indexes
+   - **TRAP:** `job_queue.company_name` (NICHT `company`)
+
+8. **`directives/FEATURE_COMPAT_MATRIX.md`** — Feature-Silo Rules
+   - Check Section 4+ for Feature-Silo boundaries
+   - Identify Forbidden Files before coding
 
 ---
+
+## ⛔ FORBIDDEN FILES — Define Before Coding
+
+Bevor du Code schreibst, definiere **explizit** welche Dateien Sperrzone sind:
+
+```
+# Beispiel für Certificates-Feature:
+lib/ai/model-router.ts            ← SHARED — NICHT anfassen
+lib/inngest/cv-match-pipeline.ts   ← FREMDES FEATURE
+middleware.ts                      ← SYSTEM-LEVEL
+```
+
+**Regel:** Wenn eine geplante Änderung eine Forbidden File berühren würde → STOPP → Erkläre warum → Warte auf Freigabe.
 
 ## EXECUTION PRINCIPLES
 
@@ -115,7 +133,7 @@ After implementation, verify:
 - [ ] `npx tsc --noEmit` passes (no new TypeScript errors)
 - [ ] New service integrates with existing API routes
 - [ ] New components render correctly in existing layouts
-- [ ] Database queries match schema columns exactly
+- [ ] Database queries match schema columns exactly (`.select()` vs actual columns)
 - [ ] Environment variables are documented in `.env.example`
 - [ ] **No Forbidden Files were touched** (unless explicitly approved)
 

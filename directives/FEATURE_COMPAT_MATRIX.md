@@ -1,8 +1,8 @@
 # FEATURE COMPATIBILITY MATRIX & ARCHITECTURE OWNERSHIP
 
 > **Authority:** CLAUDE.md v2.4 | BINDEND
-> **Last Updated:** 2026-03-03 (Cross-Feature-Shield hinzugefügt)
-> **Scope:** OptInModules × TonePresets × IntroFocus — Source of Truth
+> **Last Updated:** 2026-03-03 (Cross-Feature-Shield + Certificates Pipeline Fixes)
+> **Scope:** OptInModules × TonePresets × IntroFocus — Source of Truth + Feature-Silo Rules
 
 ---
 
@@ -180,3 +180,41 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via Migration
 - [ ] **Tag-Check:** Wenn das Feature interne Steuer-Tags einführt (z.B. `[TAG]...[/TAG]`): Füge den Strip-Regex in `generateCoverLetter()` UND `fixParagraph()` hinzu. Unconditional.
 - [ ] **Judge-Sync:** Wenn der Judge das Feature bewerten soll: Stelle sicher, dass der Judge die Bewertung ÜBERSPRINGT wenn `optInModules.X === false`. Kein False-Negative bei deaktiviertem Feature.
 - [ ] **Cross-Feature-Check (NEU):** Prüfe Abschnitt 0.1 — berührt das neue Feature eine Forbidden File? Wenn ja: Impact-Analyse + Freigabe erforderlich.
+
+---
+
+## 4. Feature-Silo: Certificates (Weiterbildung)
+
+> **Added:** 2026-03-03 | **Owner:** `certificates-pipeline.ts` + `certificate-kanban-board.tsx`
+
+### 4.1 Erlaubte Dateien (Scope)
+
+| Datei | Rolle |
+|---|---|
+| `lib/inngest/certificates-pipeline.ts` | Backend — 3-Phase Pipeline (Gap → Perplexity → Synthese) |
+| `components/certificates/certificate-kanban-board.tsx` | Frontend — Kanban-Board, Polling, State |
+| `components/certificates/certificate-card.tsx` | Frontend — Einzelne Karte |
+| `app/api/certificates/generate/route.ts` | API — Trigger + Idempotenz |
+| `app/api/certificates/[jobId]/route.ts` | API — Status-Abfrage + Stale-Detection |
+| `types/certificates.ts` | Types — `CertificateRecommendation`, `CertificateStatus` |
+
+### 4.2 Verbotene Dateien (Sperrzone)
+
+| Datei | Grund |
+|---|---|
+| `lib/ai/model-router.ts` | SHARED — CV Match + Steckbrief + Certificates |
+| `lib/inngest/cv-match-pipeline.ts` | Fremdes Feature |
+| `app/dashboard/components/cv-match/*` | Fremdes Feature |
+| `lib/inngest/cover-letter-*.ts` | Fremdes Feature |
+| `middleware.ts` | System-Level |
+
+### 4.3 Bekannte Patterns
+
+| Pattern | Details |
+|---|---|
+| DB Column `company_name` | `job_queue` hat `company_name`, NICHT `company` |
+| Stale Processing | GET-Route prüft `updated_at > 5min` → `failed` Response |
+| URL Fallback | `applyUrlFallback()` nach HEAD-check (§10) — 14 Provider |
+| State Persist | `initialData` + `onDataLoaded` Props überleben Tab-Wechsel |
+| Parallel Perplexity | `Promise.allSettled()` statt `for...of` in Phase 2 |
+>>>>>>> 5db9f9b (docs: update CLAUDE.md v2.4, FEATURE_COMPAT_MATRIX (Certificates silo), MASTER_PROMPT_TEMPLATE (Forbidden Files))
