@@ -32,13 +32,29 @@ export async function GET(
         // Query user-scoped (Contract §3)
         const { data, error } = await supabase
             .from('job_certificates')
-            .select('status, recommendations, summary_text')
+            .select('status, recommendations, summary_text, updated_at')
             .eq('job_id', jobId)
             .eq('user_id', user.id)
             .single();
 
         if (error || !data) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
+
+        // Stale processing detection — server restart may have killed the pipeline
+        const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+        if (data.status === 'processing') {
+            const updatedAt = new Date(data.updated_at).getTime();
+            const isStale = Date.now() - updatedAt > STALE_THRESHOLD_MS;
+
+            if (isStale) {
+                console.warn(`[Certificates] Stale processing detected for job=${jobId}`);
+                return NextResponse.json({
+                    status: 'failed',
+                    summary_text: 'Pipeline timeout — bitte erneut versuchen.',
+                    recommendations: [],
+                });
+            }
         }
 
         return NextResponse.json({
