@@ -1,12 +1,82 @@
 # FEATURE COMPATIBILITY MATRIX & ARCHITECTURE OWNERSHIP
 
-> **Authority:** CLAUDE.md v2.3 | BINDEND
-> **Last Updated:** 2026-02-28 (QA Report Blind Spots #1–#4)
+> **Authority:** CLAUDE.md v2.4 | BINDEND
+> **Last Updated:** 2026-03-03 (Cross-Feature-Shield hinzugefügt)
 > **Scope:** OptInModules × TonePresets × IntroFocus — Source of Truth
 
 ---
 
-## 1. The Compatibility Grid
+## 0. GENERISCHE CROSS-FEATURE-OWNERSHIP-REGELN (NEU — 2026-03-03)
+
+**Diese Regeln gelten für ALLE Features, nicht nur Cover Letter.**
+
+### 0.1 Forbidden Files — Dateien die NUR mit expliziter Freigabe angefasst werden dürfen
+
+**Diese Dateien sind SHARED oder gehören zu fremden Features. Jede ungeplante Berührung ist ein Cross-Feature-Contamination-Fehler.**
+
+```
+lib/ai/model-router.ts                          ← SHARED — CV Match + Steckbrief + Cover Letter + Certificates
+lib/inngest/cv-match-pipeline.ts                ← Feature: CV Match
+lib/inngest/cover-letter-*.ts                   ← Feature: Cover Letter
+lib/inngest/certificates-pipeline.ts            ← Feature: Certificates
+app/dashboard/components/cv-match/*             ← Feature: CV Match
+app/dashboard/components/steckbrief/*           ← Feature: Steckbrief
+app/api/cover-letter/*                          ← Feature: Cover Letter (außer explizit beauftragt)
+middleware.ts                                   ← SYSTEM-LEVEL
+supabase/migrations/*                           ← DB-SCHEMA (nur via Migration-Tasks)
+```
+
+**Warum diese Regel existiert:**
+- `model-router.ts` wird von 4+ Features genutzt. Eine Änderung dort hat Blast Radius auf ALLE.
+- Ein "kleiner Fix" in Certificates crasht CV Match, Steckbrief UND Cover Letter.
+- Das kostet Zeit (mehrere Repair-Zyklen), Geld (API-Calls) und Vertrauen.
+
+**Workflow wenn dein Task eine Forbidden File berühren würde:**
+1. STOPP sofort
+2. Erkläre dem User WARUM du sie anfassen müsstest
+3. Zeige WELCHE anderen Features betroffen wären
+4. Warte auf explizite Freigabe
+5. Erst nach Freigabe: Änderung durchführen + alle betroffenen Features testen
+
+### 0.2 Feature-Silos — Isolation-Principle
+
+**Jedes Feature soll ein abgeschlossenes Modul sein. Änderungen in Feature A dürfen Feature B nicht beeinflussen.**
+
+| Feature-Typ | Erlaubter Scope | Verbotener Scope |
+|---|---|---|
+| **Certificates** | `lib/inngest/certificates-pipeline.ts`, `app/api/certificates/*`, `components/certificates/*`, `types/certificates.ts` | `cv-match-pipeline.ts`, `cover-letter-*.ts`, `model-router.ts` (ohne Freigabe) |
+| **CV Match** | `lib/inngest/cv-match-pipeline.ts`, `app/api/cv/*`, `components/dashboard/components/cv-match/*` | `certificates-pipeline.ts`, `cover-letter-*.ts`, `model-router.ts` (ohne Freigabe) |
+| **Cover Letter** | `lib/inngest/cover-letter-*.ts`, `app/api/cover-letter/*`, `lib/services/cover-letter-*.ts` | `cv-match-pipeline.ts`, `certificates-pipeline.ts`, `model-router.ts` (ohne Freigabe) |
+| **Steckbrief** | `app/dashboard/components/steckbrief/*`, `lib/services/steckbrief-*.ts` | Alle anderen Inngest-Pipelines, `model-router.ts` (ohne Freigabe) |
+
+**Regel:** Wenn dein Task sagt "Fix Certificates", darfst du NUR Dateien im Certificates-Scope anfassen. Alles außerhalb = Freigabe erforderlich.
+
+### 0.3 Shared Libraries — Defense-in-Depth
+
+**Dateien wie `model-router.ts` sind SHARED. Änderungen dort müssen gegen ALLE Konsumenten getestet werden.**
+
+**Wenn eine Änderung an einer Shared Library unvermeidbar ist:**
+
+1. **Zeige Impact-Analyse:**
+   - Welche Features nutzen diese Datei?
+   - Welche Funktionen/Typen ändern sich?
+   - Welche Tests müssen laufen?
+
+2. **Warte auf Freigabe:**
+   - User MUSS explizit bestätigen: "Ja, ändere model-router.ts"
+
+3. **Testing-Protokoll:**
+   - Nach Änderung: CV Match starten → keine Fehler
+   - Nach Änderung: Cover Letter generieren → keine Fehler
+   - Nach Änderung: Certificates generieren → keine Fehler
+   - Nach Änderung: Steckbrief anzeigen → keine Fehler
+
+**Motto:** 
+> "Eine Shared-Library-Änderung ohne Full-Regression-Test ist ein potenzieller Production-Outage."
+
+---
+
+## 1. The Compatibility Grid (Cover Letter Specific)
 
 ### OptInModules × TonePresets
 
@@ -44,7 +114,7 @@
 
 ---
 
-## 2. Architecture Ownership — Rules of Engagement
+## 2. Architecture Ownership — Rules of Engagement (Cover Letter Specific)
 
 ### 2.1 State Management (Zustand Store)
 
@@ -109,3 +179,4 @@
 - [ ] **Ownership-Check:** Bestimme den Owner für jede Schicht (Store-Reset, UI-Guard, Prompt-Builder-Sektion, Judge-Kriterium, Post-Processor-Strip). Dokumentiere in Abschnitt 2.
 - [ ] **Tag-Check:** Wenn das Feature interne Steuer-Tags einführt (z.B. `[TAG]...[/TAG]`): Füge den Strip-Regex in `generateCoverLetter()` UND `fixParagraph()` hinzu. Unconditional.
 - [ ] **Judge-Sync:** Wenn der Judge das Feature bewerten soll: Stelle sicher, dass der Judge die Bewertung ÜBERSPRINGT wenn `optInModules.X === false`. Kein False-Negative bei deaktiviertem Feature.
+- [ ] **Cross-Feature-Check (NEU):** Prüfe Abschnitt 0.1 — berührt das neue Feature eine Forbidden File? Wenn ja: Impact-Analyse + Freigabe erforderlich.
