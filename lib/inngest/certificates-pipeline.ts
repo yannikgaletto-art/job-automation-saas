@@ -41,6 +41,48 @@ async function validateUrl(url: string): Promise<boolean> {
     }
 }
 
+// ─── Provider URL Fallback (Contract §10 extension) ──────────────────────
+const PROVIDER_FALLBACK_URLS: Record<string, string> = {
+    coursera: 'https://www.coursera.org/search?query=',
+    udemy: 'https://www.udemy.com/courses/search/?q=',
+    linkedin: 'https://www.linkedin.com/learning/search?keywords=',
+    'linkedin learning': 'https://www.linkedin.com/learning/search?keywords=',
+    tuv: 'https://www.tuvsud.com/de-de/dienstleistungen/weiterbildung/seminare/',
+    'tüv': 'https://www.tuvsud.com/de-de/dienstleistungen/weiterbildung/seminare/',
+    'tüv rheinland': 'https://www.tuv.com/de/deutschland/privatkunden/seminare_schulungen_1/weiterbildung_1.html',
+    dekra: 'https://www.dekra-akademie.de/de/suche/?q=',
+    'dekra akademie': 'https://www.dekra-akademie.de/de/suche/?q=',
+    haufe: 'https://www.haufe-akademie.de/weiterbildung/?q=',
+    'haufe akademie': 'https://www.haufe-akademie.de/weiterbildung/?q=',
+    alfatraining: 'https://www.alfatraining.de/gefoerderte-weiterbildung/',
+    ihk: 'https://www.ihk-akademie.de/weiterbildung/',
+    dqs: 'https://www.dqs-akademie.de/seminare/',
+    bsi: 'https://www.bsi.bund.de/DE/Themen/Unternehmen-und-Organisationen/Qualifizierung/qualifizierung_node.html',
+};
+
+function applyUrlFallback(
+    rec: CertificateRecommendation,
+    keyword: string
+): CertificateRecommendation {
+    if (rec.urlValid) return rec; // URL ist valid — kein Fallback nötig
+
+    const providerKey = rec.provider.toLowerCase();
+    const matchedKey = Object.keys(PROVIDER_FALLBACK_URLS).find(k =>
+        providerKey.includes(k)
+    );
+
+    if (matchedKey) {
+        const fallbackBase = PROVIDER_FALLBACK_URLS[matchedKey];
+        const searchUrl = fallbackBase + encodeURIComponent(keyword);
+        console.log(`[Certificates] URL fallback: ${rec.provider} → ${searchUrl}`);
+        return { ...rec, url: searchUrl, urlValid: true };
+    }
+
+    // Kein bekannter Provider — URL bleibt invalid, aber kein Crash
+    console.warn(`[Certificates] No fallback URL for provider: ${rec.provider}`);
+    return rec;
+}
+
 async function validateUrls(recommendations: CertificateRecommendation[]): Promise<CertificateRecommendation[]> {
     const results = await Promise.allSettled(
         recommendations.map(async (rec) => {
@@ -60,7 +102,7 @@ async function searchCertificates(keyword: string, location: string = 'Deutschla
     const query = `${keyword} Zertifizierung ${location} 2025 2026 TÜV DEKRA DQS BSI AlfaTraining AZAV Bildungsgutschein Coursera Udemy LinkedIn Learning online Preis Anmeldung URL`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     try {
         const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -258,11 +300,13 @@ Antworte NUR mit einem JSON-Array von Strings:
 
             // ── Phase 2: Live-Recherche via Perplexity ───────────────────
             const rawResearchTexts = await step.run('phase-2-perplexity-research', async () => {
-                const results: string[] = [];
-                for (const keyword of skillGaps) {
-                    const text = await searchCertificates(keyword, inputData.location || 'Deutschland');
-                    if (text) results.push(text);
-                }
+                // Parallel Perplexity calls — Promise.allSettled ensures one failure doesn't crash the entire phase
+                const settled = await Promise.allSettled(
+                    skillGaps.map(kw => searchCertificates(kw, inputData.location || 'Deutschland'))
+                );
+                const results: string[] = settled
+                    .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled' && !!r.value)
+                    .map(r => r.value);
 
                 if (results.length === 0) {
                     // Fallback: search with job title directly
@@ -364,7 +408,10 @@ REGELN:
 
             // ── Link Validation (Contract §10) ──────────────────────────
             const validatedRecs = await step.run('validate-urls', async () => {
-                return validateUrls(recommendations);
+                const validated = await validateUrls(recommendations);
+                // Apply provider fallback for invalid URLs (§10 extension)
+                const primaryKeyword = skillGaps[0] || inputData.jobTitle;
+                return validated.map(rec => applyUrlFallback(rec, primaryKeyword));
             });
 
             const validCount = validatedRecs.filter(r => r.urlValid).length;

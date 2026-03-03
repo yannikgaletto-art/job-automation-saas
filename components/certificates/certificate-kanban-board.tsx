@@ -117,7 +117,7 @@ export function CertificateKanbanBoard({ jobId, jobStatus }: CertificateKanbanBo
             const elapsed = pollStartTimeRef.current
                 ? Date.now() - pollStartTimeRef.current
                 : 0;
-            if (elapsed > 90_000) {
+            if (elapsed > 120_000) {
                 clearInterval(interval);
                 pollStartTimeRef.current = null;
                 setStatus('failed');
