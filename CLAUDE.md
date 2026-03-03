@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 2.3
-**Last Updated:** 2026-02-26
+**Version:** 2.4
+**Last Updated:** 2026-03-03
 
 ---
 
@@ -10,7 +10,7 @@
 → docs/MOTION_PRINCIPLES.md
 Kein Framer Motion Code ohne diese Datei gelesen zu haben.
 
-## ⚠️ MIGRATIONS — AUTORITATIVER PFAD
+## ⚠️ MIGRATIONS — AUTORITÄRER PFAD
 → supabase/migrations/ ist das einzige aktive Migrationsverzeichnis.
 → database/migrations/ ist veraltet — NIEMALS neue Migrationen dort anlegen.
 → Neue Migrationen IMMER in: supabase/migrations/
@@ -18,6 +18,28 @@ Kein Framer Motion Code ohne diese Datei gelesen zu haben.
 ## ⚠️ COMPANY RESEARCH DIRECTIVE
 → directives/company_research.md (die einzige aktuelle Version)
 → AGENT_2.1 und AGENT_3.1 wurden gelöscht
+
+## ⛔ CROSS-FEATURE-SHIELD (NEUE PFLICHT ab 2026-03-03)
+→ directives/FEATURE_COMPAT_MATRIX.md
+**PFLICHT bei JEDEM Task — keine Ausnahmen.**
+
+Was das ist:
+- Abschnitt 1: Feature-spezifische Kompatibilitäts-Matrizen (Cover Letter Modules)
+- Abschnitt 2: **Generische Cross-Feature-Ownership-Regeln** — gilt für ALLE Features
+- Abschnitt 3: Forbidden Files Liste — Dateien die NUR mit expliziter Freigabe angefasst werden dürfen
+
+Warum das wichtig ist:
+- Verhindert, dass ein Fix in Feature A die Features B, C, D crasht
+- `model-router.ts` wird von CV Match, Steckbrief, Cover Letter UND Certificates genutzt
+- Eine ungeplante Änderung dort hat Blast Radius auf ALLE Features
+- Das kostet Zeit, Geld und Vertrauen
+
+**Workflow:**
+1. Task erhalten
+2. FEATURE_COMPAT_MATRIX.md lesen (Abschnitt 2 + 3)
+3. Prüfen: Berührt mein Task eine Forbidden File?
+4. Wenn JA: STOPP → User fragen → Freigabe abwarten
+5. Wenn NEIN: Fortfahren
 
 ## ⚠️ NEUES FEATURE? PFLICHT-ANALYSE ZUERST
 → directives/FEATURE_IMPACT_ANALYSIS.md
@@ -196,6 +218,7 @@ Chrome Extension (Plasmo)
 1. **Read the docs:**
    - `/docs/ARCHITECTURE.md` - Complete system design
    - `/database/schema.sql` - Database structure
+   - **`directives/FEATURE_COMPAT_MATRIX.md`** - Cross-Feature-Ownership (PFLICHT)
 
 2. **Check existing code:**
    - Don't rewrite what exists
@@ -449,6 +472,7 @@ const fillApplication = async () => {
 - [ ] RLS policies enabled
 - [ ] No console.logs with PII
 - [ ] Visual verification complete
+- [ ] **Cross-Feature-Compatibility verified** (FEATURE_COMPAT_MATRIX.md checked)
 
 ### Deploy Commands
 
@@ -475,6 +499,7 @@ npm run build
 3. **Writing style matters** - Use conjunctions, avoid clichés
 4. **Track everything** - Manual + auto applications
 5. **Visual verification** - Trust the pixel, not the code
+6. **Cross-Feature-Shield** - Check FEATURE_COMPAT_MATRIX.md before touching shared files
 
 ---
 
