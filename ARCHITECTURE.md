@@ -102,6 +102,20 @@ Frontend-Polling (`certificate-kanban-board.tsx`) hat einen **90s Timeout** — 
 
 ---
 
+## 3.2 LOKALE ENTWICKLUNG — INNGEST (PFLICHTNOTIZ)
+
+Zwei separate Terminal-Prozesse sind **IMMER** erforderlich:
+
+1. `npm run dev` → Next.js (Port 3000)
+2. `npx inngest-cli@latest dev` → Inngest Dev-Server (Port 8288)
+
+Ohne Prozess 2 bleiben alle Events in "pending" und
+das Frontend pollt bis zum Timeout.
+
+**Dashboard:** http://localhost:8288
+
+---
+
 ## 4. DATENBANKSTRUKTUR
 
 Das DB-Schema basiert auf PostgreSQL und wird exklusiv über `supabase/migrations/` versioniert (**Klarstellung: `supabase/migrations/` ist das autoritative Migrationsverzeichnis!** Das alte Verzeichnis `database/migrations/` ist veraltet).

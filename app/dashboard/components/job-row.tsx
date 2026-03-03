@@ -483,18 +483,21 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                         {displayTab === 4 && (
                             <CertificateKanbanBoard
                                 jobId={job.id}
-                                jobStatus={(() => {
-                                    // Map UI status back to DB status for blocking checks
-                                    switch (job.status) {
-                                        case 'NEW': return 'pending';
-                                        case 'JOB_REVIEWED': return 'steckbrief_confirmed';
-                                        case 'CV_CHECKED': return 'cv_match_done';
-                                        case 'CV_OPTIMIZED': return 'cv_optimized';
-                                        case 'CL_GENERATED': return 'cover_letter_done';
-                                        case 'READY': return 'ready_to_apply';
-                                        default: return 'pending';
-                                    }
-                                })()}
+                                jobStatus={
+                                    // Use raw dbStatus as primary source — bypass UI mapping
+                                    job.dbStatus === 'cv_matched' || job.dbStatus === 'cv_match_done'
+                                        ? 'cv_match_done'
+                                        : (() => {
+                                            switch (job.status) {
+                                                case 'CV_CHECKED': return 'cv_match_done';
+                                                case 'CV_OPTIMIZED': return 'cv_optimized';
+                                                case 'CL_GENERATED': return 'cover_letter_done';
+                                                case 'READY': return 'ready_to_apply';
+                                                case 'JOB_REVIEWED': return 'steckbrief_confirmed';
+                                                default: return 'pending';
+                                            }
+                                        })()
+                                }
                             />
                         )}
                     </motion.div>

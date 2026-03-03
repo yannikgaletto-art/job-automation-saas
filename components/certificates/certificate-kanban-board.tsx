@@ -74,7 +74,7 @@ export function CertificateKanbanBoard({ jobId, jobStatus }: CertificateKanbanBo
     const pollStartTimeRef = useRef<number | null>(null);
 
     // ── Blocking states ─────────────────────────────────────────────
-    const cvMatchStatuses = ['cv_match_done', 'cv_optimized', 'cover_letter_done', 'ready_for_review', 'ready_to_apply'];
+    const cvMatchStatuses = ['cv_matched', 'cv_match_done', 'cv_optimized', 'cover_letter_done', 'ready_for_review', 'ready_to_apply'];
     const hasCVMatch = cvMatchStatuses.includes(jobStatus?.toLowerCase() || '');
 
     // ── Fetch existing certificates ─────────────────────────────────
@@ -114,7 +114,10 @@ export function CertificateKanbanBoard({ jobId, jobStatus }: CertificateKanbanBo
 
         const interval = setInterval(async () => {
             // Timeout after 90s — stop polling, show error
-            if (Date.now() - (pollStartTimeRef.current ?? Date.now()) > 90_000) {
+            const elapsed = pollStartTimeRef.current
+                ? Date.now() - pollStartTimeRef.current
+                : 0;
+            if (elapsed > 90_000) {
                 clearInterval(interval);
                 pollStartTimeRef.current = null;
                 setStatus('failed');

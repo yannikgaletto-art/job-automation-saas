@@ -56,8 +56,8 @@ async function validateUrls(recommendations: CertificateRecommendation[]): Promi
 }
 
 // ─── Perplexity API Call ─────────────────────────────────────────────────
-async function searchCertificates(keyword: string): Promise<string> {
-    const query = `${keyword} Zertifizierung Deutschland 2025 2026 TÜV DEKRA DQS BSI AlfaTraining AZAV Bildungsgutschein Preis Anmeldung URL`;
+async function searchCertificates(keyword: string, location: string = 'Deutschland'): Promise<string> {
+    const query = `${keyword} Zertifizierung ${location} 2025 2026 TÜV DEKRA DQS BSI AlfaTraining AZAV Bildungsgutschein Coursera Udemy LinkedIn Learning online Preis Anmeldung URL`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -74,7 +74,7 @@ async function searchCertificates(keyword: string): Promise<string> {
                 messages: [
                     {
                         role: 'system',
-                        content: 'Du bist ein Experte für berufliche Weiterbildung und Zertifizierungen in Deutschland. Antworte auf Deutsch. Nenne immer konkrete Anbieter, Preise, Dauer und direkte URLs zur Anmeldung.',
+                        content: 'Du bist ein Experte für berufliche Weiterbildung und Zertifizierungen. Antworte auf Deutsch. Nenne immer konkrete Anbieter, Preise, Dauer und direkte URLs zur Anmeldung. Berücksichtige sowohl lokale Deutsche Anbieter (TÜV, DEKRA, IHK, AlfaTraining) als auch globale Online-Plattformen (Coursera, Udemy, LinkedIn Learning).',
                     },
                     {
                         role: 'user',
@@ -89,7 +89,10 @@ Ich brauche für JEDEN gefundenen Anbieter:
 - Direkte URL zur Kurs-/Anmeldeseite
 - Reputation des Anbieters
 
-Nenne mindestens 4-5 verschiedene Optionen mit unterschiedlichen Anbietern.`,
+Nenne mindestens 4-5 verschiedene Optionen mit unterschiedlichen Anbietern — darunter:
+- Lokale/Deutsche Anbieter (TÜV Rheinland, DEKRA, AlfaTraining, Haufe Akademie, IHK)
+- Online-Plattformen (Coursera, Udemy, LinkedIn Learning) für flexible, ortsunabhängige Optionen
+- AZAV-geförderte Angebote wenn vorhanden`,
                     },
                 ],
                 temperature: 0,
@@ -146,7 +149,7 @@ export const generateCertificates = inngest.createFunction(
                 // Get job data (Contract §3: user_id scoped)
                 const { data: job, error: jobErr } = await supabase
                     .from('job_queue')
-                    .select('job_title, job_description, steckbrief, cv_match_result')
+                    .select('job_title, description, requirements, metadata, company, seniority, location')
                     .eq('id', jobId)
                     .eq('user_id', userId)
                     .single();
@@ -165,34 +168,51 @@ export const generateCertificates = inngest.createFunction(
 
                 const cvText = cvDoc?.metadata?.extracted_text || cvDoc?.metadata?.raw_text || '';
 
+                const jobMetadata = (job.metadata as Record<string, unknown>) || {};
+
                 return {
                     jobTitle: job.job_title || '',
-                    jobDescription: job.job_description || '',
-                    steckbrief: job.steckbrief || {},
-                    cvMatchResult: job.cv_match_result || {},
+                    jobDescription: job.description || '',
+                    company: (job.company as string) || '',
+                    seniority: (job.seniority as string) || '',
+                    location: (job.location as string) || '',
+                    steckbrief: job.requirements || {},
+                    cvMatchResult: jobMetadata.cv_match || {},
                     cvText,
                 };
             });
 
             // ── Phase 1: Gap-Analyse via Claude Sonnet ───────────────────
             const skillGaps = await step.run('phase-1-gap-analysis', async () => {
+                // Extract real gaps from CV Match requirementRows
+                const missingReqs = ((inputData.cvMatchResult as any)?.requirementRows || [])
+                    .filter((r: any) => r.status === 'missing' || r.status === 'partial')
+                    .map((r: any) => r.requirement)
+                    .join(', ');
+
                 const prompt = `Analysiere den Lebenslauf und die Stellenanforderungen. Identifiziere die 1-2 wichtigsten Qualifikationslücken, für die eine Zertifizierung sinnvoll wäre.
 
 STELLENTITEL: ${inputData.jobTitle}
+UNTERNEHMEN: ${inputData.company || 'nicht angegeben'}
+SENIORITY: ${inputData.seniority || 'nicht angegeben'}
+STANDORT: ${inputData.location || 'Deutschland'}
 
 STECKBRIEF / ANFORDERUNGEN:
 ${JSON.stringify(inputData.steckbrief, null, 2)}
 
+BEKANNTE QUALIFIKATIONSLÜCKEN AUS CV MATCH:
+${missingReqs || 'Keine CV-Match-Daten vorhanden — aus Anforderungen ableiten'}
+
 CV MATCH ERGEBNIS:
 ${JSON.stringify(inputData.cvMatchResult, null, 2)}
 
-LEBENSLAUF (Auszug, max 2000 Zeichen):
-${inputData.cvText.substring(0, 2000)}
+LEBENSLAUF (Auszug, max 4000 Zeichen):
+${inputData.cvText.substring(0, 4000)}
 
 REGELN:
 - Identifiziere GENAU 1-2 konkrete Skill-Gaps
 - Formuliere jedes als kurzes Keyword (z.B. "Scrum Master", "KI-Management", "ITIL", "AWS Cloud Architect")
-- Berücksichtige den deutschen Arbeitsmarkt
+- Berücksichtige den deutschen Arbeitsmarkt und die Branche von ${inputData.company || 'dem Unternehmen'}
 - Ignoriere Gaps die durch Berufserfahrung abgedeckt werden können
 
 Antworte NUR mit einem JSON-Array von Strings:
@@ -240,14 +260,14 @@ Antworte NUR mit einem JSON-Array von Strings:
             const rawResearchTexts = await step.run('phase-2-perplexity-research', async () => {
                 const results: string[] = [];
                 for (const keyword of skillGaps) {
-                    const text = await searchCertificates(keyword);
+                    const text = await searchCertificates(keyword, inputData.location || 'Deutschland');
                     if (text) results.push(text);
                 }
 
                 if (results.length === 0) {
                     // Fallback: search with job title directly
                     console.warn('[Certificates] Phase 2 fallback — searching with job title');
-                    const fallback = await searchCertificates(inputData.jobTitle);
+                    const fallback = await searchCertificates(inputData.jobTitle, inputData.location || 'Deutschland');
                     if (fallback) results.push(fallback);
                 }
 
@@ -258,10 +278,20 @@ Antworte NUR mit einem JSON-Array von Strings:
 
             // ── Phase 3: Synthese via Claude Haiku ────────────────────────
             const recommendations = await step.run('phase-3-synthesize', async () => {
+                // CV Match gaps used in Phase 1 are also needed here — re-extract for Phase 3
+                const missingReqsPhase3 = ((inputData.cvMatchResult as any)?.requirementRows || [])
+                    .filter((r: any) => r.status === 'missing' || r.status === 'partial')
+                    .map((r: any) => r.requirement)
+                    .join(', ');
+
                 const prompt = `Basierend auf den folgenden Recherche-Ergebnissen zu Zertifizierungen, erstelle EXAKT 3 strukturierte Empfehlungen.
 
 STELLENTITEL: ${inputData.jobTitle}
+UNTERNEHMEN: ${inputData.company || 'nicht angegeben'}
+BRANCHE-KONTEXT: ${inputData.seniority ? `${inputData.seniority} Position` : 'Position'} bei ${inputData.company || 'dem Unternehmen'}
+STANDORT FÜR AZAV-FÖRDERUNG: ${inputData.location || 'Deutschland'}
 SKILL-GAPS: ${skillGaps.join(', ')}
+BEKANNTE LÜCKEN AUS CV MATCH: ${missingReqsPhase3 || 'aus Recherche-Ergebnissen ableiten'}
 
 RECHERCHE-ERGEBNISSE:
 ${rawResearchTexts.join('\n\n---\n\n')}
@@ -279,17 +309,18 @@ AUSGABE-FORMAT (JSON-Array mit EXAKT 3 Objekten):
     "reputationScore": 1|2|3,
     "url": "https://direkt-link-zur-kursseite",
     "urlValid": false,
-    "reasonForMatch": "1 Satz warum das zur Stelle passt"
+    "reasonForMatch": "1 Satz warum das zur Stelle bei ${inputData.company || 'dem Unternehmen'} passt"
   }
 ]
 
 REGELN:
 - EXAKT 3 Empfehlungen — NICHT mehr, NICHT weniger
-- providerType-Verteilung: 1x "reputation" (TÜV, SGS, DQS, BSI, DEKRA), 1x "specialist" (AlfaTraining, Haufe, etc.), 1x "value" (günstigste/AZAV-Option)
+- providerType-Verteilung: 1x "reputation" (TÜV, SGS, DQS, BSI, DEKRA, IHK), 1x "specialist" (AlfaTraining, Haufe, Linkedin Learning, Coursera), 1x "value" (günstigste/AZAV-Option ODER kostenlose Coursera/Udemy Option)
 - reputationScore 3 = TÜV, BSI, DQS, SGS; 2 = DEKRA, Haufe, IHK; 1 = andere
 - Falls keine AZAV-Info gefunden: hasAZAV auf false setzen, priceEstimate als "Preis auf Anfrage"
 - Falls keine URL gefunden: url auf die Hauptseite des Anbieters setzen
 - Deutsche Sprache in allen Textfeldern
+- reasonForMatch MUSS auf die spezifischen Anforderungen der Stelle bei ${inputData.company || 'dem Unternehmen'} Bezug nehmen
 - Antworte NUR mit dem JSON-Array — KEIN Fließtext`;
 
                 let response;

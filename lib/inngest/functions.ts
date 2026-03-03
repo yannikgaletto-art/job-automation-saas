@@ -1,3 +1,13 @@
+/**
+ * @deprecated — Diese Datei enthält nur Stub-Funktionen ohne Implementierung.
+ * Die echten Pipelines befinden sich in:
+ *   - certificates-pipeline.ts
+ *   - cv-match-pipeline.ts
+ *   - extract-job-pipeline.ts
+ *
+ * Diese Stubs werden noch in app/api/inngest/route.ts registriert.
+ * Langfristig: Stubs entfernen und route.ts bereinigen.
+ */
 import { inngest } from './client';
 
 export const discoverJobs = inngest.createFunction(
@@ -23,8 +33,7 @@ export const researchCompany = inngest.createFunction(
         name: 'Company Research',
         rateLimit: {
             limit: 20,
-            period: '1m',
-            key: 'global'
+            period: '1m'
         }
     },
     { event: 'company/research' },
@@ -40,8 +49,7 @@ export const generateCoverLetter = inngest.createFunction(
         name: 'Generate Cover Letter',
         rateLimit: {
             limit: 100,
-            period: '1m',
-            key: 'global'
+            period: '1m'
         }
     },
     { event: 'cover-letter/generate' },

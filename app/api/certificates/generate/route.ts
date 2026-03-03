@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Verify status is cv_match_done or higher
-        const validStatuses = ['cv_match_done', 'cv_optimized', 'cover_letter_done', 'ready_for_review', 'ready_to_apply'];
+        const validStatuses = ['cv_matched', 'cv_match_done', 'cv_optimized', 'cover_letter_done', 'ready_for_review', 'ready_to_apply'];
         if (!validStatuses.includes(job.status?.toLowerCase() || '')) {
             return NextResponse.json(
                 { error: 'CV Match must be completed first.' },
@@ -67,22 +67,37 @@ export async function POST(request: NextRequest) {
         // Check if already exists (idempotency)
         const { data: existing } = await supabase
             .from('job_certificates')
-            .select('id, status')
+            .select('id, status, updated_at')
             .eq('job_id', jobId)
             .eq('user_id', user.id)
             .single();
 
         if (existing) {
-            // If already done or processing, return existing
-            if (existing.status === 'done' || existing.status === 'processing') {
+            // If already done → return immediately (no re-generation)
+            if (existing.status === 'done') {
                 return NextResponse.json({
                     success: true,
                     certificateId: existing.id,
                     status: existing.status,
                 });
             }
-            // If failed, allow re-generation by updating to pending
-            if (existing.status === 'failed') {
+            // If processing but NOT stale → return in-progress status
+            if (existing.status === 'processing') {
+                const updatedAt = new Date((existing as any).updated_at || 0).getTime();
+                const staleThresholdMs = 5 * 60 * 1000; // 5 minutes
+                const isStale = Date.now() - updatedAt > staleThresholdMs;
+                if (!isStale) {
+                    return NextResponse.json({
+                        success: true,
+                        certificateId: existing.id,
+                        status: existing.status,
+                    });
+                }
+                // Stale processing → reset to pending so Inngest re-runs
+                console.log(`[Certificates] Stale processing record detected — resetting to pending for job=${jobId}`);
+            }
+            // If failed or stale processing → allow re-generation by resetting to pending
+            if (existing.status === 'failed' || existing.status === 'processing') {
                 await supabase
                     .from('job_certificates')
                     .update({ status: 'pending', updated_at: new Date().toISOString() })

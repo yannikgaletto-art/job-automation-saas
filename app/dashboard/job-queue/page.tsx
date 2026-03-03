@@ -29,7 +29,8 @@ export default function JobQueuePage() {
             case 'pending': return 'NEW';
             case 'processing': return 'JOB_REVIEWED';
             case 'steckbrief_confirmed': return 'JOB_REVIEWED';
-            case 'cv_match_done': return 'CV_OPTIMIZED';
+            case 'cv_matched':       // ← von Inngest Pipeline gesetzt
+            case 'cv_match_done': return 'CV_CHECKED';  // ← beide → CV_CHECKED
             case 'cv_optimized': return 'CV_OPTIMIZED';
             case 'cover_letter_done': return 'CL_GENERATED';
             case 'ready_for_review': return 'CL_GENERATED';
@@ -44,6 +45,7 @@ export default function JobQueuePage() {
             case 'pending': return 0;
             case 'processing': return 10;
             case 'steckbrief_confirmed': return 30;
+            case 'cv_matched':       // ← von Inngest Pipeline gesetzt
             case 'cv_match_done': return 30;
             case 'cv_optimized': return 60;
             case 'cover_letter_done': return 100;

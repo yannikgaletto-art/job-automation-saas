@@ -32,3 +32,25 @@ Geänderte Dateien:
 ### Status: DONE
 Keine weiteren UI-Iterationen für diese Features geplant.
 TypeScript: 0 Fehler. Emojis: 0. Browser: ✓ verifiziert.
+
+## [2026-03-03] fix/cv-match-null-guard — CV Match TypeError resolved
+
+Geänderte Dateien:
+- `app/dashboard/components/cv-match/cv-match-tab.tsx`
+- `lib/inngest/cv-match-pipeline.ts`
+
+### Was geändert wurde
+
+**cv-match-tab.tsx:**
+- 6 Arrays (`requirementRows`, `strengths`, `gaps`, `potentialHighlights`, `keywordsFound`, `keywordsMissing`) mit `Array.isArray()` Guards versehen
+- Alle direkten `matchData.<array>` Zugriffe durch sichere lokale Variablen ersetzt
+- Verhindert `TypeError: Cannot read properties of undefined (reading 'map')` bei abgeschnittenen AI-Responses
+
+**cv-match-pipeline.ts:**
+- `safeResult` Normalisierung vor DB-Write (§7-Compliance)
+- Fehlende Array-Felder werden zu `[]` normalisiert + `_normalized` Flag gesetzt
+- Warning-Log bei fehlenden Feldern für Debugging
+- `safeResult` statt `matchResult` für JSONB-Merge verwendet
+
+### Status: DONE
+Gate A (TypeScript): ✓ bestanden — kein neuer TS-Fehler.

@@ -14,7 +14,7 @@ import OpenAI from 'openai';
 
 export const MODELS = {
     CLAUDE_SONNET: {
-        id: 'claude-3-5-sonnet-20241022',
+        id: 'claude-sonnet-4-5-20250929',
         provider: 'anthropic' as const,
         cost_per_1m_tokens: 3.0,
         strengths: ['creative_writing', 'complex_reasoning'],
@@ -26,7 +26,7 @@ export const MODELS = {
         strengths: ['parsing', 'classification', 'summarization'],
     },
     CLAUDE_HAIKU: {
-        id: 'claude-3-haiku-20240307',
+        id: 'claude-haiku-4-5-20251001',
         provider: 'anthropic' as const,
         cost_per_1m_tokens: 0.25,
         strengths: ['parsing', 'classification', 'fast_execution'],
@@ -67,15 +67,16 @@ export function selectModel(taskType: TaskType) {
         detect_ats_system: 'GPT_4O_MINI',
         classify_job_board: 'GPT_4O_MINI',
         summarize_job_description: 'GPT_4O_MINI',
-        // Premium tasks
+        // Premium tasks (creative writing only)
         write_cover_letter: 'CLAUDE_SONNET',
         personalize_intro: 'CLAUDE_SONNET',
         generate_motivation_text: 'CLAUDE_SONNET',
         optimize_cv: 'CLAUDE_SONNET',
-        cv_match: 'CLAUDE_SONNET',
-        cv_parse: 'CLAUDE_SONNET',
+        // Structured analysis (Haiku: fast + cheap, no creative writing needed)
+        cv_match: 'CLAUDE_HAIKU',
+        cv_parse: 'CLAUDE_HAIKU',
         // Certificate pipeline
-        analyze_skill_gaps: 'CLAUDE_SONNET',
+        analyze_skill_gaps: 'CLAUDE_HAIKU',
         synthesize_certificates: 'CLAUDE_HAIKU',
     };
 

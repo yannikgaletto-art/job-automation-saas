@@ -417,8 +417,16 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
 
     // ── COMPLETE ───────────────────────────────────────────────
     if (state === 'complete' && matchData) {
-        const metCount = matchData.requirementRows.filter(r => r.status === 'met').length;
-        const totalCount = matchData.requirementRows.length;
+        // §7-compliant: Array.isArray() guards — AI may return null, string, or truncated objects
+        const rows = Array.isArray(matchData.requirementRows) ? matchData.requirementRows : [];
+        const strengths = Array.isArray(matchData.strengths) ? matchData.strengths : [];
+        const gaps = Array.isArray(matchData.gaps) ? matchData.gaps : [];
+        const potentialHighlights = Array.isArray(matchData.potentialHighlights) ? matchData.potentialHighlights : [];
+        const keywordsFound = Array.isArray(matchData.keywordsFound) ? matchData.keywordsFound : [];
+        const keywordsMissing = Array.isArray(matchData.keywordsMissing) ? matchData.keywordsMissing : [];
+
+        const metCount = rows.filter(r => r.status === 'met').length;
+        const totalCount = rows.length;
         const metPercent = totalCount > 0 ? Math.round((metCount / totalCount) * 100) : 0;
 
         const scoreColor = matchData.overallScore >= 70 ? '#22c55e' : matchData.overallScore >= 50 ? '#f59e0b' : '#ef4444';
@@ -458,9 +466,9 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         </div>
                         <div className="space-y-3 flex-1">
                             {[
-                                { label: 'Stärken', items: matchData.strengths.length > 0 ? matchData.strengths : ['Keine spezifischen Stärken dokumentiert.'] },
-                                { label: 'Lücken', items: matchData.gaps.length > 0 ? matchData.gaps : ['Keine kritischen Lücken identifiziert.'] },
-                                { label: 'Versteckte Potenziale', items: matchData.potentialHighlights.length > 0 ? matchData.potentialHighlights : ['Keine ungenutzten Potenziale erkannt.'] },
+                                { label: 'Stärken', items: strengths.length > 0 ? strengths : ['Keine spezifischen Stärken dokumentiert.'] },
+                                { label: 'Lücken', items: gaps.length > 0 ? gaps : ['Keine kritischen Lücken identifiziert.'] },
+                                { label: 'Versteckte Potenziale', items: potentialHighlights.length > 0 ? potentialHighlights : ['Keine ungenutzten Potenziale erkannt.'] },
                             ].map(({ label, items }) => (
                                 <div key={label}>
                                     <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
@@ -530,7 +538,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {matchData.requirementRows.map((row, i) => (
+                            {rows.map((row, i) => (
                                 <motion.tr
                                     key={i}
                                     initial={{ opacity: 0, y: 5 }}
@@ -565,17 +573,17 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         ATS Keywords <span className="text-[10px] text-slate-400 font-normal ml-1">(Applicant Tracking System)</span>
                     </h4>
                     <div className="flex flex-wrap gap-1.5">
-                        {matchData.keywordsFound.map(kw => (
+                        {keywordsFound.map(kw => (
                             <span key={kw} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
                                 <CheckCircle2 size={10} /> {kw}
                             </span>
                         ))}
-                        {matchData.keywordsMissing.map(kw => (
+                        {keywordsMissing.map(kw => (
                             <span key={kw} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-red-50 text-red-700 border border-red-100 opacity-75">
                                 <AlertCircle size={10} /> {kw}
                             </span>
                         ))}
-                        {matchData.keywordsFound.length === 0 && matchData.keywordsMissing.length === 0 && (
+                        {keywordsFound.length === 0 && keywordsMissing.length === 0 && (
                             <span className="text-xs text-slate-400 italic">Keine expliziten Keywords analysiert.</span>
                         )}
                     </div>
