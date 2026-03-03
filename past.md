@@ -54,3 +54,32 @@ Geänderte Dateien:
 
 ### Status: DONE
 Gate A (TypeScript): ✓ bestanden — kein neuer TS-Fehler.
+
+## [2026-03-03] fix/certificates-parallel-url-fallback
+
+Geänderte Dateien:
+- `lib/inngest/certificates-pipeline.ts`
+- `components/certificates/certificate-kanban-board.tsx`
+
+### Was geändert wurde
+- Phase 2: Sequential `for...of` → Parallel `Promise.allSettled()` (bis zu 50% schneller)
+- Perplexity Timeout: 15s → 20s für stabilere Recherche
+- Provider URL Fallback Map: 14 Anbieter (Coursera, Udemy, LinkedIn, TÜV, DEKRA, Haufe, etc.)
+- `applyUrlFallback()` ersetzt invalide URLs mit Provider-Suchseiten — §10 HEAD-check bleibt aktiv
+- Frontend Polling Timeout: 90s → 120s
+
+### Status: DONE
+
+## [2026-03-03] fix/certificates-tab-state-persist
+
+Geänderte Dateien:
+- `components/certificates/certificate-kanban-board.tsx`
+- `app/dashboard/components/job-row.tsx`
+
+### Was geändert wurde
+- State-Lifting: `cachedCertificates` State in `job-row.tsx` (überlebt Tab-Wechsel)
+- Neue Props: `initialData` + `onDataLoaded` für `CertificateKanbanBoard`
+- Early-Return bei `initialData.status === 'done'` → kein erneuter API-Call
+- `onDataLoaded` wird in fetchCertificates() UND Polling-Done-Branch aufgerufen
+
+### Status: DONE
