@@ -83,3 +83,16 @@ Geänderte Dateien:
 - `onDataLoaded` wird in fetchCertificates() UND Polling-Done-Branch aufgerufen
 
 ### Status: DONE
+
+## [2026-03-03] fix/certificates-stale-status
+
+Geänderte Dateien:
+- `app/api/certificates/[jobId]/route.ts`
+
+### Was geändert wurde
+- Stale processing detection: `status === 'processing'` + `updated_at > 5min` → `failed` Response
+- Response-Level-Fix — kein DB-Write, Status bleibt für Audit erhalten
+- Frontend zeigt sofort "Erneut versuchen" statt endlosem Polling
+- Forbidden Files (model-router.ts, cv-match-pipeline.ts): unberührt
+
+### Status: DONE
