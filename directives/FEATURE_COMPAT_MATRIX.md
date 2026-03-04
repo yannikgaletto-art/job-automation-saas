@@ -218,3 +218,40 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via Migration
 | State Persist | `initialData` + `onDataLoaded` Props überleben Tab-Wechsel |
 | Parallel Perplexity | `Promise.allSettled()` statt `for...of` in Phase 2 |
 >>>>>>> 5db9f9b (docs: update CLAUDE.md v2.4, FEATURE_COMPAT_MATRIX (Certificates silo), MASTER_PROMPT_TEMPLATE (Forbidden Files))
+
+---
+
+## 5. Feature-Silo: Ehrenamt (Volunteering)
+
+> **Added:** 2026-03-04 | **Owner:** `volunteering-scraper.ts` + `volunteering/page.tsx`
+
+### 5.1 Erlaubte Dateien (Scope)
+
+| Datei | Rolle |
+|---|---|
+| `app/dashboard/volunteering/*` | Frontend — Hub Page |
+| `app/api/volunteering/*` | API — Opportunities, Bookmarks, Match, Votes |
+| `components/volunteering/*` | Frontend — OpportunityCard, TestimonialsWall, CategoryVote, SmartMatchBanner |
+| `lib/inngest/volunteering-scraper.ts` | Backend — Weekly Scraper Cron |
+| `lib/services/volunteering-scraper-service.ts` | Backend — Source Parsers |
+| `types/volunteering.ts` | Types — Opportunity, Bookmark, Vote |
+| `supabase/migrations/20260304_volunteering_tables.sql` | DB Schema |
+
+### 5.2 Verbotene Dateien (Sperrzone)
+
+| Datei | Grund |
+|---|---|
+| `lib/ai/model-router.ts` | SHARED — CV Match + Steckbrief + Certificates |
+| `lib/inngest/cv-match-pipeline.ts` | Fremdes Feature |
+| `lib/inngest/cover-letter-*.ts` | Fremdes Feature |
+| `lib/inngest/certificates-pipeline.ts` | Fremdes Feature |
+| `middleware.ts` | System-Level |
+
+### 5.3 Bekannte Patterns
+
+| Pattern | Details |
+|---|---|
+| Scraper Dedup | Upsert via `url` UNIQUE index (ON CONFLICT DO UPDATE) |
+| Smart Match | Rule-based keyword matching from CV, keine AI-Calls |
+| RLS | Opportunities: public read. Bookmarks + Votes: user_id-scoped |
+| Testimonials | Seed data in Phase 1, user-submitted in Phase 2 |

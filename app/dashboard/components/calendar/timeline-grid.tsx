@@ -13,7 +13,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
-import { CheckCircle2, GripHorizontal, Calendar } from 'lucide-react';
+import { CheckCircle2, GripHorizontal, Calendar, Trash2, Timer } from 'lucide-react';
 import { useCalendarStore, type CalendarTask } from '@/store/use-calendar-store';
 import { toast } from 'sonner';
 
@@ -94,8 +94,9 @@ function InlineTaskCreator({
 // ─── Task Block with Resize Handle ──────────────────────────────
 
 function TaskBlock({ task }: { task: CalendarTask }) {
-    const { requestFocus, updateTask } = useCalendarStore();
+    const { requestFocus, updateTask, removeTask } = useCalendarStore();
     const [isResizing, setIsResizing] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
     const resizeStartRef = useRef<{ y: number; height: number } | null>(null);
 
     if (!task.scheduled_start) return null;
@@ -116,11 +117,12 @@ function TaskBlock({ task }: { task: CalendarTask }) {
     const isFocus = task.status === 'focus';
     const hasProgress = task.progress_percent !== null && task.progress_percent > 0;
 
+    // Darker, more visible colors
     const bgColor = isCompleted
-        ? 'bg-green-50 border-green-300'
+        ? 'bg-green-100 border-green-400'
         : isFocus
-            ? 'bg-[#002e7a]/10 border-[#002e7a]'
-            : 'bg-[#f0f4ff] border-[#002e7a]/30';
+            ? 'bg-[#002e7a]/20 border-[#002e7a]'
+            : 'bg-[#d6e4ff] border-[#4a78d4]';
 
     const formatTime = (d: Date) =>
         d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -173,33 +175,81 @@ function TaskBlock({ task }: { task: CalendarTask }) {
         document.addEventListener('touchend', handleUp);
     };
 
+    const handleDelete = async () => {
+        removeTask(task.id);
+        toast.success(`„${task.title}" gelöscht`);
+        try {
+            await fetch(`/api/tasks?id=${task.id}`, { method: 'DELETE' });
+        } catch {
+            toast.error('Löschen fehlgeschlagen');
+        }
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             whileHover={{ scale: 1.005, zIndex: 10 }}
-            onClick={() => !isCompleted && !isResizing && requestFocus(task.id)}
-            className={`absolute left-16 right-4 rounded-lg border-2 px-3 py-2 cursor-pointer shadow-sm transition-all group ${bgColor} ${isResizing ? 'ring-2 ring-[#002e7a]/30' : ''
+            onClick={() => !isCompleted && !isResizing && !confirmDelete && requestFocus(task.id)}
+            className={`absolute left-16 right-4 rounded-lg border-2 px-3 py-2 cursor-pointer shadow-md transition-all group ${bgColor} ${isResizing ? 'ring-2 ring-[#002e7a]/30' : ''
                 }`}
             style={{ top: `${top}px`, height: `${height}px`, minHeight: '32px' }}
         >
             <div className="flex items-start justify-between h-full">
                 <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-semibold truncate ${isCompleted ? 'text-green-700' : 'text-[#37352F]'}`}>
+                    <p className={`text-xs font-semibold truncate ${isCompleted ? 'text-green-700' : 'text-[#1a2f6e]'}`}>
                         {isCompleted && <CheckCircle2 className="w-3 h-3 inline mr-1" />}
                         {task.title}
                     </p>
                     {height > 40 && (
-                        <p className="text-[10px] text-[#73726E] mt-0.5">
+                        <p className="text-[10px] text-[#4a6096] mt-0.5">
                             {formatTime(start)} – {formatTime(end)} · {task.estimated_minutes}min
                         </p>
                     )}
+                    {/* Pomodoro CTA — visible when tall enough */}
+                    {height > 56 && !isCompleted && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); requestFocus(task.id); }}
+                            className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-[#002e7a] bg-white/70 hover:bg-white px-1.5 py-0.5 rounded-md transition-colors border border-[#002e7a]/20"
+                        >
+                            <Timer className="w-3 h-3" />
+                            Pomodoro starten
+                        </button>
+                    )}
                 </div>
-                {isFocus && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-[#002e7a] text-white rounded-full animate-pulse">
-                        FOCUS
-                    </span>
-                )}
+                <div className="flex flex-col items-end gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {isFocus && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-[#002e7a] text-white rounded-full animate-pulse">
+                            FOCUS
+                        </span>
+                    )}
+                    {/* Delete button */}
+                    {!isCompleted && (
+                        confirmDelete ? (
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={handleDelete}
+                                    className="text-[10px] px-1.5 py-0.5 bg-red-500 text-white rounded font-medium hover:bg-red-600"
+                                >
+                                    Ja
+                                </button>
+                                <button
+                                    onClick={() => setConfirmDelete(false)}
+                                    className="text-[10px] px-1.5 py-0.5 text-[#73726E] hover:text-[#37352F]"
+                                >
+                                    Nein
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setConfirmDelete(true)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-[#A8A29E] hover:text-red-500"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        )
+                    )}
+                </div>
             </div>
 
             {/* Progress bar at bottom */}

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { Sidebar, NavSection, NavItem } from '@/components/motion/sidebar';
-import { Home, Search, Inbox, BarChart3, Users, Shield, Settings } from 'lucide-react';
+import { Home, Search, Inbox, BarChart3, Users, Heart, Shield, Settings } from 'lucide-react';
 import { PomodoroMiniWidget } from './components/pomodoro-mini-widget';
 import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
@@ -11,6 +11,7 @@ import { CommandPalette } from '@/components/dashboard/command-palette';
 import { MoodCheckInOverlay } from '@/components/MoodCheckInOverlay';
 import { useMoodCheckIn } from './hooks/useMoodCheckIn';
 import { useJobQueueCount } from '@/store/use-job-queue-count';
+import { useCalendarStore } from '@/store/use-calendar-store';
 
 export default function DashboardLayout({
     children,
@@ -20,6 +21,13 @@ export default function DashboardLayout({
     const pathname = usePathname();
     const { showOverlay: showMoodOverlay, dismiss: dismissMoodOverlay } = useMoodCheckIn();
     const { count: queueCount, setCount } = useJobQueueCount();
+    const timerTick = useCalendarStore((s) => s.timerTick);
+
+    // ─── Global Pomodoro timer tick — runs on ALL pages ───────────
+    useEffect(() => {
+        const interval = setInterval(() => { timerTick(); }, 1000);
+        return () => clearInterval(interval);
+    }, [timerTick]);
 
     // Fetch initial queue count on mount
     useEffect(() => {
@@ -47,12 +55,13 @@ export default function DashboardLayout({
                             shortcut="G"
                         />
                         <NavItem icon={Search} label="Job Search" href="/dashboard/job-search" shortcut="S" />
-                        <NavItem icon={Inbox} label="Job Queue" href="/dashboard/job-queue" shortcut="Q" badge={queueCount > 0 ? queueCount : undefined} />
+                        <NavItem icon={Inbox} label="Job Queue" href="/dashboard/job-queue" shortcut="Q" />
                         <NavItem icon={BarChart3} label="Analytics" href="/dashboard/analytics" shortcut="A" />
                     </NavSection>
 
                     <NavSection title="Community">
                         <NavItem icon={Users} label="Community" href="/dashboard/community" shortcut="C" />
+                        <NavItem icon={Heart} label="Ehrenamt" href="/dashboard/volunteering" shortcut="E" />
                     </NavSection>
 
                     <NavSection title="Tools">

@@ -66,11 +66,14 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { title, estimated_minutes, job_queue_id } = body;
+        const { title, estimated_minutes, job_queue_id, source } = body;
 
         if (!title?.trim()) {
             return NextResponse.json({ error: 'Title is required' }, { status: 400 });
         }
+
+        // Validate source field
+        const validSource = source === 'pulse' ? 'pulse' : 'manual';
 
         const { data: task, error } = await supabaseAdmin
             .from('tasks')
@@ -80,6 +83,7 @@ export async function POST(request: NextRequest) {
                 estimated_minutes: estimated_minutes || 60,
                 job_queue_id: job_queue_id || null,
                 status: 'inbox',
+                source: validSource,
             })
             .select('*')
             .single();
@@ -117,7 +121,7 @@ export async function PATCH(request: NextRequest) {
         const allowed = [
             'title', 'estimated_minutes', 'status', 'scheduled_start', 'scheduled_end',
             'pomodoros_completed', 'notes', 'completed_at', 'progress_percent',
-            'progress_note', 'carry_over_to', 'carry_over_count',
+            'progress_note', 'carry_over_to', 'carry_over_count', 'source',
         ];
         const safeUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
         for (const key of allowed) {

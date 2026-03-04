@@ -74,6 +74,7 @@ Die Anwendung basiert auf dem Next.js App Router (`app/` Verzeichnis):
 - `/api/certificates/[jobId]` (Zertifikats-Empfehlungen abrufen — GET)
 - `/api/jobs/extract` (Slim Trigger → Inngest `job/extract` — POST)
 - `/api/cv/match` (Slim Trigger → Inngest `cv-match/analyze` — POST)
+- `/api/pulse/generate` (Deterministic task suggestions from pipeline state — GET)
 
 ---
 
@@ -133,6 +134,7 @@ Das DB-Schema basiert auf PostgreSQL und wird exklusiv über `supabase/migration
 - `form_selectors` (Lernsystem für externe Bewerbungsformulare)
 - `generation_logs` (AI Audit: Token usage & Scores)
 - `job_certificates` (KI-generierte Zertifikats-Empfehlungen pro Job, Kanban-Board)
+- `tasks` (Timeblocking + Focus Mode Tasks, inkl. `source` Feld: 'manual' | 'pulse')
 - `schema_version` (Interne Versionierung)
 
 ---

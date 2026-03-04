@@ -12,6 +12,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GripVertical, Plus, ChevronDown, RotateCcw, Flame, Trash2, X } from 'lucide-react';
 import { useCalendarStore, type CalendarTask } from '@/store/use-calendar-store';
+import { PulseMissionPanel } from './pulse-mission-panel';
 import { toast } from 'sonner';
 
 // ─── Duration Options ────────────────────────────────────────────
@@ -271,17 +272,31 @@ export function TaskInbox() {
             {/* Header */}
             <div className="px-4 py-3 border-b border-[#E7E7E5]">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-[#37352F]">📥 Inbox</h2>
-                    {totalScheduled > 0 && (
-                        <span className="text-[10px] text-[#73726E] flex items-center gap-1">
-                            <Flame className="w-3 h-3 text-orange-500" />
-                            {completedCount} von {totalScheduled} erledigt
-                        </span>
-                    )}
+                    <h2 className="text-sm font-semibold text-[#37352F]">Missionen</h2>
+                    <div className="flex items-center gap-2">
+                        {totalScheduled > 0 && (
+                            <span className="text-[10px] text-[#73726E] flex items-center gap-1">
+                                <Flame className="w-3 h-3 text-orange-500" />
+                                {completedCount} von {totalScheduled} erledigt
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 
             <div className="p-4 space-y-3">
+                {/* Pulse Missions */}
+                <PulseMissionPanel />
+
+                {/* Divider + custom task section */}
+                <div className="flex items-center gap-3 pt-1">
+                    <div className="flex-1 border-t border-[#E7E7E5]" />
+                    <span className="text-xs text-[#73726E] font-semibold whitespace-nowrap">
+                        Erstelle deine eigene Task
+                    </span>
+                    <div className="flex-1 border-t border-[#E7E7E5]" />
+                </div>
+
                 {/* Add task */}
                 <AddTaskForm />
 

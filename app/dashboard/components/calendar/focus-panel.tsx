@@ -3,6 +3,10 @@
 /**
  * Focus Panel — Right column (Modus B).
  * Pomodoro timer, session notes, progress mini-panel, completion ritual.
+ *
+ * Timer uses the STORE state (timerIsActive, timerTimeRemaining, timerMode)
+ * so the PomodoroMiniWidget and persistence across pages work seamlessly.
+ * The global timerTick() in layout.tsx drives the countdown.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -63,7 +67,7 @@ function ProgressPanel({
                 progress_note: note || null,
             }),
         });
-        toast.success(`„${taskTitle}" auf morgen verschoben.`);
+        toast.success(`\u201E${taskTitle}\u201C auf morgen verschoben.`);
         onClose();
     };
 
@@ -93,7 +97,7 @@ function ProgressPanel({
         >
             <div>
                 <p className="text-sm font-semibold text-[#37352F]">Wo stehst du gerade?</p>
-                <p className="text-xs text-[#73726E] mt-0.5">„{taskTitle}"</p>
+                <p className="text-xs text-[#73726E] mt-0.5">&bdquo;{taskTitle}&ldquo;</p>
             </div>
 
             {/* Progress slider */}
@@ -153,78 +157,74 @@ function ProgressPanel({
 // ─── Main Focus Panel ───────────────────────────────────────────
 
 export function FocusPanel() {
-    const { focusedTaskId, tasks, exitFocus, completeTask, updateTask, pomodoroDuration, autoStartTimer } = useCalendarStore();
+    const {
+        focusedTaskId, tasks, exitFocus, completeTask, updateTask,
+        pomodoroDuration, autoStartTimer,
+        // Store timer — single source of truth
+        timerIsActive, timerTimeRemaining, timerMode, timerTotalTime,
+        timerToggle, timerSkip, timerSessions,
+    } = useCalendarStore();
+
     const task = tasks.find((t) => t.id === focusedTaskId);
 
     const pomoDurationSecs = pomodoroDuration * 60;
     const breakDurationSecs = pomodoroDuration === 50 ? DEEP_BREAK_DURATION : DEFAULT_BREAK_DURATION;
 
-    const [secondsLeft, setSecondsLeft] = useState(pomoDurationSecs);
-    const [isRunning, setIsRunning] = useState(false);
-    const [isBreak, setIsBreak] = useState(false);
     const [showProgress, setShowProgress] = useState(false);
     const [sessionNotes, setSessionNotes] = useState('');
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const autoStartedRef = useRef(false);
 
     const totalPomodoros = task ? getPomodoroCount(task.estimated_minutes) : 2;
     const completedPomodoros = task?.pomodoros_completed ?? 0;
 
-    // Timer logic
+    // Derived state from store
+    const isRunning = timerIsActive;
+    const isBreak = timerMode === 'break';
+    const secondsLeft = timerTimeRemaining;
+
+    // Reset timer when entering a NEW task focus
     useEffect(() => {
-        if (!isRunning) {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            return;
-        }
-
-        intervalRef.current = setInterval(() => {
-            setSecondsLeft((prev) => {
-                if (prev <= 1) {
-                    if (!isBreak) {
-                        // Pomodoro completed
-                        if (task) {
-                            const newCount = completedPomodoros + 1;
-                            updateTask(task.id, { pomodoros_completed: newCount });
-                            fetch('/api/tasks', {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: task.id, pomodoros_completed: newCount }),
-                            });
-                        }
-                        setIsBreak(true);
-                        return breakDurationSecs;
-                    } else {
-                        setIsBreak(false);
-                        return pomoDurationSecs;
-                    }
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        return () => {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-        };
-    }, [isRunning, isBreak]);
-
-    // Reset when task changes
-    useEffect(() => {
-        setSecondsLeft(pomoDurationSecs);
-        setIsRunning(false);
-        setIsBreak(false);
+        autoStartedRef.current = false;
         setShowProgress(false);
         setSessionNotes(task?.notes || '');
-        autoStartedRef.current = false;
-    }, [focusedTaskId, pomoDurationSecs]);
+
+        // Only reset the timer if it's not already running for this task
+        if (!timerIsActive) {
+            useCalendarStore.setState({
+                timerTimeRemaining: pomoDurationSecs,
+                timerTotalTime: pomoDurationSecs,
+                timerMode: 'focus',
+                timerIsActive: false,
+            });
+        }
+    }, [focusedTaskId]);
 
     // Auto-start timer when entering focus mode
     useEffect(() => {
         if (autoStartTimer && focusedTaskId && !autoStartedRef.current) {
             autoStartedRef.current = true;
-            setSecondsLeft(pomoDurationSecs);
-            setIsRunning(true);
+            useCalendarStore.setState({
+                timerTimeRemaining: pomoDurationSecs,
+                timerTotalTime: pomoDurationSecs,
+                timerMode: 'focus',
+                timerIsActive: true,
+            });
         }
     }, [autoStartTimer, focusedTaskId, pomoDurationSecs]);
+
+    // Track pomodoro completions when timer finishes a focus cycle
+    useEffect(() => {
+        if (timerTimeRemaining === 0 && !isBreak && task) {
+            // A focus session just completed — update pomodoro count
+            const newCount = completedPomodoros + 1;
+            updateTask(task.id, { pomodoros_completed: newCount });
+            fetch('/api/tasks', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: task.id, pomodoros_completed: newCount }),
+            });
+        }
+    }, [timerTimeRemaining, isBreak]);
 
     // Auto-save session notes
     const saveNotes = useCallback(async () => {
@@ -240,6 +240,8 @@ export function FocusPanel() {
 
     const handleComplete = async () => {
         if (!task) return;
+        // Stop timer
+        useCalendarStore.setState({ timerIsActive: false });
         completeTask(task.id);
         await fetch('/api/tasks', {
             method: 'PATCH',
@@ -255,6 +257,38 @@ export function FocusPanel() {
         toast.success('Task erledigt!');
     };
 
+    const handleToggleTimer = () => {
+        if (!isRunning && secondsLeft === pomoDurationSecs) {
+            // Starting fresh — make sure store is set up
+            useCalendarStore.setState({
+                timerTimeRemaining: pomoDurationSecs,
+                timerTotalTime: pomoDurationSecs,
+                timerMode: 'focus',
+                timerIsActive: true,
+            });
+        } else {
+            timerToggle();
+        }
+    };
+
+    const handleSwitchMode = () => {
+        if (isBreak) {
+            useCalendarStore.setState({
+                timerMode: 'focus',
+                timerTimeRemaining: pomoDurationSecs,
+                timerTotalTime: pomoDurationSecs,
+                timerIsActive: false,
+            });
+        } else {
+            useCalendarStore.setState({
+                timerMode: 'break',
+                timerTimeRemaining: breakDurationSecs,
+                timerTotalTime: breakDurationSecs,
+                timerIsActive: false,
+            });
+        }
+    };
+
     if (!task) return null;
 
     const formatTimeRange = () => {
@@ -262,7 +296,7 @@ export function FocusPanel() {
         const start = new Date(task.scheduled_start);
         const end = task.scheduled_end ? new Date(task.scheduled_end) : new Date(start.getTime() + task.estimated_minutes * 60000);
         const fmt = (d: Date) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-        return `${fmt(start)} – ${fmt(end)}`;
+        return `${fmt(start)} \u2013 ${fmt(end)}`;
     };
 
     return (
@@ -277,10 +311,10 @@ export function FocusPanel() {
                 <h3 className="text-sm font-bold text-[#37352F]">{task.title}</h3>
                 <div className="flex items-center gap-2 mt-1">
                     <span className="text-[10px] text-[#73726E]">{formatTimeRange()}</span>
-                    <span className="text-[10px]">·</span>
+                    <span className="text-[10px]">&middot;</span>
                     <span className="text-[10px]">
                         {Array.from({ length: totalPomodoros }).map((_, i) => (
-                            <span key={i}>{i < completedPomodoros ? '●' : '○'} </span>
+                            <span key={i}>{i < completedPomodoros ? '\u25cf' : '\u25cb'} </span>
                         ))}
                     </span>
                 </div>
@@ -300,7 +334,7 @@ export function FocusPanel() {
                             <motion.button
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
-                                onClick={() => setIsRunning(!isRunning)}
+                                onClick={handleToggleTimer}
                                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isRunning
                                     ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                                     : 'bg-[#002e7a] text-white hover:bg-[#001d4f]'
@@ -311,10 +345,7 @@ export function FocusPanel() {
                             <motion.button
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
-                                onClick={() => {
-                                    setIsBreak(!isBreak);
-                                    setSecondsLeft(isBreak ? pomoDurationSecs : breakDurationSecs);
-                                }}
+                                onClick={handleSwitchMode}
                                 className="w-10 h-10 rounded-full bg-[#F7F7F5] text-[#73726E] flex items-center justify-center hover:bg-[#E7E7E5] transition-colors"
                             >
                                 {isBreak ? <Clock className="w-4 h-4" /> : <Coffee className="w-4 h-4" />}

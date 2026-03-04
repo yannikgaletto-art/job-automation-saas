@@ -3,6 +3,7 @@
 /**
  * Calendar Orchestrator — Combines Timeline + Inbox/Focus + DnD context.
  * Wraps everything with @dnd-kit DndContext and handles drop logic.
+ * Supports both regular task drops AND pulse mission drops.
  * Responsive: 2-col on desktop, stacked on mobile.
  * Includes TouchSensor for mobile drag-and-drop.
  */
@@ -17,11 +18,12 @@ import {
     useSensors,
 } from '@dnd-kit/core';
 import { AnimatePresence } from 'framer-motion';
-import { useCalendarStore } from '@/store/use-calendar-store';
+import { useCalendarStore, type PulseSuggestion } from '@/store/use-calendar-store';
 import { TimelineGrid } from './timeline-grid';
 import { TaskInbox } from './task-inbox';
 import { FocusPanel } from './focus-panel';
 import { FocusConfirmationModal } from './focus-confirmation-modal';
+import { acceptSuggestionViaAPI } from './pulse-mission-panel';
 import { toast } from 'sonner';
 
 export function CalendarOrchestrator() {
@@ -29,7 +31,11 @@ export function CalendarOrchestrator() {
         setTasks,
         setLoading,
         scheduleTask,
+        setPulseSuggestions,
+        setPulseLoading,
+        acceptSuggestion,
         tasks,
+        pulseSuggestions,
         contextMode,
         focusedTaskId,
         showFocusConfirmation,
@@ -44,7 +50,7 @@ export function CalendarOrchestrator() {
     });
     const sensors = useSensors(pointerSensor, touchSensor);
 
-    // Fetch tasks on mount
+    // Fetch tasks + pulse suggestions on mount
     useEffect(() => {
         async function fetchTasks() {
             setLoading(true);
@@ -60,21 +66,34 @@ export function CalendarOrchestrator() {
                 setLoading(false);
             }
         }
+
+        async function fetchPulseSuggestions() {
+            setPulseLoading(true);
+            try {
+                const res = await fetch('/api/pulse/generate');
+                const data = await res.json();
+                if (data.success && data.suggestions) {
+                    setPulseSuggestions(data.suggestions);
+                }
+            } catch (err) {
+                console.error('Failed to fetch pulse suggestions:', err);
+            } finally {
+                setPulseLoading(false);
+            }
+        }
+
         fetchTasks();
+        fetchPulseSuggestions();
     }, []);
 
     // ─── Drop Handler ──────────────────────────────────────────────
-    // Converts drop zone ID (e.g. "slot-10:00") to local time,
-    // then to UTC ISO string before sending to API.
+    // Handles both regular task drops AND pulse mission drops.
+    // Pulse missions: auto-accept → create task → schedule at drop position.
 
     const handleDragEnd = useCallback(
         async (event: DragEndEvent) => {
             const { active, over } = event;
             if (!over) return;
-
-            const taskId = active.id as string;
-            const task = tasks.find((t) => t.id === taskId);
-            if (!task) return;
 
             // Parse drop zone: "slot-HH:MM"
             const slotMatch = (over.id as string).match(/^slot-(\d{1,2}):(\d{2})$/);
@@ -83,10 +102,38 @@ export function CalendarOrchestrator() {
             const hour = parseInt(slotMatch[1]);
             const minute = parseInt(slotMatch[2]);
 
+            // ─── Check if this is a Pulse Mission drag ─────────────
+            const dragData = active.data?.current;
+            const isPulseDrag = dragData?.type === 'pulse';
+
+            let taskId: string;
+            let estimatedMinutes: number;
+
+            if (isPulseDrag) {
+                // Pulse Mission: accept first, then schedule
+                const suggestion = dragData.suggestion as PulseSuggestion;
+                try {
+                    const task = await acceptSuggestionViaAPI(suggestion);
+                    acceptSuggestion(suggestion, task);
+                    taskId = task.id;
+                    estimatedMinutes = task.estimated_minutes;
+                    toast.success(`Mission eingeplant: ${suggestion.title}`);
+                } catch {
+                    toast.error('Mission konnte nicht erstellt werden.');
+                    return;
+                }
+            } else {
+                // Regular task drag
+                taskId = active.id as string;
+                const task = tasks.find((t) => t.id === taskId);
+                if (!task) return;
+                estimatedMinutes = task.estimated_minutes;
+            }
+
             // Build local time for today
             const today = new Date();
             const startLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, minute);
-            const endLocal = new Date(startLocal.getTime() + task.estimated_minutes * 60000);
+            const endLocal = new Date(startLocal.getTime() + estimatedMinutes * 60000);
 
             // Check for collisions
             const scheduledTasks = tasks.filter(
@@ -106,7 +153,7 @@ export function CalendarOrchestrator() {
 
                 for (let attempt = 0; attempt < 24; attempt++) {
                     pushed = new Date(pushed.getTime() + 30 * 60000); // +30 min
-                    const pushedEnd = new Date(pushed.getTime() + task.estimated_minutes * 60000);
+                    const pushedEnd = new Date(pushed.getTime() + estimatedMinutes * 60000);
 
                     if (pushed.getHours() >= 20) break; // Out of range
 
@@ -121,7 +168,7 @@ export function CalendarOrchestrator() {
                         const mm = pushed.getMinutes().toString().padStart(2, '0');
                         toast.info(`${hour}:${minute < 10 ? '0' + minute : minute} ist belegt. Auf ${hh}:${mm} verschoben.`);
                         startLocal.setTime(pushed.getTime());
-                        endLocal.setTime(pushed.getTime() + task.estimated_minutes * 60000);
+                        endLocal.setTime(pushed.getTime() + estimatedMinutes * 60000);
                         foundFree = true;
                         break;
                     }
@@ -157,7 +204,7 @@ export function CalendarOrchestrator() {
                 toast.error('Zeitblock konnte nicht gespeichert werden.');
             }
         },
-        [tasks, scheduleTask]
+        [tasks, scheduleTask, acceptSuggestion, pulseSuggestions]
     );
 
     return (

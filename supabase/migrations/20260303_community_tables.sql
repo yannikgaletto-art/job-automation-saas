@@ -18,16 +18,19 @@ CREATE TABLE IF NOT EXISTS community_profiles (
 
 ALTER TABLE community_profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "community_profiles_select" ON community_profiles;
 CREATE POLICY "community_profiles_select"
     ON community_profiles FOR SELECT
     TO authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "community_profiles_insert" ON community_profiles;
 CREATE POLICY "community_profiles_insert"
     ON community_profiles FOR INSERT
     TO authenticated
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "community_profiles_update" ON community_profiles;
 CREATE POLICY "community_profiles_update"
     ON community_profiles FOR UPDATE
     TO authenticated
@@ -53,22 +56,26 @@ CREATE TABLE IF NOT EXISTS community_posts (
 
 ALTER TABLE community_posts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "community_posts_select" ON community_posts;
 CREATE POLICY "community_posts_select"
     ON community_posts FOR SELECT
     TO authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "community_posts_insert" ON community_posts;
 CREATE POLICY "community_posts_insert"
     ON community_posts FOR INSERT
     TO authenticated
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "community_posts_update" ON community_posts;
 CREATE POLICY "community_posts_update"
     ON community_posts FOR UPDATE
     TO authenticated
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "community_posts_delete" ON community_posts;
 CREATE POLICY "community_posts_delete"
     ON community_posts FOR DELETE
     TO authenticated
@@ -91,16 +98,19 @@ CREATE TABLE IF NOT EXISTS community_comments (
 
 ALTER TABLE community_comments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "community_comments_select" ON community_comments;
 CREATE POLICY "community_comments_select"
     ON community_comments FOR SELECT
     TO authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "community_comments_insert" ON community_comments;
 CREATE POLICY "community_comments_insert"
     ON community_comments FOR INSERT
     TO authenticated
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "community_comments_delete" ON community_comments;
 CREATE POLICY "community_comments_delete"
     ON community_comments FOR DELETE
     TO authenticated
@@ -119,16 +129,19 @@ CREATE TABLE IF NOT EXISTS community_upvotes (
 
 ALTER TABLE community_upvotes ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "community_upvotes_select" ON community_upvotes;
 CREATE POLICY "community_upvotes_select"
     ON community_upvotes FOR SELECT
     TO authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "community_upvotes_insert" ON community_upvotes;
 CREATE POLICY "community_upvotes_insert"
     ON community_upvotes FOR INSERT
     TO authenticated
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "community_upvotes_delete" ON community_upvotes;
 CREATE POLICY "community_upvotes_delete"
     ON community_upvotes FOR DELETE
     TO authenticated
