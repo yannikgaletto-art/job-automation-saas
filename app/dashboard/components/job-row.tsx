@@ -27,6 +27,7 @@ export interface Job {
     seniority?: string | null;
     buzzwords?: string[] | null;
     metadata?: any;
+    source_url?: string | null;
     matchScore: number;
     workflowStep: number; // 0-4
     dbStatus: string; // Raw DB status (e.g. 'steckbrief_confirmed') — used by getNextAction
@@ -352,6 +353,22 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                     </span>
                                 )}
 
+                                {/* Source URL — direct link to job posting */}
+                                {job.source_url && (
+                                    <a
+                                        href={job.source_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="inline-flex items-center gap-1.5 text-xs text-[#002e7a] hover:text-[#003d99] hover:underline transition-colors"
+                                    >
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                        Originalanzeige ansehen
+                                    </a>
+                                )}
+
                                 {/* 2-Column Split */}
                                 <div className="grid grid-cols-[3fr_2fr] gap-4">
                                     {/* LEFT COLUMN (60%) */}
@@ -440,7 +457,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                             {job.summary && <p className="text-sm text-[#37352F] max-w-lg mx-auto">{job.summary}</p>}
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onReanalyze?.(job.id); }}
-                                                className="text-xs text-blue-600 underline hover:no-underline"
+                                                className="px-4 py-2 bg-[#002e7a] text-white text-xs font-medium rounded-lg hover:bg-[#003d99] transition-colors shadow-sm"
                                             >
                                                 Jetzt analysieren
                                             </button>

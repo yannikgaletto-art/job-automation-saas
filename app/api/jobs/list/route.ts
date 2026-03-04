@@ -27,6 +27,7 @@ export async function GET() {
             .select(`
                 id, 
                 job_url, 
+                source_url,
                 job_title, 
                 company_name, 
                 location, 

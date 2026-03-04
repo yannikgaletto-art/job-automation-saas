@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { LucideIcon, LogOut, Coins } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -98,22 +98,31 @@ export function NavItem({ icon: Icon, label, href, badge, isActive: isActiveProp
           </motion.div>
           <span className="flex-1">{label}</span>
 
-          {shortcut && (
-            <motion.span
-              className="text-xs text-[#A8A29E] font-mono"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-            >
-              {shortcut}
-            </motion.span>
-          )}
-
-          {badge && badge > 0 && (
-            <Badge variant="primary" interactive>
-              {badge}
-            </Badge>
-          )}
+          <div className="w-8 flex justify-end shrink-0">
+            {badge && badge > 0 ? (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={badge}
+                  initial={{ scale: 1.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                >
+                  <Badge variant="primary" interactive>
+                    {badge}
+                  </Badge>
+                </motion.div>
+              </AnimatePresence>
+            ) : shortcut ? (
+              <motion.span
+                className="text-xs text-[#A8A29E] font-mono"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                {shortcut}
+              </motion.span>
+            ) : null}
+          </div>
 
           {/* Active Indicator — only after mount to avoid hydration mismatch */}
           {isActive && (

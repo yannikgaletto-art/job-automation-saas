@@ -58,7 +58,7 @@ export default function JobQueuePage() {
     const fetchJobs = async () => {
         try {
             const res = await fetch('/api/jobs/list', { cache: 'no-store' });
-            if (!res.ok) return;
+            if (!res.ok) return [];
             const data = await res.json();
             if (data.success && data.jobs) {
                 const dbJobs: Job[] = data.jobs.map((j: Record<string, unknown>) => ({
@@ -78,11 +78,15 @@ export default function JobQueuePage() {
                     status: mapDbStatusToUi(j.status as string),
                     // ✅ Pass through metadata so cv_match cache is available in CVMatchTab
                     metadata: (j.metadata as Record<string, unknown>) || null,
+                    source_url: (j.source_url as string) || null,
                 }));
                 setJobs(dbJobs);
+                return dbJobs;
             }
+            return [];
         } catch (err) {
             console.warn('⚠️ Could not fetch jobs:', err);
+            return [];
         }
     };
 
@@ -108,8 +112,8 @@ export default function JobQueuePage() {
             const pollInterval = setInterval(async () => {
                 attempts++;
                 try {
-                    await fetchJobs();
-                    const updatedJob = jobs.find(j => j.id === jobId);
+                    const freshJobs = await fetchJobs();
+                    const updatedJob = freshJobs.find(j => j.id === jobId);
                     if (updatedJob?.summary) {
                         clearInterval(pollInterval);
                         showSafeToast('Steckbrief erfolgreich extrahiert ✓', `extract_success:${jobId}`);

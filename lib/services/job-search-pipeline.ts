@@ -13,6 +13,7 @@ import Anthropic from '@anthropic-ai/sdk';
 export interface SerpApiJob {
     title: string;
     company_name: string;
+    thumbnail?: string; // Company logo URL from SerpAPI
     location: string;
     description: string; // Short description from SerpAPI
     apply_link: string;
@@ -105,15 +106,19 @@ export async function withRetry<T>(
 
 const WERTE_FILTER_KEYWORDS: Record<string, string> = {
     nachhaltigkeit: 'nachhaltig OR ESG OR Green OR Klimaschutz',
-    innovation: 'Innovation OR Disruption OR New Work',
+    innovation: 'Innovation OR Disruption OR Transformation',
     social_impact: 'Social Impact OR gemeinnützig OR NGO',
     deep_tech: 'Deep Tech OR KI OR AI OR Machine Learning',
+    dei: 'Diversity OR Equity OR Inclusion OR Chancengleichheit',
+    gemeinwohl: 'Gemeinwohl OR gemeinnützig OR Wohlfahrt OR Sozialwirtschaft',
+    circular_economy: 'Circular Economy OR Kreislaufwirtschaft OR Recycling OR Nachhaltigkeit',
+    new_work: 'New Work OR Remote OR Hybrid OR Flexibles Arbeiten',
 };
 
 export interface JobSearchFilters {
     experience?: string[];   // ['Entry', 'Mid', 'Senior', 'Lead']
     orgType?: string[];      // ['Startup', 'Konzern', 'NGO', 'Staat']
-    werte?: string[];        // ['nachhaltigkeit', 'innovation', 'social_impact', 'deep_tech']
+    werte?: string[];        // ['nachhaltigkeit', 'innovation', ...]
 }
 
 export async function searchJobs(
@@ -131,15 +136,9 @@ export async function searchJobs(
         enrichedQuery = `${query} ${location}`;
     }
 
-    if (filters?.werte && filters.werte.length > 0) {
-        const keywords = filters.werte
-            .map(w => WERTE_FILTER_KEYWORDS[w])
-            .filter(Boolean)
-            .join(' OR ');
-        if (keywords) {
-            enrichedQuery = `${enrichedQuery} ${keywords}`;
-        }
-    }
+    // We no longer append Werte-Filters to the query string here.
+    // Google Jobs fails with 0 results when query strings are too complex (e.g. "Innovation OR Disruption").
+    // Instead, Phase 10.3 handles this purely via Post-Search Tagging (`tagJobsWithFilters`) on the returned results.
 
     const params = new URLSearchParams({
         engine: 'google_jobs',
@@ -168,6 +167,7 @@ export async function searchJobs(
     const mapped: SerpApiJob[] = jobsResults.map((job: any) => ({
         title: job.title || '',
         company_name: job.company_name || '',
+        thumbnail: job.thumbnail || null,
         location: job.location || '',
         description: job.description || '',
         // Primary: share_link (Google Jobs link — always present)

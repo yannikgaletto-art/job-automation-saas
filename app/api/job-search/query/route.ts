@@ -5,14 +5,75 @@ export const dynamic = 'force-dynamic';
  * 
  * Searches SerpAPI Google Jobs, caches in saved_job_searches (4h TTL),
  * deduplicates against job_queue, and enforces max 10 saved searches.
+ * 
+ * Supports two modes:
+ * - 'keyword' (default): Direct SerpAPI query with user-provided keywords
+ * - 'mission': GPT-4o-mini translates natural-language intent into keywords
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { searchJobs, type JobSearchFilters } from '@/lib/services/job-search-pipeline';
+import OpenAI from 'openai';
 
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const MAX_SAVED_SEARCHES = 10;
+
+// ─── Mission Mode: Intent → Keywords ─────────────────────────────
+
+async function translateMissionIntent(
+    intent: string,
+    fallbackLocation: string,
+): Promise<{ query: string; location: string }> {
+    try {
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const systemPrompt = `Du bist ein HR-Suchexperte. Der User beschreibt seine Karriere-Vision als Freitext.
+Deine Aufgabe: Übersetze die Vision in einen KONKRETEN Jobtitel oder Berufsbezeichnung, die auf Google Jobs tatsächlich gefunden wird.
+
+Regeln:
+1. Der Suchbegriff MUSS ein realer Jobtitel sein (z.B. "Sustainability Manager", "Umweltberater", "CSR Referent"), KEIN abstraktes Konzept
+2. Max 4 Wörter, deutsch oder englisch — je nachdem was auf dem Jobmarkt üblicher ist
+3. Wenn die Vision abstrakt ist, finde den nächstliegenden, real existierenden Jobtitel
+4. Standort extrahieren (falls erwähnt, sonst "Deutschland")
+
+Beispiele:
+- "Ich möchte das Umweltbewusstsein stärken" → "Sustainability Manager"
+- "Ich will die Welt durch Technologie verbessern" → "Impact Engineer"
+- "Ich möchte Menschen bei der Karriere helfen" → "Career Coach"
+
+Antworte AUSSCHLIESSLICH in diesem JSON-Format:
+{"query": "...", "location": "..."}
+Keine Erklärungen, kein Markdown, nur das nackte JSON-Objekt.`;
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: intent },
+            ],
+            response_format: { type: 'json_object' },
+            max_tokens: 100,
+            temperature: 0.3,
+        });
+
+        const raw = completion.choices[0].message.content || '{}';
+        const parsed = JSON.parse(raw);
+
+        const extractedQuery = typeof parsed.query === 'string' && parsed.query.trim()
+            ? parsed.query.trim()
+            : intent;
+        const extractedLocation = typeof parsed.location === 'string' && parsed.location.trim()
+            ? parsed.location.trim()
+            : fallbackLocation || 'Deutschland';
+
+        console.log(`✅ [Search] Mission translated: "${intent}" → query="${extractedQuery}", location="${extractedLocation}"`);
+        return { query: extractedQuery, location: extractedLocation };
+    } catch (err) {
+        console.warn('⚠️ [Search] Mission mode fallback to raw query:', err instanceof Error ? err.message : String(err));
+        return { query: intent, location: fallbackLocation || 'Deutschland' };
+    }
+}
 
 export async function POST(request: NextRequest) {
     try {
@@ -23,21 +84,33 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { query, location, filters, forceRefresh } = body as {
+        const { query, location, filters, forceRefresh, mode } = body as {
             query: string;
             location: string;
             filters?: JobSearchFilters;
             forceRefresh?: boolean;
+            mode?: 'keyword' | 'mission';
         };
 
         if (!query?.trim()) {
             return NextResponse.json({ error: 'Query is required' }, { status: 400 });
         }
 
+        const searchMode = mode || 'keyword';
         const trimmedQuery = query.trim();
         const trimmedLocation = (location || '').trim();
 
-        // ─── 1. Cache Check ──────────────────────────────────────────
+        // ─── Mission Mode: translate intent → keywords ──────────────
+        let serpApiQuery = trimmedQuery;
+        let serpApiLocation = trimmedLocation;
+
+        if (searchMode === 'mission') {
+            const translated = await translateMissionIntent(trimmedQuery, trimmedLocation);
+            serpApiQuery = translated.query;
+            serpApiLocation = translated.location;
+        }
+
+        // ─── 1. Cache Check (uses original intent as key) ───────────
         const { data: cached } = await supabase
             .from('saved_job_searches')
             .select('*')
@@ -66,14 +139,18 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // ─── 2. SerpAPI Fetch ────────────────────────────────────────
-        console.log(`✅ [Search] Querying SerpAPI: "${trimmedQuery}" in "${trimmedLocation}"`);
-        const jobs = await searchJobs(trimmedQuery, trimmedLocation, filters);
+        // ─── 2. SerpAPI Fetch (uses extracted keywords for mission) ──
+        console.log(`✅ [Search] Querying SerpAPI: "${serpApiQuery}" in "${serpApiLocation}"`);
+        const jobs = await searchJobs(serpApiQuery, serpApiLocation, filters);
 
         // ─── 3. Cross-Queue Check ────────────────────────────────────
         const enriched = await enrichWithQueueStatus(supabase, user.id, jobs);
 
+        // ─── 3.5. Tag jobs with matching Werte-Filters ───────────────
+        const tagged = await tagJobsWithFilters(enriched, filters?.werte);
+
         // ─── 4. Upsert into saved_job_searches ──────────────────────
+        // query = original intent text (so accordion header shows user's words)
         const { data: upserted, error: upsertError } = await supabase
             .from('saved_job_searches')
             .upsert({
@@ -81,11 +158,13 @@ export async function POST(request: NextRequest) {
                 query: trimmedQuery,
                 location: trimmedLocation,
                 filters: filters || {},
-                results: enriched,
-                result_count: enriched.length,
+                results: tagged,
+                result_count: tagged.length,
                 fetched_at: new Date().toISOString(),
+                search_mode: searchMode,
             }, {
                 onConflict: 'user_id,query,location',
+                ignoreDuplicates: false,
             })
             .select('id')
             .single();
@@ -98,10 +177,10 @@ export async function POST(request: NextRequest) {
         await enforceMaxSearches(supabase, user.id);
 
         return NextResponse.json({
-            results: enriched,
+            results: tagged,
             cached: false,
             search_id: upserted?.id || null,
-            result_count: enriched.length,
+            result_count: tagged.length,
         });
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
@@ -152,6 +231,77 @@ async function enforceMaxSearches(supabase: any, userId: string) {
             .from('saved_job_searches')
             .delete()
             .in('id', toDelete);
-        console.log(`✅ [Search] Cleaned up ${toDelete.length} old searches`);
+        console.log(`[Search] Cleaned up ${toDelete.length} old searches`);
+    }
+}
+
+// ─── GPT-4o-mini Werte-Filter Tagging ─────────────────────────────
+
+async function tagJobsWithFilters(
+    jobs: any[],
+    activeFilters?: string[]
+): Promise<any[]> {
+    // Only tag if user has selected Werte-Filters
+    if (!activeFilters || activeFilters.length === 0 || jobs.length === 0) {
+        return jobs.map(j => ({ ...j, matched_filters: [] }));
+    }
+
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!openaiKey) {
+        return jobs.map(j => ({ ...j, matched_filters: [] }));
+    }
+
+    try {
+        const openai = new OpenAI({ apiKey: openaiKey });
+
+        const jobSummaries = jobs.map((j, i) =>
+            `Job ${i}: "${j.title}" bei ${j.company_name}. ${(j.description || '').slice(0, 200)}`
+        ).join('\n');
+
+        const filterLabels: Record<string, string> = {
+            nachhaltigkeit: 'Nachhaltigkeit (ESG, Klimaschutz, Umwelt)',
+            innovation: 'Innovation (Disruption, Transformation)',
+            social_impact: 'Social Impact (gemeinnützig, NGO, sozial)',
+            deep_tech: 'Deep Tech (KI, AI, Machine Learning, Forschung)',
+            dei: 'Diversity / Equity / Inclusion (Chancengleichheit, Vielfalt)',
+            gemeinwohl: 'Gemeinwohl (gemeinnützig, Wohlfahrt, Sozialwirtschaft)',
+            circular_economy: 'Circular Economy (Kreislaufwirtschaft, Recycling)',
+            new_work: 'New Work (Remote, Hybrid, Flexibles Arbeiten, Agilität)',
+        };
+
+        const filterDescriptions = activeFilters
+            .map(f => `"${f}": ${filterLabels[f] || f}`)
+            .join(', ');
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            temperature: 0,
+            max_tokens: 500,
+            response_format: { type: 'json_object' },
+            messages: [
+                {
+                    role: 'system',
+                    content: `Klassifiziere Jobs nach Werte-Filtern. Aktive Filter: ${filterDescriptions}.
+Für jeden Job: Gib nur die Filter zurück, die WIRKLICH aus dem Text ersichtlich sind. Halluziniere NICHT.
+Antwort als JSON: {"tags": [["filter1"], ["filter1", "filter2"], [], ...]}
+Das Array hat exakt ${jobs.length} Einträge (einer pro Job). Leeres Array = kein Filter passt.`
+                },
+                { role: 'user', content: jobSummaries }
+            ],
+        });
+
+        const text = completion.choices[0]?.message?.content?.trim();
+        if (!text) return jobs.map(j => ({ ...j, matched_filters: [] }));
+
+        const parsed = JSON.parse(text);
+        const tags: string[][] = parsed.tags || [];
+
+        return jobs.map((job, i) => ({
+            ...job,
+            matched_filters: tags[i] || [],
+        }));
+    } catch (err) {
+        console.warn('[Search] Filter tagging failed, continuing without tags');
+        return jobs.map(j => ({ ...j, matched_filters: [] }));
     }
 }

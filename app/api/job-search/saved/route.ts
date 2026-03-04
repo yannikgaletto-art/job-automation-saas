@@ -27,7 +27,41 @@ export async function GET() {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        return NextResponse.json({ searches: searches || [] });
+        // Enrich results with already_in_queue status
+        const allSearches = searches || [];
+        if (allSearches.length > 0) {
+            // Collect all unique apply_links across all searches
+            const allLinks = new Set<string>();
+            for (const s of allSearches) {
+                if (Array.isArray(s.results)) {
+                    for (const job of s.results) {
+                        if (job.apply_link) allLinks.add(job.apply_link);
+                    }
+                }
+            }
+
+            if (allLinks.size > 0) {
+                const { data: queuedJobs } = await supabase
+                    .from('job_queue')
+                    .select('source_url')
+                    .eq('user_id', user.id)
+                    .in('source_url', Array.from(allLinks));
+
+                const queuedUrls = new Set((queuedJobs || []).map((j: any) => j.source_url));
+
+                // Tag each job in each search
+                for (const s of allSearches) {
+                    if (Array.isArray(s.results)) {
+                        s.results = s.results.map((job: any) => ({
+                            ...job,
+                            already_in_queue: queuedUrls.has(job.apply_link),
+                        }));
+                    }
+                }
+            }
+        }
+
+        return NextResponse.json({ searches: allSearches });
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
         return NextResponse.json({ error: errMsg }, { status: 500 });

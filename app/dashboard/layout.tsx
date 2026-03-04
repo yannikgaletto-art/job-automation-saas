@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect } from 'react';
 import { Sidebar, NavSection, NavItem } from '@/components/motion/sidebar';
-import { Home, Search, Inbox, BarChart3, Shield, Settings } from 'lucide-react';
+import { Home, Search, Inbox, BarChart3, Users, Shield, Settings } from 'lucide-react';
 import { PomodoroMiniWidget } from './components/pomodoro-mini-widget';
 import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
@@ -9,6 +10,7 @@ import { MorningBriefing } from '@/components/dashboard/morning-briefing';
 import { CommandPalette } from '@/components/dashboard/command-palette';
 import { MoodCheckInOverlay } from '@/components/MoodCheckInOverlay';
 import { useMoodCheckIn } from './hooks/useMoodCheckIn';
+import { useJobQueueCount } from '@/store/use-job-queue-count';
 
 export default function DashboardLayout({
     children,
@@ -17,6 +19,19 @@ export default function DashboardLayout({
 }) {
     const pathname = usePathname();
     const { showOverlay: showMoodOverlay, dismiss: dismissMoodOverlay } = useMoodCheckIn();
+    const { count: queueCount, setCount } = useJobQueueCount();
+
+    // Fetch initial queue count on mount
+    useEffect(() => {
+        fetch('/api/jobs/list')
+            .then(r => r.json())
+            .then(data => {
+                if (data.jobs && Array.isArray(data.jobs)) {
+                    setCount(data.jobs.length);
+                }
+            })
+            .catch(() => { }); // Silent — badge is nice-to-have
+    }, [setCount]);
 
     return (
         <>
@@ -32,8 +47,12 @@ export default function DashboardLayout({
                             shortcut="G"
                         />
                         <NavItem icon={Search} label="Job Search" href="/dashboard/job-search" shortcut="S" />
-                        <NavItem icon={Inbox} label="Job Queue" href="/dashboard/job-queue" shortcut="Q" />
+                        <NavItem icon={Inbox} label="Job Queue" href="/dashboard/job-queue" shortcut="Q" badge={queueCount > 0 ? queueCount : undefined} />
                         <NavItem icon={BarChart3} label="Analytics" href="/dashboard/analytics" shortcut="A" />
+                    </NavSection>
+
+                    <NavSection title="Community">
+                        <NavItem icon={Users} label="Community" href="/dashboard/community" shortcut="C" />
                     </NavSection>
 
                     <NavSection title="Tools">
