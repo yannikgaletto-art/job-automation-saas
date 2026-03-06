@@ -7,10 +7,13 @@
 ALTER TABLE public.tasks
   ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual';
 
--- Step 2: Add constraint as NOT VALID (no table scan)
-ALTER TABLE public.tasks
-  ADD CONSTRAINT tasks_source_check
-  CHECK (source IN ('manual', 'pulse')) NOT VALID;
+-- Step 2: Add constraint as NOT VALID (idempotent)
+DO $$ BEGIN
+  ALTER TABLE public.tasks
+    ADD CONSTRAINT tasks_source_check
+    CHECK (source IN ('manual', 'pulse')) NOT VALID;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Step 3: Validate constraint (non-blocking background scan)
 ALTER TABLE public.tasks

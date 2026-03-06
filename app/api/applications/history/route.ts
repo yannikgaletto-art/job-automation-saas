@@ -34,6 +34,7 @@ export async function GET(request: Request) {
                 companyName: app.company_name,
                 jobTitle: app.job_title,
                 appliedAt: app.applied_at,
+                submittedAt: app.submitted_at || null,
                 applicationMethod: app.application_method,
                 jobUrl: app.job_url,
                 generatedDocuments: {
@@ -64,6 +65,45 @@ export async function GET(request: Request) {
             })
         }
 
+        return NextResponse.json(
+            { error: error.message || "Internal Server Error" },
+            { status: 500 }
+        )
+    }
+}
+
+/**
+ * PATCH: Toggle "Bewerbung abgeschickt" checkbox.
+ * Sets submitted_at = NOW() when checked, NULL when unchecked.
+ * RLS enforced via authenticated Supabase client.
+ */
+export async function PATCH(request: Request) {
+    const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    try {
+        const body = await request.json()
+        const { id, submitted } = body
+
+        if (!id || typeof submitted !== 'boolean') {
+            return NextResponse.json({ error: "Missing id or submitted field" }, { status: 400 })
+        }
+
+        const { error } = await supabase
+            .from("application_history")
+            .update({ submitted_at: submitted ? new Date().toISOString() : null })
+            .eq("id", id)
+            .eq("user_id", user.id) // Double-check ownership
+
+        if (error) throw error
+
+        return NextResponse.json({ success: true })
+    } catch (error: any) {
+        console.error("Error in PATCH /api/applications/history:", error)
         return NextResponse.json(
             { error: error.message || "Internal Server Error" },
             { status: 500 }

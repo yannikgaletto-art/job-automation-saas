@@ -97,15 +97,29 @@ export async function generateCoverLetterWithQuality(
 
     if (profileError || !profileData) throw new Error(`Profile not found: ${profileError?.message}`);
 
-    const { data: docs } = await supabaseAdmin
-        .from('documents')
-        .select('metadata')
-        .eq('user_id', userId)
-        .eq('document_type', 'cover_letter')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-    const styleAnalysis: StyleAnalysis | null = docs?.[0]?.metadata?.style_analysis ?? null;
+    // ─── Style Analysis: Route based on toneSource ─────────────────────────
+    let styleAnalysis: StyleAnalysis | null = null;
+    if (setupContext?.tone?.toneSource === 'custom-style' && setupContext.tone.selectedStyleDocId) {
+        // Load the user-selected document's style analysis
+        const { data: selectedDoc } = await supabaseAdmin
+            .from('documents')
+            .select('metadata')
+            .eq('id', setupContext.tone.selectedStyleDocId)
+            .eq('user_id', userId) // RLS defense-in-depth
+            .single();
+        styleAnalysis = selectedDoc?.metadata?.style_analysis ?? null;
+        console.log(`[CoverLetterGen] Using custom style from doc ${setupContext.tone.selectedStyleDocId}: ${styleAnalysis ? 'found' : 'not found'}`);
+    } else {
+        // Legacy: latest cover letter style
+        const { data: docs } = await supabaseAdmin
+            .from('documents')
+            .select('metadata')
+            .eq('user_id', userId)
+            .eq('document_type', 'cover_letter')
+            .order('created_at', { ascending: false })
+            .limit(1);
+        styleAnalysis = docs?.[0]?.metadata?.style_analysis ?? null;
+    }
 
     let research: CompanyResearchData | undefined = jobData.company_research?.[0]?.intel_data;
 
@@ -177,7 +191,7 @@ REGELN:
 
     try {
         const message = await anthropic.messages.create({
-            model: 'claude-3-5-sonnet-20241022',
+            model: 'claude-sonnet-4-5-20250929',
             max_tokens: 1500,
             temperature: 0.5,
             messages: [{ role: 'user', content: prompt }]
@@ -250,7 +264,7 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
         }
 
         const message = await anthropic.messages.create({
-            model: 'claude-3-5-sonnet-20241022',
+            model: 'claude-sonnet-4-5-20250929',
             max_tokens: 2000,
             temperature: 0.7,
             system: 'You are a senior career advisor and expert cover letter writer. Output ONLY the letter body. No explanations, no markdown, no preamble.',
@@ -527,7 +541,7 @@ Kein Freitext, nur das JSON-Array.`;
     console.log('🔍 [AuditTrail] Generating audit trail via Haiku...');
 
     const message = await anthropic.messages.create({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 1500,
         temperature: 0.1,
         system: 'You are a text analysis assistant. Respond ONLY with a valid JSON array.',

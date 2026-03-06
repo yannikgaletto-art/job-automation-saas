@@ -36,6 +36,8 @@ export interface SelectedCVStation {
 // ─── Step C Output ────────────────────────────────────────────────
 export interface ToneConfig {
     preset: TonePreset;
+    toneSource: 'preset' | 'custom-style';  // Woher der Ton kommt: Preset oder eigenes Anschreiben
+    selectedStyleDocId?: string;             // Welches Anschreiben für Custom-Style (Document ID)
     targetLanguage: TargetLanguage;      // Sprache des Anschreibens
     hasStyleSample: boolean;             // Wurde altes Anschreiben hochgeladen?
     styleWarningAcknowledged: boolean;   // User hat Anti-GPT-Callout gelesen
@@ -126,4 +128,10 @@ export interface SetupDataResponse {
     hasStyleSample: boolean;
     styleAnalysisSummary: string;   // z.B. "Formal, Ø 20 Wörter/Satz"
     detectedJobLanguage: TargetLanguage;
+    availableStyleDocs: Array<{
+        id: string;
+        fileName: string;
+        createdAt: string;
+        hasStyleAnalysis: boolean;
+    }>;
 }

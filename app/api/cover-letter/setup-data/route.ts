@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
     try {
         // ─── Parallel Queries ─────────────────────────────────────────
-        const [jobRes, docsRes, profileRes] = await Promise.all([
+        const [jobRes, docsRes, profileRes, allCLDocsRes] = await Promise.all([
             supabase
                 .from('job_queue')
                 .select('requirements, metadata, company_name, company_website, job_title')
@@ -32,6 +32,17 @@ export async function GET(req: NextRequest) {
                 .select('cv_structured_data')
                 .eq('id', user.id)
                 .single(),
+
+            // All cover letter docs for tone source selection (slim payload)
+            // WHY: metadata->>'original_name' fetches ONLY the key we need from the JSONB column,
+            // preventing the full metadata blob (incl. extracted_text) from being loaded.
+            supabase
+                .from('documents')
+                .select('id, created_at, metadata->>original_name, metadata->style_analysis')
+                .eq('user_id', user.id)
+                .eq('document_type', 'cover_letter')
+                .order('created_at', { ascending: false })
+                .limit(15),
         ]);
 
         if (jobRes.error || !jobRes.data) {
@@ -205,6 +216,17 @@ export async function GET(req: NextRequest) {
         const detectedJobLanguage: TargetLanguage =
             (job.metadata?.language || 'de') as TargetLanguage;
 
+        // ─── Available Style Docs (for Tone Source Selection) ─────────
+        // WHY: PostgREST JSON subkey select returns flattened keys:
+        //   metadata->>original_name  → row.original_name (as string)
+        //   metadata->style_analysis  → row.style_analysis (as object/null)
+        const availableStyleDocs = (allCLDocsRes.data || []).map((doc: any) => ({
+            id: doc.id,
+            fileName: (doc.original_name as string) || 'Anschreiben',
+            createdAt: doc.created_at,
+            hasStyleAnalysis: !!doc.style_analysis,
+        }));
+
         const response: SetupDataResponse = {
             hooks,
             hasPerplexityData: hooks.some((h) => h.type !== 'manual'),
@@ -215,6 +237,7 @@ export async function GET(req: NextRequest) {
             hasStyleSample,
             styleAnalysisSummary,
             detectedJobLanguage,
+            availableStyleDocs,
         };
 
         console.log(`✅ [SetupData] Built for job ${jobId}: ${hooks.length} hooks, ${cvData.length} stations`);

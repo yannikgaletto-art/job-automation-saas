@@ -46,7 +46,7 @@ export async function processDocument(
             analysisResult = mockExtraction(rawText);
         } else {
             const message = await anthropic.messages.create({
-                model: 'claude-3-haiku-20240307', // Fast & cheap
+                model: 'claude-haiku-4-5-20251001', // Fast & cheap
                 max_tokens: 1024,
                 temperature: 0,
                 system: "You are a specialized CV Parser. Extract Personally Identifiable Information (PII) and professional metadata from the text. Return ONLY valid JSON.",

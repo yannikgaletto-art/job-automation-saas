@@ -2,20 +2,19 @@
 
 import { useState, useEffect } from "react"
 import { TableSkeleton } from "@/components/skeletons/table-skeleton"
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ExternalLink, Download, ChevronLeft, ChevronRight, FileText, Loader2 } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight } from "lucide-react"
 import { formatAppliedDate } from "@/lib/utils/date-formatting"
 import { motion } from "framer-motion"
-import { ErrorAlert } from "@/components/ui/error-alert"
 import { EmptyApplicationHistory } from "@/components/empty-states/empty-application-history"
+import { cn } from "@/lib/utils"
+import { showSafeToast } from "@/lib/utils/toast"
 
 interface Application {
     id: string
     companyName: string
     jobTitle: string
     appliedAt: string
+    submittedAt: string | null
     applicationMethod: "auto" | "manual" | "extension"
     jobUrl: string
     generatedDocuments?: {
@@ -39,6 +38,7 @@ export function ApplicationHistory() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [page, setPage] = useState(1)
+    const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
 
     useEffect(() => {
         fetchHistory(page)
@@ -50,16 +50,10 @@ export function ApplicationHistory() {
         try {
             const res = await fetch(`/api/applications/history?page=${pageNum}&limit=10`)
 
-            // Handle unauthenticated users gracefully (show empty state instead of error)
             if (res.status === 401) {
                 setData({
                     applications: [],
-                    pagination: {
-                        page: 1,
-                        limit: 10,
-                        total: 0,
-                        hasMore: false
-                    }
+                    pagination: { page: 1, limit: 10, total: 0, hasMore: false }
                 })
                 setLoading(false)
                 return
@@ -85,125 +79,197 @@ export function ApplicationHistory() {
         }
     }
 
-    const MethodBadge = ({ method }: { method: Application["applicationMethod"] }) => {
-        const variants = {
-            auto: { label: "Auto", className: "bg-green-100 text-green-700 hover:bg-green-100" },
-            manual: { label: "Manual", className: "bg-blue-100 text-blue-700 hover:bg-blue-100" },
-            extension: { label: "Extension", className: "bg-purple-100 text-purple-700 hover:bg-purple-100" }
+    const handleToggleSubmitted = async (appId: string, currentlySubmitted: boolean) => {
+        const newSubmitted = !currentlySubmitted
+        setTogglingIds(prev => new Set(prev).add(appId))
+
+        // Optimistic update
+        setData(prev => {
+            if (!prev) return prev
+            return {
+                ...prev,
+                applications: prev.applications.map(app =>
+                    app.id === appId
+                        ? { ...app, submittedAt: newSubmitted ? new Date().toISOString() : null }
+                        : app
+                )
+            }
+        })
+
+        try {
+            const res = await fetch('/api/applications/history', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: appId, submitted: newSubmitted })
+            })
+
+            if (!res.ok) throw new Error('Failed to update')
+
+            // Confetti on marking as submitted
+            if (newSubmitted) {
+                import('canvas-confetti').then(({ default: confetti }) => {
+                    const duration = 2000
+                    const end = Date.now() + duration
+
+                    const frame = () => {
+                        confetti({
+                            particleCount: 3,
+                            angle: 60,
+                            spread: 55,
+                            origin: { x: 0, y: 0.7 },
+                            colors: ['#002e7a', '#3b82f6', '#60a5fa', '#93c5fd'],
+                        })
+                        confetti({
+                            particleCount: 3,
+                            angle: 120,
+                            spread: 55,
+                            origin: { x: 1, y: 0.7 },
+                            colors: ['#002e7a', '#3b82f6', '#60a5fa', '#93c5fd'],
+                        })
+                        if (Date.now() < end) {
+                            requestAnimationFrame(frame)
+                        }
+                    }
+                    frame()
+                })
+            }
+        } catch {
+            // Revert on error
+            setData(prev => {
+                if (!prev) return prev
+                return {
+                    ...prev,
+                    applications: prev.applications.map(app =>
+                        app.id === appId
+                            ? { ...app, submittedAt: currentlySubmitted ? app.submittedAt : null }
+                            : app
+                    )
+                }
+            })
+            showSafeToast('Fehler beim Speichern', `submit_toggle_error:${appId}`, 'error')
+        } finally {
+            setTogglingIds(prev => {
+                const next = new Set(prev)
+                next.delete(appId)
+                return next
+            })
         }
-        const { label, className } = variants[method] || variants.manual
-        return <Badge className={className} variant="secondary">{label}</Badge>
     }
 
     if (error) {
         return (
-            <ErrorAlert
-                message="Failed to load application history."
-                onRetry={() => fetchHistory(page)}
-            />
+            <div className="text-center py-8 text-sm text-red-500">
+                Fehler beim Laden der Application History.
+                <button
+                    onClick={() => fetchHistory(page)}
+                    className="ml-2 text-[#002e7a] hover:underline"
+                >
+                    Erneut versuchen
+                </button>
+            </div>
         )
     }
 
+    if (loading) {
+        return <TableSkeleton rows={3} columns={4} />
+    }
+
+    const isEmpty = !data || data.applications.length === 0
+
     return (
-        <div className="bg-white rounded-xl border border-[#d6d6d6] overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                        <TableRow className="hover:bg-transparent border-[#d6d6d6]">
-                            <TableHead className="w-[250px] text-[#73726E]">Company & Role</TableHead>
-                            <TableHead className="text-[#73726E]">Applied</TableHead>
-                            <TableHead className="text-[#73726E]">Method</TableHead>
-                            <TableHead className="text-right text-[#73726E]">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {loading ? (
-                            <TableRow>
-                                <TableCell colSpan={4} className="p-0">
-                                    <div className="p-4">
-                                        <TableSkeleton rows={5} columns={4} />
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ) : data?.applications.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={4} className="h-64 text-center">
-                                    <EmptyApplicationHistory />
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            data?.applications.map((app) => (
-                                <TableRow key={app.id} className="group hover:bg-[#fafaf9] border-[#d6d6d6] transition-colors">
-                                    <TableCell>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-lg font-semibold text-gray-500 uppercase shrink-0">
-                                                {app.companyName.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-[#37352F]">{app.companyName}</div>
-                                                <div className="text-xs text-gray-500 truncate max-w-[150px]">{app.jobTitle}</div>
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-sm text-gray-600">
-                                        {formatAppliedDate(app.appliedAt)}
-                                    </TableCell>
-                                    <TableCell>
-                                        <MethodBadge method={app.applicationMethod} />
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-gray-500 hover:text-[#37352F]"
-                                                onClick={() => window.open(app.jobUrl, "_blank")}
-                                                title="Open Job URL"
-                                            >
-                                                <ExternalLink className="h-4 w-4" />
-                                            </Button>
-                                            {/* Future: Download Documents */}
-                                            {/* {app.generatedDocuments?.cv_url && (
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500">
-                                                    <Download className="h-4 w-4" />
-                                                </Button>
-                                            )} */}
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
+        <div>
+            {/* Table Header — always visible */}
+            <div className="grid grid-cols-[1fr_1fr_140px_140px] gap-4 px-5 py-2.5 text-xs font-medium text-[#73726E] uppercase tracking-wider border-b border-[#E7E7E5]">
+                <span>Job</span>
+                <span>Company</span>
+                <span>Fertiggestellt am</span>
+                <span className="text-center">Abgeschickt</span>
             </div>
 
-            {/* Pagination */}
-            {data && data.pagination.total > 0 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-[#d6d6d6] bg-[#fafaf9]">
-                    <div className="text-xs text-gray-500">
-                        Page {data.pagination.page} of {Math.ceil(data.pagination.total / data.pagination.limit)}
-                    </div>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={page === 1 || loading}
-                            onClick={() => setPage(p => p - 1)}
-                            className="h-8 px-2"
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!data.pagination.hasMore || loading}
-                            onClick={() => setPage(p => p + 1)}
-                            className="h-8 px-2"
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                    </div>
+            {isEmpty ? (
+                <div className="py-12">
+                    <EmptyApplicationHistory />
                 </div>
+            ) : (
+                <>
+                    {/* Rows */}
+                    <div>
+                        {data.applications.map((app) => {
+                            const isSubmitted = !!app.submittedAt
+                            const isToggling = togglingIds.has(app.id)
+
+                            return (
+                                <motion.div
+                                    key={app.id}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className={cn(
+                                        "grid grid-cols-[1fr_1fr_140px_140px] gap-4 px-5 py-3.5 items-center border-b border-[#E7E7E5] last:border-b-0 transition-colors",
+                                        isSubmitted ? "bg-[#f0fdf4]" : "hover:bg-[#FAFAF9]"
+                                    )}
+                                >
+                                    {/* Job */}
+                                    <div className="text-sm text-[#37352F] truncate" title={app.jobTitle}>
+                                        {app.jobTitle || "–"}
+                                    </div>
+
+                                    {/* Company */}
+                                    <div className="text-sm font-medium text-[#37352F] truncate" title={app.companyName}>
+                                        {app.companyName}
+                                    </div>
+
+                                    {/* Fertiggestellt am */}
+                                    <div className="text-sm text-[#73726E]">
+                                        {formatAppliedDate(app.appliedAt)}
+                                    </div>
+
+                                    {/* Bewerbung abgeschickt — Checkbox */}
+                                    <div className="flex justify-center">
+                                        <button
+                                            onClick={() => handleToggleSubmitted(app.id, isSubmitted)}
+                                            disabled={isToggling}
+                                            className={cn(
+                                                "w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200",
+                                                isSubmitted
+                                                    ? "bg-green-500 border-green-500 text-white"
+                                                    : "border-[#D6D6D3] hover:border-[#002e7a] bg-white",
+                                                isToggling && "opacity-50 cursor-wait"
+                                            )}
+                                            title={isSubmitted ? "Als nicht abgeschickt markieren" : "Als abgeschickt markieren"}
+                                        >
+                                            {isSubmitted && <Check className="w-3 h-3" />}
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )
+                        })}
+                    </div>
+
+                    {/* Pagination */}
+                    {data.pagination.total > data.pagination.limit && (
+                        <div className="flex items-center justify-between px-5 py-3 border-t border-[#E7E7E5]">
+                            <span className="text-xs text-[#73726E]">
+                                Seite {data.pagination.page} von {Math.ceil(data.pagination.total / data.pagination.limit)}
+                            </span>
+                            <div className="flex gap-2">
+                                <button
+                                    disabled={page === 1}
+                                    onClick={() => setPage(p => p - 1)}
+                                    className="p-1.5 rounded-md border border-[#E7E7E5] text-[#73726E] hover:bg-[#FAFAF9] disabled:opacity-30 transition-colors"
+                                >
+                                    <ChevronLeft className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                    disabled={!data.pagination.hasMore}
+                                    onClick={() => setPage(p => p + 1)}
+                                    className="p-1.5 rounded-md border border-[#E7E7E5] text-[#73726E] hover:bg-[#FAFAF9] disabled:opacity-30 transition-colors"
+                                >
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     )

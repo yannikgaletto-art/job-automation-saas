@@ -7,11 +7,16 @@
  *
  * Contract (SICHERHEITSARCHITEKTUR.md Section 6):
  * - XHR for real upload progress
- * - Status texts: 0-30% “Datei wird hochgeladen...”, 30-80% “Wird gespeichert...”, 80-100% “Fertig ✅”
+ * - Status texts: 0-30% "Datei wird hochgeladen...", 30-80% "Wird gespeichert...", 80-100% "Fertig ✅"
+ *
+ * Cover Letter Categorization:
+ * - User-created categories stored in localStorage
+ * - Collapsible category groups reduce visual clutter
  */
 
 import { useState, useEffect, useRef } from "react";
-import { FileText, Upload, Trash2, Plus, Download } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X } from "lucide-react";
 import { Button } from "@/components/motion/button";
 import { showSafeToast } from "@/lib/utils/toast";
 
@@ -22,12 +27,39 @@ type DocumentEntry = {
     createdAt: string;
 };
 
+type CategoryMap = Record<string, string[]>; // categoryName → [documentId, ...]
+
+const STORAGE_KEY = 'pathly_cl_categories';
+const COLLAPSED_KEY = 'pathly_cl_collapsed';
+
 function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("de-DE", {
         day: "numeric",
         month: "short",
         year: "numeric",
     });
+}
+
+function loadCategories(): CategoryMap {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+}
+
+function saveCategories(map: CategoryMap) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+}
+
+function loadCollapsed(): Record<string, boolean> {
+    try {
+        const raw = localStorage.getItem(COLLAPSED_KEY);
+        return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+}
+
+function saveCollapsed(map: Record<string, boolean>) {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify(map));
 }
 
 export function ActiveCVCard() {
@@ -38,6 +70,15 @@ export function ActiveCVCard() {
     const [uploadStatus, setUploadStatus] = useState<string>('');
     const cvRef = useRef<HTMLInputElement>(null);
     const clRef = useRef<HTMLInputElement>(null);
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const returnTo = searchParams.get('returnTo');
+
+    // Category state
+    const [categories, setCategories] = useState<CategoryMap>({});
+    const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [showAddCategory, setShowAddCategory] = useState(false);
 
     const loadDocs = async () => {
         try {
@@ -51,7 +92,11 @@ export function ActiveCVCard() {
         }
     };
 
-    useEffect(() => { loadDocs(); }, []);
+    useEffect(() => {
+        loadDocs();
+        setCategories(loadCategories());
+        setCollapsed(loadCollapsed());
+    }, []);
 
     const handleUpload = async (file: File, type: 'cv' | 'cover_letter') => {
         setUploading(type);
@@ -101,6 +146,14 @@ export function ActiveCVCard() {
                 `upload_success:${type}`
             );
             await loadDocs();
+
+            // QA Integration: If user came from a feature via DocumentsRequiredDialog,
+            // redirect them back after successful upload
+            if (returnTo) {
+                setTimeout(() => {
+                    router.push(decodeURIComponent(returnTo));
+                }, 1500); // Short delay so user sees "Fertig ✅" status
+            }
         } catch (err: any) {
             showSafeToast(err.message || 'Upload fehlgeschlagen', `upload_error:${type}`, 'error');
         } finally {
@@ -119,6 +172,13 @@ export function ActiveCVCard() {
             if (!res.ok) throw new Error(data.error || 'Löschen fehlgeschlagen');
             showSafeToast('Dokument gelöscht', `delete_success:${id}`);
             setDocs(prev => prev.filter(d => d.id !== id));
+            // Also remove from categories
+            const updated = { ...categories };
+            for (const cat of Object.keys(updated)) {
+                updated[cat] = updated[cat].filter(docId => docId !== id);
+            }
+            setCategories(updated);
+            saveCategories(updated);
         } catch (err: unknown) {
             const errMsg = err instanceof Error ? err.message : 'Löschen fehlgeschlagen';
             showSafeToast(errMsg, `delete_error:${id}`, 'error');
@@ -144,8 +204,100 @@ export function ActiveCVCard() {
         }
     };
 
+    // Category management
+    const addCategory = () => {
+        const name = newCategoryName.trim();
+        if (!name || categories[name]) return;
+        const updated = { ...categories, [name]: [] };
+        setCategories(updated);
+        saveCategories(updated);
+        setNewCategoryName('');
+        setShowAddCategory(false);
+    };
+
+    const deleteCategory = (name: string) => {
+        const updated = { ...categories };
+        delete updated[name];
+        setCategories(updated);
+        saveCategories(updated);
+    };
+
+    const toggleCollapse = (name: string) => {
+        const updated = { ...collapsed, [name]: !collapsed[name] };
+        setCollapsed(updated);
+        saveCollapsed(updated);
+    };
+
+    const assignCategory = (docId: string, categoryName: string) => {
+        const updated = { ...categories };
+        // Remove from all categories first
+        for (const cat of Object.keys(updated)) {
+            updated[cat] = updated[cat].filter(id => id !== docId);
+        }
+        // Add to target
+        if (categoryName !== '__none__') {
+            updated[categoryName] = [...(updated[categoryName] || []), docId];
+        }
+        setCategories(updated);
+        saveCategories(updated);
+    };
+
+    const getCategoryForDoc = (docId: string): string | null => {
+        for (const [cat, ids] of Object.entries(categories)) {
+            if (ids.includes(docId)) return cat;
+        }
+        return null;
+    };
+
     const cvDocs = docs.filter(d => d.type === 'cv');
     const clDocs = docs.filter(d => d.type === 'cover_letter');
+
+    // Group cover letters by category
+    const categoryNames = Object.keys(categories);
+    const categorizedCLs: Record<string, DocumentEntry[]> = {};
+    const uncategorizedCLs: DocumentEntry[] = [];
+
+    for (const doc of clDocs) {
+        const cat = getCategoryForDoc(doc.id);
+        if (cat) {
+            if (!categorizedCLs[cat]) categorizedCLs[cat] = [];
+            categorizedCLs[cat].push(doc);
+        } else {
+            uncategorizedCLs.push(doc);
+        }
+    }
+
+    const renderDocRow = (doc: DocumentEntry, highlight: boolean = false) => (
+        <li key={doc.id} className={`flex items-center gap-3 p-3 rounded-lg ${highlight ? 'bg-[#F0F7FF] border border-[#0066FF]/20' : 'bg-white border border-[#E7E7E5]'}`}>
+            <FileText className={`w-4 h-4 shrink-0 ${highlight ? 'text-[#0066FF]' : 'text-[#73726E]'}`} />
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-[#37352F] truncate">{doc.name}</p>
+                <p className="text-xs text-[#73726E]">Hochgeladen: {formatDate(doc.createdAt)}</p>
+            </div>
+            {/* Category selector for cover letters */}
+            {doc.type === 'cover_letter' && categoryNames.length > 0 && (
+                <select
+                    value={getCategoryForDoc(doc.id) ?? '__none__'}
+                    onChange={(e) => assignCategory(doc.id, e.target.value)}
+                    className="text-xs border border-[#E7E7E5] rounded px-1.5 py-1 text-[#73726E] bg-white focus:outline-none focus:ring-1 focus:ring-[#0066FF]/30 max-w-[120px]"
+                    title="Kategorie zuweisen"
+                >
+                    <option value="__none__">Ohne</option>
+                    {categoryNames.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                </select>
+            )}
+            <div className="flex items-center gap-1">
+                <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#0066FF] transition-colors p-1" title="Herunterladen">
+                    <Download className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1" title="Löschen">
+                    <Trash2 className="w-4 h-4" />
+                </button>
+            </div>
+        </li>
+    );
 
     return (
         <div className="space-y-6">
@@ -195,23 +347,7 @@ export function ActiveCVCard() {
                     </div>
                 ) : (
                     <ul className="space-y-2">
-                        {cvDocs.map(doc => (
-                            <li key={doc.id} className="flex items-center gap-3 p-3 bg-[#F0F7FF] border border-[#0066FF]/20 rounded-lg">
-                                <FileText className="w-4 h-4 text-[#0066FF] shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-[#37352F] truncate">{doc.name}</p>
-                                    <p className="text-xs text-[#73726E]">Hochgeladen: {formatDate(doc.createdAt)}</p>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#0066FF] transition-colors p-1" title="Herunterladen">
-                                        <Download className="w-4 h-4" />
-                                    </button>
-                                    <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1" title="Löschen">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </li>
-                        ))}
+                        {cvDocs.map(doc => renderDocRow(doc, true))}
                     </ul>
                 )}
                 <input ref={cvRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
@@ -226,16 +362,58 @@ export function ActiveCVCard() {
                         <FileText className="w-4 h-4 text-[#0066FF]" />
                         Anschreiben (Cover Letters)
                     </h3>
-                    <Button
-                        variant="secondary"
-                        className="text-xs h-8"
-                        onClick={() => clRef.current?.click()}
-                        disabled={!!uploading || clDocs.length >= 3}
-                    >
-                        <Upload className="w-3 h-3 mr-1.5" />
-                        {uploading === 'cover_letter' ? `${uploadProgress}%` : `Hochladen (${clDocs.length}/3)`}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {/* Add Category Button */}
+                        {clDocs.length > 0 && (
+                            <button
+                                onClick={() => setShowAddCategory(!showAddCategory)}
+                                className="flex items-center gap-1 text-xs text-[#73726E] hover:text-[#0066FF] transition-colors px-2 py-1 rounded border border-[#E7E7E5] hover:border-[#0066FF]/30"
+                                title="Kategorie erstellen"
+                            >
+                                <Tag className="w-3 h-3" />
+                                Kategorie
+                            </button>
+                        )}
+                        <Button
+                            variant="secondary"
+                            className="text-xs h-8"
+                            onClick={() => clRef.current?.click()}
+                            disabled={!!uploading}
+                        >
+                            <Upload className="w-3 h-3 mr-1.5" />
+                            {uploading === 'cover_letter' ? `${uploadProgress}%` : 'Hochladen'}
+                        </Button>
+                    </div>
                 </div>
+
+                {/* Add Category Input */}
+                {showAddCategory && (
+                    <div className="flex items-center gap-2 mb-3 p-2 bg-[#F7F7F5] rounded-lg border border-[#E7E7E5]">
+                        <Tag className="w-3.5 h-3.5 text-[#73726E] shrink-0" />
+                        <input
+                            type="text"
+                            placeholder="z.B. Account Executive, Business Development..."
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') addCategory(); }}
+                            className="flex-1 text-sm bg-transparent text-[#37352F] placeholder-[#A8A29E] focus:outline-none"
+                            autoFocus
+                        />
+                        <button
+                            onClick={addCategory}
+                            disabled={!newCategoryName.trim()}
+                            className="text-xs px-2 py-1 bg-[#0066FF] text-white rounded disabled:opacity-40 hover:bg-[#0052CC] transition-colors"
+                        >
+                            Erstellen
+                        </button>
+                        <button
+                            onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }}
+                            className="text-[#A8A29E] hover:text-[#37352F] p-0.5"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                )}
 
                 {isLoading ? (
                     <div className="h-10 bg-[#F7F7F5] rounded-lg animate-pulse" />
@@ -245,28 +423,86 @@ export function ActiveCVCard() {
                         onClick={() => clRef.current?.click()}
                     >
                         <Plus className="w-5 h-5 text-[#A8A29E] mx-auto mb-1" />
-                        <p className="text-sm text-[#73726E]">Noch keine Anschreiben hochgeladen</p>
+                        <p className="text-sm text-[#73726E]">Lade erfolgreiche Anschreiben hoch, damit Pathly deinen Schreibstil lernt.</p>
                     </div>
                 ) : (
-                    <ul className="space-y-2">
-                        {clDocs.map(doc => (
-                            <li key={doc.id} className="flex items-center gap-3 p-3 bg-white border border-[#E7E7E5] rounded-lg">
-                                <FileText className="w-4 h-4 text-[#73726E] shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-[#37352F] truncate">{doc.name}</p>
-                                    <p className="text-xs text-[#73726E]">Hochgeladen: {formatDate(doc.createdAt)}</p>
+                    <div className="space-y-3">
+                        {/* Categorized groups */}
+                        {categoryNames.map(catName => {
+                            const catDocs = categorizedCLs[catName] || [];
+                            if (catDocs.length === 0 && categoryNames.length > 0) {
+                                // Show empty category with delete option
+                                return (
+                                    <div key={catName} className="rounded-lg border border-[#E7E7E5] overflow-hidden">
+                                        <div className="flex items-center justify-between px-3 py-2 bg-[#FAFAF9]">
+                                            <button
+                                                onClick={() => toggleCollapse(catName)}
+                                                className="flex items-center gap-1.5 text-xs font-medium text-[#73726E] hover:text-[#37352F] transition-colors"
+                                            >
+                                                <ChevronRight className="w-3 h-3" />
+                                                <Tag className="w-3 h-3" />
+                                                {catName}
+                                                <span className="text-[#A8A29E] font-normal">(0)</span>
+                                            </button>
+                                            <button
+                                                onClick={() => deleteCategory(catName)}
+                                                className="text-[#A8A29E] hover:text-red-500 transition-colors p-0.5"
+                                                title="Kategorie löschen"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            if (catDocs.length === 0) return null;
+
+                            const isCollapsed = collapsed[catName];
+                            return (
+                                <div key={catName} className="rounded-lg border border-[#E7E7E5] overflow-hidden">
+                                    <div className="flex items-center justify-between px-3 py-2 bg-[#FAFAF9]">
+                                        <button
+                                            onClick={() => toggleCollapse(catName)}
+                                            className="flex items-center gap-1.5 text-xs font-medium text-[#37352F] hover:text-[#0066FF] transition-colors"
+                                        >
+                                            {isCollapsed ? (
+                                                <ChevronRight className="w-3 h-3" />
+                                            ) : (
+                                                <ChevronDown className="w-3 h-3" />
+                                            )}
+                                            <Tag className="w-3 h-3 text-[#0066FF]" />
+                                            {catName}
+                                            <span className="text-[#A8A29E] font-normal">({catDocs.length})</span>
+                                        </button>
+                                        <button
+                                            onClick={() => deleteCategory(catName)}
+                                            className="text-[#A8A29E] hover:text-red-500 transition-colors p-0.5"
+                                            title="Kategorie löschen"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                    {!isCollapsed && (
+                                        <ul className="space-y-1 p-2">
+                                            {catDocs.map(doc => renderDocRow(doc))}
+                                        </ul>
+                                    )}
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#0066FF] transition-colors p-1" title="Herunterladen">
-                                        <Download className="w-4 h-4" />
-                                    </button>
-                                    <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1" title="Löschen">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
+                            );
+                        })}
+
+                        {/* Uncategorized */}
+                        {uncategorizedCLs.length > 0 && (
+                            <div>
+                                {categoryNames.length > 0 && (
+                                    <p className="text-xs text-[#A8A29E] mb-1.5 px-1">Ohne Kategorie</p>
+                                )}
+                                <ul className="space-y-2">
+                                    {uncategorizedCLs.map(doc => renderDocRow(doc))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
                 )}
                 <input ref={clRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) { handleUpload(f, 'cover_letter'); e.target.value = ''; } }}

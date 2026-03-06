@@ -255,3 +255,45 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via Migration
 | Smart Match | Rule-based keyword matching from CV, keine AI-Calls |
 | RLS | Opportunities: public read. Bookmarks + Votes: user_id-scoped |
 | Testimonials | Seed data in Phase 1, user-submitted in Phase 2 |
+
+---
+
+## 6. Feature-Silo: Coaching (Voice Note)
+
+> **Added:** 2026-03-05 | **Owner:** `coaching-service.ts` + `[sessionId]/page.tsx`
+
+### 6.1 Erlaubte Dateien (Scope)
+
+| Datei | Rolle |
+|---|---|
+| `app/dashboard/coaching/*` | Frontend — Hub + Chat + Analysis Pages |
+| `app/api/coaching/*` | API — Session, Message, Complete, Transcribe |
+| `components/coaching/*` | Frontend — VoiceConsentModal |
+| `hooks/use-voice-recorder.ts` | Frontend — Recording Hook |
+| `lib/services/coaching-service.ts` | Backend — Conversation Flow |
+| `lib/services/coaching-gap-analyzer.ts` | Backend — CV-vs-Job Analyse |
+| `lib/inngest/coaching-report-pipeline.ts` | Backend — Feedback Report |
+| `lib/prompts/coaching-system-prompt.ts` | Backend — Round-specific Prompts |
+| `types/coaching.ts` | Types — ChatMessage, Session, Dossier |
+| `supabase/migrations/20260304_coaching_sessions.sql` | DB Schema |
+
+### 6.2 Verbotene Dateien (Sperrzone)
+
+| Datei | Grund |
+|---|---|
+| `lib/ai/model-router.ts` | SHARED — Coaching nutzt isolierten Anthropic Client |
+| `lib/inngest/cv-match-pipeline.ts` | Fremdes Feature |
+| `lib/inngest/cover-letter-*.ts` | Fremdes Feature |
+| `lib/inngest/certificates-pipeline.ts` | Fremdes Feature |
+| `middleware.ts` | System-Level |
+
+### 6.3 Bekannte Patterns
+
+| Pattern | Details |
+|---|---|
+| Isolierter AI Client | Eigener `Anthropic({ apiKey })` statt model-router.ts |
+| Voice Transcription | OpenAI Whisper API, Audio nicht gespeichert (DSGVO) |
+| DSGVO Consent | `localStorage` key `pathly_voice_consent`, einmaliges Popup |
+| 60s Recording Limit | Hard timeout im Frontend, auto-stop + auto-submit |
+| Halluzinations-Filter | Backend-seitig bekannte Whisper-Patterns gefiltert |
+| Safari Compat | `MediaRecorder.isTypeSupported()` für MIME-Auswahl |

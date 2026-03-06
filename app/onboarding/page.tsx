@@ -3,13 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Briefcase, Chrome, Plus, Search, Mail, CheckCircle2, Upload } from 'lucide-react';
-
-import { DocumentUpload } from '@/components/onboarding/document-upload';
+import { Briefcase, Chrome, Plus, Search, Mail, CheckCircle2 } from 'lucide-react';
 
 // ─── Step Definitions ─────────────────────────────────────────────────────────
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 
 function StepIndicator({ current }: { current: number }) {
     return (
@@ -107,7 +105,7 @@ export default function OnboardingPage() {
             const res = await fetch('/api/onboarding/complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ step: 6 }),
+                body: JSON.stringify({ step: 5 }),
             });
             const data = await res.json() as { success: boolean; error?: string };
 
@@ -187,41 +185,7 @@ export default function OnboardingPage() {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                             >
-                                <DocumentUpload
-                                    introHeadline="Damit wir wissen, wie du schreibst"
-                                    introText="Um dein CV und Cover Letter wirklich auf jede Stelle abzustimmen, ist es wichtig, dass wir sehen wie du schreibst — und was dir wichtig ist. Lade deinen aktuellen CV und ein Anschreiben hoch. Du kannst sie jederzeit in den Settings aktualisieren."
-                                    onComplete={async (files) => {
-                                        try {
-                                            const formData = new FormData()
-                                            formData.append('cv', files.cv)
-                                            files.coverLetters.forEach((file, index) => {
-                                                formData.append(`coverLetter_${index}`, file)
-                                            })
-
-                                            const response = await fetch('/api/documents/upload', {
-                                                method: 'POST',
-                                                body: formData
-                                            })
-
-                                            if (!response.ok) {
-                                                const errorData = await response.json().catch(() => ({}))
-                                                console.error("Onboarding upload failed:", errorData)
-                                            }
-                                        } catch (error) {
-                                            console.error('Onboarding upload error:', error)
-                                        }
-                                        setStep(5);
-                                    }}
-                                    onBack={() => setStep(3)}
-                                />
-                                <div className="text-center mt-2">
-                                    <button
-                                        onClick={() => setStep(5)}
-                                        className="text-sm text-gray-400 hover:text-gray-600 mt-3 underline"
-                                    >
-                                        Jetzt überspringen — später in Settings hochladen
-                                    </button>
-                                </div>
+                                <Step4Feedback onNext={next} />
                             </motion.div>
                         )}
                         {step === 5 && (
@@ -233,19 +197,7 @@ export default function OnboardingPage() {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                             >
-                                <Step5Feedback onNext={next} />
-                            </motion.div>
-                        )}
-                        {step === 6 && (
-                            <motion.div
-                                key="step-6"
-                                variants={slideVariants}
-                                initial="enter"
-                                animate="center"
-                                exit="exit"
-                                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                            >
-                                <Step6Consent
+                                <Step5Consent
                                     privacyAccepted={privacyAccepted}
                                     aiProcessingAccepted={aiProcessingAccepted}
                                     termsAccepted={termsAccepted}
@@ -287,12 +239,20 @@ function Step1Welcome({ onNext }: { onNext: () => void }) {
             <h1 className="text-2xl font-bold text-[#0f172a] mb-6">
                 Willkommen bei Pathly
             </h1>
-            <div className="bg-[#f8fafc] rounded-xl p-6 mb-8 text-left">
+            <div className="bg-[#f8fafc] rounded-xl p-6 mb-8 text-left space-y-4">
                 <p className="text-sm text-[#334155] leading-relaxed">
-                    Pathly ist entstanden, weil ich ChatGPT zu generisch fand und ich nicht mehr
-                    zwischen verschiedenen Seiten suchen, Text einbetten und 10x iterieren wollte.
-                    Pathly ist mein kleiner Workspace mit Pomodoro, den ich mit dir teilen
-                    {' '}m&ouml;chte &mdash; und hoffe, dass du etwas Freude daran finden kannst.
+                    Wir haben Pathly gebaut, weil die <strong>Standard-ChatGPT-UX</strong> für Jobbewerbungen
+                    uns etwas frustriert hat. Das ständige <strong>Wechseln zwischen Tabs</strong>,
+                    Copy-Paste und endloses <strong>Prompt-Iterieren</strong>... also dachten wir uns:
+                    Das geht auch besser!
+                </p>
+                <p className="text-sm text-[#334155] leading-relaxed">
+                    Mit Pathly haben wir einen <strong>AI-Workspace</strong> entwickelt mit
+                    integriertem <strong>Pomodoro-Timer</strong>, aber auch <strong>Coaching-Sessions</strong> und
+                    Inspiration für <strong>Ehrenamt</strong> und <strong>Community</strong>.
+                </p>
+                <p className="text-sm text-[#334155] leading-relaxed">
+                    Daher haben wir Pathly entwickelt und möchten es jetzt <strong>mit dir teilen</strong> :)
                 </p>
             </div>
             <StepButton onClick={onNext}>Los geht&apos;s &rarr;</StepButton>
@@ -363,7 +323,7 @@ function Step3JobQueue({ onNext }: { onNext: () => void }) {
     );
 }
 
-function Step5Feedback({ onNext }: { onNext: () => void }) {
+function Step4Feedback({ onNext }: { onNext: () => void }) {
     return (
         <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
             <div className="w-16 h-16 rounded-2xl bg-[#002e7a]/10 flex items-center justify-center mx-auto mb-6">
@@ -387,7 +347,7 @@ function Step5Feedback({ onNext }: { onNext: () => void }) {
     );
 }
 
-function Step6Consent({
+function Step5Consent({
     privacyAccepted,
     aiProcessingAccepted,
     termsAccepted,

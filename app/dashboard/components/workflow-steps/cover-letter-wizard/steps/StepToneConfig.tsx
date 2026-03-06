@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse, TonePreset, TargetLanguage } from '@/types/cover-letter-setup';
-import { Info, ChevronLeft, Sparkles, Zap, Shield } from 'lucide-react';
+import { Info, ChevronLeft, Sparkles, Zap, Shield, FileText, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
@@ -15,29 +15,37 @@ interface Props {
 const toneOptions: { id: TonePreset; label: string; desc: string; previewText: string }[] = [
     {
         id: 'data-driven',
-        label: '📊 Daten-getrieben',
+        label: 'Daten-getrieben',
         desc: 'Zahlen, Fakten, konkrete Ergebnisse',
         previewText: '„Ich konnte den Umsatz im B2B-Segment um 15% steigern — durch systematische Optimierung der Vertriebsprozesse."',
     },
     {
         id: 'storytelling',
-        label: '📖 Storytelling',
+        label: 'Storytelling',
         desc: 'Narrative, persönliche Geschichte',
         previewText: '„Als ich zum ersten Mal die Herausforderungen im B2B-Sales sah, wusste ich: Hier kann ich wirklich etwas bewegen."',
     },
     {
         id: 'formal',
-        label: '🎩 Formal',
+        label: 'Formal',
         desc: 'Klassisch, strukturiert, konservativ',
         previewText: '„Meine bisherige Laufbahn ist geprägt durch erfolgreiche Abschlüsse im strategischen Vertrieb."',
     },
     {
         id: 'philosophisch',
-        label: '🔮 Philosophisch',
+        label: 'Philosophisch',
         desc: 'Konzeptionell, reflektiert, intellektuell',
         previewText: '„Wachstum entsteht dort, wo bewährte Prozesse hinterfragt und neu gedacht werden."',
     },
 ];
+
+function formatDate(dateStr: string) {
+    return new Date(dateStr).toLocaleDateString('de-DE', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
+}
 
 export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const { setTone, setOptInModule, isStepComplete, tone, optInModules } = useCoverLetterSetupStore();
@@ -48,41 +56,99 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const [first90Days, setFirst90Days] = useState(optInModules?.first90DaysHypothesis ?? false);
     const [vulInjector, setVulInjector] = useState(optInModules?.vulnerabilityInjector ?? false);
 
+    // ─── Tone Source Feature ─────────────────────────────────────────
+    const [toneSource, setToneSource] = useState<'preset' | 'custom-style'>(tone?.toneSource || 'preset');
+    const [selectedDocId, setSelectedDocId] = useState<string | undefined>(tone?.selectedStyleDocId);
+    const [showDocPicker, setShowDocPicker] = useState(false);
+
+    const availableDocs = setupData.availableStyleDocs || [];
+    const hasUploadedDocs = availableDocs.length > 0;
+    const docsWithStyle = availableDocs.filter(d => d.hasStyleAnalysis);
+
+    // ─── Orphaned Reference Guard (QA Blind Spot #3) ─────────────────
+    // If the stored selectedDocId no longer exists (user deleted it in Settings),
+    // reset to 'preset' mode and clear the dead reference.
+    useEffect(() => {
+        if (toneSource === 'custom-style' && selectedDocId) {
+            const stillExists = availableDocs.some(d => d.id === selectedDocId);
+            if (!stillExists) {
+                console.warn('⚠️ [ToneConfig] Selected style doc was deleted — resetting to preset');
+                setToneSource('preset');
+                setSelectedDocId(undefined);
+                syncTone('preset', selectedPreset, undefined);
+            }
+        }
+    }, [availableDocs]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // WHY: formal preset enforces strict 4-paragraph structure + souveräner Ton.
-    // first90Days (adds 5th paragraph), vulnerabilityInjector (breaks tone), and pingPong
-    // (storytelling element) are structurally/tonally incompatible.
-    // CONFLICTS RESOLVED: Formal Tension (Blind Spot #3, QA Report 2026-02-28)
     const isFormal = selectedPreset === 'formal';
 
     // Ensure the store always has a valid tone on mount (for default selection)
     useEffect(() => {
         if (!tone?.preset) {
-            setTone({
-                preset: selectedPreset,
-                targetLanguage: language,
-                hasStyleSample: setupData.hasStyleSample,
-                styleWarningAcknowledged: true,
-                contactPerson,
-                formality,
-            });
+            syncTone(toneSource, selectedPreset, selectedDocId);
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const canGenerate = isStepComplete(3);
 
-    const handlePresetSelect = (preset: TonePreset) => {
-        setSelectedPreset(preset);
+    // Centralized tone sync to store — avoids repeating setTone() in every handler
+    const syncTone = (
+        source: 'preset' | 'custom-style',
+        preset: TonePreset,
+        docId?: string,
+        overrides?: { lang?: TargetLanguage; contact?: string; form?: 'sie' | 'du' }
+    ) => {
         setTone({
             preset,
-            targetLanguage: language,
+            toneSource: source,
+            selectedStyleDocId: docId,
+            targetLanguage: overrides?.lang ?? language,
             hasStyleSample: setupData.hasStyleSample,
             styleWarningAcknowledged: true,
-            contactPerson,
-            formality,
+            contactPerson: overrides?.contact ?? contactPerson,
+            formality: overrides?.form ?? formality,
         });
+    };
+
+    // ─── Tone Source Toggle Handler ─────────────────────────────────
+    const handleToneSourceChange = (source: 'preset' | 'custom-style') => {
+        setToneSource(source);
+
+        if (source === 'custom-style') {
+            // Fix: Ghost-Preset — reset hidden preset to data-driven
+            // so First90Days / Vulnerability toggles are not blocked
+            // by an invisible 'formal' preset when user is in custom-style mode.
+            if (selectedPreset === 'formal') {
+                setSelectedPreset('data-driven');
+            }
+
+            if (docsWithStyle.length === 1) {
+                // Auto-select the only available doc
+                const doc = docsWithStyle[0];
+                setSelectedDocId(doc.id);
+                syncTone('custom-style', selectedPreset === 'formal' ? 'data-driven' : selectedPreset, doc.id);
+            } else if (docsWithStyle.length > 1) {
+                // Show selection popup
+                setShowDocPicker(true);
+            }
+        } else {
+            setSelectedDocId(undefined);
+            syncTone('preset', selectedPreset, undefined);
+        }
+    };
+
+    const handleDocSelect = (docId: string) => {
+        setSelectedDocId(docId);
+        setShowDocPicker(false);
+        syncTone('custom-style', selectedPreset, docId);
+    };
+
+    const handlePresetSelect = (preset: TonePreset) => {
+        setSelectedPreset(preset);
+        syncTone(toneSource, preset, selectedDocId);
 
         // Auto-reset incompatible modules when switching TO formal
-        // User is aware they'll need to re-enable if switching back — confirmed as cleanest approach.
         if (preset === 'formal') {
             setFirst90Days(false);
             setOptInModule('first90DaysHypothesis', false);
@@ -94,40 +160,24 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
 
     const handleLanguageChange = (lang: TargetLanguage) => {
         setLanguage(lang);
-        setTone({
-            preset: selectedPreset,
-            targetLanguage: lang,
-            hasStyleSample: setupData.hasStyleSample,
-            styleWarningAcknowledged: true,
-            contactPerson,
-            formality,
-        });
+        syncTone(toneSource, selectedPreset, selectedDocId, { lang });
     };
 
     const handleContactPersonChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setContactPerson(val);
-        setTone({
-            preset: selectedPreset,
-            targetLanguage: language,
-            hasStyleSample: setupData.hasStyleSample,
-            styleWarningAcknowledged: true,
-            contactPerson: val,
-            formality,
-        });
+        syncTone(toneSource, selectedPreset, selectedDocId, { contact: val });
     };
 
     const handleFormalityChange = (f: 'sie' | 'du') => {
         setFormality(f);
-        setTone({
-            preset: selectedPreset,
-            targetLanguage: language,
-            hasStyleSample: setupData.hasStyleSample,
-            styleWarningAcknowledged: true,
-            contactPerson,
-            formality: f,
-        });
+        syncTone(toneSource, selectedPreset, selectedDocId, { form: f });
     };
+
+    // Find the currently selected doc name for display
+    const selectedDocName = selectedDocId
+        ? availableDocs.find(d => d.id === selectedDocId)?.fileName || 'Anschreiben'
+        : null;
 
     return (
         <div className="space-y-4">
@@ -148,52 +198,189 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                                 language === lang ? 'bg-white text-[#002e7a] shadow-sm' : 'text-[#73726E]',
                             ].join(' ')}
                         >
-                            {lang === 'de' ? '🇩🇪 DE' : '🇬🇧 EN'}
+                            {lang === 'de' ? 'DE' : 'EN'}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* Tone Options with Micro-Preview */}
-            <div className="grid grid-cols-1 gap-2">
-                {toneOptions.map((opt) => {
-                    const isActive = selectedPreset === opt.id;
-                    return (
-                        <button
-                            key={opt.id}
-                            onClick={() => handlePresetSelect(opt.id)}
-                            className={[
-                                'text-left px-3 py-2.5 rounded-lg border transition-all',
-                                isActive
-                                    ? 'border-2 border-[#002e7a] bg-[#f0f4ff]'
-                                    : 'border border-[#E7E7E5] bg-white hover:shadow-sm',
-                            ].join(' ')}
-                        >
-                            <p className="text-xs font-semibold text-[#37352F]">{opt.label}</p>
-                            <p className="text-[10px] text-[#73726E] mt-0.5">{opt.desc}</p>
-
-                            {/* Micro-Preview — animated */}
-                            <AnimatePresence>
-                                {isActive && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: 'auto', opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        transition={{ duration: 0.25, ease: 'easeInOut' }}
-                                        className="overflow-hidden"
-                                    >
-                                        <div className="mt-2 pt-2 border-t border-[#D0DEFF]">
-                                            <p className="text-[11px] text-[#5A7AB5] italic leading-snug">
-                                                {opt.previewText}
-                                            </p>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </button>
-                    );
-                })}
+            {/* ─── Tone Source Toggle ─────────────────────────────────────── */}
+            <div className="flex items-center gap-0.5 bg-[#E7E7E5] rounded-md p-0.5">
+                <button
+                    onClick={() => handleToneSourceChange('custom-style')}
+                    disabled={!hasUploadedDocs}
+                    className={[
+                        'flex-1 px-3 py-1.5 rounded text-xs font-semibold transition-all',
+                        toneSource === 'custom-style' && hasUploadedDocs
+                            ? 'bg-white text-[#002e7a] shadow-sm'
+                            : hasUploadedDocs
+                                ? 'text-[#73726E] hover:text-[#37352F]'
+                                : 'text-[#A8A29E] cursor-not-allowed',
+                    ].join(' ')}
+                    title={!hasUploadedDocs ? 'Lade ein Anschreiben in den Settings hoch' : ''}
+                >
+                    Eigener Stil
+                </button>
+                <button
+                    onClick={() => handleToneSourceChange('preset')}
+                    className={[
+                        'flex-1 px-3 py-1.5 rounded text-xs font-semibold transition-all',
+                        toneSource === 'preset'
+                            ? 'bg-white text-[#002e7a] shadow-sm'
+                            : 'text-[#73726E] hover:text-[#37352F]',
+                    ].join(' ')}
+                >
+                    Preset wählen
+                </button>
             </div>
+
+            {/* ─── Custom Style: Selected Doc Info ───────────────────────── */}
+            <AnimatePresence mode="wait">
+                {toneSource === 'custom-style' && hasUploadedDocs && (
+                    <motion.div
+                        key="custom-style-info"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="bg-[#EEF3FF] border border-[#002e7a]/20 rounded-lg p-3">
+                            <div className="flex items-start gap-2">
+                                <FileText className="w-4 h-4 text-[#002e7a] shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-semibold text-[#37352F]">
+                                        Tonvorlage: {selectedDocName || 'Bitte wählen'}
+                                    </p>
+                                    <p className="text-[10px] text-[#73726E] mt-0.5">
+                                        Die KI übernimmt Ton, Satzstruktur und Konjunktionen aus diesem Anschreiben.
+                                    </p>
+                                </div>
+                                {docsWithStyle.length > 1 && (
+                                    <button
+                                        onClick={() => setShowDocPicker(true)}
+                                        className="text-[10px] text-[#002e7a] hover:underline shrink-0"
+                                    >
+                                        Ändern
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Warning if selected doc has no style analysis */}
+                            {selectedDocId && !availableDocs.find(d => d.id === selectedDocId)?.hasStyleAnalysis && (
+                                <div className="flex items-center gap-1.5 mt-2 text-[10px] text-amber-600">
+                                    <AlertTriangle className="w-3 h-3 shrink-0" />
+                                    Dieses Anschreiben wurde noch nicht analysiert. Die KI nutzt den Standardton.
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+
+                {/* ─── Preset Cards ───────────────────────────────────────── */}
+                {toneSource === 'preset' && (
+                    <motion.div
+                        key="preset-cards"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="grid grid-cols-1 gap-2">
+                            {toneOptions.map((opt) => {
+                                const isActive = selectedPreset === opt.id;
+                                return (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => handlePresetSelect(opt.id)}
+                                        className={[
+                                            'text-left px-3 py-2.5 rounded-lg border transition-all',
+                                            isActive
+                                                ? 'border-2 border-[#002e7a] bg-[#f0f4ff]'
+                                                : 'border border-[#E7E7E5] bg-white hover:shadow-sm',
+                                        ].join(' ')}
+                                    >
+                                        <p className="text-xs font-semibold text-[#37352F]">{opt.label}</p>
+                                        <p className="text-[10px] text-[#73726E] mt-0.5">{opt.desc}</p>
+
+                                        {/* Micro-Preview — animated */}
+                                        <AnimatePresence>
+                                            {isActive && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                                                    className="overflow-hidden"
+                                                >
+                                                    <div className="mt-2 pt-2 border-t border-[#D0DEFF]">
+                                                        <p className="text-[11px] text-[#5A7AB5] italic leading-snug">
+                                                            {opt.previewText}
+                                                        </p>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* ─── Document Picker Modal ──────────────────────────────── */}
+            <AnimatePresence>
+                {showDocPicker && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+                        onClick={() => setShowDocPicker(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="bg-white rounded-xl shadow-xl max-w-sm w-full mx-4 p-4"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h4 className="text-sm font-semibold text-[#37352F] mb-3">
+                                Welches Anschreiben als Tonvorlage?
+                            </h4>
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {docsWithStyle.map((doc) => (
+                                    <button
+                                        key={doc.id}
+                                        onClick={() => handleDocSelect(doc.id)}
+                                        className={[
+                                            'w-full text-left px-3 py-2.5 rounded-lg border transition-all flex items-center gap-2',
+                                            selectedDocId === doc.id
+                                                ? 'border-2 border-[#002e7a] bg-[#f0f4ff]'
+                                                : 'border border-[#E7E7E5] bg-white hover:shadow-sm',
+                                        ].join(' ')}
+                                    >
+                                        <FileText className="w-4 h-4 text-[#73726E] shrink-0" />
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-medium text-[#37352F] truncate">{doc.fileName}</p>
+                                            <p className="text-[10px] text-[#73726E]">{formatDate(doc.createdAt)}</p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                            <button
+                                onClick={() => setShowDocPicker(false)}
+                                className="mt-3 w-full text-xs text-[#73726E] hover:text-[#37352F] py-1.5"
+                            >
+                                Abbrechen
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Contact Person Input */}
             <div className="pt-2">
@@ -237,9 +424,11 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                 <div className="flex items-start gap-2">
                     <Info className="w-4 h-4 text-[#002e7a] shrink-0 mt-0.5" />
                     <p className="text-xs text-[#37352F] leading-relaxed">
-                        {setupData.hasStyleSample
-                            ? 'Dein persönlicher Schreibstil wurde analysiert. Die KI kalibriert sich auf deine Stimme.'
-                            : 'Lade ein altes Anschreiben in den Settings hoch, damit die KI deinen Stil lernt. Bis dahin nutzen wir den gewählten Ton.'}
+                        {toneSource === 'custom-style'
+                            ? 'Die KI kalibriert sich auf den Ton deines hochgeladenen Anschreibens — Satzlänge, Konjunktionen und rhetorische Mittel werden übernommen.'
+                            : setupData.hasStyleSample
+                                ? 'Dein persönlicher Schreibstil wurde analysiert. Die KI nutzt daraus Satzlänge und Konjunktionen, der Ton kommt vom gewählten Preset.'
+                                : 'Lade ein altes Anschreiben in den Settings hoch, damit die KI deinen Stil lernt. Bis dahin nutzen wir den gewählten Ton.'}
                     </p>
                 </div>
             </div>

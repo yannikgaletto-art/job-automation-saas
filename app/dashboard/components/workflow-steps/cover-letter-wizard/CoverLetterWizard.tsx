@@ -22,6 +22,8 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
 
     const [setupData, setSetupData] = useState<SetupDataResponse | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
+    // Track the highest step reached so completed circles become clickable
+    const [maxReachedStep, setMaxReachedStep] = useState<1 | 2 | 3>(1);
 
     useEffect(() => {
         initForJob(jobId);
@@ -65,6 +67,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
         // Safe default tone
         setTone({
             preset: 'data-driven',
+            toneSource: 'preset',
             targetLanguage: setupData.detectedJobLanguage,
             hasStyleSample: setupData.hasStyleSample,
             styleWarningAcknowledged: true,
@@ -73,7 +76,15 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
 
         // Jump to last step for review
         setStep(3);
+        setMaxReachedStep(3);
         console.log('✅ [WizardSetup] Auto-Fill applied');
+    };
+
+    // Navigate to a step — only backward allowed (forward is handled by step buttons)
+    const handleNavigateToStep = (step: 1 | 2 | 3) => {
+        if (step < currentStep) {
+            setStep(step);
+        }
     };
 
     const handleFinish = () => {
@@ -124,7 +135,11 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
         <div className="px-5 py-4 bg-[#FAFAF9] space-y-4 min-h-[360px]">
             {/* Header with Auto-Fill */}
             <div className="flex items-start justify-between">
-                <WizardProgressBar currentStep={currentStep as 1 | 2 | 3} />
+                <WizardProgressBar
+                    currentStep={currentStep as 1 | 2 | 3}
+                    maxReachedStep={maxReachedStep}
+                    onNavigate={handleNavigateToStep}
+                />
                 {canAutoFill() && (
                     <button
                         onClick={handleAutoFill}
@@ -143,7 +158,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
                             jobId={jobId}
                             companyName={companyName}
                             setupData={setupData}
-                            onNext={() => setStep(2)}
+                            onNext={() => { setStep(2); setMaxReachedStep(prev => Math.max(prev, 2) as 1 | 2 | 3); }}
                             onReloadData={fetchSetupData}
                         />
                     </motion.div>
@@ -154,7 +169,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
                         <StepStationMapping
                             setupData={setupData}
                             onBack={() => setStep(1)}
-                            onNext={() => setStep(3)}
+                            onNext={() => { setStep(3); setMaxReachedStep(prev => Math.max(prev, 3) as 1 | 2 | 3); }}
                         />
                     </motion.div>
                 )}

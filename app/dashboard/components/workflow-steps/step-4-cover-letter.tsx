@@ -133,8 +133,36 @@ export function Step4CoverLetter({
     const [wizardContext, setWizardContext] = useState<CoverLetterSetupContext | null>(null)
     const [userId, setUserId] = useState<string | null>(null)
 
-    // Read from Zustand store — persisted across mounts (store > local state > null)
+    // ─── Persisted context: Never lose wizard settings across re-generations ────
+    // WHY: The Zustand store can lose state when switching jobs or on page reload.
+    // We store the last successfully used context in a ref AND load from DB draft.
     const buildContextFromStore = useCoverLetterSetupStore(state => state.buildContext)
+    const lastUsedContextRef = useRef<CoverLetterSetupContext | null>(null)
+
+    // On mount: try to load the last saved draft's setupContext from DB
+    useEffect(() => {
+        async function loadPersistedContext() {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data: lastDraft } = await supabase
+                .from('documents')
+                .select('metadata')
+                .eq('user_id', user.id)
+                .eq('document_type', 'cover_letter')
+                .eq('metadata->>job_id', jobId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single()
+
+            if (lastDraft?.metadata?.setup_context) {
+                lastUsedContextRef.current = lastDraft.metadata.setup_context
+                console.log('✅ [CoverLetter] Loaded persisted setupContext from last draft')
+            }
+        }
+        loadPersistedContext()
+    }, [jobId])
 
     const generateCoverLetter = async (context?: CoverLetterSetupContext) => {
         try {
@@ -151,9 +179,18 @@ export function Step4CoverLetter({
             }
             setUserId(currentUserId)
 
-            // Fallback: store.buildContext() → local wizardContext → null
+            // Context resolution chain: explicit > ref > store > local state > null
             const resolvedContext: CoverLetterSetupContext | null =
-                context ?? buildContextFromStore() ?? wizardContext
+                context ?? lastUsedContextRef.current ?? buildContextFromStore() ?? wizardContext
+
+            // Persist the context we're about to use (so re-generation reuses it)
+            if (resolvedContext) {
+                lastUsedContextRef.current = resolvedContext
+            }
+
+            if (!resolvedContext) {
+                console.warn('⚠️ [CoverLetter] No setupContext available — generation quality will be reduced')
+            }
 
             const response = await fetch('/api/cover-letter/generate', {
                 method: 'POST',
@@ -217,14 +254,17 @@ export function Step4CoverLetter({
 
     const handleRegenerate = async () => {
         setIsRegenerating(true)
-        await generateCoverLetter()
+        // Always pass the last used context — prevents context loss on re-generation
+        await generateCoverLetter(lastUsedContextRef.current ?? buildContextFromStore() ?? wizardContext ?? undefined)
     }
 
     const handleWizardComplete = (context: CoverLetterSetupContext) => {
         setWizardContext(context)
+        lastUsedContextRef.current = context  // Persist for future re-generations
         setWizardCompleted(true)
         generateCoverLetter(context)
     }
+
 
     // Show wizard if not yet completed and no existing result
     if (!wizardCompleted && !result) {

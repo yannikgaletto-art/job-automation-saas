@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CVSelectDialog, type CVOption } from '@/components/dashboard/cv-select-dialog';
+import { DocumentsRequiredDialog } from '@/components/shared/documents-required-dialog';
 
 interface CVMatchTabProps {
     jobId: string;
@@ -196,6 +197,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     const [showCVSelect, setShowCVSelect] = useState(false);
     const [cvOptions, setCvOptions] = useState<CVOption[]>([]);
     const [selectedCvId, setSelectedCvId] = useState<string | undefined>(undefined);
+    const [showCvDialog, setShowCvDialog] = useState(false);
 
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -303,9 +305,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
             const cvs: CVOption[] = data.cvs || [];
 
             if (cvs.length === 0) {
-                toast.error('Kein Lebenslauf gefunden', {
-                    description: 'Bitte lade deinen Lebenslauf in den Settings hoch.'
-                });
+                setShowCvDialog(true);
                 return;
             }
 
@@ -327,22 +327,29 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     // ── NO CV — Blocking State ──────────────────────────────────
     if (state === 'no-cv') {
         return (
-            <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
-                <div className="bg-amber-50 p-4 rounded-full shadow-sm mb-4 border border-amber-200">
-                    <AlertCircle className="w-8 h-8 text-amber-500" />
+            <>
+                <DocumentsRequiredDialog
+                    open={true}
+                    onClose={() => setState('idle')}
+                    type="cv"
+                />
+                <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
+                    <div className="bg-amber-50 p-4 rounded-full shadow-sm mb-4 border border-amber-200">
+                        <AlertCircle className="w-8 h-8 text-amber-500" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">Kein Lebenslauf gefunden</h3>
+                    <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
+                        Um den CV Match zu starten, musst du zuerst deinen Lebenslauf hochladen.
+                        Das dauert nur 30 Sekunden.
+                    </p>
+                    <Button
+                        variant="primary"
+                        onClick={() => router.push('/dashboard/settings')}
+                    >
+                        CV in Einstellungen hochladen →
+                    </Button>
                 </div>
-                <h3 className="text-xl font-semibold text-[#37352F] mb-2">Kein Lebenslauf gefunden</h3>
-                <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
-                    Um den CV Match zu starten, musst du zuerst deinen Lebenslauf hochladen.
-                    Das dauert nur 30 Sekunden.
-                </p>
-                <Button
-                    variant="primary"
-                    onClick={() => router.push('/dashboard/settings')}
-                >
-                    CV in Einstellungen hochladen →
-                </Button>
-            </div>
+            </>
         );
     }
 
@@ -350,6 +357,11 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     if (state === 'idle' || state === 'error') {
         return (
             <>
+                <DocumentsRequiredDialog
+                    open={showCvDialog}
+                    onClose={() => setShowCvDialog(false)}
+                    type="cv"
+                />
                 <CVSelectDialog
                     isOpen={showCVSelect}
                     cvOptions={cvOptions}

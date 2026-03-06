@@ -67,11 +67,6 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                         cvStations: [],
                         tone: null,
                         introFocus: 'quote',
-                        // WHY: optInModules (pingPong, vulnerabilityInjector, first90Days etc.)
-                        // müssen bei jedem neuen Job vollständig zurückgesetzt werden.
-                        // Ohne Reset: Silent feature carry-over von Job A zu Job B.
-                        // CRITICAL: Spread-Operator ist Pflicht (kein Reference Sharing).
-                        // CONFLICTS RESOLVED: State Store Residues (Blind Spot #4, QA Report 2026-02-28)
                         optInModules: { ...DEFAULT_OPT_IN_MODULES },
                     });
                     console.log(`✅ [WizardSetup] Initialized for job: ${jobId}`);

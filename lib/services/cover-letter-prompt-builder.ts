@@ -172,8 +172,24 @@ VERBOTEN: Oberflächliche Name-Dropping von Philosophen ohne Bezug, Arroganz, ak
     const activeTone = toneInstructions[ctx?.tone.preset ?? 'formal'];
 
     // ─── Style Sample (Anti-Competition: Preset hat Vorrang über Style-Sample) ──
+    const isCustomStyle = ctx?.tone?.toneSource === 'custom-style';
     const hasPreset = !!ctx?.tone?.preset;
-    const styleSection = style
+
+    // Custom Style: analyzed cover letter is the FULL tone source (not rhythm-only)
+    const customStyleBlock = isCustomStyle && style ? `STIL: DEIN EIGENER SCHREIBSTIL (aus deinem hochgeladenen Anschreiben)
+Ton: ${style.tone}
+Satzlänge: ${style.sentence_length}
+Bevorzugte Konjunktionen: ${(style.conjunctions || []).join(', ') || 'Daher, Deshalb, Zudem'}
+Begrüßung: ${style.greeting}
+${(style.rhetorical_devices || []).length > 0 ? `Rhetorische Mittel: ${style.rhetorical_devices.join(', ')}` : ''}
+${(style.forbidden_constructs || []).length > 0 ? `VERBOTEN (User nutzt diese NIE): ${style.forbidden_constructs.join(', ')}` : ''}
+
+Du MUSST den Ton, die Satzstruktur und die Konjunktionen aus DIESEM Schreibstil übernehmen.
+Der Output soll klingen, als hätte der Bewerber selbst geschrieben.
+Nutze die extrahierten Konjunktionen statt generischer Übergänge.
+Kalibriere deinen Output auf dieses Muster — übernimm den Stil, nicht den Inhalt.` : null;
+
+    const styleSection = style && !isCustomStyle
         ? hasPreset
             // Anti-Competition: Preset hat Vorrang → Style-Sample nur für Rhythmus
             ? `SCHREIBRHYTHMUS (aus bisherigen Anschreiben des Users — NUR für Satzbau, NICHT für Tonalität):
@@ -486,10 +502,21 @@ OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
 - Anrede-Form: ${isDuForm ? 'DU-FORM (du/dein/euch/dir). Wende diese Du-Form STRIKT auf das GESAMTE Anschreiben an. Kein "Sie" oder "Ihnen" — NIEMALS.' : 'SIE-FORM (Sie/Ihr/Ihnen). Wende diese Sie-Form STRIKT auf das GESAMTE Anschreiben an.'}
 
 === SEKTION 2: TONALITÄT & STIL (HÖCHSTE PRIORITÄT) ===
+${isCustomStyle && customStyleBlock
+            ? `MODUS: EIGENER SCHREIBSTIL (Custom Style)
+${customStyleBlock}`
+            : isCustomStyle && !customStyleBlock
+                // Race-Condition Fallback: User selected custom-style but style analysis is not yet ready.
+                // Fallback to preset so the AI always has a tone instruction — never falls into a void.
+                ? `MODUS: FALLBACK AUF PRESET (Stil-Analyse noch nicht verfügbar)
 PRESET: ${ctx?.tone.preset || 'formal'}
 ${activeTone}
 
-${styleSection}
+HINWEIS: Schreibe professionell und präzise. Stil-Kalibrierung nicht möglich (Analyse ausstehend).`
+                : `PRESET: ${ctx?.tone.preset || 'formal'}
+${activeTone}`}
+
+${isCustomStyle ? '' : styleSection}
 
 ${buildBlacklistPromptSection()}
 

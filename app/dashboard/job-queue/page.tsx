@@ -1,16 +1,63 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronRight, PlusCircle } from 'lucide-react';
 import { JobQueueTable } from '../components/job-queue-table';
 import { Job } from '../components/job-row';
 import { Button } from '@/components/motion/button';
-import { PlusCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { AddJobDialog } from '@/components/dashboard/add-job-dialog';
 import { CustomDialog } from '@/components/ui/custom-dialog';
 import { CVComparison } from '@/components/cv/cv-comparison';
 import type { CVOptimizationResult } from '@/lib/services/cv-optimizer';
 import { showSafeToast } from '@/lib/utils/toast';
 import { ApplicationHistory } from '@/app/dashboard/components/application-history';
+
+// ─── Toggle Section (Notion-style accordion) ───────────────────────────
+function ToggleSection({ title, count, defaultOpen = false, children }: {
+    title: string;
+    count?: number;
+    defaultOpen?: boolean;
+    children: React.ReactNode;
+}) {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+    return (
+        <div className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden shadow-sm">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center gap-2.5 px-5 py-3 hover:bg-[#FAFAF9] transition-colors text-left cursor-pointer"
+            >
+                <motion.div
+                    animate={{ rotate: isOpen ? 90 : 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="shrink-0"
+                >
+                    <ChevronRight className="w-3.5 h-3.5 text-[#A8A29E]" />
+                </motion.div>
+                <span className="text-sm font-medium text-[#37352F]">{title}</span>
+                {count !== undefined && (
+                    <span className="text-sm text-[#73726E]">({count})</span>
+                )}
+            </button>
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="border-t border-[#E7E7E5]">
+                            {children}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
 
 export default function JobQueuePage() {
     const [jobs, setJobs] = useState<Job[]>([]);
@@ -203,39 +250,54 @@ export default function JobQueuePage() {
             {/* Header */}
             <div>
                 <div>
-                    <h1 className="text-3xl font-semibold text-[#37352F]">Job Queue</h1>
-                    <p className="text-[#73726E] mt-1">Manage and track your active job applications</p>
+                    <h1 className="text-2xl font-semibold text-[#37352F]">Job Queue</h1>
+                    <p className="text-sm text-[#73726E] mt-1">Verwalte und tracke deine aktiven Bewerbungen</p>
                 </div>
-                <div className="mt-3">
-                    <Button variant="primary" onClick={() => setIsAddJobOpen(true)} className="rounded-xl px-5 py-2.5 font-medium">
+                <div className="mt-3 flex items-center gap-3">
+                    <Button
+                        variant="primary"
+                        onClick={() => setIsAddJobOpen(true)}
+                        className="rounded-xl px-5 py-2.5 font-medium"
+                        disabled={jobs.length >= 5}
+                    >
                         <PlusCircle className="w-4 h-4 mr-2" />
                         Add Job
                     </Button>
+                    {jobs.length >= 5 && (
+                        <span className="text-xs text-[#73726E]">
+                            Max. 5 aktive Jobs erreicht
+                        </span>
+                    )}
                 </div>
             </div>
 
-            {/* Job Queue Table */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                    {isOptimizing && <span className="text-sm text-blue-600 animate-pulse">Optimizing CV...</span>}
+            {/* Toggle 1: Aktuelle Jobs */}
+            <ToggleSection
+                title="Aktuelle Jobs"
+                count={jobs.length}
+                defaultOpen={true}
+            >
+                <div className="space-y-2">
+                    {isOptimizing && <span className="text-sm text-blue-600 animate-pulse px-5">Optimizing CV...</span>}
+                    <JobQueueTable
+                        jobs={jobs}
+                        onOptimize={handleOptimizeCV}
+                        onReanalyze={handleReanalyze}
+                        onConfirm={handleConfirm}
+                        onDelete={handleDelete}
+                        loading={isLoading}
+                        optimizingJobId={isOptimizing ? currentJobId : null}
+                    />
                 </div>
+            </ToggleSection>
 
-                <JobQueueTable
-                    jobs={jobs}
-                    onOptimize={handleOptimizeCV}
-                    onReanalyze={handleReanalyze}
-                    onConfirm={handleConfirm}
-                    onDelete={handleDelete}
-                    loading={isLoading}
-                    optimizingJobId={isOptimizing ? currentJobId : null}
-                />
-            </div>
-
-            {/* Application History */}
-            <div className="space-y-4 pt-8 border-t border-[#d6d6d6]">
-                <h2 className="text-xl font-semibold text-[#37352F]">Application History</h2>
+            {/* Toggle 2: Application History */}
+            <ToggleSection
+                title="Application History"
+                defaultOpen={false}
+            >
                 <ApplicationHistory />
-            </div>
+            </ToggleSection>
 
             {/* Optimization Modal */}
             <CustomDialog

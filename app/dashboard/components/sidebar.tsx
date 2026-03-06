@@ -1,21 +1,30 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Home, Inbox, BarChart3, Shield, Settings, User } from 'lucide-react'
+import { Home, Inbox, BarChart3, Shield, Settings, User, MessageSquare, Search, Heart } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { PomodoroCard } from './pomodoro-card'
 import { createClient } from '@/lib/supabase/client'
+import { isAdmin } from '@/lib/admin'
 
 const navItems = [
   {
     title: 'Main',
     items: [
       { icon: Home, label: 'Today\'s Goals', href: '/dashboard', badge: 'G' },
-      { icon: Inbox, label: 'Job Search', href: '/dashboard/job-search', badge: 'S' },
+      { icon: Search, label: 'Job Search', href: '/dashboard/job-search', badge: 'S' },
       { icon: Inbox, label: 'Job Queue', href: '/dashboard/job-queue', badge: 'Q' },
       { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics', badge: 'A' },
+      { icon: MessageSquare, label: 'Coaching', href: '/dashboard/coaching', badge: 'I' },
+    ],
+  },
+  {
+    title: 'Community',
+    items: [
+      { icon: User, label: 'Community', href: '/dashboard/community', badge: 'C' },
+      { icon: Heart, label: 'Ehrenamt', href: '/dashboard/ehrenamt', badge: 'E' },
     ],
   },
   {
@@ -97,6 +106,24 @@ export function Sidebar() {
         ))}
       </nav>
 
+      {/* Admin — only for whitelisted emails */}
+      {user?.email && ['galettoyannik7@gmail.com', 'yannik.galetto@gmail.com'].includes(user.email.toLowerCase()) && (
+        <div className="px-4 pb-2">
+          <Link
+            href="/dashboard/admin"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+              pathname === '/dashboard/admin'
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Shield className="h-4 w-4" />
+            <span className="flex-1">Admin</span>
+          </Link>
+        </div>
+      )}
+
       {/* User Info */}
       <div className="px-4 py-3 border-t border-slate-200">
         <div className="flex items-center gap-3">
@@ -116,6 +143,8 @@ export function Sidebar() {
           </div>
         </div>
       </div>
+
+
 
       {/* Pomodoro Timer */}
       <div className="p-4 border-t">

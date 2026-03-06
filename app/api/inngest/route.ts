@@ -5,6 +5,7 @@ import { generateCertificates } from '@/lib/inngest/certificates-pipeline';
 import { extractJob } from '@/lib/inngest/extract-job-pipeline';
 import { analyzeCVMatch } from '@/lib/inngest/cv-match-pipeline';
 import { volunteeringScraper } from '@/lib/inngest/volunteering-scraper';
+import { generateCoachingReport } from '@/lib/inngest/coaching-report-pipeline';
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -16,5 +17,6 @@ export const { GET, POST, PUT } = serve({
         extractJob,
         analyzeCVMatch,
         volunteeringScraper,
+        generateCoachingReport,
     ]
 });

@@ -91,11 +91,24 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
         setPhase('quoteSearching');
         setQuoteError(null);
         try {
-            // Extract company values from the hooks we have
-            const companyValues = setupData.hooks
+            // Extract company values from value/vision hooks (primary)
+            // Fall back to all non-manual hooks if primary is insufficient
+            let companyValues = setupData.hooks
                 .filter(h => h.type === 'value' || h.type === 'vision')
                 .map(h => h.content)
                 .slice(0, 3);
+
+            if (companyValues.length === 0) {
+                companyValues = setupData.hooks
+                    .filter(h => h.type !== 'manual' && h.type !== 'quote')
+                    .map(h => h.content)
+                    .slice(0, 3);
+            }
+
+            // Extract vision separately for richer thinker identification
+            const companyVision = setupData.hooks
+                .find(h => h.type === 'vision')
+                ?.content ?? '';
 
             const res = await fetch('/api/cover-letter/quotes', {
                 method: 'POST',
@@ -104,6 +117,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     jobId,
                     companyName,
                     companyValues,
+                    companyVision,
                     jobTitle: setupData.jobTitle ?? undefined,
                 })
             });

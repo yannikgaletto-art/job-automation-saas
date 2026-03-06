@@ -276,10 +276,10 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                     )}
                 />
 
-                <div className="w-28 md:w-32 font-medium text-[#002e7a] truncate" title={job.company}>{job.company}</div>
-                <div className="w-40 md:w-48 text-[#002e7a] font-medium truncate" title={job.jobTitle}>{job.jobTitle}</div>
+                <div className="w-28 md:w-32 text-sm font-medium text-[#37352F] truncate" title={job.company}>{job.company}</div>
+                <div className="w-40 md:w-48 text-sm text-[#37352F] truncate" title={job.jobTitle}>{job.jobTitle}</div>
 
-                <div className="flex-1 min-w-[200px]" onClick={(e) => e.stopPropagation()}>
+                <div className="w-[30%] mx-4" onClick={(e) => e.stopPropagation()}>
                     <ProgressWorkflow
                         current={optimisticStep ?? job.workflowStep}
                         onStepClick={handleStepClick}
@@ -288,24 +288,15 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                     />
                 </div>
 
-                <div className="w-56 md:w-64 flex items-center justify-end gap-2 pr-2">
-                    <Button
-                        variant={nextAction.variant}
-                        className="flex-1 text-sm"
-                        disabled={isOptimizing}
-                        onClick={(e) => { e.stopPropagation(); nextAction.action?.(); }}
-                    >
-                        {isOptimizing ? <LoadingSpinner size="sm" className="mr-2" /> : nextAction.icon}
-                        <span className="ml-2">{isOptimizing ? "Optimizing..." : nextAction.label}</span>
-                    </Button>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(true); }}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                        title="Delete Job"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                </div>
+                <div className="flex-1" />
+
+                <button
+                    onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(true); }}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors shrink-0 mr-2"
+                    title="Delete Job"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
             </div>
 
             {/* Expanded Details */}

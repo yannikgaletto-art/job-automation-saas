@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Sidebar, NavSection, NavItem } from '@/components/motion/sidebar';
-import { Home, Search, Inbox, BarChart3, Users, Heart, Shield, Settings } from 'lucide-react';
+import { Home, Search, Inbox, BarChart3, Users, Heart, Shield, Settings, MessageSquare } from 'lucide-react';
 import { PomodoroMiniWidget } from './components/pomodoro-mini-widget';
 import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
@@ -12,6 +12,26 @@ import { MoodCheckInOverlay } from '@/components/MoodCheckInOverlay';
 import { useMoodCheckIn } from './hooks/useMoodCheckIn';
 import { useJobQueueCount } from '@/store/use-job-queue-count';
 import { useCalendarStore } from '@/store/use-calendar-store';
+import { createClient } from '@/lib/supabase/client';
+
+const ADMIN_EMAILS = ['galettoyannik7@gmail.com', 'yannik.galetto@gmail.com'];
+
+/** Admin NavItem — only renders for whitelisted admin emails */
+function AdminNavItem() {
+    const [isAdminUser, setIsAdminUser] = useState(false);
+
+    useEffect(() => {
+        const supabase = createClient();
+        supabase.auth.getUser().then(({ data }) => {
+            if (data?.user?.email && ADMIN_EMAILS.includes(data.user.email.toLowerCase())) {
+                setIsAdminUser(true);
+            }
+        });
+    }, []);
+
+    if (!isAdminUser) return null;
+    return <NavItem icon={Shield} label="Admin" href="/dashboard/admin" />;
+}
 
 export default function DashboardLayout({
     children,
@@ -57,6 +77,7 @@ export default function DashboardLayout({
                         <NavItem icon={Search} label="Job Search" href="/dashboard/job-search" shortcut="S" />
                         <NavItem icon={Inbox} label="Job Queue" href="/dashboard/job-queue" shortcut="Q" />
                         <NavItem icon={BarChart3} label="Analytics" href="/dashboard/analytics" shortcut="A" />
+                        <NavItem icon={MessageSquare} label="Coaching" href="/dashboard/coaching" shortcut="I" />
                     </NavSection>
 
                     <NavSection title="Community">
@@ -67,6 +88,7 @@ export default function DashboardLayout({
                     <NavSection title="Tools">
                         <NavItem icon={Shield} label="Data Security" href="/dashboard/security" />
                         <NavItem icon={Settings} label="Settings" href="/dashboard/settings" />
+                        <AdminNavItem />
                     </NavSection>
 
                 </Sidebar>

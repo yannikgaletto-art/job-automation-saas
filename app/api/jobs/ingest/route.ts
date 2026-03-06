@@ -52,6 +52,22 @@ export async function POST(request: NextRequest) {
         const userId = user.id;
 
         // ================================================================
+        // STEP 0.5: Enforce max 5 active jobs per user
+        // ================================================================
+        const { count: activeJobCount, error: countError } = await supabaseAdmin
+            .from('job_queue')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId);
+
+        if (!countError && (activeJobCount ?? 0) >= 5) {
+            console.log(`[${requestId}] route=jobs/ingest step=limit_check blocked count=${activeJobCount}`);
+            return NextResponse.json(
+                { success: false, error: 'Max. 5 aktive Jobs erreicht. Bitte schliesse bestehende Jobs ab oder loesche sie.', requestId },
+                { status: 429 }
+            );
+        }
+
+        // ================================================================
         // STEP 1: Validate input
         // ================================================================
         const body = await request.json();

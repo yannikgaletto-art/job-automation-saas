@@ -30,7 +30,7 @@ const stations: SelectedCVStation[] = [{
 }];
 
 const baseTone = (preset: string, formality: 'du' | 'sie' = 'du'): ToneConfig => ({
-    preset: preset as any, targetLanguage: 'de', hasStyleSample: false,
+    preset: preset as any, toneSource: 'preset', targetLanguage: 'de', hasStyleSample: false,
     styleWarningAcknowledged: true, formality
 });
 

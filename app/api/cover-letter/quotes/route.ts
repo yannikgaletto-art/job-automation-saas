@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { suggestRelevantQuotes } from '@/lib/services/quote-matcher';
 
+// Allow up to 60s — pipeline runs 3x Claude + 3x Perplexity (can take 30–50s)
+export const maxDuration = 60;
+
 // validateUrl removed for Batch 7 — Quotes use text-based sources (books, speeches), not live URLs.
 
 const supabaseAdmin = createAdminClient(

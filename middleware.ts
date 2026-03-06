@@ -62,8 +62,12 @@ export async function middleware(request: NextRequest) {
         request.nextUrl.pathname.startsWith(route)
     )
 
+    // Protected routes that require auth: /dashboard and /onboarding
+    const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
+        request.nextUrl.pathname.startsWith('/onboarding')
+
     // If not logged in and trying to access protected route
-    if (!session && !isPublicRoute && request.nextUrl.pathname.startsWith('/dashboard')) {
+    if (!session && !isPublicRoute && isProtectedRoute) {
         const redirectUrl = new URL('/login', request.url)
         console.log("⚠️ Unauthorized access, redirecting to login")
         return NextResponse.redirect(redirectUrl)

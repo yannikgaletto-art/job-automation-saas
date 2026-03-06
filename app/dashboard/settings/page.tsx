@@ -1,6 +1,7 @@
 import { ActiveCVCard } from "./active-cv-card"
+import { ProfileCard } from "./profile-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Settings as SettingsIcon } from "lucide-react"
+import { FileText, User, Sparkles } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 
@@ -18,16 +19,36 @@ export default async function SettingsPage() {
             {/* Page Header */}
             <div className="mb-8">
                 <div className="flex items-center gap-3 mb-2">
-                    <SettingsIcon className="h-8 w-8 text-[#0066FF]" />
-                    <h1 className="text-3xl font-bold text-[#37352F]">Settings</h1>
+                    <div className="p-2 bg-gradient-to-br from-[#0066FF]/10 to-[#0066FF]/5 rounded-xl">
+                        <Sparkles className="h-6 w-6 text-[#0066FF]" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-bold text-[#37352F]">Dein Karriere-Profil</h1>
+                        <p className="text-sm text-[#73726E]">
+                            Je mehr Pathly über dich weiß, desto besser werden deine Bewerbungen.
+                        </p>
+                    </div>
                 </div>
-                <p className="text-[#73726E]">
-                    Manage your documents and personal information
-                </p>
             </div>
 
+            {/* Profile Context Section */}
+            <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">
+                <CardHeader className="pb-4">
+                    <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
+                        <User className="h-5 w-5 text-[#0066FF]" />
+                        Persönlicher Kontext
+                    </CardTitle>
+                    <CardDescription className="text-[#73726E]">
+                        Diese Informationen helfen der KI, deine Bewerbungen zu personalisieren.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ProfileCard />
+                </CardContent>
+            </Card>
+
             {/* Document Management Section */}
-            <Card className="bg-white border-[#E7E7E5] shadow-sm mb-8">
+            <Card className="bg-white border-[#E7E7E5] shadow-sm">
                 <CardHeader>
                     <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
                         <FileText className="h-5 w-5 text-[#0066FF]" />
@@ -39,23 +60,6 @@ export default async function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                     <ActiveCVCard />
-                </CardContent>
-            </Card>
-
-            {/* Additional Settings Placeholder */}
-            <Card className="bg-white border-[#E7E7E5] shadow-sm">
-                <CardHeader>
-                    <CardTitle className="text-xl text-[#37352F]">Additional Settings</CardTitle>
-                    <CardDescription className="text-[#73726E]">
-                        More configuration options coming soon...
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="bg-[#F7F7F5] border border-[#E7E7E5] rounded-lg p-8 text-center">
-                        <p className="text-[#73726E]">
-                            Stay tuned for profile preferences, notification settings, and more!
-                        </p>
-                    </div>
                 </CardContent>
             </Card>
         </div>

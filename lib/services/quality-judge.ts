@@ -49,7 +49,7 @@ export async function judgeQuality(
     })
 
     const judgment = await anthropic.messages.create({
-        model: "claude-3-haiku-20240307", // Using specific model ID for stability
+        model: "claude-haiku-4-5-20251001", // Using specific model ID for stability
         max_tokens: 1500,
         messages: [{
             role: "user",

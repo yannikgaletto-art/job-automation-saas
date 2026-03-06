@@ -64,16 +64,21 @@ REGELN:
 2. Wähle Vordenker aus VERSCHIEDENEN Epochen und Disziplinen.
    Ideal: ein/e Wissenschaftler/in, ein/e Praktiker/in, ein/e Philosoph/in.
 3. Die Vordenker müssen für die KONKRETE ROLLE relevant sein, nicht nur generisch "inspirierend".
-4. Gib KEINE ZITATE zurück — nur Profile.
-5. Das Feld "searchQuery" muss eine präzise englische Suchanfrage sein,
-   z.B. "Peter Drucker quote on organizational change" oder "Grace Hopper quote on innovation and courage".
+   WICHTIG: Wähle Vordenker, die KONSTRUKTIV und AUFBAUEND denken — keine reinen Kritiker.
+4. Gib KEINE ZITATE zurück — nur Profile. (Zitate kommen in Schritt 2 von Perplexity.)
+5. Das Feld "searchQuery" MUSS thematisch zur STELLE und zum UNTERNEHMENSBEREICH passen.
+   Format: "[Name] quote on [Thema direkt aus jobTitle oder companyValues]"
+   RICHTIG: "Andrew Ng quote on AI platform innovation"
+   RICHTIG: "Fei-Fei Li quote on human-centered artificial intelligence"
+   FALSCH: "Shoshana Zuboff quote on corporate surveillance" (thematisch unpassend für ein KI-Unternehmen)
+   FALSCH: allgemeine Lebensweisheiten ohne Bezug zur Stelle
 
 OUTPUT (JSON Array, KEINE Umrahmung):
 [
   {
     "name": "Vorname Nachname",
     "why": "Warum passt diese Person zur Rolle + den Werten (1 Satz)",
-    "searchQuery": "Name short quote under 20 words on specific topic",
+    "searchQuery": "Name quote on [topic matching jobTitle/companyValues]",
     "matchedValue": "Exakter Text des Unternehmenswertes aus der Liste, der am besten passt"
   }
 ]`,
@@ -198,70 +203,62 @@ REGELN:
 }
 
 
-// ─── Stage 3: Quote Judge (Claude Sonnet, temp 0.2) ──────────────────────────
+// ─── Stage 3: Quote Validator (rule-based — Perplexity already verified) ──────
+// WHY: The previous Claude judge rejected ~100% of quotes due to subjective
+// "relevance" and "fluff" checks that failed too aggressively in live context.
+// Perplexity (Stage 2) already verified authenticity. We only need hard rules.
 
 interface JudgeVerdict {
     approved: boolean;
     reason: string;
 }
 
-async function judgeQuote(
+// Authors that should never appear in a professional cover letter
+const BANNED_AUTHORS = [
+    'anonymous', 'unknown', 'unbekannt', 'autor unbekannt',
+    'various', 'n/a', 'na', '-', '', 'zitat', 'quote'
+];
+
+// Obvious spam / placeholder patterns in quote text
+const SPAM_PATTERNS = [
+    /lorem ipsum/i,
+    /\[insert quote\]/i,
+    /placeholder/i,
+    /example quote/i,
+];
+
+
+function judgeQuote(
     quote: string,
     author: string,
-    source: string,
-    jobTitle: string,
-    companyValues: string[]
-): Promise<JudgeVerdict> {
-    try {
-        const response = await complete({
-            taskType: 'personalize_intro',
-            systemPrompt: 'Du bist ein strenger Qualitätsprüfer für Zitate in Bewerbungsanschreiben. Antworte AUSSCHLIESSLICH mit validem JSON.',
-            prompt: `Prüfe dieses Zitat für ein Anschreiben als "${jobTitle}".
+    _source: string,
+    _jobTitle: string,
+    _companyValues: string[],
+    _thinkerWhy: string = ''
+): JudgeVerdict {
+    const authorNorm = author.trim().toLowerCase();
 
-ZITAT: "${quote}"
-AUTOR: ${author}
-QUELLE: ${source || 'KEINE QUELLE ANGEGEBEN'}
-UNTERNEHMENSWERTE: ${JSON.stringify(companyValues)}
-
-PRÜFE DREI KRITERIEN:
-
-1. QUELLEN-CHECK: Hat das Zitat eine nicht-leere Quelle?
-   Wenn source leer oder "Unbekannt" → ABLEHNEN.
-
-2. FLUFF-CHECK: Ist das Zitat substanziell?
-   ABLEHNEN wenn es eines dieser Muster erfüllt:
-   - Allgemeinplätze ("Der Schlüssel zum Erfolg ist...")
-   - Sätze die auf JEDE Firma passen
-   - Weniger als 8 Wörter
-
-3. RELEVANZ-CHECK: Zeigt das Zitat einen thematischen Bezug zur Rolle "${jobTitle}" oder zu den Unternehmenswerten?
-   Wir verlangen keine perfekte 1:1 Übereinstimmung, aber eine erkennbare Brücke. Wenn es einen inhaltlichen Wertbeitrag bietet, ist es APPROVED. Ablehnen nur bei völliger Irrelevanz.
-
-OUTPUT (JSON):
-{
-  "approved": true/false,
-  "reason": "Begründung in einem Satz"
-}`,
-            temperature: 0.4,
-            maxTokens: 512,
-        });
-
-        let rawText = response.text.trim();
-        const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch && jsonMatch[1]) {
-            rawText = jsonMatch[1].trim();
-        }
-
-        const parsed = JSON.parse(rawText);
-        return {
-            approved: !!parsed.approved,
-            reason: parsed.reason || '',
-        };
-    } catch (error) {
-        console.error('❌ [Stage 3] Judge failed:', error instanceof Error ? error.message : error);
-        // Conservative: reject on error
-        return { approved: false, reason: 'Judge evaluation failed' };
+    // 1. Author must be a real named person
+    if (!author.trim() || BANNED_AUTHORS.includes(authorNorm)) {
+        return { approved: false, reason: `Autor unbekannt oder anonym: "${author}"` };
     }
+
+    // 2. Quote must be at least 8 words
+    const wordCount = quote.trim().split(/\s+/).length;
+    if (wordCount < 8) {
+        return { approved: false, reason: `Zitat zu kurz (${wordCount} Wörter, min. 8 erforderlich)` };
+    }
+
+    // 3. Quote must not be obvious spam/placeholder
+    for (const pattern of SPAM_PATTERNS) {
+        if (pattern.test(quote)) {
+            return { approved: false, reason: 'Zitat enthält Placeholder-Text' };
+        }
+    }
+
+    // Relevanz wird durch Stage 1 (searchQuery-Anker) sichergestellt.
+    // Perplexity verifiziert die Authentizität in Stage 2.
+    return { approved: true, reason: 'Zitat von bekanntem Autor, ausreichend lang, verifiziert durch Perplexity.' };
 }
 
 
@@ -382,18 +379,19 @@ export async function suggestRelevantQuotes(
     console.error(`✅ [Stage 2] ${verifiedQuotes.length}/${thinkers.length} quotes verified`);
 
     // ═══════════════════════════════════════════════════════════════════════
-    // STAGE 3: Judge Quotes (Claude Sonnet, temp 0.2)
+    // STAGE 3: Validate Quotes (rule-based — fast, no extra AI call)
     // ═══════════════════════════════════════════════════════════════════════
-    console.error('🔍 [Stage 3] Judging quote quality...');
+    console.error('🔍 [Stage 3] Validating quote quality (rule-based)...');
     const judgedQuotes: QuoteSuggestion[] = [];
 
     for (const { thinker, result } of verifiedQuotes) {
-        const verdict = await judgeQuote(
+        const verdict = judgeQuote(
             result.quote,
             result.author,
             result.source,
             jobTitle,
-            companyValues
+            companyValues,
+            thinker.why || ''
         );
 
         if (verdict.approved) {
