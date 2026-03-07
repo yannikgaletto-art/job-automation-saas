@@ -122,7 +122,7 @@ export default function AdminPage() {
     if (!authorized) {
         return (
             <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-6 h-6 animate-spin text-[#0066FF]" />
+                <Loader2 className="w-6 h-6 animate-spin text-[#012e7a]" />
             </div>
         );
     }
@@ -178,7 +178,7 @@ export default function AdminPage() {
                     <button
                         onClick={loadUsers}
                         disabled={loading}
-                        className="text-xs text-[#73726E] hover:text-[#0066FF] transition-colors flex items-center gap-1"
+                        className="text-xs text-[#73726E] hover:text-[#012e7a] transition-colors flex items-center gap-1"
                     >
                         <RotateCcw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
                         Aktualisieren

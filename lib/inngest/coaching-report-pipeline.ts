@@ -74,49 +74,106 @@ export const generateCoachingReport = inngest.createFunction(
 
             const round = session.interview_round || 'kennenlernen';
 
-            // Round-specific evaluation dimensions
-            const dimensionsByRound: Record<string, string> = {
-                kennenlernen: `[
-    { "name": "Fachliche Kompetenz", "score": 8, "feedback": "..." },
-    { "name": "Kommunikation & Struktur", "score": 6, "feedback": "..." },
-    { "name": "Motivation & Cultural Fit", "score": 7, "feedback": "..." },
-    { "name": "Selbstreflexion", "score": 7, "feedback": "..." },
-    { "name": "Auftreten & Authentizität", "score": 6, "feedback": "..." }
-  ]`,
-                deep_dive: `[
-    { "name": "Technische / Fachliche Tiefe", "score": 8, "feedback": "..." },
-    { "name": "STAR-Methodik (Situation-Task-Action-Result)", "score": 6, "feedback": "..." },
-    { "name": "Problemlösungskompetenz", "score": 7, "feedback": "..." },
-    { "name": "Konkretheit & Belastbarkeit der Beispiele", "score": 7, "feedback": "..." },
-    { "name": "Reflexionsfähigkeit", "score": 6, "feedback": "..." }
-  ]`,
-                case_study: `[
-    { "name": "Strukturiertes Denken", "score": 8, "feedback": "..." },
-    { "name": "Datenanalyse & Informationsbeschaffung", "score": 6, "feedback": "..." },
-    { "name": "Kreativität & Lösungsansätze", "score": 7, "feedback": "..." },
-    { "name": "Synthese & Empfehlung", "score": 7, "feedback": "..." },
-    { "name": "Kommunikation unter Druck", "score": 6, "feedback": "..." }
-  ]`,
+            // Round-specific dimension names
+            const dimensionNamesByRound: Record<string, string[]> = {
+                kennenlernen: [
+                    'Fachliche Kompetenz',
+                    'Kommunikation & Struktur',
+                    'Motivation & Cultural Fit',
+                    'Selbstreflexion',
+                    'Auftreten & Authentizität',
+                ],
+                deep_dive: [
+                    'Technische / Fachliche Tiefe',
+                    'STAR-Methodik',
+                    'Problemlösungskompetenz',
+                    'Konkretheit & Belastbarkeit',
+                    'Reflexionsfähigkeit',
+                ],
+                case_study: [
+                    'Strukturiertes Denken',
+                    'Datenanalyse & Informationsbeschaffung',
+                    'Kreativität & Lösungsansätze',
+                    'Synthese & Empfehlung',
+                    'Kommunikation unter Druck',
+                ],
             };
 
-            const dimensions = dimensionsByRound[round] || dimensionsByRound['kennenlernen'];
+            const dimNames = dimensionNamesByRound[round] || dimensionNamesByRound['kennenlernen'];
 
             const client = getClient();
             const response = await client.messages.create({
                 model: REPORT_MODEL,
-                max_tokens: 2048,
+                max_tokens: 3000,
                 temperature: 0.3,
-                system: `Du bist ein Senior Recruiting Coach. Erstelle einen strukturierten Feedback-Report basierend auf dem Mock-Interview-Protokoll.
-        
-Antworte als valides JSON (kein Markdown, keine Code-Blöcke). Verwende diese exakte Struktur:
+                system: `Du bist ein empathischer Senior Recruiting Coach.
+
+ABSOLUT WICHTIG — KÜRZE:
+- KEINE GANZEN SÄTZE. Nur kurze Stichpunkte (max 8-10 Wörter pro Feld).
+- Markiere 1-2 entscheidende Wörter mit **fett**.
+- Der User muss in 3 Sekunden verstehen, worum es geht.
+- Sprich den Kandidaten mit "du" an.
+
+SCORING-SYSTEM (score ist 1-10):
+- score 1-3 (unter 40%) → level: "red", tag: "Das vermissen wir"
+- score 4-6 (40-69%) → level: "yellow", tag: "Da fehlt nicht viel"
+- score 7-10 (70-100%) → level: "green", tag: "Das machst du gut"
+
+WICHTIG — DIFFERENZIERUNG:
+- Nutze die VOLLE Skala von 1 bis 10. NICHT alles auf 5-7 setzen!
+- Ein Kandidat hat IMMER Stärken (grün) UND Schwächen (gelb/rot). Mixed Tags sind Pflicht!
+- Mindestens 1 Dimension muss "green" sein und mindestens 1 muss "yellow" oder "red" sein.
+
+JEDE Dimension braucht ein echtes ZITAT aus dem Interview-Protokoll.
+
+Antworte als valides JSON (kein Markdown, keine Code-Blöcke). Exakte Struktur:
 {
-  "overallScore": 7,
-  "dimensions": ${dimensions},
-  "summary": "2-3 Sätze Gesamteinschätzung",
-  "strengths": ["Stärke 1", "Stärke 2", "Stärke 3"],
-  "improvements": ["Verbesserung 1 mit konkreter Beispielformulierung", "Verbesserung 2", "Verbesserung 3"],
-  "topicSuggestions": ["Thema 1 das der Kandidat vertiefen sollte", "Thema 2", "Thema 3"]
-}`,
+  "overallScore": 6,
+  "topStrength": "Solide **Grundkenntnisse** im Kundenmanagement",
+  "recommendation": "Mehr **konkrete Beispiele** und **STAR-Struktur** nutzen",
+  "dimensions": [
+    {
+      "name": "${dimNames[0]}",
+      "score": 6,
+      "level": "yellow",
+      "tag": "Da fehlt nicht viel",
+      "observation": "Kennt **Theorie**, wenig **Praxisbeispiele**",
+      "reason": "Bleibt bei **Nachfragen** konzeptionell",
+      "suggestion": "Mit **realen Fallstudien** und Zahlen belegen",
+      "quote": "Also ich würde versuchen, transparent zu sein...",
+      "feedback": ""
+    },
+    ... (für ALLE 5 Dimensionen: ${dimNames.join(', ')})
+  ],
+  "summary": "1-2 kurze Sätze Gesamteinschätzung",
+  "strengths": ["**Kundenverständnis** und Lösungsorientierung", "**Offenheit** für neue Ansätze", "**Gründungserfahrung** zeigt Eigeninitiative"],
+  "improvements": [
+    {
+      "title": "**STAR-Methode** für strukturierte Antworten",
+      "bad": "Ich versuche immer transparent zu sein...",
+      "good": "Bei **Projekt Y** habe ich den Kunden **3 Tage vorher** angerufen und **3 Timelines** präsentiert."
+    }
+  ],
+  "topicSuggestions": [
+    {
+      "topic": "Strategisches Account Management",
+      "searchQuery": "Strategisches Account Management Interview Tipps",
+      "youtubeTitle": "Strategisches Account Management – So überzeugst du im Interview"
+    },
+    {
+      "topic": "Verhandlungsführung",
+      "searchQuery": "Verhandlungsführung Techniken Beruf",
+      "youtubeTitle": "Verhandlungsführung – Techniken für schwierige Gespräche"
+    },
+    {
+      "topic": "Storytelling",
+      "searchQuery": "STAR Methode Interview Beispiele",
+      "youtubeTitle": "Die STAR-Methode in Aktion: So beantwortest du jede Interview-Frage"
+    }
+  ]
+}
+
+NOCHMAL: observation, reason, suggestion sind KURZE STICHPUNKTE (max 8-10 Wörter). KEINE Sätze, KEINE Absätze!`,
                 messages: [
                     {
                         role: 'user',
@@ -147,20 +204,29 @@ Antworte als JSON.`,
         await step.run('save-report', async () => {
             let reportJson;
             try {
-                const cleaned = report.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                // Robust JSON extraction: strip markdown code blocks, find first { ... }
+                let cleaned = report.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                if (!cleaned.startsWith('{')) {
+                    const match = cleaned.match(/\{[\s\S]*\}/);
+                    if (match) cleaned = match[0];
+                }
                 reportJson = JSON.parse(cleaned);
             } catch {
                 console.error('❌ [Coaching Report] JSON parse failed, saving raw text');
-                reportJson = { overallScore: 5, summary: report.text, dimensions: [], strengths: [], improvements: [] };
+                reportJson = { overallScore: 5, summary: report.text.substring(0, 500), dimensions: [], strengths: [], improvements: [] };
             }
 
             const score = Math.min(10, Math.max(1, reportJson.overallScore || 5));
+
+            // Save the PARSED JSON as string (not raw Claude text with markdown wrappers).
+            // This ensures the analysis page can always JSON.parse() it cleanly.
+            const cleanReportString = JSON.stringify(reportJson);
 
             const { error: updateError } = await supabaseAdmin
                 .from('coaching_sessions')
                 .update({
                     session_status: 'completed',
-                    feedback_report: report.text,
+                    feedback_report: cleanReportString,
                     coaching_score: score,
                     tokens_used: (session.tokens_used || 0) + report.tokensUsed,
                     cost_cents: (session.cost_cents || 0) + report.costCents,

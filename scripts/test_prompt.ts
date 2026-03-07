@@ -55,7 +55,6 @@ export const ctx: CoverLetterSetupContext = {
         styleWarningAcknowledged: true,
         formality: 'du'
     },
-    autoFilled: false,
     completedAt: 'now',
     introFocus: 'quote'
 };

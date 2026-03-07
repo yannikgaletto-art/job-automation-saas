@@ -13,11 +13,22 @@ export interface ProbingArea {
     followUps: string[];
 }
 
+/** Role research output — generated on-demand via "Analysieren" button */
+export interface AboutRole {
+    dailyBusiness: string[];
+    cases: string[];
+    methodology: string[];
+}
+
 /** Base dossier shared by all rounds */
 export interface CoachingDossierBase {
     strengths: string[];
     gaps: string[];
     companyContext: string;
+    /** On-demand: role research (populated after user clicks "Analysieren") */
+    aboutRole?: AboutRole;
+    /** On-demand: user story bullet points from CV/cover letter analysis */
+    myStory?: string[];
 }
 
 /** Kennenlernen dossier — 5 broad questions */
@@ -120,17 +131,41 @@ export interface CompleteSessionResponse {
 // FEEDBACK REPORT
 // ============================================================================
 
+/** Structured topic suggestion with YouTube search query */
+export interface TopicSuggestion {
+    topic: string;
+    searchQuery: string;
+    youtubeTitle: string;
+}
+
 export interface FeedbackReport {
     overallScore: number;
+    topStrength: string;
+    recommendation: string;
     dimensions: FeedbackDimension[];
     summary: string;
     strengths: string[];
-    improvements: string[];
-    topicSuggestions: string[];
+    improvements: FeedbackImprovement[];
+    /** New format: TopicSuggestion[]; Old format: string[] (backwards compat) */
+    topicSuggestions: (TopicSuggestion | string)[];
 }
+
+export type DimensionLevel = 'green' | 'yellow' | 'red';
 
 export interface FeedbackDimension {
     name: string;
     score: number;
+    level: DimensionLevel;
+    tag: string;
+    observation: string;
+    reason: string;
+    suggestion: string;
+    quote?: string;
     feedback: string;
+}
+
+export interface FeedbackImprovement {
+    title: string;
+    bad: string;
+    good: string;
 }

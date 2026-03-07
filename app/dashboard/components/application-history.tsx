@@ -7,7 +7,6 @@ import { formatAppliedDate } from "@/lib/utils/date-formatting"
 import { motion } from "framer-motion"
 import { EmptyApplicationHistory } from "@/components/empty-states/empty-application-history"
 import { cn } from "@/lib/utils"
-import { showSafeToast } from "@/lib/utils/toast"
 
 interface Application {
     id: string
@@ -146,7 +145,6 @@ export function ApplicationHistory() {
                     )
                 }
             })
-            showSafeToast('Fehler beim Speichern', `submit_toggle_error:${appId}`, 'error')
         } finally {
             setTogglingIds(prev => {
                 const next = new Set(prev)

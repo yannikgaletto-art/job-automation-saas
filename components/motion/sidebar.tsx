@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LucideIcon, LogOut, Coins } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { DynamicIsland } from './dynamic-island';
 import { Badge } from './badge';
 import { Progress } from './progress';
 import { CountUp } from './count-up';
@@ -127,7 +128,7 @@ export function NavItem({ icon: Icon, label, href, badge, isActive: isActiveProp
           {/* Active Indicator — only after mount to avoid hydration mismatch */}
           {isActive && (
             <motion.div
-              className="absolute left-0 top-1/2 w-1 h-4 bg-[#0066FF] rounded-r-full"
+              className="absolute left-0 top-1/2 w-1 h-4 bg-[#012e7a] rounded-r-full"
               layoutId="activeIndicator"
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -209,7 +210,7 @@ export function ProgressCard({ title, value, total, className }: ProgressCardPro
 export function CreditsCard({ remaining, className }: CreditsCardProps) {
   return (
     <motion.div
-      className={cn("px-3 py-3 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#3385FF]/10 border border-[#0066FF]/20", className)}
+      className={cn("px-3 py-3 rounded-lg bg-gradient-to-br from-[#012e7a]/10 to-[#1a4a9a]/10 border border-[#012e7a]/20", className)}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{
@@ -221,11 +222,11 @@ export function CreditsCard({ remaining, className }: CreditsCardProps) {
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-[#37352F] flex items-center gap-1">
-          <Coins className="h-3.5 w-3.5 text-[#0066FF]" />
+          <Coins className="h-3.5 w-3.5 text-[#012e7a]" />
           Credits
         </span>
         <motion.span
-          className="text-sm font-semibold text-[#0066FF]"
+          className="text-sm font-semibold text-[#012e7a]"
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
@@ -260,7 +261,7 @@ export function Sidebar({ children, className, collapsed = false }: SidebarProps
     <motion.aside
       className={cn(
         "sticky top-0 h-screen shrink-0 border-r border-[#E7E7E5] bg-white",
-        "flex flex-col p-4 space-y-6 z-30 overflow-hidden",
+        "flex flex-col p-4 space-y-6 z-30",
         className
       )}
       animate={{
@@ -269,22 +270,8 @@ export function Sidebar({ children, className, collapsed = false }: SidebarProps
       }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
     >
-      {/* Logo */}
-      <motion.div
-        className="flex items-center gap-2 px-2"
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-      >
-        <motion.div
-          className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0066FF] to-[#3385FF] flex items-center justify-center"
-          whileHover={{ rotate: 360, scale: 1.1 }}
-          transition={{ duration: 0.6, ease: "easeInOut" }}
-        >
-          <span className="text-white font-bold text-lg">P</span>
-        </motion.div>
-        <span className="text-lg font-semibold text-[#37352F]">Pathly</span>
-      </motion.div>
+      {/* Dynamic Island Logo — morphs to show notifications */}
+      <DynamicIsland />
 
       {/* Navigation Content */}
       <div className="flex-1 flex flex-col space-y-6 overflow-y-auto scrollbar-hide">

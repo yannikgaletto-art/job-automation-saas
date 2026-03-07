@@ -122,7 +122,7 @@ export function CreditsCard({ remaining, className }: CreditsCardProps) {
     <div className={cn("px-3 py-3 rounded-lg bg-[#FAFAF9] border border-[#E7E7E5]", className)}>
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-[#37352F]">💰 Credits</span>
-        <span className="text-sm font-semibold text-[#0066FF]">{remaining} left</span>
+        <span className="text-sm font-semibold text-[#012e7a]">{remaining} left</span>
       </div>
     </div>
   );
@@ -143,7 +143,7 @@ export function Sidebar({ children, className }: SidebarProps) {
     >
       {/* Logo */}
       <div className="flex items-center gap-2 px-2">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0066FF] to-[#3385FF] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#012e7a] to-[#1a4a9a] flex items-center justify-center">
           <span className="text-white font-bold text-lg">P</span>
         </div>
         <span className="text-lg font-semibold text-[#37352F]">Pathly</span>

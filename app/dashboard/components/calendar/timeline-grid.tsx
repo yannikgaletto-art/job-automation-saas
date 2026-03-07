@@ -15,7 +15,6 @@ import { useDroppable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { CheckCircle2, GripHorizontal, Calendar, Trash2, Timer } from 'lucide-react';
 import { useCalendarStore, type CalendarTask } from '@/store/use-calendar-store';
-import { toast } from 'sonner';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0:00 to 23:00
 const SLOT_HEIGHT = 48; // px per 30min slot → 96px per hour
@@ -177,11 +176,9 @@ function TaskBlock({ task }: { task: CalendarTask }) {
 
     const handleDelete = async () => {
         removeTask(task.id);
-        toast.success(`„${task.title}" gelöscht`);
         try {
             await fetch(`/api/tasks?id=${task.id}`, { method: 'DELETE' });
         } catch {
-            toast.error('Löschen fehlgeschlagen');
         }
     };
 
@@ -346,10 +343,8 @@ export function TimelineGrid() {
                     }),
                 });
 
-                toast.success(`\u201E${title}\u201C um ${inlineCreate.hour}:${inlineCreate.minute === 0 ? '00' : '30'} erstellt`);
             }
         } catch {
-            toast.error('Task konnte nicht erstellt werden');
         }
 
         setInlineCreate(null);

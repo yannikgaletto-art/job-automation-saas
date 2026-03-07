@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Validate source field
-        const validSource = source === 'pulse' ? 'pulse' : 'manual';
+        const validSource = ['pulse', 'coaching'].includes(source) ? source : 'manual';
 
         const { data: task, error } = await supabaseAdmin
             .from('tasks')

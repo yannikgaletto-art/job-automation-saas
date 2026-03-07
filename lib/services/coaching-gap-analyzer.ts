@@ -41,46 +41,108 @@ function getSchemaInstruction(round: InterviewRound, companyName: string, jobTit
         case 'kennenlernen':
             return `Antworte als JSON mit exakt dieser Struktur:
 {
-  "strengths": ["Genau 3 relevante Stärken des Kandidaten für diese Stelle"],
-  "gaps": ["Genau 3 kritische Lücken zwischen CV und Anforderungsprofil"],
-  "interviewQuestions": ["5 Motivations- und Cultural-Fit-Fragen basierend auf dem CV und den Gaps. Fokus: Werdegang, Motivation, Soft Skills. BEZIEHE DICH auf konkrete Punkte aus dem Lebenslauf."],
-  "companyContext": "2-3 Sätze über das Unternehmen und die Rolle"
-}`;
+  "strengths": ["Genau 3 relevante Stärken. Jede Stärke: 1 prägnanter Satz. Format: **Schlüsselwort:** Aussage."],
+  "gaps": ["Genau 3 kritische Lücken. Jede Lücke: 1 prägnanter Satz. Format: **Schlüsselwort:** Aussage."],
+  "interviewQuestions": ["5 Fragen — siehe ORIENTIERUNG unten"],
+  "companyContext": "1-2 Sätze über das Unternehmen und die Rolle"
+}
+
+ORIENTIERUNG FÜR FRAGEN (Phase 1: Erstes Kennenlernen):
+Die Fragen sollen locker, menschlich und motivationsbezogen sein. KEIN technisches Tieftauchen!
+Der Recruiter soll zuerst auf eine interessante Station im Lebenslauf eingehen und DANN die Frage daraus ableiten.
+
+Ton: Neugierig, wertschätzend, wie ein echtes Erstgespräch unter Menschen.
+Themen: Werdegang, Motivation, Cultural Fit, Arbeitsweise, Teamdynamik, Erwartungen.
+
+Beispiele als Orientierung (NICHT 1:1 kopieren, sondern Stil und Tiefe als Maßstab nehmen):
+- "Nimm mich mal kurz mit durch deinen Lebenslauf: Welche Station hat dich fachlich und persönlich am meisten geprägt?"
+- "Was reizt dich an genau dieser Rolle am meisten – und gibt es auch etwas, wo du sagst: Da muss ich mich erst noch richtig reinfuchsen?"
+- "Wenn du an deine letzte Position denkst: Was hat dir richtig Energie gegeben, und was hat dir eher Energie geraubt?"
+- "Was war der konkrete Auslöser dafür, dass du dich nach etwas Neuem umschaust?"
+- "In was für einem Team-Setup brauchst du, um glücklich zu sein?"
+- "Was erwartest du von deiner direkten Führungskraft, damit du einen richtig guten Job machen kannst?"
+- "Wenn wir deine Kolleg:innen fragen würden, wofür sie dich am meisten schätzen – was würden sie sagen?"
+- "Erzähl mir von einem Projekt, das so richtig gegen die Wand gefahren ist. Was hast du daraus gelernt?"
+- "Wie gehst du vor, wenn du dich unter Zeitdruck in ein komplett neues Themengebiet einarbeiten musst?"
+
+WICHTIG:
+- Passe die Fragen an den KONTEXT des Kandidaten an (z.B. Lehrer, Change Manager, Entwickler, Sales).
+- BEZIEHE DICH immer auf konkrete CV-Stationen. Zeige echte Neugier an bisherigen Erfahrungen.
+- Jede Frage soll sich anfühlen wie ein natürliches Gespräch, nicht wie ein Fragenkatalog.`;
 
         case 'deep_dive':
             return `Antworte als JSON mit exakt dieser Struktur:
 {
-  "strengths": ["Genau 3 relevante Stärken des Kandidaten"],
-  "gaps": ["Genau 3 kritische fachliche/technische Lücken"],
+  "strengths": ["Genau 3 relevante Stärken. Format: **Schlüsselwort:** Max 1 Satz."],
+  "gaps": ["Genau 3 kritische fachliche/technische Lücken. Format: **Schlüsselwort:** Max 1 Satz."],
   "probingAreas": [
     {
-      "mainQuestion": "Eine tiefgehende STAR-Format-Frage zu einem kritischen Gap. BEZIEHE DICH auf konkrete Projekte oder Erfahrungen aus dem Lebenslauf.",
+      "mainQuestion": "Eine tiefgehende, fachspezifische Frage — siehe ORIENTIERUNG unten.",
       "followUps": [
-        "Nachfrage 1: Warum genau dieser Ansatz? Was wäre die Alternative gewesen?",
-        "Nachfrage 2: Was war das messbare Ergebnis? Was hätten Sie rückblickend anders gemacht?"
+        "Nachfrage 1: Bohrt tiefer in die Methodik oder Entscheidungslogik.",
+        "Nachfrage 2: Fragt nach messbaren Ergebnissen oder alternativen Ansätzen."
       ]
     }
   ],
-  "companyContext": "2-3 Sätze über das Unternehmen und die Rolle"
+  "companyContext": "1-2 Sätze über das Unternehmen und die Rolle"
 }
 WICHTIG: Generiere genau 3 probingAreas, jede mit 1 mainQuestion und 2 followUps.
-Die Fragen müssen fachlich/technisch tiefgehend sein und sich auf KONKRETE CV-Inhalte beziehen.`;
+
+ORIENTIERUNG FÜR FRAGEN (Phase 2: Deep Dive / Zweitgespräch):
+Das Deep Dive geht FACHLICH IN DIE TIEFE. Keine Motivationsfragen mehr! Hier wird der Kandidat methodisch geprüft.
+Der Recruiter soll auf konkrete CV-Projekte und Erfahrungen referenzieren und daraus fachliche Szenarien ableiten.
+
+Ton: Respektvoll-fordernd, wie ein erfahrener Fachkollege der wirklich verstehen will. 
+Themen: Systematische Problemanalyse, Pragmatismus vs. Perfektionismus, Skalierbarkeit, Wissenstransfer, methodische Tiefe.
+
+Beispiele als Orientierung (NICHT 1:1 kopieren):
+- "Ein wichtiger Prozess rund um [Thema XY] gerät plötzlich massiv ins Stocken. Die offensichtlichen Erklärungen ergeben keinen Sinn. Wie gehst du systematisch zur wahren Fehlerquelle vor?"
+- "Wann ist eine Quick-and-Dirty-Lösung für dich fachlich legitim — und wo ziehst du die rote Linie und sagst: Hier müssen wir von Grund auf neu aufsetzen?"
+- "Du übernimmst ein historisch gewachsenes Konstrukt von einem Vorgänger. Kaum Übergabe, alles unübersichtlich. Wie bringst du Struktur rein, ohne im laufenden Betrieb Chaos auszulösen?"
+- "Wenn du heute ein Konzept entwirfst, das für eine kleine Gruppe funktioniert, aber in einem Jahr für das Zehnfache greifen muss: Auf welche Flaschenhälse achtest du schon am ersten Tag?"
+- "Wie filterst du pragmatisch heraus, was wirklich Mehrwert bringt und was reines Buzzword-Bingo ist?"
+- "Gibt es eine methodische Lösung der letzten Jahre, auf die du aus Fach-Perspektive richtig stolz bist? Was macht sie unter der Haube so durchdacht?"
+
+WICHTIG:
+- Passe [Thema XY]-Platzhalter an den KONKRETEN fachlichen Kontext des Kandidaten an.
+- BEZIEHE DICH auf konkrete Projekte und Erfahrungen aus dem Lebenslauf.
+- Die Fragen müssen fachlich/methodisch tiefgehend sein — KEINE Cultural-Fit-Fragen hier.`;
 
         case 'case_study':
             return `Antworte als JSON mit exakt dieser Struktur:
 {
-  "strengths": ["Genau 3 relevante Stärken des Kandidaten"],
-  "gaps": ["Genau 3 kritische Lücken"],
-  "caseScenario": "Ein detailliertes, realistisches Business-Szenario (8-12 Sätze) aus dem Arbeitsalltag bei ${companyName} für die Stelle ${jobTitle}. Das Szenario beschreibt ein konkretes Problem, das der Kandidat lösen muss. Es soll zu den Gaps des Kandidaten passen, sodass er/sie gezielt gefordert wird. Beschreibe die Ausgangssituation, die Stakeholder und das Ziel.",
+  "strengths": ["Genau 3 relevante Stärken. Format: **Schlüsselwort:** Max 1 Satz."],
+  "gaps": ["Genau 3 kritische Lücken. Format: **Schlüsselwort:** Max 1 Satz."],
+  "caseScenario": "Ein detailliertes, realistisches Business-Szenario (6-8 Sätze) aus dem Arbeitsalltag bei ${companyName} für die Stelle ${jobTitle}. Siehe ORIENTIERUNG unten.",
   "hiddenData": [
-    "Datenpunkt 1 den der Kandidat erst erfragen muss (z.B. eine konkrete Kennzahl)",
-    "Datenpunkt 2 (z.B. ein internes Hindernis oder eine Marktinformation)",
+    "Datenpunkt 1 den der Kandidat erst erfragen muss",
+    "Datenpunkt 2 (z.B. ein internes Hindernis oder Marktinfo)",
     "Datenpunkt 3 (z.B. Budget, Timeline oder Teamgröße)"
   ],
-  "expectedApproach": "Kurze Beschreibung (3-4 Sätze) wie ein idealer Kandidat das Szenario strukturiert angehen würde.",
-  "companyContext": "2-3 Sätze über das Unternehmen und die Rolle"
+  "expectedApproach": "3-4 Sätze wie ein idealer Kandidat das Szenario strukturiert angehen würde.",
+  "companyContext": "1-2 Sätze über das Unternehmen und die Rolle"
 }
-WICHTIG: Das Szenario muss SPEZIFISCH für ${companyName} und die Rolle ${jobTitle} sein. Kein generisches Szenario!`;
+
+ORIENTIERUNG FÜR DAS SZENARIO (Phase 3: Case Study):
+Das Szenario muss ein konkretes, realistisches Problem aus dem Arbeitsalltag bei ${companyName} sein.
+Es soll den Kandidaten unter Zeitdruck/Unsicherheit setzen und zu den identifizierten Gaps passen.
+
+Ton: Dringend, realistisch, wie ein echtes Business-Problem das auf dem Tisch liegt.
+Themen: Krisensituationen, Ressourcenkonflikte, strategische Entscheidungen, Stakeholder-Management.
+
+Beispiele für Szenarien-TYPEN als Orientierung (NICHT 1:1 kopieren):
+- Kundenabwanderung: Ein wichtiger Kunde droht wütend mit Kündigung wegen eines Problems. Die Lösung dauert mindestens eine Woche. Wie reagierst du heute?
+- Budgetentscheidung: Du bekommst ein Sonderbudget um ein konkretes Problem zu lösen. Wie gehst du bei Evaluierung und Planung vor?
+- Wettbewerbsdruck: Der Hauptwettbewerber hat überraschend exakt das Feature veröffentlicht, an dem ihr seit Monaten arbeitet.
+- Projektübernahme: Du übernimmst ein Projekt, das über Budget und Zeitplan ist, das Team ist frustriert.
+- Ressourcenausfall: Der wichtigste Experte für euer Prio-1-Projekt fällt für vier Wochen aus. Deadline ist in zwei Wochen.
+- Stakeholder-Konflikt: Zwei wichtige Zuarbeiter weigern sich, miteinander zu kommunizieren. Das Projekt steht auf dem Spiel.
+- Change-Widerstand: Du bemerkst, dass ein zentraler Prozess ineffizient ist. Das Team wehrt sich: "Das haben wir schon immer so gemacht."
+
+WICHTIG:
+- Das Szenario muss SPEZIFISCH für ${companyName} und die Rolle ${jobTitle} sein. Kein generisches Szenario!
+- Passe es an den KONTEXT des Kandidaten an (z.B. ein Lehrer bekommt ein Schul-Szenario, ein PM ein Produktszenario).
+- Es soll zu den GAPS des Kandidaten passen, sodass er gezielt gefordert wird.`;
     }
 }
 
@@ -168,10 +230,12 @@ export async function analyzeGap(
     const client = getClient();
     const response = await client.messages.create({
         model: COACHING_MODEL,
-        max_tokens: 2048,
+        max_tokens: 1500,
         temperature: 0.3,
         system: `Du bist ein Recruiting-Analyst. Analysiere den Lebenslauf gegen die Stellenanforderungen.
 BEZIEHE DICH IMMER auf konkrete Inhalte aus dem Lebenslauf des Kandidaten.
+Fasse dich kurz: jede Stärke und jeder Gap ist maximal 1 prägnanter Satz.
+Starte jeden Punkt mit einem **fettgedruckten Schlüsselwort** (Markdown **...**), gefolgt von einem Doppelpunkt.
 Antworte ausschließlich als valides JSON (kein Markdown, keine Code-Blöcke).`,
         messages: [
             {

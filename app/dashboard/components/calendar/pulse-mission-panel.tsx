@@ -27,7 +27,6 @@ import {
     GripVertical,
 } from 'lucide-react';
 import { useCalendarStore, type PulseSuggestion } from '@/store/use-calendar-store';
-import { toast } from 'sonner';
 
 // ─── Icon Mapping ─────────────────────────────────────────────────
 
@@ -120,9 +119,7 @@ function MissionCard({ suggestion }: { suggestion: PulseSuggestion }) {
         try {
             const task = await acceptSuggestionViaAPI(suggestion);
             acceptSuggestion(suggestion, task);
-            toast.success(`Mission angenommen: ${suggestion.title}`);
         } catch {
-            toast.error('Mission konnte nicht erstellt werden.');
             setIsAccepting(false);
         }
     }, [suggestion, acceptSuggestion, isAccepting]);
@@ -251,12 +248,8 @@ export function PulseMissionPanel() {
         (s) => !getDismissedIds().includes(s.id)
     );
 
-    const count = visibleSuggestions.length;
-
-    // Don't render at all if no suggestions and not loading
-    if (!pulseLoading && count === 0) {
-        return null;
-    }
+    // Show header + empty state even when no suggestions (never fully hidden)
+    const isEmpty = !pulseLoading && visibleSuggestions.length === 0;
 
     return (
         <div className="mb-3">
@@ -276,7 +269,7 @@ export function PulseMissionPanel() {
                     &#9654;
                 </span>
                 <span className="font-medium">
-                    Pathlys Empfehlungen – Einfach Drag &amp; Drop
+                    Pathlys Job Empfehlung
                 </span>
             </button>
 
@@ -293,6 +286,10 @@ export function PulseMissionPanel() {
                         <div className="pt-1.5 pl-5 space-y-2">
                             {pulseLoading ? (
                                 <PulseSkeleton />
+                            ) : isEmpty ? (
+                                <p className="text-xs text-[#A8A29E] py-1">
+                                    Keine Job-Empfehlungen vorhanden.
+                                </p>
                             ) : (
                                 <AnimatePresence mode="popLayout">
                                     {visibleSuggestions.map((suggestion) => (

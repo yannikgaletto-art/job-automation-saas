@@ -44,14 +44,14 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
         >
           {animated ? (
             <motion.div
-              className="h-full bg-[#0066FF] rounded-full"
+              className="h-full bg-[#012e7a] rounded-full"
               style={{ width }}
               initial={{ width: "0%" }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             />
           ) : (
             <div
-              className="h-full bg-[#0066FF] rounded-full transition-all"
+              className="h-full bg-[#012e7a] rounded-full transition-all"
               style={{ width: `${percentage}%` }}
             />
           )}

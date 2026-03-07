@@ -204,33 +204,57 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                 </div>
             </div>
 
-            {/* ─── Tone Source Toggle ─────────────────────────────────────── */}
-            <div className="flex items-center gap-0.5 bg-[#E7E7E5] rounded-md p-0.5">
+            {/* ─── Tone Source Radio Circles ─────────────────────────────── */}
+            <div className="flex items-center gap-6">
+                {/* Eigener Stil */}
                 <button
                     onClick={() => handleToneSourceChange('custom-style')}
                     disabled={!hasUploadedDocs}
-                    className={[
-                        'flex-1 px-3 py-1.5 rounded text-xs font-semibold transition-all',
-                        toneSource === 'custom-style' && hasUploadedDocs
-                            ? 'bg-white text-[#002e7a] shadow-sm'
-                            : hasUploadedDocs
-                                ? 'text-[#73726E] hover:text-[#37352F]'
-                                : 'text-[#A8A29E] cursor-not-allowed',
-                    ].join(' ')}
-                    title={!hasUploadedDocs ? 'Lade ein Anschreiben in den Settings hoch' : ''}
+                    className={`flex items-center gap-2 transition-all ${!hasUploadedDocs ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                        }`}
+                    title={!hasUploadedDocs ? 'Lade ein Anschreiben in den Settings hoch' : undefined}
                 >
-                    Eigener Stil
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${toneSource === 'custom-style' && hasUploadedDocs
+                            ? 'border-[#002e7a] bg-[#002e7a]'
+                            : 'border-[#D1D5DB]'
+                        }`}>
+                        {toneSource === 'custom-style' && hasUploadedDocs && (
+                            <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ duration: 0.15 }}
+                                className="w-2 h-2 rounded-full bg-white"
+                            />
+                        )}
+                    </div>
+                    <span className={`text-xs font-semibold ${toneSource === 'custom-style' && hasUploadedDocs ? 'text-[#002e7a]' : 'text-[#73726E]'
+                        }`}>
+                        Eigener Stil
+                    </span>
                 </button>
+
+                {/* Ton Wählen (Preset) */}
                 <button
                     onClick={() => handleToneSourceChange('preset')}
-                    className={[
-                        'flex-1 px-3 py-1.5 rounded text-xs font-semibold transition-all',
-                        toneSource === 'preset'
-                            ? 'bg-white text-[#002e7a] shadow-sm'
-                            : 'text-[#73726E] hover:text-[#37352F]',
-                    ].join(' ')}
+                    className="flex items-center gap-2 cursor-pointer"
                 >
-                    Preset wählen
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${toneSource === 'preset'
+                            ? 'border-[#002e7a] bg-[#002e7a]'
+                            : 'border-[#D1D5DB]'
+                        }`}>
+                        {toneSource === 'preset' && (
+                            <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ duration: 0.15 }}
+                                className="w-2 h-2 rounded-full bg-white"
+                            />
+                        )}
+                    </div>
+                    <span className={`text-xs font-semibold ${toneSource === 'preset' ? 'text-[#002e7a]' : 'text-[#73726E]'
+                        }`}>
+                        Ton Wählen
+                    </span>
                 </button>
             </div>
 

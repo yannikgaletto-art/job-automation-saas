@@ -3,12 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Clock, Star, Loader2 } from 'lucide-react';
+import { ChevronRight, Clock, Star, Loader2, Building2, BriefcaseBusiness, PlayCircle, ExternalLink, FileText } from 'lucide-react';
 import { DocumentsRequiredDialog } from '@/components/shared/documents-required-dialog';
 
 const BLUE = '#2B5EA7';
 const BLUE_LIGHT = '#E8EFF8';
-const BLUE_DARK = '#1E4A8A';
 const TEXT = '#37352F';
 const MUTED = '#9B9A97';
 const BORDER = '#E7E7E5';
@@ -21,7 +20,6 @@ const ROUND_OPTIONS: { value: InterviewRound; label: string; desc: string }[] = 
     { value: 'case_study', label: 'Case Study', desc: 'Praxisnahes Szenario zum Durcharbeiten' },
 ];
 
-// Progress steps shown during session creation
 const PROGRESS_STEPS = [
     { label: 'Lebenslauf laden', duration: 2000 },
     { label: 'Job-Profil analysieren', duration: 3000 },
@@ -36,6 +34,14 @@ interface JobForCoaching {
     company_name: string;
     location: string | null;
     status: string;
+    // Steckbrief fields
+    summary?: string | null;
+    seniority?: string | null;
+    responsibilities?: string[] | null;
+    qualifications?: string[] | null;
+    benefits?: string[] | null;
+    buzzwords?: string[] | null;
+    source_url?: string | null;
 }
 
 interface PastSession {
@@ -53,22 +59,31 @@ export default function CoachingPage() {
     const [jobs, setJobs] = useState<JobForCoaching[]>([]);
     const [pastSessions, setPastSessions] = useState<PastSession[]>([]);
     const [loading, setLoading] = useState(true);
-    const [jobsOpen, setJobsOpen] = useState(true);
-    const [sessionsOpen, setSessionsOpen] = useState(true);
 
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
     const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
     // Modal state
     const [selectedJob, setSelectedJob] = useState<JobForCoaching | null>(null);
-    const [modalStep, setModalStep] = useState<'round' | 'questions' | 'creating'>('round');
+    const [modalStep, setModalStep] = useState<'cv' | 'round' | 'questions' | 'creating'>('round');
     const [selectedRound, setSelectedRound] = useState<InterviewRound>('kennenlernen');
     const [questionCount, setQuestionCount] = useState(5);
+
+    // CV selection state
+    const [userCvs, setUserCvs] = useState<{ id: string; name: string; createdAt: string }[]>([]);
+    const [selectedCvId, setSelectedCvId] = useState<string | null>(null);
+    const [loadingCvs, setLoadingCvs] = useState(false);
 
     // Progress bar state
     const [currentProgressStep, setCurrentProgressStep] = useState(0);
     const [progressPercent, setProgressPercent] = useState(0);
     const [showCvDialog, setShowCvDialog] = useState(false);
+
+    // Expanded row for completed sessions
+    const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+
+    // Steckbrief inline toggle
+    const [steckbriefExpandedId, setSteckbriefExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
@@ -95,7 +110,6 @@ export default function CoachingPage() {
                 const sessions = sessionsData.sessions || [];
                 setPastSessions(sessions);
 
-                // Show active session banner instead of auto-redirecting
                 const activeSession = sessions.find((s: PastSession) => s.session_status === 'active');
                 if (activeSession) {
                     setActiveSessionId(activeSession.id);
@@ -109,13 +123,41 @@ export default function CoachingPage() {
         }
     }
 
-    function openModal(job: JobForCoaching) {
+    async function openModal(job: JobForCoaching) {
         setSelectedJob(job);
-        setModalStep('round');
         setSelectedRound('kennenlernen');
         setQuestionCount(5);
         setCurrentProgressStep(0);
         setProgressPercent(0);
+        setSelectedCvId(null);
+
+        // Fetch user CVs to decide whether to show CV picker
+        setLoadingCvs(true);
+        setModalStep('cv'); // show loading state
+        try {
+            const res = await fetch('/api/coaching/cv-list');
+            if (res.ok) {
+                const data = await res.json();
+                const cvs = data.cvs || [];
+                setUserCvs(cvs);
+                if (cvs.length <= 1) {
+                    // Auto-select the only CV (or none) and skip to round
+                    if (cvs.length === 1) setSelectedCvId(cvs[0].id);
+                    setModalStep('round');
+                } else {
+                    // Multiple CVs → show picker
+                    setSelectedCvId(cvs[0].id);
+                    setModalStep('cv');
+                }
+            } else {
+                // Couldn't fetch CVs, skip step
+                setModalStep('round');
+            }
+        } catch {
+            setModalStep('round');
+        } finally {
+            setLoadingCvs(false);
+        }
     }
 
     function closeModal() {
@@ -127,7 +169,6 @@ export default function CoachingPage() {
         if (!selectedJob) return;
         setModalStep('creating');
 
-        // Simulate progress steps while the API call runs
         let step = 0;
         const totalSteps = PROGRESS_STEPS.length;
         const stepInterval = setInterval(() => {
@@ -146,6 +187,7 @@ export default function CoachingPage() {
                     jobId: selectedJob.id,
                     maxQuestions: questionCount,
                     interviewRound: selectedRound,
+                    ...(selectedCvId ? { documentId: selectedCvId } : {}),
                 }),
             });
 
@@ -163,8 +205,6 @@ export default function CoachingPage() {
             }
 
             const data = await res.json();
-
-            // Short delay for visual completion
             await new Promise((r) => setTimeout(r, 500));
             router.push(`/dashboard/coaching/${data.sessionId}`);
         } catch (err) {
@@ -190,16 +230,18 @@ export default function CoachingPage() {
     const completedSessions = pastSessions.filter((s) => s.session_status === 'completed');
 
     return (
-        <div className="max-w-3xl">
+        <div className="w-full">
             <DocumentsRequiredDialog
                 open={showCvDialog}
                 onClose={() => setShowCvDialog(false)}
                 type="cv"
             />
+
+            {/* ─── Header ──────────────────────────────────────────────── */}
             <motion.h1
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-3xl font-bold mb-1"
+                className="text-2xl font-bold mb-1"
                 style={{ color: TEXT }}
             >
                 Interview Coaching
@@ -208,7 +250,7 @@ export default function CoachingPage() {
                 Übe Vorstellungsgespräche mit einem KI-Coach, personalisiert auf deine Jobs.
             </p>
 
-            {/* ─── Active Session Resume Banner ────────────── */}
+            {/* ─── Active Session Banner ────────────────────────────────── */}
             {activeSessionId && (
                 <motion.div
                     initial={{ opacity: 0, y: -5 }}
@@ -234,6 +276,7 @@ export default function CoachingPage() {
                 </motion.div>
             )}
 
+            {/* ─── Empty State ─────────────────────────────────────────── */}
             {jobs.length === 0 && (
                 <div className="py-12">
                     <p style={{ color: TEXT }}>Keine Jobs vorhanden.</p>
@@ -250,7 +293,7 @@ export default function CoachingPage() {
                 </div>
             )}
 
-            {/* ─── Config Modal ──────────────────────────────────────── */}
+            {/* ─── Config Modal ─────────────────────────────────────────── */}
             <AnimatePresence>
                 {selectedJob && (
                     <motion.div
@@ -268,7 +311,7 @@ export default function CoachingPage() {
                             className="rounded-xl p-6 w-[440px] shadow-xl"
                             style={{ background: '#FAFAF9', border: `1px solid ${BORDER}` }}
                         >
-                            {/* ── Step: Creating (Progress Bar) ──── */}
+                            {/* ── Creating (Progress) ── */}
                             {modalStep === 'creating' && (
                                 <div>
                                     <h3 className="text-lg font-semibold mb-1" style={{ color: TEXT }}>
@@ -277,47 +320,103 @@ export default function CoachingPage() {
                                     <p className="text-sm mb-5" style={{ color: MUTED }}>
                                         {selectedJob.job_title} bei {selectedJob.company_name}
                                     </p>
-
-                                    {/* Progress bar */}
-                                    <div className="h-2 rounded-full mb-4" style={{ background: BLUE_LIGHT }}>
-                                        <motion.div
-                                            className="h-2 rounded-full"
-                                            style={{ background: BLUE }}
-                                            initial={{ width: '5%' }}
-                                            animate={{ width: `${Math.max(progressPercent, 5)}%` }}
-                                            transition={{ duration: 0.5 }}
-                                        />
+                                    <div className="w-full">
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <span className="text-xs font-semibold" style={{ color: '#002e7a' }}>
+                                                {PROGRESS_STEPS[currentProgressStep]?.label ?? 'Vorbereitung...'}
+                                            </span>
+                                            <span className="text-xs" style={{ color: '#A8A29E' }}>{progressPercent}%</span>
+                                        </div>
+                                        <div className="h-2 w-full bg-[#E7E7E5] rounded-full overflow-hidden">
+                                            <motion.div
+                                                className="h-full bg-gradient-to-r from-[#002e7a] to-[#3B82F6] rounded-full"
+                                                initial={{ width: '5%' }}
+                                                animate={{ width: `${Math.max(progressPercent, 5)}%` }}
+                                                transition={{ duration: 0.5 }}
+                                            />
+                                        </div>
                                     </div>
-
-                                    {/* Step labels */}
-                                    <div className="space-y-2">
-                                        {PROGRESS_STEPS.map((step, i) => (
-                                            <div key={i} className="flex items-center gap-2.5">
-                                                {i < currentProgressStep ? (
-                                                    <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: BLUE }}>
-                                                        <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" /></svg>
-                                                    </div>
-                                                ) : i === currentProgressStep ? (
-                                                    <Loader2 className="w-4 h-4 animate-spin" style={{ color: BLUE }} />
-                                                ) : (
-                                                    <div className="w-4 h-4 rounded-full" style={{ background: BORDER }} />
+                                    <div className="flex items-center gap-1.5 w-full justify-center mt-3 mb-3">
+                                        {PROGRESS_STEPS.map((_, i) => (
+                                            <div key={i} className="flex items-center gap-1.5">
+                                                <div className={[
+                                                    'w-2 h-2 rounded-full transition-all duration-300',
+                                                    i < currentProgressStep ? 'bg-[#22C55E]' :
+                                                        i === currentProgressStep ? 'bg-[#002e7a] scale-125' :
+                                                            'bg-[#E7E7E5]',
+                                                ].join(' ')} />
+                                                {i < PROGRESS_STEPS.length - 1 && (
+                                                    <div className={[
+                                                        'h-px w-5 transition-colors duration-500',
+                                                        i < currentProgressStep ? 'bg-[#22C55E]' : 'bg-[#E7E7E5]',
+                                                    ].join(' ')} />
                                                 )}
-                                                <span
-                                                    className="text-sm"
-                                                    style={{
-                                                        color: i <= currentProgressStep ? TEXT : MUTED,
-                                                        fontWeight: i === currentProgressStep ? 500 : 400,
-                                                    }}
-                                                >
-                                                    {step.label}
-                                                </span>
                                             </div>
                                         ))}
                                     </div>
+                                    <p className="text-[11px] text-center mb-4" style={{ color: '#A8A29E' }}>Dauert ca. 15–20 Sekunden</p>
                                 </div>
                             )}
 
-                            {/* ── Step: Round Selector ──── */}
+                            {/* ── CV Selection ── */}
+                            {modalStep === 'cv' && (
+                                <div>
+                                    <h3 className="text-lg font-semibold mb-1" style={{ color: TEXT }}>
+                                        Lebenslauf wählen
+                                    </h3>
+                                    <p className="text-sm mb-5" style={{ color: MUTED }}>
+                                        {selectedJob.job_title} bei {selectedJob.company_name}
+                                    </p>
+                                    {loadingCvs ? (
+                                        <div className="flex items-center justify-center py-8">
+                                            <Loader2 className="h-5 w-5 animate-spin" style={{ color: BLUE }} />
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <label className="text-xs font-medium block mb-3" style={{ color: TEXT }}>
+                                                Welchen Lebenslauf möchtest du verwenden?
+                                            </label>
+                                            <div className="space-y-2 mb-6">
+                                                {userCvs.map((cv) => (
+                                                    <button
+                                                        key={cv.id}
+                                                        onClick={() => setSelectedCvId(cv.id)}
+                                                        className="w-full text-left rounded-lg px-4 py-3 transition-colors flex items-center gap-3"
+                                                        style={{
+                                                            background: selectedCvId === cv.id ? BLUE_LIGHT : '#F0EFED',
+                                                            border: `1.5px solid ${selectedCvId === cv.id ? BLUE : 'transparent'}`,
+                                                        }}
+                                                    >
+                                                        <FileText className="w-4 h-4 shrink-0" style={{ color: selectedCvId === cv.id ? BLUE : MUTED }} />
+                                                        <div className="min-w-0">
+                                                            <span className="text-sm font-medium block truncate" style={{ color: TEXT }}>
+                                                                {cv.name}
+                                                            </span>
+                                                            <span className="text-[10px]" style={{ color: MUTED }}>
+                                                                Hochgeladen am {new Date(cv.createdAt).toLocaleDateString('de-DE')}
+                                                            </span>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <button onClick={closeModal} className="flex-1 py-2.5 text-sm transition-colors" style={{ color: MUTED }}>
+                                                    Abbrechen
+                                                </button>
+                                                <button
+                                                    onClick={() => setModalStep('round')}
+                                                    className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
+                                                    style={{ background: BLUE }}
+                                                >
+                                                    Weiter
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ── Round Selector ── */}
                             {modalStep === 'round' && (
                                 <div>
                                     <h3 className="text-lg font-semibold mb-1" style={{ color: TEXT }}>
@@ -326,7 +425,6 @@ export default function CoachingPage() {
                                     <p className="text-sm mb-5" style={{ color: MUTED }}>
                                         {selectedJob.job_title} bei {selectedJob.company_name}
                                     </p>
-
                                     <label className="text-xs font-medium block mb-3" style={{ color: TEXT }}>
                                         In welcher Gesprächsrunde befinden Sie sich?
                                     </label>
@@ -344,19 +442,12 @@ export default function CoachingPage() {
                                                 <span className="text-sm font-medium" style={{ color: TEXT }}>
                                                     {opt.label}
                                                 </span>
-                                                <p className="text-xs mt-0.5" style={{ color: MUTED }}>
-                                                    {opt.desc}
-                                                </p>
+                                                <p className="text-xs mt-0.5" style={{ color: MUTED }}>{opt.desc}</p>
                                             </button>
                                         ))}
                                     </div>
-
                                     <div className="flex gap-3">
-                                        <button
-                                            onClick={closeModal}
-                                            className="flex-1 py-2.5 text-sm transition-colors"
-                                            style={{ color: MUTED }}
-                                        >
+                                        <button onClick={closeModal} className="flex-1 py-2.5 text-sm transition-colors" style={{ color: MUTED }}>
                                             Abbrechen
                                         </button>
                                         <button
@@ -370,7 +461,7 @@ export default function CoachingPage() {
                                 </div>
                             )}
 
-                            {/* ── Step: Question Count ──── */}
+                            {/* ── Question Count ── */}
                             {modalStep === 'questions' && (
                                 <div>
                                     <h3 className="text-lg font-semibold mb-1" style={{ color: TEXT }}>
@@ -379,7 +470,6 @@ export default function CoachingPage() {
                                     <p className="text-sm mb-5" style={{ color: MUTED }}>
                                         {selectedJob.job_title} bei {selectedJob.company_name}
                                     </p>
-
                                     <label className="text-xs font-medium block mb-3" style={{ color: TEXT }}>
                                         Wie viele Fragen möchtest du?
                                     </label>
@@ -398,13 +488,8 @@ export default function CoachingPage() {
                                             </button>
                                         ))}
                                     </div>
-
                                     <div className="flex gap-3">
-                                        <button
-                                            onClick={() => setModalStep('round')}
-                                            className="flex-1 py-2.5 text-sm transition-colors"
-                                            style={{ color: MUTED }}
-                                        >
+                                        <button onClick={() => setModalStep('round')} className="flex-1 py-2.5 text-sm transition-colors" style={{ color: MUTED }}>
                                             Zurück
                                         </button>
                                         <button
@@ -422,143 +507,241 @@ export default function CoachingPage() {
                 )}
             </AnimatePresence>
 
-            {/* ─── Toggle: Wähle einen Job ──────────────────────────── */}
+            {/* ─── Jobs Table ──────────────────────────────────────────── */}
             {jobs.length > 0 && (
-                <div className="mb-6">
-                    <button
-                        onClick={() => setJobsOpen(!jobsOpen)}
-                        className="flex items-center gap-1.5 py-1 w-full text-left"
-                    >
-                        <ChevronRight
-                            className={`h-4 w-4 transition-transform duration-150 ${jobsOpen ? 'rotate-90' : ''}`}
-                            style={{ color: MUTED }}
-                        />
-                        <span className="font-medium text-sm" style={{ color: TEXT }}>
-                            Wähle einen Job für dein Interview
+                <div className="w-full bg-white border border-[#E7E7E5] rounded-xl overflow-hidden shadow-sm mb-6">
+                    {/* Table Header */}
+                    <div className="grid grid-cols-[1fr_1fr_150px_180px] items-center px-5 py-2 border-b border-[#E7E7E5] bg-[#FAFAF9]">
+                        <span className="text-xs font-medium text-[#A8A29E] uppercase tracking-wider">
+                            Unternehmen
                         </span>
-                        <span className="text-xs ml-2" style={{ color: MUTED }}>
-                            {jobs.length} {jobs.length === 1 ? 'Job' : 'Jobs'}
+                        <span className="text-xs font-medium text-[#A8A29E] uppercase tracking-wider">
+                            Job
                         </span>
-                    </button>
+                        <span className="text-xs font-medium text-[#A8A29E] uppercase tracking-wider">
+                            Anzahl Interviews
+                        </span>
+                        <span />
+                    </div>
 
-                    <AnimatePresence initial={false}>
-                        {jobsOpen && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.15 }}
-                                className="overflow-hidden"
-                            >
-                                <div className="ml-5 mt-1 border-l" style={{ borderColor: BORDER }}>
-                                    {jobs.map((job) => {
-                                        const sessions = getJobSessions(job.id);
-                                        const bestScore = sessions.reduce(
-                                            (max, s) =>
-                                                s.coaching_score && s.coaching_score > max ? s.coaching_score : max,
-                                            0
-                                        );
-                                        return (
-                                            <div
-                                                key={job.id}
-                                                onClick={() => openModal(job)}
-                                                className="flex items-center justify-between pl-4 pr-2 py-2.5 hover:bg-[#F7F6F3] transition-colors rounded-r group/row cursor-pointer"
+                    {/* Table Rows */}
+                    {jobs.map((job) => {
+                        const sessions = getJobSessions(job.id);
+                        const isExpanded = expandedJobId === job.id;
+                        const bestScore = sessions.reduce(
+                            (max, s) => s.coaching_score && s.coaching_score > max ? s.coaching_score : max,
+                            0
+                        );
+                        const completedForJob = sessions.filter(s => s.session_status === 'completed');
+
+                        return (
+                            <div key={job.id} className="border-b border-[#E7E7E5] last:border-b-0">
+                                {/* Main Row — clicking row only expands past sessions, never opens modal */}
+                                <div
+                                    className={`grid grid-cols-[1fr_1fr_150px_180px] items-center px-5 py-3 transition-colors group ${completedForJob.length > 0 ? 'cursor-pointer hover:bg-[#FAFAF9]' : ''
+                                        }`}
+                                    onClick={completedForJob.length > 0
+                                        ? () => setExpandedJobId(isExpanded ? null : job.id)
+                                        : undefined
+                                    }
+                                >
+                                    {/* Col 1: Unternehmen — click opens Steckbrief */}
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        {completedForJob.length > 0 ? (
+                                            <motion.div
+                                                animate={{ rotate: isExpanded ? 90 : 0 }}
+                                                transition={{ duration: 0.15 }}
+                                                className="shrink-0"
                                             >
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-medium truncate" style={{ color: TEXT }}>
-                                                            {job.company_name}
-                                                        </span>
-                                                        {sessions.length > 0 && (
-                                                            <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded" style={{ background: BLUE_LIGHT, color: MUTED }}>
-                                                                <Clock className="h-2.5 w-2.5" />
-                                                                {sessions.length}x
-                                                            </span>
-                                                        )}
-                                                        {bestScore > 0 && (
-                                                            <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded" style={{ background: BLUE_LIGHT, color: BLUE }}>
-                                                                <Star className="h-2.5 w-2.5" />
-                                                                {bestScore}/10
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-xs truncate mt-0.5" style={{ color: MUTED }}>
-                                                        {job.job_title}{job.location ? ` · ${job.location}` : ''}
-                                                    </p>
-                                                </div>
-                                                <span className="text-sm opacity-0 group-hover/row:opacity-100 flex items-center gap-1 shrink-0 ml-4 italic" style={{ color: MUTED }}>
-                                                    Interview starten
-                                                    <ChevronRight className="h-3.5 w-3.5" />
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
+                                                <ChevronRight className="w-3.5 h-3.5 text-[#A8A29E]" />
+                                            </motion.div>
+                                        ) : (
+                                            <ChevronRight className="w-3.5 h-3.5 text-transparent" />
+                                        )}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSteckbriefExpandedId(steckbriefExpandedId === job.id ? null : job.id);
+                                            }}
+                                            className="text-sm font-medium text-[#37352F] truncate hover:text-[#2B5EA7] hover:underline text-left transition-colors"
+                                        >
+                                            {job.company_name}
+                                        </button>
+                                    </div>
+
+                                    {/* Col 2: Job */}
+                                    <span className="text-sm text-[#73726E] truncate">
+                                        {job.job_title.split(' ').slice(0, 4).join(' ')}
+                                    </span>
+
+                                    {/* Col 3: Interviews */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-[#37352F]">
+                                            {completedForJob.length > 0 ? `${completedForJob.length}x` : '—'}
+                                        </span>
+                                        {bestScore > 0 && (
+                                            <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded" style={{ background: BLUE_LIGHT, color: BLUE }}>
+                                                <Star className="h-2.5 w-2.5" />
+                                                {bestScore}/10
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Col 4: Action Button — ONLY this triggers the modal */}
+                                    <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                                        <motion.button
+                                            whileTap={{ scale: 0.97 }}
+                                            onClick={() => openModal(job)}
+                                            className="px-4 py-2 rounded-lg text-xs font-semibold transition-all border-2 hover:text-white"
+                                            style={{
+                                                borderColor: BLUE,
+                                                color: BLUE,
+                                                background: 'transparent',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                (e.currentTarget as HTMLButtonElement).style.background = BLUE;
+                                                (e.currentTarget as HTMLButtonElement).style.color = 'white';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                                                (e.currentTarget as HTMLButtonElement).style.color = BLUE;
+                                            }}
+                                        >
+                                            Interview beginnen
+                                        </motion.button>
+                                    </div>
                                 </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-            )}
 
-            {/* ─── Toggle: Abgeschlossene Sessions ─────────────────── */}
-            {completedSessions.length > 0 && (
-                <div className="mb-6">
-                    <button
-                        onClick={() => setSessionsOpen(!sessionsOpen)}
-                        className="flex items-center gap-1.5 py-1 w-full text-left"
-                    >
-                        <ChevronRight
-                            className={`h-4 w-4 transition-transform duration-150 ${sessionsOpen ? 'rotate-90' : ''}`}
-                            style={{ color: MUTED }}
-                        />
-                        <span className="font-medium text-sm" style={{ color: TEXT }}>Abgeschlossene Sessions</span>
-                        <span className="text-xs ml-2" style={{ color: MUTED }}>{completedSessions.length}</span>
-                    </button>
-                    <AnimatePresence initial={false}>
-                        {sessionsOpen && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.15 }}
-                                className="overflow-hidden"
-                            >
-                                <div className="ml-5 mt-1 border-l" style={{ borderColor: BORDER }}>
-                                    {completedSessions.map((session) => {
-                                        const job = jobs.find((j) => j.id === session.job_id);
-                                        return (
-                                            <div
-                                                key={session.id}
-                                                onClick={() => router.push(`/dashboard/coaching/${session.id}/analysis`)}
-                                                className="flex items-center justify-between pl-4 pr-2 py-2.5 hover:bg-[#F7F6F3] transition-colors rounded-r cursor-pointer group/row"
-                                            >
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-medium truncate" style={{ color: TEXT }}>
-                                                            {job?.company_name || 'Unbekannt'}
-                                                        </span>
-                                                        <span className="text-[10px]" style={{ color: MUTED }}>
-                                                            {new Date(session.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-xs truncate mt-0.5" style={{ color: MUTED }}>
-                                                        {job?.job_title || ''} · {session.turn_count} Fragen
-                                                    </p>
+                                {/* Steckbrief Inline Expand */}
+                                <AnimatePresence>
+                                    {steckbriefExpandedId === job.id && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.18 }}
+                                            className="overflow-hidden border-t border-[#E7E7E5]"
+                                        >
+                                            <div className="px-5 py-4 bg-[#FAFAF9]/50 space-y-3">
+                                                {/* Summary */}
+                                                {job.summary && (
+                                                    <p className="text-xs text-[#37352F] leading-relaxed">{job.summary}</p>
+                                                )}
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    {/* Aufgaben */}
+                                                    {job.responsibilities && job.responsibilities.length > 0 && (
+                                                        <div>
+                                                            <h5 className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Aufgaben</h5>
+                                                            <ul className="space-y-1">
+                                                                {job.responsibilities.slice(0, 4).map((item, i) => (
+                                                                    <li key={i} className="text-xs text-[#37352F] flex gap-1.5 items-start leading-snug">
+                                                                        <span className="text-slate-400 mt-px shrink-0 text-[10px]">•</span>
+                                                                        <span>{item}</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Qualifikationen */}
+                                                    {job.qualifications && job.qualifications.length > 0 && (
+                                                        <div>
+                                                            <h5 className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Qualifikationen</h5>
+                                                            <ul className="space-y-1">
+                                                                {job.qualifications.slice(0, 4).map((item, i) => (
+                                                                    <li key={i} className="text-xs text-[#37352F] flex gap-1.5 items-start leading-snug">
+                                                                        <span className="text-slate-400 mt-px shrink-0 text-[10px]">•</span>
+                                                                        <span>{item}</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                {session.coaching_score && (
-                                                    <div className="flex items-center gap-1 text-xs shrink-0 ml-4">
-                                                        <Star className="h-3 w-3" style={{ color: BLUE }} />
-                                                        <span className="font-medium" style={{ color: BLUE }}>{session.coaching_score}/10</span>
+
+                                                {/* ATS Keywords */}
+                                                {job.buzzwords && job.buzzwords.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {job.buzzwords.slice(0, 8).map((kw, i) => (
+                                                            <span key={i} className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                                                {kw}
+                                                            </span>
+                                                        ))}
                                                     </div>
                                                 )}
-                                                <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover/row:opacity-100 ml-2" style={{ color: MUTED }} />
+
+                                                {/* Source URL */}
+                                                {job.source_url && (
+                                                    <a
+                                                        href={job.source_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 text-xs text-[#2B5EA7] hover:underline"
+                                                    >
+                                                        <ExternalLink className="w-3 h-3" />
+                                                        Originalanzeige
+                                                    </a>
+                                                )}
+
+                                                {/* Empty state */}
+                                                {!job.summary && !job.responsibilities?.length && !job.qualifications?.length && (
+                                                    <p className="text-xs text-slate-400">Kein Steckbrief vorhanden.</p>
+                                                )}
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                {/* Expanded: Past Sessions for this Job */}
+                                <AnimatePresence>
+                                    {isExpanded && completedForJob.length > 0 && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.18 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="px-6 pb-3 pt-1 border-t border-[#E7E7E5]">
+                                                <p className="text-[10px] font-medium text-[#A8A29E] uppercase tracking-wider mb-2 pt-1.5">
+                                                    Abgeschlossene Sessions
+                                                </p>
+                                                <div className="space-y-1">
+                                                    {completedForJob.map((session) => (
+                                                        <div
+                                                            key={session.id}
+                                                            onClick={() => router.push(`/dashboard/coaching/${session.id}/analysis`)}
+                                                            className="flex items-center justify-between pl-4 pr-2 py-2 hover:bg-[#F7F6F3] transition-colors rounded-lg cursor-pointer group/row"
+                                                        >
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <Clock className="h-3.5 w-3.5 shrink-0" style={{ color: MUTED }} />
+                                                                <span className="text-sm text-[#37352F]">
+                                                                    {new Date(session.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                                                                </span>
+                                                                <span className="text-xs text-[#A8A29E]">
+                                                                    {session.turn_count} Fragen
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {session.coaching_score && (
+                                                                    <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: BLUE }}>
+                                                                        <Star className="h-3 w-3" />
+                                                                        {session.coaching_score}/10
+                                                                    </span>
+                                                                )}
+                                                                <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover/row:opacity-100 transition-opacity" style={{ color: MUTED }} />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>

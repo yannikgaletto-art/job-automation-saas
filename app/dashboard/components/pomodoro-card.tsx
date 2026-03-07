@@ -123,12 +123,12 @@ export function PomodoroCard({ className }: PomodoroCardProps) {
                 </div>
 
                 {/* Progress bar */}
-                <div className="relative w-full h-1.5 bg-[#d6d6d6]/50 rounded-full mt-4 overflow-hidden">
+                <div className="relative w-full h-1.5 bg-[#E7E7E5] rounded-full mt-4 overflow-hidden">
                     <motion.div
                         className={cn(
                             "absolute left-0 top-0 h-full",
                             timerMode === 'focus'
-                                ? "bg-gradient-to-r from-[#002e7a] to-[#3385FF]"
+                                ? "bg-gradient-to-r from-[#002e7a] to-[#1a4a9a]"
                                 : "bg-gradient-to-r from-[#00C853] to-[#69F0AE]"
                         )}
                         animate={{ width: `${progress}%` }}

@@ -8,7 +8,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Linkedin, Target, Check, Loader2 } from "lucide-react";
-import { showSafeToast } from "@/lib/utils/toast";
 
 export function ProfileCard() {
     const [linkedinUrl, setLinkedinUrl] = useState("");
@@ -57,7 +56,6 @@ export function ProfileCard() {
             });
             const data = await res.json();
             if (!res.ok) {
-                showSafeToast(data.error || "Speichern fehlgeschlagen", "profile_save_error", "error");
                 return;
             }
             // Update initial ref so we don't re-save same values
@@ -68,7 +66,6 @@ export function ProfileCard() {
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
         } catch (err) {
-            showSafeToast("Netzwerkfehler beim Speichern", "profile_save_network_error", "error");
         } finally {
             setSaving(false);
         }
@@ -98,7 +95,7 @@ export function ProfileCard() {
                     value={linkedinUrl}
                     onChange={(e) => setLinkedinUrl(e.target.value)}
                     onBlur={() => save({ linkedin_url: linkedinUrl, target_role: targetRole })}
-                    className="w-full px-3 py-2 text-sm border border-[#E7E7E5] rounded-lg bg-white text-[#37352F] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF] transition-all"
+                    className="w-full px-3 py-2 text-sm border border-[#E7E7E5] rounded-lg bg-white text-[#37352F] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] transition-all"
                 />
                 <p className="text-xs text-[#A8A29E] mt-1">
                     Pathly kann dein LinkedIn-Profil nutzen, um Bewerbungen besser zu personalisieren.
@@ -108,7 +105,7 @@ export function ProfileCard() {
             {/* Target Role */}
             <div>
                 <label htmlFor="target-role" className="flex items-center gap-2 text-sm font-medium text-[#37352F] mb-1.5">
-                    <Target className="w-4 h-4 text-[#0066FF]" />
+                    <Target className="w-4 h-4 text-[#012e7a]" />
                     Ziel-Rolle
                 </label>
                 <input
@@ -118,7 +115,7 @@ export function ProfileCard() {
                     value={targetRole}
                     onChange={(e) => setTargetRole(e.target.value)}
                     onBlur={() => save({ linkedin_url: linkedinUrl, target_role: targetRole })}
-                    className="w-full px-3 py-2 text-sm border border-[#E7E7E5] rounded-lg bg-white text-[#37352F] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF] transition-all"
+                    className="w-full px-3 py-2 text-sm border border-[#E7E7E5] rounded-lg bg-white text-[#37352F] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] transition-all"
                 />
                 <p className="text-xs text-[#A8A29E] mt-1">
                     Definiere deine Wunschrolle — die KI formuliert dann zielgerichteter.
@@ -130,7 +127,7 @@ export function ProfileCard() {
                 <div className="flex items-center gap-1.5 text-xs">
                     {saving ? (
                         <>
-                            <Loader2 className="w-3 h-3 animate-spin text-[#0066FF]" />
+                            <Loader2 className="w-3 h-3 animate-spin text-[#012e7a]" />
                             <span className="text-[#73726E]">Speichert...</span>
                         </>
                     ) : (

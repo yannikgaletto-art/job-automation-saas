@@ -123,7 +123,7 @@ export default function DemoPage() {
                   You've reviewed all jobs for today!
                 </p>
                 <motion.button
-                  className="mt-6 px-6 py-3 bg-[#0066FF] text-white rounded-lg font-medium"
+                  className="mt-6 px-6 py-3 bg-[#012e7a] text-white rounded-lg font-medium"
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => window.location.reload()}

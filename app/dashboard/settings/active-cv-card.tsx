@@ -18,7 +18,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X } from "lucide-react";
 import { Button } from "@/components/motion/button";
-import { showSafeToast } from "@/lib/utils/toast";
+import { useNotification } from "@/hooks/use-notification";
 
 type DocumentEntry = {
     id: string;
@@ -65,6 +65,7 @@ function saveCollapsed(map: Record<string, boolean>) {
 export function ActiveCVCard() {
     const [docs, setDocs] = useState<DocumentEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const notify = useNotification();
     const [uploading, setUploading] = useState<string | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadStatus, setUploadStatus] = useState<string>('');
@@ -141,10 +142,7 @@ export function ActiveCVCard() {
                 xhr.send(fd);
             });
 
-            showSafeToast(
-                type === 'cv' ? 'Lebenslauf gespeichert' : 'Anschreiben gespeichert',
-                `upload_success:${type}`
-            );
+            notify(type === 'cv' ? 'Lebenslauf hochgeladen' : 'Anschreiben hochgeladen');
             await loadDocs();
 
             // QA Integration: If user came from a feature via DocumentsRequiredDialog,
@@ -155,7 +153,6 @@ export function ActiveCVCard() {
                 }, 1500); // Short delay so user sees "Fertig ✅" status
             }
         } catch (err: any) {
-            showSafeToast(err.message || 'Upload fehlgeschlagen', `upload_error:${type}`, 'error');
         } finally {
             setUploading(null);
             setTimeout(() => {
@@ -170,7 +167,7 @@ export function ActiveCVCard() {
             const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Löschen fehlgeschlagen');
-            showSafeToast('Dokument gelöscht', `delete_success:${id}`);
+            notify('Dokument gelöscht');
             setDocs(prev => prev.filter(d => d.id !== id));
             // Also remove from categories
             const updated = { ...categories };
@@ -181,7 +178,6 @@ export function ActiveCVCard() {
             saveCategories(updated);
         } catch (err: unknown) {
             const errMsg = err instanceof Error ? err.message : 'Löschen fehlgeschlagen';
-            showSafeToast(errMsg, `delete_error:${id}`, 'error');
         }
     };
 
@@ -200,7 +196,6 @@ export function ActiveCVCard() {
             URL.revokeObjectURL(url);
         } catch (err: unknown) {
             const errMsg = err instanceof Error ? err.message : 'Unbekannter Fehler';
-            showSafeToast('CV-Download fehlgeschlagen — bitte erneut versuchen', `download_error:${id}`, 'error', errMsg);
         }
     };
 
@@ -268,8 +263,8 @@ export function ActiveCVCard() {
     }
 
     const renderDocRow = (doc: DocumentEntry, highlight: boolean = false) => (
-        <li key={doc.id} className={`flex items-center gap-3 p-3 rounded-lg ${highlight ? 'bg-[#F0F7FF] border border-[#0066FF]/20' : 'bg-white border border-[#E7E7E5]'}`}>
-            <FileText className={`w-4 h-4 shrink-0 ${highlight ? 'text-[#0066FF]' : 'text-[#73726E]'}`} />
+        <li key={doc.id} className={`flex items-center gap-3 p-3 rounded-lg ${highlight ? 'bg-[#F0F7FF] border border-[#012e7a]/20' : 'bg-white border border-[#E7E7E5]'}`}>
+            <FileText className={`w-4 h-4 shrink-0 ${highlight ? 'text-[#012e7a]' : 'text-[#73726E]'}`} />
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[#37352F] truncate">{doc.name}</p>
                 <p className="text-xs text-[#73726E]">Hochgeladen: {formatDate(doc.createdAt)}</p>
@@ -279,7 +274,7 @@ export function ActiveCVCard() {
                 <select
                     value={getCategoryForDoc(doc.id) ?? '__none__'}
                     onChange={(e) => assignCategory(doc.id, e.target.value)}
-                    className="text-xs border border-[#E7E7E5] rounded px-1.5 py-1 text-[#73726E] bg-white focus:outline-none focus:ring-1 focus:ring-[#0066FF]/30 max-w-[120px]"
+                    className="text-xs border border-[#E7E7E5] rounded px-1.5 py-1 text-[#73726E] bg-white focus:outline-none focus:ring-1 focus:ring-[#012e7a]/30 max-w-[120px]"
                     title="Kategorie zuweisen"
                 >
                     <option value="__none__">Ohne</option>
@@ -289,7 +284,7 @@ export function ActiveCVCard() {
                 </select>
             )}
             <div className="flex items-center gap-1">
-                <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#0066FF] transition-colors p-1" title="Herunterladen">
+                <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1" title="Herunterladen">
                     <Download className="w-4 h-4" />
                 </button>
                 <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1" title="Löschen">
@@ -310,7 +305,7 @@ export function ActiveCVCard() {
                     </div>
                     <div className="w-full bg-[#F7F7F5] rounded-full h-1.5">
                         <div
-                            className="bg-[#0066FF] h-1.5 rounded-full transition-all duration-300"
+                            className="bg-[#012e7a] h-1.5 rounded-full transition-all duration-300"
                             style={{ width: `${uploadProgress}%` }}
                         />
                     </div>
@@ -321,17 +316,18 @@ export function ActiveCVCard() {
             <div>
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-[#37352F] flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-[#0066FF]" />
+                        <FileText className="w-4 h-4 text-[#012e7a]" />
                         Lebenslauf (CV)
                     </h3>
                     <Button
                         variant="secondary"
                         className="text-xs h-8"
                         onClick={() => cvRef.current?.click()}
-                        disabled={!!uploading}
+                        disabled={!!uploading || cvDocs.length >= 3}
+                        title={cvDocs.length >= 3 ? 'Bitte lösche erst einen bestehenden Lebenslauf' : undefined}
                     >
                         <Upload className="w-3 h-3 mr-1.5" />
-                        {uploading === 'cv' ? `${uploadProgress}%` : 'Hochladen'}
+                        {uploading === 'cv' ? `${uploadProgress}%` : `Hochladen (${cvDocs.length}/3)`}
                     </Button>
                 </div>
 
@@ -339,7 +335,7 @@ export function ActiveCVCard() {
                     <div className="h-10 bg-[#F7F7F5] rounded-lg animate-pulse" />
                 ) : cvDocs.length === 0 ? (
                     <div
-                        className="border-2 border-dashed border-[#E7E7E5] rounded-lg p-5 text-center cursor-pointer hover:border-[#0066FF]/40 hover:bg-[#F0F7FF]/30 transition-all"
+                        className="border-2 border-dashed border-[#E7E7E5] rounded-lg p-5 text-center cursor-pointer hover:border-[#012e7a]/40 hover:bg-[#F0F7FF]/30 transition-all"
                         onClick={() => cvRef.current?.click()}
                     >
                         <Plus className="w-5 h-5 text-[#A8A29E] mx-auto mb-1" />
@@ -359,7 +355,7 @@ export function ActiveCVCard() {
             <div>
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-[#37352F] flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-[#0066FF]" />
+                        <FileText className="w-4 h-4 text-[#012e7a]" />
                         Anschreiben (Cover Letters)
                     </h3>
                     <div className="flex items-center gap-2">
@@ -367,7 +363,7 @@ export function ActiveCVCard() {
                         {clDocs.length > 0 && (
                             <button
                                 onClick={() => setShowAddCategory(!showAddCategory)}
-                                className="flex items-center gap-1 text-xs text-[#73726E] hover:text-[#0066FF] transition-colors px-2 py-1 rounded border border-[#E7E7E5] hover:border-[#0066FF]/30"
+                                className="flex items-center gap-1 text-xs text-[#73726E] hover:text-[#012e7a] transition-colors px-2 py-1 rounded border border-[#E7E7E5] hover:border-[#012e7a]/30"
                                 title="Kategorie erstellen"
                             >
                                 <Tag className="w-3 h-3" />
@@ -378,10 +374,11 @@ export function ActiveCVCard() {
                             variant="secondary"
                             className="text-xs h-8"
                             onClick={() => clRef.current?.click()}
-                            disabled={!!uploading}
+                            disabled={!!uploading || clDocs.length >= 3}
+                            title={clDocs.length >= 3 ? 'Bitte lösche erst ein bestehendes Anschreiben' : undefined}
                         >
                             <Upload className="w-3 h-3 mr-1.5" />
-                            {uploading === 'cover_letter' ? `${uploadProgress}%` : 'Hochladen'}
+                            {uploading === 'cover_letter' ? `${uploadProgress}%` : `Hochladen (${clDocs.length}/3)`}
                         </Button>
                     </div>
                 </div>
@@ -402,7 +399,7 @@ export function ActiveCVCard() {
                         <button
                             onClick={addCategory}
                             disabled={!newCategoryName.trim()}
-                            className="text-xs px-2 py-1 bg-[#0066FF] text-white rounded disabled:opacity-40 hover:bg-[#0052CC] transition-colors"
+                            className="text-xs px-2 py-1 bg-[#012e7a] text-white rounded disabled:opacity-40 hover:bg-[#011f5e] transition-colors"
                         >
                             Erstellen
                         </button>
@@ -419,7 +416,7 @@ export function ActiveCVCard() {
                     <div className="h-10 bg-[#F7F7F5] rounded-lg animate-pulse" />
                 ) : clDocs.length === 0 ? (
                     <div
-                        className="border-2 border-dashed border-[#E7E7E5] rounded-lg p-5 text-center cursor-pointer hover:border-[#0066FF]/40 hover:bg-[#F0F7FF]/30 transition-all"
+                        className="border-2 border-dashed border-[#E7E7E5] rounded-lg p-5 text-center cursor-pointer hover:border-[#012e7a]/40 hover:bg-[#F0F7FF]/30 transition-all"
                         onClick={() => clRef.current?.click()}
                     >
                         <Plus className="w-5 h-5 text-[#A8A29E] mx-auto mb-1" />
@@ -463,14 +460,14 @@ export function ActiveCVCard() {
                                     <div className="flex items-center justify-between px-3 py-2 bg-[#FAFAF9]">
                                         <button
                                             onClick={() => toggleCollapse(catName)}
-                                            className="flex items-center gap-1.5 text-xs font-medium text-[#37352F] hover:text-[#0066FF] transition-colors"
+                                            className="flex items-center gap-1.5 text-xs font-medium text-[#37352F] hover:text-[#012e7a] transition-colors"
                                         >
                                             {isCollapsed ? (
                                                 <ChevronRight className="w-3 h-3" />
                                             ) : (
                                                 <ChevronDown className="w-3 h-3" />
                                             )}
-                                            <Tag className="w-3 h-3 text-[#0066FF]" />
+                                            <Tag className="w-3 h-3 text-[#012e7a]" />
                                             {catName}
                                             <span className="text-[#A8A29E] font-normal">({catDocs.length})</span>
                                         </button>

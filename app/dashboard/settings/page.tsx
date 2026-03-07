@@ -19,8 +19,8 @@ export default async function SettingsPage() {
             {/* Page Header */}
             <div className="mb-8">
                 <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-gradient-to-br from-[#0066FF]/10 to-[#0066FF]/5 rounded-xl">
-                        <Sparkles className="h-6 w-6 text-[#0066FF]" />
+                    <div className="p-2 bg-gradient-to-br from-[#012e7a]/10 to-[#012e7a]/5 rounded-xl">
+                        <Sparkles className="h-6 w-6 text-[#012e7a]" />
                     </div>
                     <div>
                         <h1 className="text-3xl font-bold text-[#37352F]">Dein Karriere-Profil</h1>
@@ -35,7 +35,7 @@ export default async function SettingsPage() {
             <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">
                 <CardHeader className="pb-4">
                     <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
-                        <User className="h-5 w-5 text-[#0066FF]" />
+                        <User className="h-5 w-5 text-[#012e7a]" />
                         Persönlicher Kontext
                     </CardTitle>
                     <CardDescription className="text-[#73726E]">
@@ -51,7 +51,7 @@ export default async function SettingsPage() {
             <Card className="bg-white border-[#E7E7E5] shadow-sm">
                 <CardHeader>
                     <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-[#0066FF]" />
+                        <FileText className="h-5 w-5 text-[#012e7a]" />
                         Meine Dokumente
                     </CardTitle>
                     <CardDescription className="text-[#73726E]">

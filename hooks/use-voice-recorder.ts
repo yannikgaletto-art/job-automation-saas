@@ -14,6 +14,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 export type RecordingState = 'idle' | 'recording' | 'transcribing';
 
 const CONSENT_KEY = 'pathly_voice_consent';
+const PERMANENT_CONSENT_KEY = 'pathly_voice_consent_permanent';
 const MAX_RECORDING_MS = 60_000; // 1 minute hard limit
 
 interface UseVoiceRecorderOptions {
@@ -28,7 +29,7 @@ interface UseVoiceRecorderReturn {
     hasConsent: boolean;
     startRecording: () => void;
     stopRecording: () => void;
-    grantConsent: () => void;
+    grantConsent: (skipFuture?: boolean) => void;
     denyConsent: () => void;
     needsConsent: boolean;
 }
@@ -76,8 +77,13 @@ export function useVoiceRecorder({
     const streamRef = useRef<MediaStream | null>(null);
     const mimeTypeRef = useRef<string>('audio/webm');
 
-    // Check consent on mount
+    // Check consent on mount — permanent consent skips the modal entirely
     useEffect(() => {
+        const permanent = localStorage.getItem(PERMANENT_CONSENT_KEY);
+        if (permanent === 'true') {
+            setHasConsent(true);
+            return;
+        }
         const consent = localStorage.getItem(CONSENT_KEY);
         setHasConsent(consent === 'true');
     }, []);
@@ -127,8 +133,11 @@ export function useVoiceRecorder({
         chunksRef.current = [];
     }
 
-    function grantConsent() {
+    function grantConsent(skipFuture?: boolean) {
         localStorage.setItem(CONSENT_KEY, 'true');
+        if (skipFuture) {
+            localStorage.setItem(PERMANENT_CONSENT_KEY, 'true');
+        }
         setHasConsent(true);
         setNeedsConsent(false);
     }
@@ -139,11 +148,20 @@ export function useVoiceRecorder({
         setNeedsConsent(false);
     }
 
+    // On next startRecording attempt after granting consent, auto-start
+    // (For non-permanent consent: reset consent so modal shows next time)
     const startRecording = useCallback(async () => {
-        // Check consent first
-        if (!hasConsent) {
-            setNeedsConsent(true);
-            return;
+        // If permanent consent is set, skip the modal entirely
+        const permanent = localStorage.getItem(PERMANENT_CONSENT_KEY);
+        if (permanent !== 'true') {
+            // Reset per-session consent so modal shows every time
+            if (!hasConsent) {
+                setNeedsConsent(true);
+                return;
+            }
+        } else if (!hasConsent) {
+            // Permanent was set but state is stale — fix it
+            setHasConsent(true);
         }
 
         if (!isMicAvailable) {

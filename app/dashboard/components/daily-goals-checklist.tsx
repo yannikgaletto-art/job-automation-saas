@@ -100,8 +100,8 @@ function GoalItem({ goal, onUpdate }: { goal: Goal; onUpdate: (g: Goal) => void 
                     className={cn(
                         'w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0',
                         goal.completed
-                            ? 'bg-[#0066FF] border-[#0066FF]'
-                            : 'border-[#D1D5DB] hover:border-[#0066FF]'
+                            ? 'bg-[#012e7a] border-[#012e7a]'
+                            : 'border-[#D1D5DB] hover:border-[#012e7a]'
                     )}
                 >
                     {goal.completed && <Check className="w-3 h-3 text-white" />}
@@ -170,7 +170,7 @@ function GoalItem({ goal, onUpdate }: { goal: Goal; onUpdate: (g: Goal) => void 
                             <Button
                                 size="sm"
                                 onClick={updateProgress}
-                                className="flex-1 bg-[#0066FF] hover:bg-[#0052CC] text-white"
+                                className="flex-1 bg-[#012e7a] hover:bg-[#011f5e] text-white"
                             >
                                 Update
                             </Button>
@@ -193,7 +193,7 @@ function GoalItem({ goal, onUpdate }: { goal: Goal; onUpdate: (g: Goal) => void 
             {/* Progress Bar */}
             <div className="w-full h-1 bg-[#E7E7E5] rounded-full overflow-hidden">
                 <div
-                    className="h-full bg-[#0066FF] rounded-full transition-all duration-300"
+                    className="h-full bg-[#012e7a] rounded-full transition-all duration-300"
                     style={{ width: `${goal.progress}%` }}
                 />
             </div>

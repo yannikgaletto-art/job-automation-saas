@@ -3,7 +3,7 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const MOON_LABELS = ['', '🌑', '🌒', '🌓', '🌔', '🌕'];
-const BAR_COLORS = ['#d6d6d6', '#d6d6d6', '#93c5fd', '#3385FF', '#002e7a'];
+const BAR_COLORS = ['#d6d6d6', '#d6d6d6', '#93c5fd', '#1a4a9a', '#002e7a'];
 
 interface Session { energy_level: number | null; completed: boolean; }
 

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronUp, Plus, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 import type { VoteAggregation } from '@/types/volunteering';
 
 interface CategoryVoteProps {
@@ -29,16 +28,12 @@ export function CategoryVote({ votes, onVoteSubmitted }: CategoryVoteProps) {
             const data = await res.json();
 
             if (res.status === 409) {
-                toast.info('Du hast bereits für diesen Bereich gestimmt.');
             } else if (!res.ok) {
-                toast.error(data.error ?? 'Abstimmung fehlgeschlagen');
             } else {
-                toast.success('Vorschlag eingereicht!');
                 setInput('');
                 onVoteSubmitted();
             }
         } catch {
-            toast.error('Netzwerkfehler');
         } finally {
             setSubmitting(false);
         }
@@ -62,13 +57,13 @@ export function CategoryVote({ votes, onVoteSubmitted }: CategoryVoteProps) {
                     onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
                     placeholder="z.B. Tierschutz, Digitale Bildung..."
                     maxLength={100}
-                    className="flex-1 px-3.5 py-2.5 text-sm rounded-lg border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF] transition-colors"
+                    className="flex-1 px-3.5 py-2.5 text-sm rounded-lg border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] transition-colors"
                 />
                 <motion.button
                     onClick={handleSubmit}
                     disabled={submitting || input.trim().length < 2}
                     whileTap={{ scale: 0.95 }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-white bg-[#0066FF] hover:bg-[#0052CC] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-white bg-[#012e7a] hover:bg-[#011f5e] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                     Vorschlagen
@@ -99,7 +94,7 @@ export function CategoryVote({ votes, onVoteSubmitted }: CategoryVoteProps) {
                                         {v.vote_count} {v.vote_count === 1 ? 'Stimme' : 'Stimmen'}
                                     </span>
                                     {v.user_voted && (
-                                        <span className="flex items-center gap-0.5 text-xs text-[#0066FF] font-medium">
+                                        <span className="flex items-center gap-0.5 text-xs text-[#012e7a] font-medium">
                                             <ChevronUp className="w-3.5 h-3.5" />
                                             Deine Stimme
                                         </span>

@@ -77,11 +77,11 @@ export function CVSelectDialog({ isOpen, cvOptions, onSelect, onClose }: CVSelec
                                 type="button"
                                 onClick={() => setSelected(cv.id)}
                                 className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${selected === cv.id
-                                        ? "border-[#0066FF] bg-[#F0F7FF] ring-1 ring-[#0066FF]/30"
-                                        : "border-[#E7E7E5] bg-white hover:border-[#0066FF]/40 hover:bg-[#F0F7FF]/30"
+                                        ? "border-[#012e7a] bg-[#F0F7FF] ring-1 ring-[#012e7a]/30"
+                                        : "border-[#E7E7E5] bg-white hover:border-[#012e7a]/40 hover:bg-[#F0F7FF]/30"
                                     }`}
                             >
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${selected === cv.id ? "bg-[#0066FF]" : "bg-[#F7F7F5]"
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${selected === cv.id ? "bg-[#012e7a]" : "bg-[#F7F7F5]"
                                     }`}>
                                     {selected === cv.id ? (
                                         <Check className="w-4 h-4 text-white" />

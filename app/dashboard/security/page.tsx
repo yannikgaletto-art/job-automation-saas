@@ -187,7 +187,7 @@ export default function SecurityPage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-semibold text-[#37352F] flex items-center gap-3">
-          <Shield className="w-8 h-8 text-[#0066FF]" />
+          <Shield className="w-8 h-8 text-[#012e7a]" />
           Security & Privacy
         </h1>
         <p className="text-[#73726E] mt-1">DSGVO & NIS2 compliant data management. Your privacy is our top priority.</p>
@@ -337,7 +337,7 @@ export default function SecurityPage() {
                 <p className="text-sm font-medium text-[#37352F]">Kontakt:</p>
                 <a
                   href="mailto:kontakt@pathly.app?subject=Account%20Deletion%20Request"
-                  className="text-sm text-[#0066FF] hover:underline"
+                  className="text-sm text-[#012e7a] hover:underline"
                 >
                   kontakt@pathly.app
                 </a>
@@ -356,7 +356,7 @@ export default function SecurityPage() {
 
       <div className="text-center text-sm text-[#73726E] pt-4">
         Fragen zur Datensicherheit?{' '}
-        <a href="/legal/privacy-policy" className="text-[#0066FF] hover:underline">
+        <a href="/legal/privacy-policy" className="text-[#012e7a] hover:underline">
           Datenschutzerklärung lesen
         </a>
       </div>

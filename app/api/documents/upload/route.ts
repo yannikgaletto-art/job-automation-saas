@@ -58,7 +58,30 @@ export async function POST(req: NextRequest) {
                 { status: 401 }
             )
         }
+
         const formData = await req.formData()
+
+        // ─── Document Limit Guard (max 3 per type) ───────────────────
+        // Double-Assurance: Frontend disables button at 3, backend rejects at 3.
+        const singleTypeField = (formData.get('type') as string) || null;
+
+        // Only applies to Settings mode: single `file` upload with explicit `type`
+        if (formData.get('file')) {
+            const explicitType = singleTypeField || 'cv';
+            const { count, error: countErr } = await supabaseAdmin
+                .from('documents')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .eq('document_type', explicitType);
+
+            if (!countErr && (count ?? 0) >= 3) {
+                console.log(`[${requestId}] route=documents/upload BLOCKED — ${explicitType} limit reached (${count}/3)`);
+                return NextResponse.json(
+                    { error: `Limit erreicht: Du kannst maximal 3 ${explicitType === 'cv' ? 'Lebensläufe' : 'Anschreiben'} hochladen. Lösche zuerst ein bestehendes Dokument.`, code: 'DOCUMENT_LIMIT_REACHED', requestId },
+                    { status: 429 }
+                );
+            }
+        }
 
         // ================================================================
         // Settings mode: single `file` + `type` field

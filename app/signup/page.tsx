@@ -67,7 +67,7 @@ export default function SignupPage() {
             <div className="max-w-md w-full bg-white p-8 rounded-xl border border-[#E7E7E5] shadow-sm">
                 <div className="mb-8">
                     <div className="flex items-center gap-2 mb-4">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF] to-[#3385FF] flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#012e7a] to-[#1a4a9a] flex items-center justify-center">
                             <span className="text-white font-bold text-xl">P</span>
                         </div>
                         <h1 className="text-3xl font-bold text-[#37352F]">Pathly</h1>
@@ -92,7 +92,7 @@ export default function SignupPage() {
                             Keine E-Mail erhalten? Prüfe deinen Spam-Ordner oder{" "}
                             <button
                                 onClick={() => setSignupSuccess(false)}
-                                className="text-[#0066FF] hover:underline font-medium"
+                                className="text-[#012e7a] hover:underline font-medium"
                             >
                                 versuche es erneut
                             </button>.
@@ -166,7 +166,7 @@ export default function SignupPage() {
 
                 <p className="mt-6 text-sm text-center text-[#73726E]">
                     Bereits registriert?{" "}
-                    <Link href="/login" className="text-[#0066FF] hover:underline font-medium">
+                    <Link href="/login" className="text-[#012e7a] hover:underline font-medium">
                         Einloggen
                     </Link>
                 </p>

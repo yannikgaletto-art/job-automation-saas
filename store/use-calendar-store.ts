@@ -38,6 +38,7 @@ export interface CalendarTask {
     progress_note: string | null;
     carry_over_to: string | null;
     carry_over_count: number;
+    source?: 'manual' | 'pulse' | 'coaching';
     created_at: string;
     updated_at: string;
 }

@@ -8,7 +8,6 @@ import {
     ArrowRight, Repeat, HelpCircle, Rocket, Plus, Search,
     Loader2, MessageSquare,
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 // ─── Types ────────────────────────────────────────────────────────
 interface SearchResult {
@@ -161,7 +160,7 @@ function CommunitySearch() {
                     onKeyDown={handleKeyDown}
                     onFocus={() => results.length > 0 && setShowResults(true)}
                     placeholder="Community durchsuchen..."
-                    className="w-full pl-9 pr-9 py-2.5 text-sm rounded-lg border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF] transition-colors"
+                    className="w-full pl-9 pr-9 py-2.5 text-sm rounded-lg border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] transition-colors"
                 />
                 {searching && (
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A9A9A6] animate-spin" />
@@ -265,13 +264,13 @@ export default function CommunityHubPage() {
 
                                     {/* Content */}
                                     <div className="flex flex-col flex-1 p-5">
-                                        <h2 className="text-lg font-semibold text-[#37352F] group-hover:text-[#0066FF] transition-colors">
+                                        <h2 className="text-lg font-semibold text-[#37352F] group-hover:text-[#012e7a] transition-colors">
                                             {cat.title}
                                         </h2>
                                         <p className="text-sm text-[#73726E] mt-1 leading-relaxed flex-1">
                                             {cat.description}
                                         </p>
-                                        <div className="flex items-center text-sm text-[#73726E] group-hover:text-[#0066FF] transition-colors mt-3">
+                                        <div className="flex items-center text-sm text-[#73726E] group-hover:text-[#012e7a] transition-colors mt-3">
                                             <span>Entdecken</span>
                                             <ArrowRight className="w-4 h-4 ml-1.5 transform group-hover:translate-x-1 transition-transform" />
                                         </div>

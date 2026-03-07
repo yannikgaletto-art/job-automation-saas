@@ -69,7 +69,7 @@ interface MatchScoreProps {
 
 export function AnimatedMatchScore({ score, showIcon = true, className = "" }: MatchScoreProps) {
   const getGradientClass = (value: number) => {
-    if (value >= 70) return "from-[#00C853] to-[#0066FF]";
+    if (value >= 70) return "from-[#00C853] to-[#012e7a]";
     return "from-[#D32F2F] to-[#C62828]";
   };
 

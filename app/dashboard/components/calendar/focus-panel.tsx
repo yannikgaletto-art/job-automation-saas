@@ -13,7 +13,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, SkipForward, Coffee, ArrowLeft, CheckCircle2, RotateCcw, Clock } from 'lucide-react';
 import { useCalendarStore } from '@/store/use-calendar-store';
-import { toast } from 'sonner';
+import { useNotification } from '@/hooks/use-notification';
 
 
 const DEFAULT_BREAK_DURATION = 5 * 60; // 5 minutes (for 25-min pomodoro)
@@ -45,6 +45,7 @@ function ProgressPanel({
     onClose: () => void;
 }) {
     const { updateProgress, completeTask, carryOverTask } = useCalendarStore();
+    const notify = useNotification();
     const [percent, setPercent] = useState(50);
     const [note, setNote] = useState('');
 
@@ -67,7 +68,6 @@ function ProgressPanel({
                 progress_note: note || null,
             }),
         });
-        toast.success(`\u201E${taskTitle}\u201C auf morgen verschoben.`);
         onClose();
     };
 
@@ -84,7 +84,7 @@ function ProgressPanel({
             }),
         });
         fireConfetti();
-        toast.success('Task erledigt!');
+        notify('Task erledigt');
         onClose();
     };
 
@@ -166,6 +166,7 @@ export function FocusPanel() {
     } = useCalendarStore();
 
     const task = tasks.find((t) => t.id === focusedTaskId);
+    const notify = useNotification();
 
     const pomoDurationSecs = pomodoroDuration * 60;
     const breakDurationSecs = pomodoroDuration === 50 ? DEEP_BREAK_DURATION : DEFAULT_BREAK_DURATION;
@@ -254,7 +255,7 @@ export function FocusPanel() {
             }),
         });
         fireConfetti();
-        toast.success('Task erledigt!');
+        notify('Task erledigt');
     };
 
     const handleToggleTimer = () => {
@@ -266,6 +267,7 @@ export function FocusPanel() {
                 timerMode: 'focus',
                 timerIsActive: true,
             });
+            notify('Focus on ⏱');
         } else {
             timerToggle();
         }

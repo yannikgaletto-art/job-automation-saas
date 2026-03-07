@@ -15,10 +15,10 @@ import { Button } from '@/components/motion/button';
 import {
     Loader2, CheckCircle2, AlertCircle, Sparkles, Zap, ChevronDown
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CVSelectDialog, type CVOption } from '@/components/dashboard/cv-select-dialog';
 import { DocumentsRequiredDialog } from '@/components/shared/documents-required-dialog';
+import { useNotification } from '@/hooks/use-notification';
 
 interface CVMatchTabProps {
     jobId: string;
@@ -149,6 +149,7 @@ function ExpandableCell({ text, boldFn }: { text: string; boldFn: (s: string) =>
 export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, onNextStep }: CVMatchTabProps) {
     const [state, setState] = useState<'idle' | 'loading' | 'complete' | 'error' | 'no-cv'>('idle');
     const router = useRouter();
+    const notify = useNotification();
     const [matchData, setMatchData] = useState<CVMatchResult | null>(null);
     const [loadingStep, setLoadingStep] = useState(0);
     const [progressText, setProgressText] = useState("Profil wird mit Stellenausschreibung abgeglichen...");
@@ -266,8 +267,8 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         setLoadingStep(3);
                         setMatchData(pollData.cached);
                         setState('complete');
+                        notify('CV Match erstellt');
                         onMatchComplete?.(pollData.cached);
-                        toast.success('CV Analyse erfolgreich');
                     } else if (attempts >= maxAttempts) {
                         if (pollingRef.current) clearInterval(pollingRef.current);
                         pollingRef.current = null;
@@ -278,7 +279,6 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                     pollingRef.current = null;
                     const errMsg = pollError instanceof Error ? pollError.message : String(pollError);
                     setState('error');
-                    toast.error('Analyse fehlgeschlagen', { description: errMsg });
                 }
             }, 3000);
 
@@ -286,7 +286,6 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
             const errMsg = error instanceof Error ? error.message : String(error);
             console.error(error);
             setState('error');
-            toast.error('Analyse fehlgeschlagen', { description: errMsg });
         }
     }, [jobId, onMatchStart, onMatchComplete]);
 
@@ -397,31 +396,43 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     // ── LOADING ────────────────────────────────────────────────
     if (state === 'loading') {
         return (
-            <div className="px-6 py-16 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
-                <Loader2 className="w-10 h-10 text-[#002e7a] animate-spin mb-6" />
-                <h3 className="text-lg font-medium text-[#37352F] mb-4">
-                    <AnimatePresence mode="popLayout">
-                        <motion.span
-                            key={loadingStep === 2 ? progressText : loadingStep}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.4 }}
-                            className="inline-block"
-                        >
-                            {loadingStep === 1 && "Lebenslauf wird gelesen..."}
-                            {loadingStep === 2 && progressText}
-                            {loadingStep === 3 && "Match-Bericht wird erstellt..."}
-                        </motion.span>
-                    </AnimatePresence>
-                </h3>
-                <div className="w-64 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                    <motion.div
-                        className="h-full bg-[#002e7a]"
-                        initial={{ width: '0%' }}
-                        animate={{ width: loadingStep === 1 ? '30%' : loadingStep === 2 ? '70%' : '95%' }}
-                        transition={{ duration: 0.5 }}
-                    />
+            <div className="px-6 py-16 flex flex-col items-center justify-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
+                <div className="w-72">
+                    {/* Label + percent */}
+                    <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs font-semibold" style={{ color: '#002e7a' }}>
+                            <AnimatePresence mode="popLayout">
+                                <motion.span
+                                    key={loadingStep === 2 ? progressText : loadingStep}
+                                    initial={{ opacity: 0, y: 6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -6 }}
+                                    transition={{ duration: 0.35 }}
+                                    className="inline-block"
+                                >
+                                    {loadingStep === 1 && 'Lebenslauf wird gelesen...'}
+                                    {loadingStep === 2 && progressText}
+                                    {loadingStep === 3 && 'Match-Bericht wird erstellt...'}
+                                </motion.span>
+                            </AnimatePresence>
+                        </span>
+                        <span className="text-xs" style={{ color: '#A8A29E' }}>
+                            {loadingStep === 1 ? '30' : loadingStep === 2 ? '70' : '95'}%
+                        </span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="w-full h-2 bg-[#E7E7E5] rounded-full overflow-hidden">
+                        <motion.div
+                            className="h-full bg-gradient-to-r from-[#002e7a] to-[#3B82F6] rounded-full"
+                            initial={{ width: '5%' }}
+                            animate={{ width: loadingStep === 1 ? '30%' : loadingStep === 2 ? '70%' : '95%' }}
+                            transition={{ duration: 0.5 }}
+                        />
+                    </div>
+
+                    {/* Time estimate */}
+                    <p className="text-[11px] text-center mt-3" style={{ color: '#A8A29E' }}>Dauert ca. 15–30 Sekunden</p>
                 </div>
             </div>
         );
@@ -506,12 +517,12 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                                     <div key={i} className="mb-2 last:mb-0">
                                         <div className="flex items-center text-sm mb-1">
                                             <div className="w-32 text-slate-500 font-medium text-xs"><strong>{item.label}</strong></div>
-                                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden mx-2">
+                                            <div className="flex-1 h-1.5 bg-[#E7E7E5] rounded-full overflow-hidden mx-2">
                                                 <motion.div
                                                     initial={{ width: 0 }}
                                                     animate={{ width: sc + '%' }}
                                                     transition={{ duration: 1, delay: i * 0.1 }}
-                                                    className="h-full bg-[#002e7a]"
+                                                    className="h-full bg-gradient-to-r from-[#002e7a] to-[#3B82F6]"
                                                 />
                                             </div>
                                             <div className="w-8 text-right font-medium text-xs text-[#37352F]">{sc}%</div>

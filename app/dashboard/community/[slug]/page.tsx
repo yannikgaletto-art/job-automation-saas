@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
 
 // ─── Types ────────────────────────────────────────────────────────
 interface CommunityProfile {
@@ -168,7 +167,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
             <p className="font-medium text-[#37352F]">Posts konnten nicht geladen werden</p>
             <button
                 onClick={onRetry}
-                className="mt-3 px-4 py-2 text-sm font-medium text-[#0066FF] border border-[#0066FF] rounded-lg hover:bg-[#0066FF]/5 transition-colors"
+                className="mt-3 px-4 py-2 text-sm font-medium text-[#012e7a] border border-[#012e7a] rounded-lg hover:bg-[#012e7a]/5 transition-colors"
             >
                 Erneut versuchen
             </button>
@@ -204,13 +203,10 @@ function InlineProfileForm({
                 }),
             });
             if (res.ok) {
-                toast.success('Profil erstellt');
                 onCreated();
             } else {
-                toast.error('Profil konnte nicht erstellt werden. Bitte erneut versuchen.');
             }
         } catch {
-            toast.error('Aktion fehlgeschlagen. Bitte erneut versuchen.');
         } finally {
             setSaving(false);
         }
@@ -239,7 +235,7 @@ function InlineProfileForm({
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
                         placeholder="z.B. Yannik G."
-                        className="w-full px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF]"
+                        className="w-full px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a]"
                         required
                     />
                 </div>
@@ -250,13 +246,13 @@ function InlineProfileForm({
                         value={skills}
                         onChange={(e) => setSkills(e.target.value)}
                         placeholder="z.B. React, UX Design, Python"
-                        className="w-full px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF]"
+                        className="w-full px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a]"
                     />
                 </div>
                 <button
                     type="submit"
                     disabled={saving || !displayName.trim()}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#0066FF] rounded-md hover:bg-[#0052CC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#012e7a] rounded-md hover:bg-[#011f5e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Profil erstellen
@@ -304,12 +300,10 @@ function PostCard({
                 // Revert on failure
                 setUpvoted(prev);
                 setUpvoteCount(prevCount);
-                toast.error('Aktion fehlgeschlagen. Bitte erneut versuchen.', { id: `upvote-error-${post.id}` });
             }
         } catch {
             setUpvoted(prev);
             setUpvoteCount(prevCount);
-            toast.error('Aktion fehlgeschlagen. Bitte erneut versuchen.', { id: `upvote-error-${post.id}` });
         }
     };
 
@@ -322,7 +316,6 @@ function PostCard({
                     if (d.success) setComments(d.data ?? []);
                 })
                 .catch(() => {
-                    toast.error('Kommentare konnten nicht geladen werden.');
                 })
                 .finally(() => setLoadingComments(false));
         }
@@ -342,13 +335,10 @@ function PostCard({
                 if (d.success && d.data) {
                     setComments((prev) => [...prev, d.data]);
                     setCommentText('');
-                    toast.success('Kommentar gepostet', { id: `comment-${d.data.id}` });
                 }
             } else {
-                toast.error('Kommentar konnte nicht gepostet werden.');
             }
         } catch {
-            toast.error('Aktion fehlgeschlagen. Bitte erneut versuchen.');
         } finally {
             setSendingComment(false);
         }
@@ -406,14 +396,14 @@ function PostCard({
                 <div className="flex items-center gap-4 mt-3 pt-2.5 border-t border-[#F0F0EE]">
                     <button
                         onClick={handleUpvote}
-                        className={`flex items-center gap-1 text-xs font-medium transition-colors ${upvoted ? 'text-[#0066FF]' : 'text-[#A9A9A6] hover:text-[#37352F]'
+                        className={`flex items-center gap-1 text-xs font-medium transition-colors ${upvoted ? 'text-[#012e7a]' : 'text-[#A9A9A6] hover:text-[#37352F]'
                             }`}
                     >
                         <motion.div
                             animate={upvoteAnimating ? { scale: [1, 1.3, 1] } : {}}
                             transition={{ duration: 0.3 }}
                         >
-                            <ChevronUp className={`w-4 h-4 ${upvoted ? 'text-[#0066FF]' : ''}`} />
+                            <ChevronUp className={`w-4 h-4 ${upvoted ? 'text-[#012e7a]' : ''}`} />
                         </motion.div>
                         {upvoteCount > 0 && <span>{upvoteCount}</span>}
                     </button>
@@ -484,12 +474,12 @@ function PostCard({
                                     onChange={(e) => setCommentText(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
                                     placeholder="Antwort schreiben..."
-                                    className="flex-1 px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF]"
+                                    className="flex-1 px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a]"
                                 />
                                 <button
                                     onClick={handleSendComment}
                                     disabled={sendingComment || !commentText.trim()}
-                                    className="p-2 text-white bg-[#0066FF] rounded-md hover:bg-[#0052CC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    className="p-2 text-white bg-[#012e7a] rounded-md hover:bg-[#011f5e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {sendingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                 </button>
@@ -539,17 +529,14 @@ function CreatePostForm({
             });
             if (res.ok) {
                 const d = await res.json();
-                toast.success('Post erstellt', { id: `post-created-${d.data?.id ?? 'new'}` });
                 onCreated();
                 setTitle('');
                 setContent('');
                 setTagInput('');
             } else {
                 const d = await res.json().catch(() => ({}));
-                toast.error(d.error ?? 'Post konnte nicht erstellt werden.');
             }
         } catch {
-            toast.error('Aktion fehlgeschlagen. Bitte erneut versuchen.');
         } finally {
             setSaving(false);
         }
@@ -585,7 +572,7 @@ function CreatePostForm({
                                 type="button"
                                 onClick={() => setPostType(type)}
                                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${postType === type
-                                    ? 'bg-[#0066FF] text-white'
+                                    ? 'bg-[#012e7a] text-white'
                                     : 'bg-[#F7F7F5] text-[#73726E] hover:bg-[#F0F0EE]'
                                     }`}
                             >
@@ -600,7 +587,7 @@ function CreatePostForm({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder={isCareer ? 'Deine Frage...' : 'Titel'}
-                    className="w-full px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF]"
+                    className="w-full px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a]"
                     required
                 />
 
@@ -610,7 +597,7 @@ function CreatePostForm({
                         onChange={(e) => setContent(e.target.value)}
                         placeholder="Beschreibung (optional)"
                         rows={3}
-                        className="w-full px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF] resize-none"
+                        className="w-full px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] resize-none"
                     />
                 )}
 
@@ -620,7 +607,7 @@ function CreatePostForm({
                         value={tagInput}
                         onChange={(e) => setTagInput(e.target.value)}
                         placeholder="Tags (kommagetrennt, optional)"
-                        className="w-full px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF]"
+                        className="w-full px-3 py-2 text-sm rounded-md border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a]"
                     />
                 )}
 
@@ -628,7 +615,7 @@ function CreatePostForm({
                     <button
                         type="submit"
                         disabled={saving || !title.trim()}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#0066FF] rounded-md hover:bg-[#0052CC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#012e7a] rounded-md hover:bg-[#011f5e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                         Posten
@@ -756,7 +743,7 @@ export default function CommunityDetailPage() {
         return (
             <div className="text-center py-20">
                 <p className="text-[#73726E]">Community nicht gefunden.</p>
-                <Link href="/dashboard/community" className="text-sm text-[#0066FF] hover:underline mt-2 inline-block">
+                <Link href="/dashboard/community" className="text-sm text-[#012e7a] hover:underline mt-2 inline-block">
                     Zurueck zur Uebersicht
                 </Link>
             </div>
@@ -793,7 +780,7 @@ export default function CommunityDetailPage() {
                     </div>
                     <button
                         onClick={handleNewPostClick}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#0066FF] rounded-lg hover:bg-[#0052CC] transition-colors flex-shrink-0"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#012e7a] rounded-lg hover:bg-[#011f5e] transition-colors flex-shrink-0"
                     >
                         <Plus className="w-4 h-4" />
                         Neuer Post

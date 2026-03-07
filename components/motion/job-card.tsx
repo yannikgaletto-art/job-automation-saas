@@ -194,7 +194,7 @@ export function JobCard({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 + 0.5 }}
-          whileHover={{ scale: 1.01, borderColor: "#0066FF" }}
+          whileHover={{ scale: 1.01, borderColor: "#012e7a" }}
         >
           <p className="text-sm text-[#37352F]">
             <motion.span

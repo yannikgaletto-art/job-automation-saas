@@ -108,6 +108,7 @@ export async function sendCoachingMessage(
         companyName: job?.company_name || 'Unbekanntes Unternehmen',
         dossier,
         round,
+        maxQuestions,
     });
 
     // 6. Build messages for Claude (convert to Anthropic format)
@@ -116,13 +117,24 @@ export async function sendCoachingMessage(
         content: msg.content,
     }));
 
+    // 6b. Hard turn-limit enforcement: inject LETZTE_FRAGE marker for the last turn
+    // This ensures the AI gives ONLY feedback and stops — no more questions.
+    let finalSystemPrompt = systemPrompt;
+    if (currentTurn >= maxQuestions) {
+        finalSystemPrompt += `\n\n⚠️ LETZTE FRAGE — HARD STOP ⚠️
+Dies ist die Antwort auf die LETZTE Frage (Frage ${maxQuestions} von ${maxQuestions}).
+Du gibst NUR noch Feedback (2-3 Sätze) zur gerade gegebenen Antwort.
+Du stellst KEINE weitere Frage. KEINE Verabschiedung. KEIN "Danke für das Gespräch".
+Nur Feedback, dann Schluss. Das System übernimmt die Weiterleitung zur Analyse.`;
+    }
+
     // 7. Call Claude (isolated client)
     const client = getClient();
     const response = await client.messages.create({
         model: COACHING_MODEL,
         max_tokens: 1024,
         temperature: 0.7,
-        system: systemPrompt,
+        system: finalSystemPrompt,
         messages: anthropicMessages,
     });
 
@@ -163,12 +175,8 @@ export async function sendCoachingMessage(
         console.warn('[Coaching] Hint generation failed, proceeding without');
     }
 
-    // 10. Check if AI asks for analysis (user must confirm)
-    const isComplete =
-        aiText.toLowerCase().includes('auswertung') ||
-        aiText.toLowerCase().includes('analyse') ||
-        aiText.toLowerCase().includes('interview beendet') ||
-        aiText.toLowerCase().includes('feedback-report');
+    // 10. Deterministic completion: user answered all selected questions
+    const isComplete = currentTurn >= maxQuestions;
 
     // 11. Update session in DB
     const { error: updateError } = await supabaseAdmin
@@ -246,6 +254,7 @@ export async function getInitialCoachingMessage(
         companyName: job?.company_name || 'Unbekanntes Unternehmen',
         dossier,
         round,
+        maxQuestions: session.max_questions || 5,
     });
 
     // Get the first message from Claude (round-aware kickoff)

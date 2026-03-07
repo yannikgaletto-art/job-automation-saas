@@ -57,7 +57,7 @@ export function TimeBlockingCalendar() {
                             className={cn(
                                 'flex-1 h-8 rounded-md border-2 transition-all',
                                 blocks[hour]
-                                    ? 'bg-[#D3E5FF] border-[#0066FF]'
+                                    ? 'bg-[#D3E5FF] border-[#012e7a]'
                                     : 'bg-white border-[#E7E7E5] hover:bg-[#F7F7F5]'
                             )}
                             aria-label={`Toggle ${hour}:00`}

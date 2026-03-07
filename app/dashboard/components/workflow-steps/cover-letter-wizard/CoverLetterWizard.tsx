@@ -8,7 +8,6 @@ import { StepHookSelection } from './steps/StepHookSelection';
 import { StepStationMapping } from './steps/StepStationMapping';
 import { StepToneConfig } from './steps/StepToneConfig';
 import type { CoverLetterSetupContext, SetupDataResponse } from '@/types/cover-letter-setup';
-import { Sparkles } from 'lucide-react';
 
 interface Props {
     jobId: string;
@@ -17,7 +16,7 @@ interface Props {
 }
 
 export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
-    const { currentStep, setStep, initForJob, buildContext, setHook, toggleStation, setTone, canAutoFill } =
+    const { currentStep, setStep, initForJob, buildContext } =
         useCoverLetterSetupStore();
 
     const [setupData, setSetupData] = useState<SetupDataResponse | null>(null);
@@ -43,42 +42,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
         }
     };
 
-    const handleAutoFill = () => {
-        if (!setupData) return;
-        // Best hook (highest relevanceScore)
-        const bestHook = [...setupData.hooks].sort((a, b) => b.relevanceScore - a.relevanceScore)[0];
-        if (bestHook) setHook(bestHook);
 
-        // Top-3 stations (filtered for data hygiene, matching Step 2 logic)
-        const validStations = setupData.cvStations.filter(s => s.role && s.company);
-        validStations.slice(0, 3).forEach((s, i) => {
-            const req = setupData.jobRequirements[i] || setupData.jobRequirements[0] || '';
-            toggleStation({
-                company: s.company,
-                role: s.role,
-                period: s.period,
-                keyBullet: s.bullets?.[0] || '',
-                matchedRequirement: req,
-                intent: `Beweis für: ${req || 'Berufserfahrung'}`,
-                bullets: s.bullets || [],
-            });
-        });
-
-        // Safe default tone
-        setTone({
-            preset: 'data-driven',
-            toneSource: 'preset',
-            targetLanguage: setupData.detectedJobLanguage,
-            hasStyleSample: setupData.hasStyleSample,
-            styleWarningAcknowledged: true,
-            formality: 'sie',
-        });
-
-        // Jump to last step for review
-        setStep(3);
-        setMaxReachedStep(3);
-        console.log('✅ [WizardSetup] Auto-Fill applied');
-    };
 
     // Navigate to a step — only backward allowed (forward is handled by step buttons)
     const handleNavigateToStep = (step: 1 | 2 | 3) => {
@@ -133,21 +97,13 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
 
     return (
         <div className="px-5 py-4 bg-[#FAFAF9] space-y-4 min-h-[360px]">
-            {/* Header with Auto-Fill */}
+            {/* Header */}
             <div className="flex items-start justify-between">
                 <WizardProgressBar
                     currentStep={currentStep as 1 | 2 | 3}
                     maxReachedStep={maxReachedStep}
                     onNavigate={handleNavigateToStep}
                 />
-                {canAutoFill() && (
-                    <button
-                        onClick={handleAutoFill}
-                        className="flex items-center gap-1 text-[10px] font-semibold text-[#002e7a] bg-[#EEF3FF] border border-[#002e7a]/20 px-2 py-1 rounded-md hover:bg-[#dce8ff] transition-colors shrink-0 ml-3"
-                    >
-                        <Sparkles className="w-3 h-3" /> Auto-Fill
-                    </button>
-                )}
             </div>
 
             {/* Steps */}

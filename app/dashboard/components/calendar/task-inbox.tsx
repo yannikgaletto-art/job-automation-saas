@@ -10,10 +10,9 @@ import { useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GripVertical, Plus, ChevronDown, RotateCcw, Flame, Trash2, X } from 'lucide-react';
+import { GripVertical, Plus, ChevronDown, RotateCcw, Flame, Trash2, X, BookOpen } from 'lucide-react';
 import { useCalendarStore, type CalendarTask } from '@/store/use-calendar-store';
 import { PulseMissionPanel } from './pulse-mission-panel';
-import { toast } from 'sonner';
 
 // ─── Duration Options ────────────────────────────────────────────
 
@@ -74,9 +73,7 @@ function DraggableTaskItem({ task }: { task: CalendarTask }) {
         removeTask(task.id);
         try {
             await fetch(`/api/tasks?id=${task.id}`, { method: 'DELETE' });
-            toast.success(`„${task.title}" gelöscht`);
         } catch {
-            toast.error('Löschen fehlgeschlagen');
         }
     };
 
@@ -220,10 +217,8 @@ function AddTaskForm() {
             if (data.success && data.task) {
                 addTask(data.task);
                 setTitle('');
-                toast.success(`„${data.task.title}" zur Inbox hinzugefügt`);
             }
         } catch {
-            toast.error('Task konnte nicht erstellt werden');
         } finally {
             setIsAdding(false);
         }
@@ -252,13 +247,75 @@ function AddTaskForm() {
     );
 }
 
+// ─── Coaching Recommendation Panel ──────────────────────────────
+
+function CoachingRecommendationPanel({ tasks }: { tasks: CalendarTask[] }) {
+    const [isExpanded, setIsExpanded] = useState(true);
+
+    return (
+        <div className="mb-3">
+            {/* Notion-style toggle header */}
+            <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="
+                    w-full flex items-center gap-2 py-1.5 px-1
+                    text-sm text-[#37352F] hover:bg-[#F5F5F4]
+                    rounded transition-colors text-left
+                "
+            >
+                <span
+                    className="text-[#A8A29E] transition-transform duration-150 text-[10px] flex-shrink-0"
+                    style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                >
+                    &#9654;
+                </span>
+                <BookOpen className="w-3.5 h-3.5 text-[#2B5EA7]" />
+                <span className="font-medium">
+                    Pathlys Coaching Empfehlung
+                </span>
+                <span className="text-[10px] text-[#A8A29E] ml-auto">
+                    {tasks.length}
+                </span>
+            </button>
+
+            {/* Content */}
+            <AnimatePresence>
+                {isExpanded && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="pt-1.5 pl-5 space-y-2">
+                            <AnimatePresence mode="popLayout">
+                                {tasks.length === 0 ? (
+                                    <p className="text-xs text-[#A8A29E] py-1">
+                                        Speichere Themen aus deiner Coaching-Analyse hier.
+                                    </p>
+                                ) : (
+                                    tasks.map((task) => (
+                                        <DraggableTaskItem key={task.id} task={task} />
+                                    ))
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
 // ─── Main Inbox Panel ───────────────────────────────────────────
 
 export function TaskInbox() {
     const tasks = useCalendarStore((s) => s.tasks);
     const today = new Date().toISOString().split('T')[0];
 
-    const inboxTasks = tasks.filter((t) => t.status === 'inbox');
+    const inboxTasks = tasks.filter((t) => t.status === 'inbox' && t.source !== 'coaching');
+    const coachingTasks = tasks.filter((t) => t.status === 'inbox' && t.source === 'coaching');
     const carryOverTasks = tasks.filter(
         (t) => t.status === 'carry_over' && t.carry_over_to === today
     );
@@ -272,7 +329,7 @@ export function TaskInbox() {
             {/* Header */}
             <div className="px-4 py-3 border-b border-[#E7E7E5]">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-[#37352F]">Missionen</h2>
+                    <h2 className="text-sm font-semibold text-[#37352F]">Missionen - Drag &amp; Drop</h2>
                     <div className="flex items-center gap-2">
                         {totalScheduled > 0 && (
                             <span className="text-[10px] text-[#73726E] flex items-center gap-1">
@@ -285,8 +342,10 @@ export function TaskInbox() {
             </div>
 
             <div className="p-4 space-y-3">
-                {/* Pulse Missions */}
                 <PulseMissionPanel />
+
+                {/* Coaching Recommendations — always visible */}
+                <CoachingRecommendationPanel tasks={coachingTasks} />
 
                 {/* Divider + custom task section */}
                 <div className="flex items-center gap-3 pt-1">

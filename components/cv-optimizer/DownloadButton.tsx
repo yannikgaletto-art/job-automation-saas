@@ -8,7 +8,6 @@ import { ClassicTemplate } from '../cv-templates/ClassicTemplate';
 import { TechTemplate } from '../cv-templates/TechTemplate';
 import { ValleyTemplate } from '../cv-templates/ValleyTemplate';
 import { Download, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface DownloadButtonProps {
     data: CvStructuredData;
@@ -52,7 +51,6 @@ export default function DownloadButton({ data, templateId }: DownloadButtonProps
             URL.revokeObjectURL(url);
         } catch (err) {
             console.error(err);
-            toast.error('Download fehlgeschlagen, bitte erneut probieren.');
         } finally {
             setIsDownloading(false);
         }

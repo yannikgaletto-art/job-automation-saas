@@ -12,8 +12,9 @@ import {
     Mic,
     Square,
 } from 'lucide-react';
-import type { ChatMessage, CoachingDossier } from '@/types/coaching';
+import type { ChatMessage, CoachingDossier, AboutRole } from '@/types/coaching';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
+import { useNotification } from '@/hooks/use-notification';
 import { VoiceConsentModal } from '@/components/coaching/voice-consent-modal';
 
 const BLUE = '#2B5EA7';
@@ -32,6 +33,7 @@ export default function CoachingSessionPage() {
     const params = useParams();
     const router = useRouter();
     const sessionId = params.sessionId as string;
+    const notify = useNotification();
 
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -49,6 +51,12 @@ export default function CoachingSessionPage() {
     const [showAnalysisPrompt, setShowAnalysisPrompt] = useState(false);
     const [requestingAnalysis, setRequestingAnalysis] = useState(false);
     const [voiceError, setVoiceError] = useState<string | null>(null);
+    const [roleData, setRoleData] = useState<AboutRole | null>(null);
+    const [myStoryData, setMyStoryData] = useState<string[]>([]);
+    const [analyzingRole, setAnalyzingRole] = useState(false);
+    const [analyzingStory, setAnalyzingStory] = useState(false);
+    const [roleOpen, setRoleOpen] = useState(false);
+    const [storyOpen, setStoryOpen] = useState(false);
     const pollRef = useRef<NodeJS.Timeout | null>(null);
 
     // Voice recorder hook
@@ -92,6 +100,19 @@ export default function CoachingSessionPage() {
             setDossier(session.coaching_dossier);
             setTurnCount(session.turn_count || 0);
             setMaxQuestions(session.max_questions || 5);
+
+            // QA fix: Restore farewell state on page reload
+            if (session.session_status === 'active' && (session.turn_count || 0) >= (session.max_questions || 5)) {
+                setShowAnalysisPrompt(true);
+            }
+
+            // Load persisted role research data from dossier
+            if (session.coaching_dossier?.aboutRole) {
+                setRoleData(session.coaching_dossier.aboutRole);
+            }
+            if (session.coaching_dossier?.myStory && Array.isArray(session.coaching_dossier.myStory)) {
+                setMyStoryData(session.coaching_dossier.myStory);
+            }
 
             const jobRes = await fetch(`/api/jobs/list`);
             if (jobRes.ok) {
@@ -192,6 +213,7 @@ export default function CoachingSessionPage() {
         setShowAnalysisPrompt(false);
         try {
             await fetch(`/api/coaching/session/${sessionId}/complete`, { method: 'POST' });
+            notify('Coaching abgeschlossen');
             startPolling();
         } catch {
             setRequestingAnalysis(false);
@@ -257,10 +279,9 @@ export default function CoachingSessionPage() {
 
                     {/* Progress bar */}
                     <div className="mt-3 flex items-center gap-3">
-                        <div className="flex-1 h-1.5 rounded-full" style={{ background: BLUE_LIGHT }}>
+                        <div className="flex-1 h-1.5 rounded-full bg-[#E7E7E5] overflow-hidden">
                             <motion.div
-                                className="h-1.5 rounded-full"
-                                style={{ background: BLUE }}
+                                className="h-1.5 rounded-full bg-gradient-to-r from-[#002e7a] to-[#3B82F6]"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${progress}%` }}
                                 transition={{ duration: 0.3 }}
@@ -299,20 +320,211 @@ export default function CoachingSessionPage() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <h4 className="text-xs font-semibold mb-1" style={{ color: BLUE }}>Stärken</h4>
-                                            <ul className="text-xs space-y-1" style={{ color: MUTED }}>
-                                                {dossier.strengths.map((s, i) => <li key={i}>+ {s}</li>)}
+                                            <ul className="text-xs space-y-1.5" style={{ color: MUTED }}>
+                                                {dossier.strengths.map((s, i) => (
+                                                    <li key={i} className="leading-relaxed" dangerouslySetInnerHTML={{
+                                                        __html: '+ ' + s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                    }} />
+                                                ))}
                                             </ul>
                                         </div>
                                         <div>
                                             <h4 className="text-xs font-semibold text-orange-600 mb-1">Gaps</h4>
-                                            <ul className="text-xs space-y-1" style={{ color: MUTED }}>
-                                                {dossier.gaps.map((g, i) => <li key={i}>- {g}</li>)}
+                                            <ul className="text-xs space-y-1.5" style={{ color: MUTED }}>
+                                                {dossier.gaps.map((g, i) => (
+                                                    <li key={i} className="leading-relaxed" dangerouslySetInnerHTML={{
+                                                        __html: '- ' + g.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                    }} />
+                                                ))}
                                             </ul>
                                         </div>
                                     </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
+
+                        {/* ── About the Role — Analysieren scoped to this category only ── */}
+                        <div className="flex items-center w-full">
+                            <button
+                                onClick={() => setRoleOpen(!roleOpen)}
+                                className="flex items-center gap-1.5 py-2 flex-1 text-left"
+                            >
+                                <ChevronRight
+                                    className={`h-3.5 w-3.5 transition-transform duration-150 ${roleOpen ? 'rotate-90' : ''}`}
+                                    style={{ color: MUTED }}
+                                />
+                                <span className="text-xs font-medium" style={{ color: MUTED }}>About the Role</span>
+                            </button>
+                            {!analyzingRole && (
+                                <button
+                                    onClick={async () => {
+                                        setAnalyzingRole(true);
+                                        try {
+                                            const res = await fetch('/api/coaching/role-research', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ sessionId, category: 'aboutRole', force: !roleData ? undefined : true }),
+                                            });
+                                            if (res.ok) {
+                                                const data = await res.json();
+                                                if (data.aboutRole) {
+                                                    setRoleData(data.aboutRole);
+                                                    setRoleOpen(true);
+                                                }
+                                            }
+                                        } catch (e) {
+                                            console.error('[Coaching] Role research failed:', e);
+                                        } finally {
+                                            setAnalyzingRole(false);
+                                        }
+                                    }}
+                                    disabled={analyzingStory}
+                                    className="text-xs px-2.5 py-1 rounded-md border transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    style={{ borderColor: BORDER, color: MUTED, background: 'transparent' }}
+                                >
+                                    {roleData ? 'Neu analysieren' : 'Analysieren'}
+                                </button>
+                            )}
+                            {analyzingRole && (
+                                <div className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: MUTED }}>
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <span>Analysiert...</span>
+                                </div>
+                            )}
+                        </div>
+                        <AnimatePresence>
+                            {roleOpen && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden ml-5 border-l pl-4 pb-2"
+                                    style={{ borderColor: BORDER }}
+                                >
+                                    {roleData ? (
+                                        <div className="space-y-3">
+                                            {roleData.dailyBusiness.length > 0 && (
+                                                <div>
+                                                    <h5 className="text-xs font-semibold mb-1" style={{ color: TEXT }}>Konkrete Aufgaben und Daily Business</h5>
+                                                    <ul className="text-xs space-y-1.5" style={{ color: MUTED }}>
+                                                        {roleData.dailyBusiness.map((item, i) => (
+                                                            <li key={i} className="leading-relaxed" dangerouslySetInnerHTML={{
+                                                                __html: '• ' + item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                            }} />
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                            {roleData.cases.length > 0 && (
+                                                <div>
+                                                    <h5 className="text-xs font-semibold mb-1" style={{ color: TEXT }}>Cases im Alltag</h5>
+                                                    <ul className="text-xs space-y-1.5" style={{ color: MUTED }}>
+                                                        {roleData.cases.map((item, i) => (
+                                                            <li key={i} className="leading-relaxed" dangerouslySetInnerHTML={{
+                                                                __html: '• ' + item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                            }} />
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                            {roleData.methodology.length > 0 && (
+                                                <div>
+                                                    <h5 className="text-xs font-semibold mb-1" style={{ color: TEXT }}>Arbeitsweisen und Methodik</h5>
+                                                    <ul className="text-xs space-y-1.5" style={{ color: MUTED }}>
+                                                        {roleData.methodology.map((item, i) => (
+                                                            <li key={i} className="leading-relaxed" dangerouslySetInnerHTML={{
+                                                                __html: '• ' + item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                            }} />
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs italic py-1" style={{ color: MUTED }}>
+                                            {analyzingRole ? 'Wird analysiert...' : 'Klicke „Analysieren" um Infos zur Rolle zu laden.'}
+                                        </p>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* ── Meine Geschichte — Analysieren scoped to this category only ── */}
+                        <div className="flex items-center w-full">
+                            <button
+                                onClick={() => setStoryOpen(!storyOpen)}
+                                className="flex items-center gap-1.5 py-2 flex-1 text-left"
+                            >
+                                <ChevronRight
+                                    className={`h-3.5 w-3.5 transition-transform duration-150 ${storyOpen ? 'rotate-90' : ''}`}
+                                    style={{ color: MUTED }}
+                                />
+                                <span className="text-xs font-medium" style={{ color: MUTED }}>Meine Geschichte</span>
+                            </button>
+                            {!analyzingStory && (
+                                <button
+                                    onClick={async () => {
+                                        setAnalyzingStory(true);
+                                        try {
+                                            const res = await fetch('/api/coaching/role-research', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ sessionId, category: 'myStory', force: myStoryData.length === 0 ? undefined : true }),
+                                            });
+                                            if (res.ok) {
+                                                const data = await res.json();
+                                                if (data.myStory) {
+                                                    setMyStoryData(data.myStory);
+                                                    setStoryOpen(true);
+                                                }
+                                            }
+                                        } catch (e) {
+                                            console.error('[Coaching] Story research failed:', e);
+                                        } finally {
+                                            setAnalyzingStory(false);
+                                        }
+                                    }}
+                                    disabled={analyzingRole}
+                                    className="text-xs px-2.5 py-1 rounded-md border transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    style={{ borderColor: BORDER, color: MUTED, background: 'transparent' }}
+                                >
+                                    {myStoryData.length > 0 ? 'Neu analysieren' : 'Analysieren'}
+                                </button>
+                            )}
+                            {analyzingStory && (
+                                <div className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: MUTED }}>
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <span>Analysiert...</span>
+                                </div>
+                            )}
+                        </div>
+                        <AnimatePresence>
+                            {storyOpen && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden ml-5 border-l pl-4 pb-2"
+                                    style={{ borderColor: BORDER }}
+                                >
+                                    {myStoryData.length > 0 ? (
+                                        <ul className="text-xs space-y-2" style={{ color: MUTED }}>
+                                            {myStoryData.map((bullet, i) => (
+                                                <li key={i} className="leading-relaxed" dangerouslySetInnerHTML={{
+                                                    __html: bullet.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                }} />
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-xs italic py-1" style={{ color: MUTED }}>
+                                            {analyzingRole ? 'Wird analysiert...' : 'Klicke „Analysieren" um deine Geschichte zu generieren.'}
+                                        </p>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        <div className="pb-1" />
                     </div>
                 </div>
             )}
@@ -401,26 +613,18 @@ export default function CoachingSessionPage() {
                             animate={{ opacity: 1, y: 0 }}
                             className="flex justify-center py-4"
                         >
-                            <div className="rounded-xl p-4 text-center" style={{ background: BLUE_LIGHT, border: `1px solid ${BLUE}22` }}>
-                                <p className="text-sm font-medium mb-3" style={{ color: TEXT }}>
-                                    Möchtest du eine Auswertung deines Interviews?
-                                </p>
-                                <div className="flex gap-3 justify-center">
-                                    <button
-                                        onClick={() => setShowAnalysisPrompt(false)}
-                                        className="px-4 py-2 text-sm rounded-lg transition-colors"
-                                        style={{ color: MUTED }}
-                                    >
-                                        Nein, danke
-                                    </button>
+                            <div className="rounded-xl p-5 text-center max-w-md" style={{ background: BLUE_LIGHT, border: `1px solid ${BLUE}22` }}>
+                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}>
+                                    Yannik, vielen Dank für das Gespräch! Wenn du willst, kannst du{' '}
                                     <button
                                         onClick={requestAnalysis}
-                                        className="px-4 py-2 text-sm font-medium rounded-lg text-white transition-colors"
-                                        style={{ background: BLUE }}
+                                        className="font-semibold underline underline-offset-2 transition-colors hover:opacity-80"
+                                        style={{ color: BLUE }}
                                     >
-                                        Ja, auswerten
-                                    </button>
-                                </div>
+                                        Hier
+                                    </button>{' '}
+                                    klicken und dir deine Analyse anschauen.
+                                </p>
                             </div>
                         </motion.div>
                     )}

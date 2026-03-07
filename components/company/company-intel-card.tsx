@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Building2, Globe, Linkedin, CheckCircle, AlertTriangle, HelpCircle, Search, X, Loader2 } from "lucide-react"
 import { NewsFeed } from "./news-feed"
-import { showSafeToast } from "@/lib/utils/toast"
 
 interface LinkedInPost {
     content: string
@@ -73,19 +72,9 @@ export function CompanyIntelCard({
             // Step 3: Notify parent + refresh Next.js server cache
             onEnrichmentUpdated?.()
             router.refresh()
-            showSafeToast(
-                'Recherche abgeschlossen — Ergebnisse werden geladen ✓',
-                `enrich_started:${jobId}`
-            )
         } catch (err) {
             const errMsg = err instanceof Error ? err.message : 'Unbekannter Fehler'
             console.error('[CompanyIntelCard] Research with context failed:', errMsg)
-            showSafeToast(
-                'Recherche fehlgeschlagen',
-                `enrich_error:${jobId}`,
-                'error',
-                errMsg
-            )
         } finally {
             setIsResearching(false)
         }

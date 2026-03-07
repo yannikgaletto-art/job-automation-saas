@@ -38,7 +38,7 @@ function makeCtx(overrides: Partial<CoverLetterSetupContext>): CoverLetterSetupC
     return {
         jobId: 'test', companyName: 'JobTeaser',
         selectedHook: hook, cvStations: stations,
-        tone: baseTone('formal'), autoFilled: false, completedAt: 'now',
+        tone: baseTone('formal'), completedAt: 'now',
         introFocus: 'quote', ...overrides
     };
 }

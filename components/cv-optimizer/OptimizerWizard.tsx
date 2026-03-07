@@ -10,7 +10,6 @@ import { CVOptSettings, DEFAULT_CV_OPT_SETTINGS, StationMetrics } from "@/types/
 import { applyCVOptSettings } from "@/lib/utils/cv-settings-filter"
 import { saveCvDecisions } from "@/app/actions/save-cv-decisions"
 import { createClient } from '@/lib/supabase/client'
-import { toast } from "sonner"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Check, Settings, Sparkles, FileText, Layout, Pencil, CheckCheck, ToggleLeft, ToggleRight } from "lucide-react"
 import Link from 'next/link';
@@ -141,7 +140,6 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                 }
             } catch (err) {
                 console.error("Failed to fetch wizard data:", err);
-                toast.error("Ein Fehler ist beim Laden aufgetreten.");
             } finally {
                 if (isMounted) setIsLoading(false);
             }
@@ -165,7 +163,6 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     /** Intercept optimizer start to check for metrics first */
     const handleOptimizeClick = () => {
         if (!cvData) {
-            toast.error("Keine CV-Daten gefunden. Bitte lade zuerst deinen Lebenslauf in den Einstellungen hoch.");
             return;
         }
 
@@ -217,12 +214,10 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
 
     const runOptimizer = async (metricsOverride?: StationMetrics[]) => {
         if (!cvData) {
-            toast.error("Keine CV-Daten gefunden. Bitte lade zuerst deinen Lebenslauf in den Einstellungen hoch.");
             return;
         }
 
         setIsOptimizing(true);
-        toast.info("CV wird optimiert... Dies dauert meist ~15s");
         try {
             const supabase = createClient();
             const { data: freshJob } = await supabase
@@ -237,7 +232,6 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                 || jobData?.metadata?.cv_match
                 || jobData?.cv_match_result;
             if (!cvMatch) {
-                toast.error("CV-Match-Analyse nicht gefunden. Bitte zuerst den 'CV Match' Tab ausfuehren.");
                 setIsOptimizing(false);
                 return;
             }
@@ -266,11 +260,9 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
             }
 
             setProposal(data.proposal);
-            toast.success("Optimierung abgeschlossen - bitte jetzt pruefen!");
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : 'Unbekannter Fehler';
             console.error("Optimizer error:", msg);
-            toast.error("Optimizer fehlgeschlagen", { description: msg });
         } finally {
             setIsOptimizing(false);
         }
@@ -279,23 +271,19 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     const handleSaveDiffs = async (finalData: CvStructuredData, accepted: any[]) => {
         setFinalCv(finalData);
 
-        toast.info("Speichere Entscheidungen...");
         const choices: Record<string, 'accepted'> = {};
         accepted.forEach(c => { choices[c.id] = 'accepted'; });
         const decisions: UserDecisions = { choices, appliedChanges: accepted };
         setUserDecisions(decisions);
 
         if (!proposal) {
-            toast.error("Vorschlag fehlt.");
             return;
         }
 
         const res = await saveCvDecisions(jobId, decisions, proposal);
         if (res.success) {
-            toast.success("Einstellungen gespeichert");
             setStep(2); // -> Preview
         } else {
-            toast.error("Fehler", { description: res.error });
         }
     };
 

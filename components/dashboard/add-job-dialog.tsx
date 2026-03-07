@@ -51,12 +51,8 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
             if (!res.ok) {
                 if (data.requestId) {
                     setErrorRequestId(data.requestId);
-                    // Error toast stays here — parent only handles success
-                    const { toast } = await import('sonner');
-                    toast.error(`Fehler. Support-ID: ${data.requestId}`);
                 } else {
-                    const { toast } = await import('sonner');
-                    toast.error("Ein unerwarteter Fehler ist aufgetreten.");
+                    // error handled by inline UI below
                 }
                 setError(data.error || 'Failed to add job');
                 return;
@@ -74,8 +70,6 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
             console.error(err);
             const message = err instanceof Error ? err.message : String(err);
             setError(message);
-            const { toast } = await import('sonner');
-            toast.error("Ein unerwarteter Fehler ist aufgetreten.");
         } finally {
             setIsLoading(false);
         }

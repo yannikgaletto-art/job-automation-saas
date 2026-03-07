@@ -58,7 +58,7 @@ function timeAgo(dateStr: string): string {
 
 function getScoreBar(score: number): { color: string; label: string | null } {
     if (score >= 80) return { color: 'bg-green-500', label: 'Strong Match' };
-    if (score >= 65) return { color: 'bg-[#0066FF]', label: null };
+    if (score >= 65) return { color: 'bg-[#012e7a]', label: null };
     return { color: 'bg-stone-400', label: null };
 }
 

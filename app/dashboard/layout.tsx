@@ -5,7 +5,7 @@ import { Sidebar, NavSection, NavItem } from '@/components/motion/sidebar';
 import { Home, Search, Inbox, BarChart3, Users, Heart, Shield, Settings, MessageSquare } from 'lucide-react';
 import { PomodoroMiniWidget } from './components/pomodoro-mini-widget';
 import { usePathname } from 'next/navigation';
-import { Toaster } from 'sonner';
+
 import { MorningBriefing } from '@/components/dashboard/morning-briefing';
 import { CommandPalette } from '@/components/dashboard/command-palette';
 import { MoodCheckInOverlay } from '@/components/MoodCheckInOverlay';
@@ -111,7 +111,7 @@ export default function DashboardLayout({
             {/* Command Palette (Cmd+K) */}
             <CommandPalette />
 
-            <Toaster richColors position="top-right" offset={{ top: 72 }} />
+
         </>
     );
 }

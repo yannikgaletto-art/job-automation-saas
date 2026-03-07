@@ -24,7 +24,6 @@ import { TaskInbox } from './task-inbox';
 import { FocusPanel } from './focus-panel';
 import { FocusConfirmationModal } from './focus-confirmation-modal';
 import { acceptSuggestionViaAPI } from './pulse-mission-panel';
-import { toast } from 'sonner';
 
 export function CalendarOrchestrator() {
     const {
@@ -117,9 +116,7 @@ export function CalendarOrchestrator() {
                     acceptSuggestion(suggestion, task);
                     taskId = task.id;
                     estimatedMinutes = task.estimated_minutes;
-                    toast.success(`Mission eingeplant: ${suggestion.title}`);
                 } catch {
-                    toast.error('Mission konnte nicht erstellt werden.');
                     return;
                 }
             } else {
@@ -166,7 +163,6 @@ export function CalendarOrchestrator() {
                     if (!stillCollides) {
                         const hh = pushed.getHours().toString().padStart(2, '0');
                         const mm = pushed.getMinutes().toString().padStart(2, '0');
-                        toast.info(`${hour}:${minute < 10 ? '0' + minute : minute} ist belegt. Auf ${hh}:${mm} verschoben.`);
                         startLocal.setTime(pushed.getTime());
                         endLocal.setTime(pushed.getTime() + estimatedMinutes * 60000);
                         foundFree = true;
@@ -175,7 +171,6 @@ export function CalendarOrchestrator() {
                 }
 
                 if (!foundFree) {
-                    toast.error('Kein freier Slot. Task bleibt in der Inbox.');
                     return;
                 }
             }
@@ -201,7 +196,6 @@ export function CalendarOrchestrator() {
                 });
             } catch {
                 // Rollback handled by store if needed
-                toast.error('Zeitblock konnte nicht gespeichert werden.');
             }
         },
         [tasks, scheduleTask, acceptSuggestion, pulseSuggestions]

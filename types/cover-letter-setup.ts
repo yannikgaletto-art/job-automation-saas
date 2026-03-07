@@ -97,7 +97,6 @@ export interface CoverLetterSetupContext {
     selectedQuote?: SelectedQuote;     // Optional quote from Phase B
     cvStations: SelectedCVStation[];   // Min 1, Max 3
     tone: ToneConfig;
-    autoFilled: boolean;               // Wurde Auto-Fill verwendet?
     completedAt: string;               // ISO Timestamp
     enablePingPong?: boolean;          // B1.3: Set via optInModules.pingPong
     selectedNews?: { title: string; date: string; source?: string }; // B2.5: News-Binding

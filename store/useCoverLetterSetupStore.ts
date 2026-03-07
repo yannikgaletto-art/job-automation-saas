@@ -35,7 +35,6 @@ interface SetupStore {
 
     // Computed
     isStepComplete: (step: 1 | 2 | 3) => boolean;
-    canAutoFill: () => boolean;
     buildContext: () => CoverLetterSetupContext | null;
 }
 
@@ -145,7 +144,7 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 return false;
             },
 
-            canAutoFill: () => true, // Immer möglich, Daten kommen vom API
+            canAutoFill: () => true, // Legacy — kept for backward compat but unused
 
             buildContext: (): CoverLetterSetupContext | null => {
                 const s = get();
@@ -160,7 +159,6 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                     selectedQuote: s.selectedQuote ?? undefined,
                     cvStations: s.cvStations,
                     tone: s.tone,
-                    autoFilled: false,
                     completedAt: new Date().toISOString(),
                     introFocus: s.introFocus,
                     optInModules: s.optInModules,

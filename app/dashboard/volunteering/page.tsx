@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Loader2, Inbox, MapPin } from 'lucide-react';
-import { toast } from 'sonner';
 import { OpportunityCard } from '@/components/volunteering/opportunity-card';
 import { TestimonialsWall } from '@/components/volunteering/testimonials-wall';
 import { CategoryVote } from '@/components/volunteering/category-vote';
@@ -187,11 +186,9 @@ export default function VolunteeringPage() {
                             next.delete(opportunityId);
                             return next;
                         });
-                        toast.success('Bookmark entfernt');
                     }
                 }
             } catch {
-                toast.error('Fehler beim Entfernen');
             }
         } else {
             try {
@@ -202,12 +199,9 @@ export default function VolunteeringPage() {
                 });
                 if (res.ok) {
                     setBookmarkedIds(prev => new Set(prev).add(opportunityId));
-                    toast.success('Gespeichert');
                 } else if (res.status === 409) {
-                    toast.info('Bereits gespeichert');
                 }
             } catch {
-                toast.error('Fehler beim Speichern');
             }
         }
     };
@@ -248,7 +242,7 @@ export default function VolunteeringPage() {
                             onChange={(e) => handleSearchChange(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
                             placeholder="Ehrenamt suchen... z.B. Obdachlosenhilfe, Nachhilfe, Tierschutz"
-                            className="w-full pl-10 pr-4 py-3 text-sm rounded-xl border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF] transition-colors shadow-sm"
+                            className="w-full pl-10 pr-4 py-3 text-sm rounded-xl border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] transition-colors shadow-sm"
                         />
                         {loading && (
                             <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A9A9A6] animate-spin" />
@@ -263,7 +257,7 @@ export default function VolunteeringPage() {
                             value={cityFilter}
                             onChange={(e) => setCityFilter(e.target.value)}
                             placeholder="Stadt..."
-                            className="w-full pl-9 pr-3 py-3 text-sm rounded-xl border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#0066FF]/20 focus:border-[#0066FF] transition-colors shadow-sm"
+                            className="w-full pl-9 pr-3 py-3 text-sm rounded-xl border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] transition-colors shadow-sm"
                         />
                     </div>
                 </div>
@@ -278,8 +272,8 @@ export default function VolunteeringPage() {
                                 onClick={() => toggleTag(tag)}
                                 whileTap={{ scale: 0.95 }}
                                 className={`px-3 py-1.5 text-[13px] rounded-full border transition-all ${isActive
-                                    ? 'bg-[#0066FF] text-white border-[#0066FF] shadow-sm'
-                                    : 'bg-white text-[#73726E] border-[#E7E7E5] hover:border-[#0066FF]/30 hover:text-[#0066FF]'
+                                    ? 'bg-[#012e7a] text-white border-[#012e7a] shadow-sm'
+                                    : 'bg-white text-[#73726E] border-[#E7E7E5] hover:border-[#012e7a]/30 hover:text-[#012e7a]'
                                     }`}
                             >
                                 {tag}
@@ -296,8 +290,8 @@ export default function VolunteeringPage() {
                         key={cat.value}
                         onClick={() => setCategoryFilter(cat.value)}
                         className={`px-3.5 py-1.5 text-sm rounded-lg border transition-all ${categoryFilter === cat.value
-                            ? 'bg-[#0066FF] text-white border-[#0066FF]'
-                            : 'bg-white text-[#73726E] border-[#E7E7E5] hover:border-[#0066FF]/30'
+                            ? 'bg-[#012e7a] text-white border-[#012e7a]'
+                            : 'bg-white text-[#73726E] border-[#E7E7E5] hover:border-[#012e7a]/30'
                             }`}
                     >
                         {cat.label}

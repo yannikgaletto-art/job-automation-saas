@@ -48,7 +48,7 @@ export function JobCard({
 
   // Determine match score gradient
   const getMatchGradient = (score: number) => {
-    if (score >= 90) return 'from-[#00C853] to-[#0066FF]'; // High
+    if (score >= 90) return 'from-[#00C853] to-[#012e7a]'; // High
     if (score >= 70) return 'from-[#FFA000] to-[#FF6D00]'; // Mid
     return 'from-[#D32F2F] to-[#C62828]'; // Low
   };

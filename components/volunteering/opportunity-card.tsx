@@ -98,7 +98,7 @@ export function OpportunityCard({ opportunity, isBookmarked, onToggleBookmark }:
                     href={opportunity.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm text-[#0066FF] hover:text-[#0052CC] font-medium transition-colors mt-1"
+                    className="inline-flex items-center gap-1.5 text-sm text-[#012e7a] hover:text-[#011f5e] font-medium transition-colors mt-1"
                 >
                     <span>Details ansehen</span>
                     <ExternalLink className="w-3.5 h-3.5" />

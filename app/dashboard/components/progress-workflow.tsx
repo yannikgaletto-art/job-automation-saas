@@ -67,7 +67,7 @@ export function ProgressWorkflow({ current, className, onStepClick, activeTab: _
                 <div
                     className={cn(
                         "h-full rounded-full transition-all duration-500 ease-out",
-                        isComplete ? "bg-green-500" : "bg-[#002e7a]"
+                        isComplete ? "bg-green-500" : "bg-gradient-to-r from-[#002e7a] to-[#3B82F6]"
                     )}
                     style={{ width: `${fillPercent}%` }}
                 />
