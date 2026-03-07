@@ -304,33 +304,50 @@ export default function CoachingAnalysisPage() {
                     </div>
                 </div>
 
-                {/* Bullet points: Stärke + Empfehlung */}
-                <div className="space-y-2">
-                    {report.topStrength && (
-                        <div className="flex items-start gap-2">
-                            <TrendingUp className="h-4 w-4 mt-0.5 shrink-0" style={{ color: BLUE }} />
-                            <p
-                                className="text-sm leading-relaxed"
-                                style={{ color: TEXT }}
-                                dangerouslySetInnerHTML={{ __html: renderBold(report.topStrength) }}
-                            />
-                        </div>
-                    )}
-                    {report.recommendation && (
-                        <div className="flex items-start gap-2">
-                            <Target className="h-4 w-4 mt-0.5 shrink-0 text-orange-500" />
-                            <p
-                                className="text-sm leading-relaxed"
-                                style={{ color: TEXT }}
-                                dangerouslySetInnerHTML={{ __html: renderBold(report.recommendation) }}
-                            />
-                        </div>
-                    )}
-                    {/* Fallback: show summary if no topStrength/recommendation (old reports) */}
-                    {!report.topStrength && !report.recommendation && report.summary && (
-                        <p className="text-sm" style={{ color: TEXT }}>{report.summary}</p>
-                    )}
-                </div>
+                {/* Recruiter-style feedback (new fields) */}
+                {(report.whatWorked || report.whatWasMissing || report.recruiterAdvice) ? (
+                    <div className="space-y-3 mt-2">
+                        {report.whatWorked && (
+                            <div className="rounded-lg px-4 py-3 border-l-4" style={{ borderLeftColor: '#16a34a', background: '#f0fdf4' }}>
+                                <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#15803d' }}>Was gut lief</p>
+                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}>{report.whatWorked}</p>
+                            </div>
+                        )}
+                        {report.whatWasMissing && (
+                            <div className="rounded-lg px-4 py-3 border-l-4" style={{ borderLeftColor: '#ea580c', background: '#fff7ed' }}>
+                                <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>Was gefehlt hat</p>
+                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}>{report.whatWasMissing}</p>
+                            </div>
+                        )}
+                        {report.recruiterAdvice && (
+                            <div className="rounded-lg px-4 py-3 border-l-4" style={{ borderLeftColor: BLUE, background: `${BLUE}0D` }}>
+                                <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: BLUE }}>Empfehlung</p>
+                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}>{report.recruiterAdvice}</p>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    /* Fallback for older reports without new fields */
+                    <div className="space-y-2 mt-2">
+                        {report.topStrength && (
+                            <div className="flex items-start gap-2">
+                                <TrendingUp className="h-4 w-4 mt-0.5 shrink-0" style={{ color: BLUE }} />
+                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}
+                                    dangerouslySetInnerHTML={{ __html: renderBold(report.topStrength) }} />
+                            </div>
+                        )}
+                        {report.recommendation && (
+                            <div className="flex items-start gap-2">
+                                <Target className="h-4 w-4 mt-0.5 shrink-0 text-orange-500" />
+                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}
+                                    dangerouslySetInnerHTML={{ __html: renderBold(report.recommendation) }} />
+                            </div>
+                        )}
+                        {!report.topStrength && !report.recommendation && report.summary && (
+                            <p className="text-sm" style={{ color: TEXT }}>{report.summary}</p>
+                        )}
+                    </div>
+                )}
             </motion.div>
 
             {/* ─── Im Detail (Colored Tags) ─────────────────────────── */}

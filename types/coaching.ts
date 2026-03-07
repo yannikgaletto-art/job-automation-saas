@@ -142,6 +142,10 @@ export interface FeedbackReport {
     overallScore: number;
     topStrength: string;
     recommendation: string;
+    /** Honest recruiter-style feedback (new fields, optional for backwards compat) */
+    whatWorked?: string;
+    whatWasMissing?: string;
+    recruiterAdvice?: string;
     dimensions: FeedbackDimension[];
     summary: string;
     strengths: string[];

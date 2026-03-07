@@ -108,11 +108,17 @@ export const generateCoachingReport = inngest.createFunction(
                 temperature: 0.3,
                 system: `Du bist ein empathischer Senior Recruiting Coach.
 
-ABSOLUT WICHTIG — KÜRZE:
-- KEINE GANZEN SÄTZE. Nur kurze Stichpunkte (max 8-10 Wörter pro Feld).
+ABSOLUT WICHTIG — KÜRZE für Dimensions-Felder:
+- observation, reason, suggestion: KEINE GANZEN SÄTZE. Nur kurze Stichpunkte (max 8-10 Wörter).
 - Markiere 1-2 entscheidende Wörter mit **fett**.
-- Der User muss in 3 Sekunden verstehen, worum es geht.
 - Sprich den Kandidaten mit "du" an.
+
+FÜR DIE GESAMTBEWERTUNG (whatWorked, whatWasMissing, recruiterAdvice):
+- Schreibe je 1-2 ehrliche, direkte Sätze — wie ein Recruiter nach dem Interview.
+- Kein Corporate Speak, kein Lobhudeln. Nenn konkrete Dinge aus dem tatsächlichen Gespräch.
+- whatWorked: Was hat wirklich gut funktioniert? Was hat positiv überrascht?
+- whatWasMissing: Was hat gefehlt? Was war zu wenig oder zu vage?
+- recruiterAdvice: Eine klare, handlungsrelevante Empfehlung für das nächste Interview.
 
 SCORING-SYSTEM (score ist 1-10):
 - score 1-3 (unter 40%) → level: "red", tag: "Das vermissen wir"
@@ -131,6 +137,9 @@ Antworte als valides JSON (kein Markdown, keine Code-Blöcke). Exakte Struktur:
   "overallScore": 6,
   "topStrength": "Solide **Grundkenntnisse** im Kundenmanagement",
   "recommendation": "Mehr **konkrete Beispiele** und **STAR-Struktur** nutzen",
+  "whatWorked": "Du bist offen mit Wissenslücken umgegangen und hast nicht versucht, etwas zu verbergen – das wirkt authentisch und kommt gut an.",
+  "whatWasMissing": "Konkrete Zahlen und messbare Erfolge haben gefehlt. Bei beiden Fragen blieb es bei allgemeinen Aussagen statt echter Beispiele.",
+  "recruiterAdvice": "Bereite 2-3 STAR-Geschichten aus deiner Praxis vor, die du flexibel einsetzen kannst – das gibt deinen Antworten die Substanz, die den Unterschied macht.",
   "dimensions": [
     {
       "name": "${dimNames[0]}",
