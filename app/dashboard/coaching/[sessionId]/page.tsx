@@ -247,15 +247,47 @@ export default function CoachingSessionPage() {
 
     if (requestingAnalysis) {
         return (
-            <div className="flex-1 flex items-center justify-center min-h-[60vh]">
-                <div className="text-center">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto" style={{ color: BLUE }} />
-                    <p className="text-sm mt-3" style={{ color: TEXT }}>
-                        Dein Interview wird analysiert...
-                    </p>
-                    <p className="text-xs mt-1" style={{ color: MUTED }}>
-                        Das dauert ca. 10-15 Sekunden.
-                    </p>
+            <div className="flex-1 flex flex-col" style={{ background: BG }}>
+                {/* Same header as during interview */}
+                <div className="px-6 py-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
+                    <div className="max-w-3xl mx-auto">
+                        <div className="flex items-center gap-3">
+                            <div>
+                                <h1 className="text-lg font-semibold" style={{ color: TEXT }}>
+                                    {jobTitle || 'Mock Interview'}
+                                </h1>
+                                <p className="text-xs" style={{ color: MUTED }}>{companyName}</p>
+                            </div>
+                        </div>
+
+                        {/* Same progress bar — 100% complete */}
+                        <div className="mt-3 flex items-center gap-3">
+                            <div className="flex-1 h-1.5 rounded-full bg-[#E7E7E5] overflow-hidden">
+                                <motion.div
+                                    className="h-1.5 rounded-full bg-gradient-to-r from-[#002e7a] to-[#3B82F6]"
+                                    initial={{ width: `${(turnCount / maxQuestions) * 100}%` }}
+                                    animate={{ width: '100%' }}
+                                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                                />
+                            </div>
+                            <span className="text-xs font-medium shrink-0" style={{ color: MUTED }}>
+                                {maxQuestions}/{maxQuestions}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Analysis indicator */}
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto" style={{ color: BLUE }} />
+                        <p className="text-sm mt-3 font-medium" style={{ color: TEXT }}>
+                            Dein Interview wird analysiert...
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: MUTED }}>
+                            Das dauert ca. 10–15 Sekunden.
+                        </p>
+                    </div>
                 </div>
             </div>
         );

@@ -204,14 +204,14 @@ export function CalendarOrchestrator() {
     return (
         <>
             <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-                <div className="flex gap-6 flex-col lg:flex-row">
+                <div className="flex gap-6 flex-col lg:flex-row lg:items-stretch">
                     {/* Left: Timeline */}
                     <div className="flex-1 min-w-0 lg:max-w-[55%]">
                         <TimelineGrid />
                     </div>
 
-                    {/* Right: Context Panel (Inbox or Focus) */}
-                    <div className="w-full lg:w-[380px] shrink-0">
+                    {/* Right: Context Panel (Inbox or Focus) — matches calendar height */}
+                    <div className="w-full lg:w-[420px] shrink-0">
                         <AnimatePresence mode="wait">
                             {contextMode === 'focus' && focusedTaskId ? (
                                 <FocusPanel key="focus" />

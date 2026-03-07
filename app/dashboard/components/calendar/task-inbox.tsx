@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GripVertical, Plus, ChevronDown, RotateCcw, Flame, Trash2, X, BookOpen } from 'lucide-react';
+import { GripVertical, Plus, ChevronDown, RotateCcw, Flame, Trash2, X, BookOpen, PenLine } from 'lucide-react';
 import { useCalendarStore, type CalendarTask } from '@/store/use-calendar-store';
 import { PulseMissionPanel } from './pulse-mission-panel';
 
@@ -313,6 +313,7 @@ function CoachingRecommendationPanel({ tasks }: { tasks: CalendarTask[] }) {
 export function TaskInbox() {
     const tasks = useCalendarStore((s) => s.tasks);
     const today = new Date().toISOString().split('T')[0];
+    const [isCustomExpanded, setIsCustomExpanded] = useState(true);
 
     const inboxTasks = tasks.filter((t) => t.status === 'inbox' && t.source !== 'coaching');
     const coachingTasks = tasks.filter((t) => t.status === 'inbox' && t.source === 'coaching');
@@ -324,8 +325,10 @@ export function TaskInbox() {
         ['scheduled', 'focus', 'in_progress', 'completed'].includes(t.status)
     ).length;
 
+    const customTaskCount = inboxTasks.length + carryOverTasks.length;
+
     return (
-        <div className="bg-white border border-[#E7E7E5] rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-[#E7E7E5] rounded-xl shadow-sm overflow-hidden h-full flex flex-col">
             {/* Header */}
             <div className="px-4 py-3 border-b border-[#E7E7E5]">
                 <div className="flex items-center justify-between">
@@ -341,60 +344,88 @@ export function TaskInbox() {
                 </div>
             </div>
 
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-3 flex-1">
                 <PulseMissionPanel />
 
                 {/* Coaching Recommendations — always visible */}
                 <CoachingRecommendationPanel tasks={coachingTasks} />
 
-                {/* Divider + custom task section */}
-                <div className="flex items-center gap-3 pt-1">
-                    <div className="flex-1 border-t border-[#E7E7E5]" />
-                    <span className="text-xs text-[#73726E] font-semibold whitespace-nowrap">
-                        Erstelle deine eigene Task
-                    </span>
-                    <div className="flex-1 border-t border-[#E7E7E5]" />
+                {/* Custom Task Toggle — Notion-style, consistent with other toggles */}
+                <div className="mb-3">
+                    <button
+                        onClick={() => setIsCustomExpanded(!isCustomExpanded)}
+                        className="
+                            w-full flex items-center gap-2 py-1.5 px-1
+                            text-sm text-[#37352F] hover:bg-[#F5F5F4]
+                            rounded transition-colors text-left
+                        "
+                    >
+                        <span
+                            className="text-[#A8A29E] transition-transform duration-150 text-[10px] flex-shrink-0"
+                            style={{ transform: isCustomExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                        >
+                            &#9654;
+                        </span>
+                        <PenLine className="w-3.5 h-3.5 text-[#73726E]" />
+                        <span className="font-medium">
+                            Erstelle deine eigene Task
+                        </span>
+                        {customTaskCount > 0 && (
+                            <span className="text-[10px] text-[#A8A29E] ml-auto">
+                                {customTaskCount}
+                            </span>
+                        )}
+                    </button>
+
+                    <AnimatePresence>
+                        {isCustomExpanded && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.15 }}
+                                className="overflow-hidden"
+                            >
+                                <div className="pt-1.5 pl-5 space-y-2">
+                                    {/* Add task */}
+                                    <AddTaskForm />
+
+                                    {/* Carry-over tasks */}
+                                    <AnimatePresence mode="popLayout">
+                                        {carryOverTasks.length > 0 && (
+                                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+                                                <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider flex items-center gap-1">
+                                                    <RotateCcw className="w-3 h-3" /> Von gestern
+                                                </p>
+                                                {carryOverTasks.map((task) => (
+                                                    <DraggableTaskItem key={task.id} task={task} />
+                                                ))}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    {/* Inbox tasks */}
+                                    <AnimatePresence mode="popLayout">
+                                        {inboxTasks.length > 0 && (
+                                            <div className="space-y-2">
+                                                {inboxTasks.map((task) => (
+                                                    <DraggableTaskItem key={task.id} task={task} />
+                                                ))}
+                                            </div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    {/* Empty state */}
+                                    {inboxTasks.length === 0 && carryOverTasks.length === 0 && (
+                                        <p className="text-xs text-[#A8A29E] py-1">
+                                            Erstelle deinen ersten Task oben.
+                                        </p>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
-
-                {/* Add task */}
-                <AddTaskForm />
-
-                {/* Carry-over tasks (always on top) */}
-                <AnimatePresence mode="popLayout">
-                    {carryOverTasks.length > 0 && (
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
-                            <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider flex items-center gap-1">
-                                <RotateCcw className="w-3 h-3" /> Von gestern
-                            </p>
-                            {carryOverTasks.map((task) => (
-                                <DraggableTaskItem key={task.id} task={task} />
-                            ))}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Inbox tasks */}
-                <AnimatePresence mode="popLayout">
-                    {inboxTasks.length > 0 && (
-                        <div className="space-y-2">
-                            {carryOverTasks.length > 0 && (
-                                <div className="border-t border-[#E7E7E5] pt-2" />
-                            )}
-                            {inboxTasks.map((task) => (
-                                <DraggableTaskItem key={task.id} task={task} />
-                            ))}
-                        </div>
-                    )}
-                </AnimatePresence>
-
-                {/* Empty state */}
-                {inboxTasks.length === 0 && carryOverTasks.length === 0 && (
-                    <div className="py-8 text-center">
-                        <p className="text-xs text-[#A8A29E]">
-                            Keine Tasks in der Inbox. Erstelle einen neuen Task oben.
-                        </p>
-                    </div>
-                )}
 
                 {/* Scheduled section */}
                 {tasks.filter(t => t.status === 'scheduled').length > 0 && (
@@ -406,7 +437,7 @@ export function TaskInbox() {
                             <div key={task.id} className="flex items-center gap-2 px-2 py-1 text-xs text-[#73726E]">
                                 <span>Done</span>
                                 <span className="truncate flex-1">{task.title}</span>
-                                <span className="font-mono text-[10px]">
+                                <span className="font-mono text-[10px] shrink-0">
                                     {task.scheduled_start ? new Date(task.scheduled_start).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}
                                 </span>
                             </div>

@@ -133,3 +133,43 @@ export function calcStreak(sessions: PomodoroSession[]): number {
     }
     return streak;
 }
+
+// ─── Coaching Trend (deterministic, $0 cost) ────────────────────
+
+interface CoachingSession {
+    coaching_score: number | null;
+    created_at: string;
+}
+
+export function calcCoachingTrend(sessions: CoachingSession[]): {
+    scores: { date: string; score: number }[];
+    trend: 'improving' | 'stable' | 'declining' | 'none';
+    improvementPct: number;
+} {
+    // QA: Strictly filter out sessions where score is null (race condition during report generation)
+    const scored = sessions
+        .filter((s): s is CoachingSession & { coaching_score: number } => s.coaching_score !== null)
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    const scores = scored.map(s => ({
+        date: new Date(s.created_at).toISOString().split('T')[0],
+        score: s.coaching_score,
+    }));
+
+    if (scores.length < 2) return { scores, trend: 'none', improvementPct: 0 };
+
+    const mid = Math.floor(scores.length / 2);
+    const firstHalf = scores.slice(0, mid);
+    const secondHalf = scores.slice(mid);
+
+    const avgFirst = firstHalf.reduce((s, x) => s + x.score, 0) / firstHalf.length;
+    const avgSecond = secondHalf.reduce((s, x) => s + x.score, 0) / secondHalf.length;
+
+    const diff = avgSecond - avgFirst;
+    const improvementPct = avgFirst > 0 ? Math.round((diff / avgFirst) * 100) : 0;
+
+    const trend: 'improving' | 'stable' | 'declining' =
+        diff > 1 ? 'improving' : diff < -1 ? 'declining' : 'stable';
+
+    return { scores, trend, improvementPct };
+}
