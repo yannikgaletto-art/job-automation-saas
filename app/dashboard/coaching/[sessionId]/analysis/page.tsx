@@ -5,16 +5,18 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
     ArrowLeft,
-    Loader2,
-    CheckCircle,
     Star,
-    BookOpen,
-    Target,
     TrendingUp,
-    Bookmark,
-    MessageSquareQuote,
-    ChevronDown,
+    Target,
+    CheckCircle,
+    XCircle,
+    BookOpen,
     ExternalLink,
+    Bookmark,
+    Loader2,
+    ChevronRight,
+    ChevronDown,
+    MessageSquareQuote,
 } from 'lucide-react';
 import type { FeedbackReport, DimensionLevel, TopicSuggestion } from '@/types/coaching';
 
@@ -498,8 +500,8 @@ export default function CoachingAnalysisPage() {
                     {report.improvements && report.improvements.length > 0 && (
                         <div className="rounded-xl p-4" style={{ border: `1px solid ${BORDER}` }}>
                             <div className="flex items-center gap-2 mb-3">
-                                <Target className="h-4 w-4 text-orange-500" />
-                                <p className="text-xs font-semibold uppercase tracking-wider text-orange-600">
+                                <Target className="h-4 w-4" style={{ color: BLUE }} />
+                                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: BLUE }}>
                                     Verbesserungspotenzial
                                 </p>
                             </div>
@@ -512,7 +514,7 @@ export default function CoachingAnalysisPage() {
                                                 <div className="rounded-lg p-2.5" style={{ background: '#F7F6F5' }}>
                                                     {item.bad && (
                                                         <div className="flex items-start gap-2 mb-1">
-                                                            <span className="text-xs shrink-0">❌</span>
+                                                            <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BLUE }} />
                                                             <p className="text-xs" style={{ color: MUTED }}>
                                                                 <em>&ldquo;{item.bad}&rdquo;</em>
                                                             </p>
@@ -520,7 +522,7 @@ export default function CoachingAnalysisPage() {
                                                     )}
                                                     {item.good && (
                                                         <div className="flex items-start gap-2">
-                                                            <span className="text-xs shrink-0">✅</span>
+                                                            <CheckCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BLUE }} />
                                                             <p
                                                                 className="text-xs"
                                                                 style={{ color: TEXT }}
@@ -531,7 +533,7 @@ export default function CoachingAnalysisPage() {
                                                 </div>
                                             ) : (
                                                 <div className="flex items-start gap-2 text-sm" style={{ color: TEXT }}>
-                                                    <span className="text-orange-500 mt-0.5">›</span>
+                                                    <CheckCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BLUE }} />
                                                     <span dangerouslySetInnerHTML={{ __html: renderBold(item.title) }} />
                                                 </div>
                                             )}
@@ -560,7 +562,7 @@ export default function CoachingAnalysisPage() {
                         </p>
                     </div>
 
-                    {/* Table layout: Empfehlung | YouTube Link | Save Button */}
+                    {/* Topics with context sub-bullets */}
                     <div className="space-y-3">
                         {report.topicSuggestions.map((raw, i) => {
                             const topic = normalizeTopic(raw);
@@ -571,53 +573,80 @@ export default function CoachingAnalysisPage() {
                             return (
                                 <div
                                     key={i}
-                                    className="flex items-center gap-3 p-3 rounded-lg"
+                                    className="rounded-lg p-4"
                                     style={{ background: '#F7F6F5', border: `1px solid ${BORDER}` }}
                                 >
-                                    {/* Left: Empfehlung */}
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium" style={{ color: TEXT }}>
-                                            {topic.topic}
-                                        </p>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        {/* Left: Empfehlung + Category badge */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-semibold" style={{ color: TEXT }}>
+                                                    {topic.topic}
+                                                </p>
+                                                {topic.category && (
+                                                    <span
+                                                        className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
+                                                        style={{
+                                                            background: topic.category === 'rolle' ? '#E8EFF8' : '#F0FDF4',
+                                                            color: topic.category === 'rolle' ? BLUE : '#15803d',
+                                                        }}
+                                                    >
+                                                        {topic.category === 'rolle' ? 'Für die Rolle' : 'Interview-Technik'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    {/* Middle: YouTube Link */}
-                                    <a
-                                        href={youtubeUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:opacity-80 shrink-0"
-                                        style={{ background: '#FF000015', color: '#CC0000' }}
-                                    >
-                                        <ExternalLink className="h-3.5 w-3.5" />
-                                        <span className="hidden sm:inline max-w-[200px] truncate">{topic.youtubeTitle}</span>
-                                        <span className="sm:hidden">YouTube</span>
-                                    </a>
+                                    {/* Context sub-bullets */}
+                                    {topic.context && topic.context.length > 0 && (
+                                        <ul className="space-y-1.5 mt-1 mb-3">
+                                            {topic.context.map((line, ci) => (
+                                                <li key={ci} className="text-xs leading-relaxed flex items-start gap-2" style={{ color: MUTED }}>
+                                                    <span className="mt-1 shrink-0" style={{ color: BLUE }}>•</span>
+                                                    <span>{line}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
 
-                                    {/* Right: Save to Today's Goals */}
-                                    <button
-                                        onClick={() => saveTopicToGoals(i, topic)}
-                                        disabled={isSaving || isSaved}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 shrink-0"
-                                        style={{
-                                            background: isSaved ? '#4CAF5020' : `${BLUE}15`,
-                                            color: isSaved ? '#4CAF50' : BLUE,
-                                        }}
-                                    >
-                                        {isSaving ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                        ) : isSaved ? (
-                                            <>
-                                                <CheckCircle className="h-3.5 w-3.5" />
-                                                <span className="hidden sm:inline">Gespeichert</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Bookmark className="h-3.5 w-3.5" />
-                                                <span className="hidden sm:inline">Todays Goals</span>
-                                            </>
-                                        )}
-                                    </button>
+                                    {/* Action buttons row */}
+                                    <div className="flex items-center gap-2">
+                                        <a
+                                            href={youtubeUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:opacity-80 shrink-0"
+                                            style={{ background: '#FF000015', color: '#CC0000' }}
+                                        >
+                                            <ExternalLink className="h-3.5 w-3.5" />
+                                            <span className="hidden sm:inline max-w-[200px] truncate">{topic.youtubeTitle}</span>
+                                            <span className="sm:hidden">YouTube</span>
+                                        </a>
+                                        <button
+                                            onClick={() => saveTopicToGoals(i, topic)}
+                                            disabled={isSaving || isSaved}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 shrink-0"
+                                            style={{
+                                                background: isSaved ? '#4CAF5020' : `${BLUE}15`,
+                                                color: isSaved ? '#4CAF50' : BLUE,
+                                            }}
+                                        >
+                                            {isSaving ? (
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : isSaved ? (
+                                                <>
+                                                    <CheckCircle className="h-3.5 w-3.5" />
+                                                    <span className="hidden sm:inline">Gespeichert</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Bookmark className="h-3.5 w-3.5" />
+                                                    <span className="hidden sm:inline">Todays Goals</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         })}

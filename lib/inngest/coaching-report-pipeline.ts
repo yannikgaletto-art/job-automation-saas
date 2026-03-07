@@ -167,20 +167,40 @@ Antworte als valides JSON (kein Markdown, keine Code-Blöcke). Exakte Struktur:
     {
       "topic": "Strategisches Account Management",
       "searchQuery": "Strategisches Account Management Interview Tipps",
-      "youtubeTitle": "Strategisches Account Management – So überzeugst du im Interview"
+      "youtubeTitle": "Strategisches Account Management – So überzeugst du im Interview",
+      "category": "rolle",
+      "context": [
+        "In der Rolle wird erwartet, dass du Key Accounts selbst steuerst – das kam in deinen Antworten nicht rüber.",
+        "Empfehlung: Bereite ein konkretes Beispiel vor, wie du einen Account von der Bestandsaufnahme bis zum Upsell geführt hast."
+      ]
     },
     {
-      "topic": "Verhandlungsführung",
-      "searchQuery": "Verhandlungsführung Techniken Beruf",
-      "youtubeTitle": "Verhandlungsführung – Techniken für schwierige Gespräche"
+      "topic": "Cold-Call Skripte und Einwandbehandlung",
+      "searchQuery": "Cold Call Skript deutsch Verkauf Einwandbehandlung",
+      "youtubeTitle": "Cold Calling meistern – Skripte und Einwandbehandlung für den Vertrieb",
+      "category": "rolle",
+      "context": [
+        "Die Stellenbeschreibung betont Kaltakquise – dazu hast du im Interview keine eigene Erfahrung gezeigt.",
+        "Empfehlung: Trainiere 2-3 Einwand-Reaktionen (z.B. 'Kein Interesse' → 'Verstehe ich, darf ich fragen was aktuell Priorität hat?')."
+      ]
     },
     {
-      "topic": "Storytelling",
-      "searchQuery": "STAR Methode Interview Beispiele",
-      "youtubeTitle": "Die STAR-Methode in Aktion: So beantwortest du jede Interview-Frage"
+      "topic": "STAR-Methode meistern",
+      "searchQuery": "STAR Methode Interview Beispiele deutsch",
+      "youtubeTitle": "Die STAR-Methode in Aktion: So beantwortest du jede Interview-Frage",
+      "category": "interview",
+      "context": [
+        "Deine Antworten blieben bei allgemeinen Aussagen – ohne messbare Ergebnisse fehlt der Beweis.",
+        "Empfehlung: Starte jede Antwort mit der konkreten Situation, dann Aufgabe → Aktion → Ergebnis mit Zahlen."
+      ]
     }
   ]
 }
+
+WICHTIG für topicSuggestions:
+- Generiere mindestens 1x category "rolle" (rollenspezifisch: was man für DIESE Stelle können muss) und 1x "interview" (Interview-Technik).
+- Die context-Stichpunkte sind KEINE generischen Tipps. Beziehe dich auf das tatsächliche Interview und was KONKRET gefehlt hat.
+- Schreibe wie ein Head of Recruiting, der ehrlich sagt: "Das brauchst du, um diese Stelle zu kriegen."
 
 NOCHMAL: observation, reason, suggestion sind KURZE STICHPUNKTE (max 8-10 Wörter). KEINE Sätze, KEINE Absätze!`,
                 messages: [

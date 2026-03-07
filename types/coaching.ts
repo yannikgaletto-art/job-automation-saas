@@ -136,6 +136,10 @@ export interface TopicSuggestion {
     topic: string;
     searchQuery: string;
     youtubeTitle: string;
+    /** 2-3 short context lines explaining WHY this topic matters */
+    context?: string[];
+    /** Category: 'rolle' = role-specific, 'interview' = interview technique */
+    category?: 'rolle' | 'interview';
 }
 
 export interface FeedbackReport {
