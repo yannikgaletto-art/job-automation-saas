@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Clock, Star, Loader2, Building2, BriefcaseBusiness, PlayCircle, ExternalLink, FileText } from 'lucide-react';
+import { ChevronRight, Clock, Loader2, Building2, BriefcaseBusiness, PlayCircle, ExternalLink, FileText, BookOpen } from 'lucide-react';
 import { DocumentsRequiredDialog } from '@/components/shared/documents-required-dialog';
 
 const BLUE = '#2B5EA7';
@@ -52,6 +52,7 @@ interface PastSession {
     turn_count: number;
     created_at: string;
     completed_at: string | null;
+    feedback_report?: string | null;
 }
 
 export default function CoachingPage() {
@@ -579,12 +580,6 @@ export default function CoachingPage() {
                                         <span className="text-sm text-[#37352F]">
                                             {completedForJob.length > 0 ? `${completedForJob.length}x` : '—'}
                                         </span>
-                                        {bestScore > 0 && (
-                                            <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded" style={{ background: BLUE_LIGHT, color: BLUE }}>
-                                                <Star className="h-2.5 w-2.5" />
-                                                {bestScore}/10
-                                            </span>
-                                        )}
                                     </div>
 
                                     {/* Col 4: Action Button — ONLY this triggers the modal */}
@@ -695,49 +690,90 @@ export default function CoachingPage() {
 
                                 {/* Expanded: Past Sessions for this Job */}
                                 <AnimatePresence>
-                                    {isExpanded && completedForJob.length > 0 && (
-                                        <motion.div
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            transition={{ duration: 0.18 }}
-                                            className="overflow-hidden"
-                                        >
-                                            <div className="px-6 pb-3 pt-1 border-t border-[#E7E7E5]">
-                                                <p className="text-[10px] font-medium text-[#A8A29E] uppercase tracking-wider mb-2 pt-1.5">
-                                                    Abgeschlossene Sessions
-                                                </p>
-                                                <div className="space-y-1">
-                                                    {completedForJob.map((session) => (
-                                                        <div
-                                                            key={session.id}
-                                                            onClick={() => router.push(`/dashboard/coaching/${session.id}/analysis`)}
-                                                            className="flex items-center justify-between pl-4 pr-2 py-2 hover:bg-[#F7F6F3] transition-colors rounded-lg cursor-pointer group/row"
-                                                        >
-                                                            <div className="flex items-center gap-3 min-w-0">
-                                                                <Clock className="h-3.5 w-3.5 shrink-0" style={{ color: MUTED }} />
-                                                                <span className="text-sm text-[#37352F]">
-                                                                    {new Date(session.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                                                                </span>
-                                                                <span className="text-xs text-[#A8A29E]">
-                                                                    {session.turn_count} Fragen
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                {session.coaching_score && (
-                                                                    <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: BLUE }}>
-                                                                        <Star className="h-3 w-3" />
-                                                                        {session.coaching_score}/10
-                                                                    </span>
-                                                                )}
-                                                                <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover/row:opacity-100 transition-opacity" style={{ color: MUTED }} />
-                                                            </div>
+                                    {isExpanded && completedForJob.length > 0 && (() => {
+                                        // Extract topic suggestions from the latest completed session with a report
+                                        const latestWithReport = completedForJob.find(s => s.feedback_report);
+                                        let topics: { topic: string; searchQuery: string; youtubeTitle: string; context?: string[]; category?: string }[] = [];
+                                        if (latestWithReport?.feedback_report) {
+                                            try {
+                                                const report = JSON.parse(latestWithReport.feedback_report);
+                                                if (report.topicSuggestions && Array.isArray(report.topicSuggestions)) {
+                                                    topics = report.topicSuggestions.map((t: string | { topic: string; searchQuery?: string; youtubeTitle?: string; context?: string[]; category?: string }) =>
+                                                        typeof t === 'string' ? { topic: t, searchQuery: t, youtubeTitle: t } : t
+                                                    );
+                                                }
+                                            } catch { /* ignore parse errors */ }
+                                        }
+
+                                        return (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.18 }}
+                                                className="overflow-hidden"
+                                            >
+                                                <div className="px-6 pb-3 pt-1 border-t border-[#E7E7E5]">
+                                                    <div className="flex items-center gap-1.5 mb-3 pt-1.5">
+                                                        <BookOpen className="h-3.5 w-3.5" style={{ color: BLUE }} />
+                                                        <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: BLUE }}>
+                                                            Empfehlungen aus deinen Interviews
+                                                        </p>
+                                                    </div>
+                                                    {topics.length > 0 ? (
+                                                        <div className="space-y-3">
+                                                            {topics.map((topic, ti) => {
+                                                                const youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(topic.searchQuery)}`;
+                                                                return (
+                                                                    <div key={ti} className="rounded-lg p-3" style={{ background: '#F7F6F5', border: `1px solid ${BORDER}` }}>
+                                                                        <div className="flex items-center gap-2 mb-1">
+                                                                            <p className="text-sm font-medium flex-1" style={{ color: TEXT }}>
+                                                                                {topic.topic}
+                                                                            </p>
+                                                                            {topic.category && (
+                                                                                <span
+                                                                                    className="text-[9px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
+                                                                                    style={{
+                                                                                        background: topic.category === 'rolle' ? '#E8EFF8' : '#F0FDF4',
+                                                                                        color: topic.category === 'rolle' ? BLUE : '#15803d',
+                                                                                    }}
+                                                                                >
+                                                                                    {topic.category === 'rolle' ? 'Für die Rolle' : 'Interview-Technik'}
+                                                                                </span>
+                                                                            )}
+                                                                            <a
+                                                                                href={youtubeUrl}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="text-[10px] font-medium px-2 py-0.5 rounded-md shrink-0 transition-colors hover:opacity-80"
+                                                                                style={{ background: '#FF000012', color: '#CC0000' }}
+                                                                            >
+                                                                                YouTube
+                                                                            </a>
+                                                                        </div>
+                                                                        {topic.context && topic.context.length > 0 && (
+                                                                            <ul className="space-y-1 mt-1.5">
+                                                                                {topic.context.map((line, ci) => (
+                                                                                    <li key={ci} className="text-xs leading-relaxed flex items-start gap-1.5" style={{ color: MUTED }}>
+                                                                                        <span className="shrink-0 mt-0.5" style={{ color: BLUE }}>•</span>
+                                                                                        <span>{line}</span>
+                                                                                    </li>
+                                                                                ))}
+                                                                            </ul>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
-                                                    ))}
+                                                    ) : (
+                                                        <p className="text-xs pl-1" style={{ color: MUTED }}>
+                                                            Schließe ein Interview ab, um Empfehlungen zu erhalten.
+                                                        </p>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        </motion.div>
-                                    )}
+                                            </motion.div>
+                                        );
+                                    })()}
                                 </AnimatePresence>
                             </div>
                         );

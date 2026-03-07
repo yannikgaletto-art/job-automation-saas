@@ -235,7 +235,7 @@ export async function GET(request: Request) {
             // List all sessions for this user
             const { data: sessions } = await supabaseAdmin
                 .from('coaching_sessions')
-                .select('id, job_id, session_status, coaching_score, turn_count, created_at, completed_at')
+                .select('id, job_id, session_status, coaching_score, turn_count, created_at, completed_at, feedback_report')
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
