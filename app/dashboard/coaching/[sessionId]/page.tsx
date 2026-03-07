@@ -185,16 +185,20 @@ export default function CoachingSessionPage() {
                 setHints((prev) => ({ ...prev, [data.turnNumber]: data.hint }));
             }
 
-            const aiMsg: ChatMessage = {
-                role: 'coach',
-                content: data.aiMessage,
-                timestamp: new Date().toISOString(),
-                turnNumber: data.turnNumber,
-            };
-            setMessages((prev) => [...prev, aiMsg]);
+            // Only add AI message if there is one (last turn returns empty to skip follow-up question)
+            if (data.aiMessage) {
+                const aiMsg: ChatMessage = {
+                    role: 'coach',
+                    content: data.aiMessage,
+                    timestamp: new Date().toISOString(),
+                    turnNumber: data.turnNumber,
+                };
+                setMessages((prev) => [...prev, aiMsg]);
+            }
+
             setTurnCount(data.turnNumber);
 
-            // If AI asks for analysis → show the prompt button
+            // Session complete → show farewell immediately, no extra AI turn
             if (data.isComplete) {
                 setShowAnalysisPrompt(true);
             }

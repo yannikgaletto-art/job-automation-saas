@@ -117,24 +117,36 @@ export async function sendCoachingMessage(
         content: msg.content,
     }));
 
-    // 6b. Hard turn-limit enforcement: inject LETZTE_FRAGE marker for the last turn
-    // This ensures the AI gives ONLY feedback and stops — no more questions.
-    let finalSystemPrompt = systemPrompt;
+    // 6b. HARD STOP: If this is the last answer, skip the AI call entirely.
+    // Prompt-engineering is NOT reliable for this — deterministic bypass only.
     if (currentTurn >= maxQuestions) {
-        finalSystemPrompt += `\n\n⚠️ LETZTE FRAGE — HARD STOP ⚠️
-Dies ist die Antwort auf die LETZTE Frage (Frage ${maxQuestions} von ${maxQuestions}).
-Du gibst NUR noch Feedback (2-3 Sätze) zur gerade gegebenen Antwort.
-Du stellst KEINE weitere Frage. KEINE Verabschiedung. KEIN "Danke für das Gespräch".
-Nur Feedback, dann Schluss. Das System übernimmt die Weiterleitung zur Analyse.`;
+        // Save the final user message to history (no AI response entry)
+        await supabaseAdmin
+            .from('coaching_sessions')
+            .update({
+                conversation_history: conversationHistory,
+                turn_count: currentTurn,
+                session_status: 'completed',
+                completed_at: new Date().toISOString(),
+            })
+            .eq('id', sessionId);
+
+        return {
+            aiMessage: '',  // Frontend shows farewell UI, not an AI message
+            hint: '',
+            turnNumber: currentTurn,
+            isComplete: true,
+            tokensUsed: 0,
+            costCents: 0,
+        };
     }
 
-    // 7. Call Claude (isolated client)
     const client = getClient();
     const response = await client.messages.create({
         model: COACHING_MODEL,
         max_tokens: 1024,
         temperature: 0.7,
-        system: finalSystemPrompt,
+        system: systemPrompt,
         messages: anthropicMessages,
     });
 
@@ -175,8 +187,7 @@ Nur Feedback, dann Schluss. Das System übernimmt die Weiterleitung zur Analyse.
         console.warn('[Coaching] Hint generation failed, proceeding without');
     }
 
-    // 10. Deterministic completion: user answered all selected questions
-    const isComplete = currentTurn >= maxQuestions;
+    const isComplete = false; // maxQuestions case is handled above with early return
 
     // 11. Update session in DB
     const { error: updateError } = await supabaseAdmin
