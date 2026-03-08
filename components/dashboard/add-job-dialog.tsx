@@ -43,6 +43,8 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                     jobTitle: title,
                     jobDescription: description,
                     companyWebsite: companyWebsite.trim() || undefined,
+                    source_url: companyWebsite.trim() || undefined,
+                    source: 'manual_entry',
                 }),
             });
 

@@ -102,18 +102,6 @@ export async function withRetry<T>(
 
 // ─── Step 1: SerpAPI Search ───────────────────────────────────────
 
-// ─── Werte-Filter Keyword Mapping ─────────────────────────────────
-
-const WERTE_FILTER_KEYWORDS: Record<string, string> = {
-    nachhaltigkeit: 'nachhaltig OR ESG OR Green OR Klimaschutz',
-    innovation: 'Innovation OR Disruption OR Transformation',
-    social_impact: 'Social Impact OR gemeinnützig OR NGO',
-    deep_tech: 'Deep Tech OR KI OR AI OR Machine Learning',
-    dei: 'Diversity OR Equity OR Inclusion OR Chancengleichheit',
-    gemeinwohl: 'Gemeinwohl OR gemeinnützig OR Wohlfahrt OR Sozialwirtschaft',
-    circular_economy: 'Circular Economy OR Kreislaufwirtschaft OR Recycling OR Nachhaltigkeit',
-    new_work: 'New Work OR Remote OR Hybrid OR Flexibles Arbeiten',
-};
 
 export interface JobSearchFilters {
     experience?: string[];   // ['Entry', 'Mid', 'Senior', 'Lead']
@@ -129,49 +117,45 @@ export async function searchJobs(
     const apiKey = process.env.SERPAPI_KEY;
     if (!apiKey) throw new Error('SERPAPI_KEY not configured');
 
-    // Build query with Werte-Filter keyword injection
-    let enrichedQuery = query;
-    if (location) {
-        // Appending location to the query works much better than SerpAPI's strict 'location' parameter
-        enrichedQuery = `${query} ${location}`;
+    const MIN_RESULTS = 5;
+
+    // Build base query
+    const baseQuery = location ? `${query} ${location}` : query;
+
+    // ── Progressive search: week → month → synonyms+month ──
+    // Step 1: Last 7 days
+    let rawJobs = await fetchSerpApiJobs(baseQuery, 'date_posted:week', apiKey);
+    console.log(`[Search] Step 1 (week): ${rawJobs.length} results for "${baseQuery}"`);
+
+    // Step 2: Widen to last 30 days if too few
+    if (rawJobs.length < MIN_RESULTS) {
+        const monthJobs = await fetchSerpApiJobs(baseQuery, 'date_posted:month', apiKey);
+        console.log(`[Search] Step 2 (month): ${monthJobs.length} results`);
+        rawJobs = deduplicateRawJobs([...rawJobs, ...monthJobs]);
     }
 
-    // We no longer append Werte-Filters to the query string here.
-    // Google Jobs fails with 0 results when query strings are too complex (e.g. "Innovation OR Disruption").
-    // Instead, Phase 10.3 handles this purely via Post-Search Tagging (`tagJobsWithFilters`) on the returned results.
+    // Step 3: Try synonym variations + month if still too few
+    if (rawJobs.length < MIN_RESULTS) {
+        const synonymQuery = generateSynonymQuery(query, location);
+        if (synonymQuery && synonymQuery !== baseQuery) {
+            const synonymJobs = await fetchSerpApiJobs(synonymQuery, 'date_posted:month', apiKey);
+            console.log(`[Search] Step 3 (synonyms "${synonymQuery}"): ${synonymJobs.length} results`);
+            rawJobs = deduplicateRawJobs([...rawJobs, ...synonymJobs]);
+        }
+    }
 
-    const params = new URLSearchParams({
-        engine: 'google_jobs',
-        q: `${enrichedQuery}`,
-        hl: 'de',
-        chips: 'date_posted:week',
-        api_key: apiKey,
-    });
-
-    console.log(`[Search] SerpAPI search: "${enrichedQuery}"`);
-
-    const response = await withRetry(async () => {
-        const res = await fetch(`https://serpapi.com/search?${params.toString()}`);
-        if (!res.ok) throw new Error(`SerpAPI error: ${res.status} ${res.statusText}`);
-        return res.json();
-    });
-
-    const jobsResults = response.jobs_results || [];
-
-    if (jobsResults.length === 0) {
-        console.log('[Search] SerpAPI returned 0 results');
+    if (rawJobs.length === 0) {
+        console.log('[Search] No results after progressive expansion');
         return [];
     }
 
-    // Map initial results — use share_link as the base link
-    const mapped: SerpApiJob[] = jobsResults.map((job: any) => ({
+    // Map to SerpApiJob format
+    const mapped: SerpApiJob[] = rawJobs.map((job: any) => ({
         title: job.title || '',
         company_name: job.company_name || '',
         thumbnail: job.thumbnail || null,
         location: job.location || '',
         description: job.description || '',
-        // Primary: share_link (Google Jobs link — always present)
-        // Fallback: any apply_options if somehow present
         apply_link: job.share_link
             || job.apply_options?.[0]?.link
             || job.related_links?.[0]?.link
@@ -185,9 +169,8 @@ export async function searchJobs(
         raw: job,
     }));
 
-    // Fetch real direct apply links via google_jobs_listing for top results
-    // This is a second API call per job but gives actual employer apply URLs
-    const MAX_LISTING_FETCHES = 10;
+    // Fetch direct apply links for top 5 results (saves SerpAPI credits)
+    const MAX_LISTING_FETCHES = 5;
     const jobsToEnrich = mapped.slice(0, MAX_LISTING_FETCHES);
 
     await Promise.allSettled(
@@ -211,7 +194,6 @@ export async function searchJobs(
                 const applyOptions = listingData.apply_options || [];
 
                 if (applyOptions.length > 0) {
-                    // Use the first direct apply link (usually the employer's own site)
                     const directLink = applyOptions[0]?.link;
                     if (directLink) {
                         mapped[index].apply_link = directLink;
@@ -233,28 +215,150 @@ export async function searchJobs(
     });
 
     const withLinks = deduplicated.filter(j => j.apply_link).length;
-    console.log(`[Search] ${jobsResults.length} raw → ${deduplicated.length} unique (${withLinks} with apply links)`);
+    console.log(`[Search] Final: ${deduplicated.length} unique (${withLinks} with apply links)`);
 
     return deduplicated;
 }
 
-// ─── Step 2: Firecrawl Deep Scrape ────────────────────────────────
+// ─── SerpAPI fetch helper ─────────────────────────────────────────
+
+async function fetchSerpApiJobs(query: string, dateChip: string, apiKey: string): Promise<any[]> {
+    const params = new URLSearchParams({
+        engine: 'google_jobs',
+        q: query,
+        hl: 'de',
+        chips: dateChip,
+        api_key: apiKey,
+    });
+
+    try {
+        const response = await withRetry(async () => {
+            const res = await fetch(`https://serpapi.com/search?${params.toString()}`);
+            if (!res.ok) throw new Error(`SerpAPI error: ${res.status} ${res.statusText}`);
+            return res.json();
+        });
+        return response.jobs_results || [];
+    } catch (error) {
+        console.warn(`[Search] SerpAPI fetch failed for "${query}":`, error);
+        return [];
+    }
+}
+
+// ─── Deterministic synonym expansion (no AI, no hallucination) ───
+
+const SYNONYM_PAIRS: [string, string][] = [
+    ['KI', 'AI'],
+    ['Künstliche Intelligenz', 'Artificial Intelligence'],
+    ['Manager', 'Beauftragter'],
+    ['Manager', 'Koordinator'],
+    ['Manager', 'Referent'],
+    ['Berater', 'Consultant'],
+    ['Leiter', 'Head of'],
+    ['Projektmanager', 'Project Manager'],
+    ['Entwickler', 'Developer'],
+    ['Ingenieur', 'Engineer'],
+];
+
+function generateSynonymQuery(query: string, location: string): string | null {
+    const lowerQuery = query.toLowerCase();
+
+    for (const [a, b] of SYNONYM_PAIRS) {
+        if (lowerQuery.includes(a.toLowerCase())) {
+            const synonymQuery = query.replace(new RegExp(a, 'gi'), b);
+            return location ? `${synonymQuery} ${location}` : synonymQuery;
+        }
+        if (lowerQuery.includes(b.toLowerCase())) {
+            const synonymQuery = query.replace(new RegExp(b, 'gi'), a);
+            return location ? `${synonymQuery} ${location}` : synonymQuery;
+        }
+    }
+
+    return null;
+}
+
+// ─── Deduplicate raw SerpAPI results by job_id ────────────────────
+
+function deduplicateRawJobs(jobs: any[]): any[] {
+    const seen = new Set<string>();
+    return jobs.filter(j => {
+        const key = j.job_id || `${j.company_name}::${j.title}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+// ─── Step 2: Deep Scrape (Jina Reader primary, Firecrawl fallback) ─
 
 export async function deepScrapeJob(applyLink: string): Promise<string | null> {
-    const apiKey = process.env.FIRECRAWL_API_KEY;
-    if (!apiKey) {
-        console.warn('⚠️ [Pipeline] FIRECRAWL_API_KEY not set, skipping deep scrape');
+    // Skip unsupported URLs
+    if (applyLink.includes('linkedin.com')) {
+        console.log('⚠️ [Pipeline] LinkedIn URL — skipping deep scrape (bot protection)');
+        return null;
+    }
+    // Skip Google redirect URLs — they return a search page, not a job posting
+    if (applyLink.includes('google.com/search?')) {
+        console.log('⚠️ [Pipeline] Google redirect URL — skipping deep scrape');
         return null;
     }
 
-    // Skip LinkedIn URLs (bot protection)
-    if (applyLink.includes('linkedin.com')) {
-        console.log('⚠️ [Pipeline] LinkedIn URL detected — skipping Firecrawl (bot protection)');
+    // ── Primary: Jina Reader (free, reliable, handles most ATS) ──
+    const jinaResult = await scrapeWithJina(applyLink);
+    if (jinaResult && jinaResult.length >= 200) {
+        return jinaResult;
+    }
+
+    // ── Fallback: Firecrawl (for JS-heavy pages Jina can't render) ──
+    const firecrawlResult = await scrapeWithFirecrawl(applyLink);
+    if (firecrawlResult && firecrawlResult.length >= 200) {
+        return firecrawlResult;
+    }
+
+    console.warn('⚠️ [Pipeline] Both scrapers failed or returned too little data');
+    return null;
+}
+
+async function scrapeWithJina(url: string): Promise<string | null> {
+    const apiKey = process.env.JINA_READER_API_KEY;
+    if (!apiKey) {
+        console.warn('⚠️ [Pipeline] JINA_READER_API_KEY not set, skipping Jina');
         return null;
     }
 
     try {
-        console.log(`✅ [Pipeline] Firecrawl scraping: ${applyLink}`);
+        console.log(`🔄 [Pipeline] Jina Reader scraping: ${url}`);
+        const res = await fetch(`https://r.jina.ai/${url}`, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Accept': 'text/markdown',
+                'X-No-Cache': 'true',
+            },
+            signal: AbortSignal.timeout(15000),
+        });
+
+        if (!res.ok) {
+            console.warn(`⚠️ [Pipeline] Jina Reader error: ${res.status}`);
+            return null;
+        }
+
+        const markdown = await res.text();
+        console.log(`✅ [Pipeline] Jina Reader: ${markdown.length} chars extracted`);
+        return markdown;
+    } catch (error: any) {
+        console.warn(`⚠️ [Pipeline] Jina Reader failed: ${error.message}`);
+        return null;
+    }
+}
+
+async function scrapeWithFirecrawl(url: string): Promise<string | null> {
+    const apiKey = process.env.FIRECRAWL_API_KEY;
+    if (!apiKey) {
+        console.warn('⚠️ [Pipeline] FIRECRAWL_API_KEY not set, skipping Firecrawl');
+        return null;
+    }
+
+    try {
+        console.log(`🔄 [Pipeline] Firecrawl scraping: ${url}`);
         const response = await withRetry(async () => {
             const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
                 method: 'POST',
@@ -263,7 +367,7 @@ export async function deepScrapeJob(applyLink: string): Promise<string | null> {
                     'Authorization': `Bearer ${apiKey}`,
                 },
                 body: JSON.stringify({
-                    url: applyLink,
+                    url,
                     formats: ['markdown'],
                     onlyMainContent: true,
                     waitFor: 2000,
@@ -272,7 +376,7 @@ export async function deepScrapeJob(applyLink: string): Promise<string | null> {
             });
             if (!res.ok) throw new Error(`Firecrawl error: ${res.status}`);
             return res.json();
-        }, 2, 2000); // 2 retries, 2s backoff
+        }, 2, 2000);
 
         const markdown = response.data?.markdown || null;
         if (markdown) {

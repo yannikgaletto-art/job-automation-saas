@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
-import { ExternalLink, CheckCircle2, XIcon, Briefcase, Euro, MapPin } from 'lucide-react';
+import { ExternalLink, CheckCircle2, XIcon, Briefcase, Euro, MapPin, ArrowRight, X, BriefcaseBusiness } from 'lucide-react';
 import { useJobQueueCount } from '@/store/use-job-queue-count';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -336,6 +336,60 @@ function SwipeCard({
     );
 }
 
+// ─── Queue Full Modal (Swipe) ─────────────────────────────────────
+
+function SwipeQueueFullModal({ onClose }: { onClose: () => void }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(4px)' }}
+            onClick={onClose}
+        >
+            <motion.div
+                initial={{ scale: 0.92, opacity: 0, y: 12 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.92, opacity: 0, y: 12 }}
+                transition={{ type: 'spring', damping: 22, stiffness: 320 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative"
+            >
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 p-1.5 rounded-lg text-[#A8A29E] hover:text-[#37352F] hover:bg-[#F7F7F5] transition-colors"
+                >
+                    <X className="w-4 h-4" />
+                </button>
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
+                    <BriefcaseBusiness className="w-6 h-6 text-amber-500" />
+                </div>
+                <h3 className="text-base font-bold text-[#37352F] mb-1.5">Job Queue ist voll</h3>
+                <p className="text-sm text-[#73726E] leading-relaxed mb-5">
+                    Du hast bereits <strong>5 aktive Jobs</strong> in deiner Job Queue.
+                    Schliesse bestehende Jobs ab oder lösche sie, bevor du neue hinzufügst.
+                </p>
+                <div className="flex flex-col gap-2">
+                    <a
+                        href="/dashboard/job-queue"
+                        className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-[#002e7a] text-white text-sm font-semibold hover:bg-[#001f5c] transition-colors"
+                    >
+                        <ArrowRight className="w-4 h-4" />
+                        Zur Job Queue
+                    </a>
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2.5 px-4 rounded-xl border border-[#E7E7E5] text-sm text-[#73726E] font-medium hover:bg-[#F7F7F5] transition-colors"
+                    >
+                        Schließen
+                    </button>
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+}
+
 // ─── Main Swipe View ─────────────────────────────────────────────
 
 export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
@@ -343,6 +397,7 @@ export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
     const [addingToQueue, setAddingToQueue] = useState(false);
     const [swipedJobs, setSwipedJobs] = useState<Set<string>>(new Set());
     const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
+    const [showQueueFull, setShowQueueFull] = useState(false);
     const { increment } = useJobQueueCount();
     const dwellStartRef = useRef<number>(Date.now());
 
@@ -396,18 +451,28 @@ export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
         if (direction === 'right' && !job.already_in_queue) {
             setAddingToQueue(true);
             try {
-                const res = await fetch('/api/jobs/ingest', {
+                const res = await fetch('/api/jobs/search/process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        jobTitle: job.title,
-                        company: job.company_name,
-                        location: job.location,
-                        jobDescription: job.description || 'Keine Beschreibung verfügbar',
-                        source_url: job.apply_link,
-                        source: 'job_search',
+                        serpApiJob: {
+                            title: job.title,
+                            company_name: job.company_name,
+                            location: job.location,
+                            description: job.description || 'Keine Beschreibung verfügbar',
+                            apply_link: job.apply_link,
+                            detected_extensions: job.detected_extensions || {},
+                            raw: job.raw || {},
+                        },
+                        searchQuery: job.title,
                     }),
                 });
+
+                if (res.status === 429) {
+                    setShowQueueFull(true);
+                    setAddingToQueue(false);
+                    return;
+                }
 
                 if (res.ok) {
                     const data = await res.json();
@@ -461,90 +526,95 @@ export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
     const nextJob = currentIndex + 1 < jobs.length ? jobs[currentIndex + 1] : null;
 
     return (
-        <div className="flex flex-col items-center">
-            {/* Progress counter */}
-            <div className="flex items-center gap-2 mb-4 w-full max-w-[380px]">
-                <div className="flex-1 h-1.5 rounded-full bg-[#F0F0EE] overflow-hidden">
-                    <motion.div
-                        className="h-full rounded-full bg-[#002e7a]"
-                        initial={false}
-                        animate={{ width: `${((currentIndex) / jobs.length) * 100}%` }}
-                        transition={{ duration: 0.3 }}
-                    />
-                </div>
-                <span className="text-xs text-[#73726E] font-medium tabular-nums shrink-0">
-                    {currentIndex + 1} / {jobs.length}
-                </span>
-            </div>
-
-            {/* Card stack */}
-            <div className="relative w-full max-w-[380px] h-[520px]">
-                <AnimatePresence mode="popLayout">
-                    {/* Background card (next) */}
-                    {nextJob && !exitDirection && (
+        <>
+            <AnimatePresence>
+                {showQueueFull && <SwipeQueueFullModal onClose={() => setShowQueueFull(false)} />}
+            </AnimatePresence>
+            <div className="flex flex-col items-center">
+                {/* Progress counter */}
+                <div className="flex items-center gap-2 mb-4 w-full max-w-[380px]">
+                    <div className="flex-1 h-1.5 rounded-full bg-[#F0F0EE] overflow-hidden">
                         <motion.div
-                            key={`bg-${currentIndex + 1}`}
-                            className="absolute inset-x-3 top-2 bottom-0"
-                            initial={{ opacity: 0.6 }}
-                            animate={{ opacity: 0.6 }}
-                        >
-                            <div className="h-full bg-white rounded-2xl border border-[#E7E7E5] shadow-sm" />
-                        </motion.div>
-                    )}
-
-                    {/* Top card */}
-                    {!exitDirection && (
-                        <motion.div
-                            key={`card-${currentIndex}`}
-                            className="absolute inset-0"
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ duration: 0.25 }}
-                        >
-                            <SwipeCard
-                                job={currentJob}
-                                isTop={true}
-                                addingToQueue={addingToQueue}
-                                onSwipe={handleSwipe}
-                            />
-                        </motion.div>
-                    )}
-
-                    {/* Exit animation */}
-                    {exitDirection && (
-                        <motion.div
-                            key={`exit-${currentIndex}`}
-                            className="absolute inset-0"
-                            initial={{ x: 0, rotate: 0, opacity: 1 }}
-                            animate={{
-                                x: exitDirection === 'right' ? 500 : -500,
-                                rotate: exitDirection === 'right' ? 20 : -20,
-                                opacity: 0,
-                            }}
+                            className="h-full rounded-full bg-[#002e7a]"
+                            initial={false}
+                            animate={{ width: `${((currentIndex) / jobs.length) * 100}%` }}
                             transition={{ duration: 0.3 }}
-                        >
-                            <SwipeCard
-                                job={currentJob}
-                                isTop={false}
-                                addingToQueue={false}
-                                onSwipe={() => { }}
-                            />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
+                        />
+                    </div>
+                    <span className="text-xs text-[#73726E] font-medium tabular-nums shrink-0">
+                        {currentIndex + 1} / {jobs.length}
+                    </span>
+                </div>
 
-            {/* Keyboard hint */}
-            <div className="flex items-center gap-4 mt-4 text-[10px] text-[#A8A29E]">
-                <span className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 rounded border border-[#E7E7E5] bg-[#F7F7F5] text-[10px] font-mono">←</kbd>
-                    Skip
-                </span>
-                <span className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 rounded border border-[#E7E7E5] bg-[#F7F7F5] text-[10px] font-mono">→</kbd>
-                    Zur Queue
-                </span>
+                {/* Card stack */}
+                <div className="relative w-full max-w-[380px] h-[520px]">
+                    <AnimatePresence mode="popLayout">
+                        {/* Background card (next) */}
+                        {nextJob && !exitDirection && (
+                            <motion.div
+                                key={`bg-${currentIndex + 1}`}
+                                className="absolute inset-x-3 top-2 bottom-0"
+                                initial={{ opacity: 0.6 }}
+                                animate={{ opacity: 0.6 }}
+                            >
+                                <div className="h-full bg-white rounded-2xl border border-[#E7E7E5] shadow-sm" />
+                            </motion.div>
+                        )}
+
+                        {/* Top card */}
+                        {!exitDirection && (
+                            <motion.div
+                                key={`card-${currentIndex}`}
+                                className="absolute inset-0"
+                                initial={{ scale: 0.95, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ duration: 0.25 }}
+                            >
+                                <SwipeCard
+                                    job={currentJob}
+                                    isTop={true}
+                                    addingToQueue={addingToQueue}
+                                    onSwipe={handleSwipe}
+                                />
+                            </motion.div>
+                        )}
+
+                        {/* Exit animation */}
+                        {exitDirection && (
+                            <motion.div
+                                key={`exit-${currentIndex}`}
+                                className="absolute inset-0"
+                                initial={{ x: 0, rotate: 0, opacity: 1 }}
+                                animate={{
+                                    x: exitDirection === 'right' ? 500 : -500,
+                                    rotate: exitDirection === 'right' ? 20 : -20,
+                                    opacity: 0,
+                                }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <SwipeCard
+                                    job={currentJob}
+                                    isTop={false}
+                                    addingToQueue={false}
+                                    onSwipe={() => { }}
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Keyboard hint */}
+                <div className="flex items-center gap-4 mt-4 text-[10px] text-[#A8A29E]">
+                    <span className="flex items-center gap-1">
+                        <kbd className="px-1.5 py-0.5 rounded border border-[#E7E7E5] bg-[#F7F7F5] text-[10px] font-mono">←</kbd>
+                        Skip
+                    </span>
+                    <span className="flex items-center gap-1">
+                        <kbd className="px-1.5 py-0.5 rounded border border-[#E7E7E5] bg-[#F7F7F5] text-[10px] font-mono">→</kbd>
+                        Zur Queue
+                    </span>
+                </div>
             </div>
-        </div>
+        </>
     );
 }

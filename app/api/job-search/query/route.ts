@@ -170,7 +170,17 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (upsertError) {
-            console.error('❌ [Search] Upsert failed:', upsertError.message);
+            // Graceful degradation: return results so user sees what they waited for,
+            // but flag that persistence failed — results will vanish on next navigation.
+            console.error('⚠️ [Search] Upsert failed — results NOT persisted:', upsertError.message);
+            return NextResponse.json({
+                results: tagged,
+                cached: false,
+                search_id: null,
+                result_count: tagged.length,
+                persisted: false,
+                warning: 'Ergebnisse konnten nicht gespeichert werden. Sie gehen beim Seitenwechsel verloren.',
+            });
         }
 
         // ─── 5. Enforce max 10 searches ──────────────────────────────

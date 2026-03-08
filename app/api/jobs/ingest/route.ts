@@ -94,10 +94,13 @@ export async function POST(request: NextRequest) {
 
         // ================================================================
         // STEP 1.5: Firecrawl deep scrape for richer Steckbrief data
+        // Skip for manual_entry — user already supplied the full description
+        // and the URL is the company website, not a job posting.
         // ================================================================
         let enrichedDescription = jobDescription;
+        const isManualEntry = source === 'manual_entry';
 
-        if (normalizedSourceUrl && !normalizedSourceUrl.includes('linkedin.com')) {
+        if (!isManualEntry && normalizedSourceUrl && !normalizedSourceUrl.includes('linkedin.com')) {
             try {
                 console.log(`[${requestId}] route=jobs/ingest step=firecrawl_scrape url=${normalizedSourceUrl}`);
                 const scraped = await Promise.race([
@@ -113,6 +116,8 @@ export async function POST(request: NextRequest) {
             } catch (err) {
                 console.warn(`[${requestId}] route=jobs/ingest step=firecrawl_scrape error fallback=original_description`);
             }
+        } else if (isManualEntry) {
+            console.log(`[${requestId}] route=jobs/ingest step=firecrawl_scrape skipped=manual_entry desc_len=${jobDescription.length}`);
         }
 
         // ================================================================

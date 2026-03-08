@@ -6,7 +6,7 @@ import {
     Search, SlidersHorizontal, Loader2, X, Sparkles,
     ExternalLink, ArrowRight, CheckCircle2, AlertTriangle,
     ChevronDown, ChevronRight, Clock, Trash2, Plus, Star, RefreshCw,
-    Compass, List, Layers
+    Compass, List, Layers, BriefcaseBusiness, PenLine
 } from 'lucide-react';
 import type { SerpApiJob } from '@/lib/services/job-search-pipeline';
 import { useJobQueueCount } from '@/store/use-job-queue-count';
@@ -79,7 +79,7 @@ export default function JobSearchPage() {
             const next = new Set(prev);
             if (next.has(url)) next.delete(url);
             else next.add(url);
-            localStorage.setItem('pathly_starred_jobs', JSON.stringify(Array.from(next)));
+            try { localStorage.setItem('pathly_starred_jobs', JSON.stringify(Array.from(next))); } catch { /* Safari Private Mode */ }
             return next;
         });
     }, []);
@@ -113,8 +113,8 @@ export default function JobSearchPage() {
                     fetched_at: new Date().toISOString()
                 };
             }));
-        } catch (err) {
-            console.error("Refresh failed:", err);
+        } catch (err: any) {
+            setError(err?.message || 'Aktualisierung fehlgeschlagen');
         }
     }, [starredUrls]);
 
@@ -124,7 +124,7 @@ export default function JobSearchPage() {
     const [isSearching, setIsSearching] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [searchMode, setSearchMode] = useState<'keyword' | 'mission'>('keyword');
+    const [searchMode, setSearchMode] = useState<'keyword' | 'mission' | 'manual'>('keyword');
 
     // Filter state
     const [selectedExperience, setSelectedExperience] = useState<string[]>([]);
@@ -249,6 +249,27 @@ export default function JobSearchPage() {
         }
     };
 
+    // ─── Delete single Job from Search ─────────────────────────────
+
+    const handleDeleteJob = async (searchId: string, jobApplyLink: string) => {
+        // Optimistic update: remove job from local state immediately
+        setSavedSearches(prev => prev.map(s => {
+            if (s.id !== searchId) return s;
+            const updatedResults = s.results.filter(j => j.apply_link !== jobApplyLink);
+            return { ...s, results: updatedResults, result_count: updatedResults.length };
+        }));
+
+        try {
+            await fetch('/api/job-search/saved', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ search_id: searchId, job_apply_link: jobApplyLink }),
+            });
+        } catch {
+            // Optimistic update already applied, silent fail
+        }
+    };
+
     // ─── Toggle filter chip ─────────────────────────────────────────
 
     const toggleFilter = (
@@ -281,188 +302,192 @@ export default function JobSearchPage() {
             <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white border border-[#E7E7E5] rounded-xl p-5 shadow-sm"
+                className={`bg-white border border-[#E7E7E5] rounded-xl p-5 shadow-sm${searchMode === 'manual' ? ' max-w-3xl' : ''}`}
             >
                 {/* Mode Toggle */}
                 <div className="flex gap-1 mb-3">
-                    {(['keyword', 'mission'] as const).map(mode => (
-                        <motion.button
-                            key={mode}
-                            onClick={() => setSearchMode(mode)}
-                            animate={{
-                                scale: searchMode === mode ? 1 : 0.97,
-                                opacity: searchMode === mode ? 1 : 0.7,
-                            }}
-                            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchMode === mode
-                                ? 'bg-[#f0f4ff] text-[#002e7a] border border-[#002e7a]/20'
-                                : 'text-[#73726E] border border-[#E7E7E5] hover:border-[#002e7a]/30'
-                                }`}
-                        >
-                            {mode === 'keyword' ? (
-                                <span className="flex items-center gap-1.5">
-                                    <Search className="w-3 h-3" />
-                                    Keyword
-                                </span>
-                            ) : (
-                                <span className="flex items-center gap-1.5">
-                                    <Compass className="w-3 h-3" />
-                                    Mission
-                                </span>
-                            )}
-                        </motion.button>
-                    ))}
-                </div>
-
-                <div className="flex gap-3">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A8A29E]" />
-                        <input
-                            type="text"
-                            placeholder={searchMode === 'mission' ? 'Beschreibe deine nächste Mission...' : 'Jobtitel eingeben...'}
-                            value={query}
-                            onChange={e => setQuery(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
-                        />
-                    </div>
-                    <div className="w-48 relative">
-                        <input
-                            type="text"
-                            placeholder="Ort..."
-                            value={location}
-                            onChange={e => setLocation(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                            className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
-                        />
-                    </div>
                     <motion.button
-                        whileHover={{ scale: 1.02, y: -1 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleSearch}
-                        disabled={isSearching || !query.trim()}
-                        className="px-6 py-2.5 bg-[#002e7a] text-white text-sm font-medium rounded-lg hover:bg-[#001d4f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                        onClick={() => setSearchMode('keyword')}
+                        animate={{ scale: searchMode === 'keyword' ? 1 : 0.97, opacity: searchMode === 'keyword' ? 1 : 0.7 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchMode === 'keyword' ? 'bg-[#f0f4ff] text-[#002e7a] border border-[#002e7a]/20' : 'text-[#73726E] border border-[#E7E7E5] hover:border-[#002e7a]/30'}`}
                     >
-                        {isSearching ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                            <Search className="w-4 h-4" />
-                        )}
-                        Suchen
+                        <span className="flex items-center gap-1.5"><Search className="w-3 h-3" />Keyword</span>
                     </motion.button>
-                    <button
-                        onClick={() => setShowFilters(!showFilters)}
-                        className={`px-3 py-2.5 rounded-lg border text-sm transition-colors ${showFilters ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff]' : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a]'}`}
+                    <motion.button
+                        onClick={() => setSearchMode('mission')}
+                        animate={{ scale: searchMode === 'mission' ? 1 : 0.97, opacity: searchMode === 'mission' ? 1 : 0.7 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchMode === 'mission' ? 'bg-[#f0f4ff] text-[#002e7a] border border-[#002e7a]/20' : 'text-[#73726E] border border-[#E7E7E5] hover:border-[#002e7a]/30'}`}
                     >
-                        <SlidersHorizontal className="w-4 h-4" />
-                    </button>
+                        <span className="flex items-center gap-1.5"><Compass className="w-3 h-3" />Mission</span>
+                    </motion.button>
+                    <motion.button
+                        onClick={() => setSearchMode('manual')}
+                        animate={{ scale: searchMode === 'manual' ? 1 : 0.97, opacity: searchMode === 'manual' ? 1 : 0.7 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchMode === 'manual' ? 'bg-[#f0f4ff] text-[#002e7a] border border-[#002e7a]/20' : 'text-[#73726E] border border-[#E7E7E5] hover:border-[#002e7a]/30'}`}
+                    >
+                        <span className="flex items-center gap-1.5"><PenLine className="w-3 h-3" />Add Job <span className="opacity-70">(Highest Quality)</span></span>
+                    </motion.button>
                 </div>
 
-                {/* Suggested Titles */}
-                {suggestedTitles.length > 0 && !isSearching && !hasSearches && (
-                    <div className="mt-3 flex items-center gap-2 flex-wrap">
-                        <span className="text-xs text-[#A8A29E] flex items-center gap-1">
-                            <Sparkles className="w-3 h-3" /> Vorschlaege:
-                        </span>
-                        {suggestedTitles.map(title => (
-                            <motion.button
-                                key={title}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => setQuery(title)}
-                                className="px-3 py-1 rounded-full bg-[#f0f4ff] text-[#002e7a] text-xs font-medium border border-[#002e7a]/10 hover:border-[#002e7a]/30 transition-colors"
-                            >
-                                {title}
-                            </motion.button>
-                        ))}
-                    </div>
-                )}
-
-                {/* Extended Filters */}
-                <AnimatePresence>
-                    {showFilters && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="mt-4 pt-4 border-t border-[#E7E7E5] space-y-4">
-                                {/* Row 1: Experience + OrgType */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Erfahrungslevel</label>
-                                        <div className="flex gap-2">
-                                            {EXPERIENCE_LEVELS.map(level => (
-                                                <button
-                                                    key={level}
-                                                    onClick={() => toggleFilter(level, selectedExperience, setSelectedExperience)}
-                                                    className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedExperience.includes(level)
-                                                        ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
-                                                        : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
-                                                        }`}
-                                                >
-                                                    {level}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Organisationsform</label>
-                                        <div className="flex gap-2">
-                                            {ORG_TYPES.map(org => (
-                                                <button
-                                                    key={org}
-                                                    onClick={() => toggleFilter(org, selectedOrgType, setSelectedOrgType)}
-                                                    className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedOrgType.includes(org)
-                                                        ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
-                                                        : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
-                                                        }`}
-                                                >
-                                                    {org}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Row 2: Werte-Filter (NEW) — 2 rows */}
-                                <div>
-                                    <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Ausrichtung</label>
-                                    <div className="flex gap-2 mb-2">
-                                        {WERTE_FILTERS.slice(0, 4).map(wf => (
-                                            <button
-                                                key={wf.key}
-                                                onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
-                                                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
-                                                    ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
-                                                    : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
-                                                    }`}
-                                            >
-                                                {wf.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {WERTE_FILTERS.slice(4).map(wf => (
-                                            <button
-                                                key={wf.key}
-                                                onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
-                                                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
-                                                    ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
-                                                    : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
-                                                    }`}
-                                            >
-                                                {wf.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                {/* Manual Job Form */}
+                {searchMode === 'manual' ? (
+                    <ManualJobForm />
+                ) : (
+                    <>
+                        <div className="flex gap-3">
+                            <div className="flex-1 relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A8A29E]" />
+                                <input
+                                    type="text"
+                                    placeholder={searchMode === 'mission' ? 'Beschreibe deine nächste Mission...' : 'Jobtitel eingeben...'}
+                                    value={query}
+                                    onChange={e => setQuery(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
+                                />
                             </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                            <div className="w-48 relative">
+                                <input
+                                    type="text"
+                                    placeholder="Ort..."
+                                    value={location}
+                                    onChange={e => setLocation(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                                    className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
+                                />
+                            </div>
+                            <motion.button
+                                whileHover={{ scale: 1.02, y: -1 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={handleSearch}
+                                disabled={isSearching || !query.trim()}
+                                className="px-6 py-2.5 bg-[#002e7a] text-white text-sm font-medium rounded-lg hover:bg-[#001d4f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                            >
+                                {isSearching ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Search className="w-4 h-4" />
+                                )}
+                                Suchen
+                            </motion.button>
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`px-3 py-2.5 rounded-lg border text-sm transition-colors ${showFilters ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff]' : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a]'}`}
+                            >
+                                <SlidersHorizontal className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Suggested Titles */}
+                        {suggestedTitles.length > 0 && !isSearching && !hasSearches && (
+                            <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                <span className="text-xs text-[#A8A29E] flex items-center gap-1">
+                                    <Sparkles className="w-3 h-3" /> Vorschlaege:
+                                </span>
+                                {suggestedTitles.map(title => (
+                                    <motion.button
+                                        key={title}
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => setQuery(title)}
+                                        className="px-3 py-1 rounded-full bg-[#f0f4ff] text-[#002e7a] text-xs font-medium border border-[#002e7a]/10 hover:border-[#002e7a]/30 transition-colors"
+                                    >
+                                        {title}
+                                    </motion.button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Extended Filters */}
+                        <AnimatePresence>
+                            {showFilters && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="mt-4 pt-4 border-t border-[#E7E7E5] space-y-4">
+                                        {/* Row 1: Experience + OrgType */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Erfahrungslevel</label>
+                                                <div className="flex gap-2">
+                                                    {EXPERIENCE_LEVELS.map(level => (
+                                                        <button
+                                                            key={level}
+                                                            onClick={() => toggleFilter(level, selectedExperience, setSelectedExperience)}
+                                                            className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedExperience.includes(level)
+                                                                ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                                : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                                }`}
+                                                        >
+                                                            {level}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Organisationsform</label>
+                                                <div className="flex gap-2">
+                                                    {ORG_TYPES.map(org => (
+                                                        <button
+                                                            key={org}
+                                                            onClick={() => toggleFilter(org, selectedOrgType, setSelectedOrgType)}
+                                                            className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedOrgType.includes(org)
+                                                                ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                                : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                                }`}
+                                                        >
+                                                            {org}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Row 2: Werte-Filter (NEW) — 2 rows */}
+                                        <div>
+                                            <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Ausrichtung</label>
+                                            <div className="flex gap-2 mb-2">
+                                                {WERTE_FILTERS.slice(0, 4).map(wf => (
+                                                    <button
+                                                        key={wf.key}
+                                                        onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
+                                                        className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
+                                                            ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                            : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                            }`}
+                                                    >
+                                                        {wf.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {WERTE_FILTERS.slice(4).map(wf => (
+                                                    <button
+                                                        key={wf.key}
+                                                        onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
+                                                        className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
+                                                            ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                            : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                            }`}
+                                                    >
+                                                        {wf.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </>
+                )}
             </motion.div>
 
             {/* Error */}
@@ -494,8 +519,8 @@ export default function JobSearchPage() {
                 </div>
             )}
 
-            {/* Saved Searches (Notion-style Table) */}
-            {!isSearching && hasSearches && (
+            {/* Saved Searches (Notion-style Table) — hidden in manual mode */}
+            {searchMode !== 'manual' && !isSearching && hasSearches && (
                 <div className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden shadow-sm">
                     {/* Table Header */}
                     <div className="grid grid-cols-[1fr_100px_160px_80px] items-center px-5 py-2 border-b border-[#E7E7E5] bg-[#FAFAF9]">
@@ -524,6 +549,7 @@ export default function JobSearchPage() {
                             )}
                             onDelete={(e) => handleDeleteSearch(search.id, e)}
                             onRefresh={(e) => handleRefreshSearch(search, e)}
+                            onDeleteJob={(jobApplyLink) => handleDeleteJob(search.id, jobApplyLink)}
                             starredUrls={starredUrls}
                             toggleStar={toggleStar}
                             viewMode={viewMode}
@@ -560,6 +586,7 @@ function SearchAccordion({
     onToggle,
     onDelete,
     onRefresh,
+    onDeleteJob,
     starredUrls,
     toggleStar,
     viewMode,
@@ -570,6 +597,7 @@ function SearchAccordion({
     onToggle: () => void;
     onDelete: (e: React.MouseEvent) => void;
     onRefresh: (e: React.MouseEvent) => void;
+    onDeleteJob: (jobApplyLink: string) => void;
     starredUrls: Set<string>;
     toggleStar: (url: string) => void;
     viewMode: 'list' | 'swipe';
@@ -682,6 +710,7 @@ function SearchAccordion({
                                                     job={job}
                                                     starredUrls={starredUrls}
                                                     toggleStar={toggleStar}
+                                                    onDelete={() => onDeleteJob(job.apply_link)}
                                                 />
                                             ))}
                                         </div>
@@ -702,15 +731,18 @@ function SearchAccordion({
 
 // ─── Job Row Component ──────────────────────────────────────────────
 
-function JobRow({ job, starredUrls, toggleStar }: { job: EnrichedJob; starredUrls: Set<string>; toggleStar: (url: string) => void }) {
+function JobRow({ job, starredUrls, toggleStar, onDelete }: { job: EnrichedJob; starredUrls: Set<string>; toggleStar: (url: string) => void; onDelete: () => void }) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     return (
         <div className="border border-[#E7E7E5] rounded-lg overflow-hidden">
             {/* Row */}
-            <button
+            <div
+                role="button"
+                tabIndex={0}
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#FAFAF9] transition-colors text-left"
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setIsExpanded(!isExpanded)}
+                className="group w-full flex items-center justify-between px-4 py-3 hover:bg-[#FAFAF9] transition-colors cursor-pointer text-left"
             >
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -776,6 +808,16 @@ function JobRow({ job, starredUrls, toggleStar }: { job: EnrichedJob; starredUrl
                             {job.detected_extensions.posted_at}
                         </span>
                     )}
+                    {/* Delete button — visible on hover */}
+                    <motion.button
+                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        className="p-1 rounded-md text-[#ccc] hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Job entfernen"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </motion.button>
                     <motion.div
                         animate={{ rotate: isExpanded ? 0 : -90 }}
                         transition={{ duration: 0.15 }}
@@ -783,7 +825,7 @@ function JobRow({ job, starredUrls, toggleStar }: { job: EnrichedJob; starredUrl
                         <ChevronDown className="w-4 h-4 text-[#A8A29E]" />
                     </motion.div>
                 </div>
-            </button>
+            </div>
 
             {/* Expanded Detail */}
             <AnimatePresence>
@@ -911,12 +953,346 @@ function JobRow({ job, starredUrls, toggleStar }: { job: EnrichedJob; starredUrl
     );
 }
 
+// ─── Manual Job Entry Form ───────────────────────────────────────
+
+function ManualJobForm() {
+    const [jobTitle, setJobTitle] = useState('');
+    const [company, setCompany] = useState('');
+    const [websiteUrl, setWebsiteUrl] = useState('');
+    const [jobDescription, setJobDescription] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+    const [showQueueFull, setShowQueueFull] = useState(false);
+    const [showPulse, setShowPulse] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
+    const increment = useJobQueueCount(s => s.increment);
+
+    const wordCount = jobDescription.trim() === '' ? 0 : jobDescription.trim().split(/\s+/).length;
+    const MAX_WORDS = 6000;
+    const MIN_WORDS = 100;
+
+    const canSubmit = jobTitle.trim().length >= 2
+        && company.trim().length >= 2
+        && websiteUrl.trim().length > 0
+        && wordCount >= MIN_WORDS
+        && wordCount <= MAX_WORDS;
+
+    const handleSubmit = async () => {
+        if (!canSubmit || submitting) return;
+        setFormError(null);
+        setSubmitting(true);
+
+        try {
+            const res = await fetch('/api/jobs/ingest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jobTitle: jobTitle.trim(),
+                    company: company.trim(),
+                    companyWebsite: websiteUrl.trim(),
+                    jobDescription: jobDescription.trim(),
+                    source_url: websiteUrl.trim(),
+                    source: 'manual_entry',
+                }),
+            });
+
+            if (res.status === 429) {
+                setShowQueueFull(true);
+                return;
+            }
+
+            if (res.ok) {
+                const data = await res.json();
+                if (!data.duplicate) {
+                    setShowPulse(true);
+                    increment();
+                    setTimeout(() => {
+                        setSubmitted(true);
+                        setShowPulse(false);
+                    }, 1200);
+                } else {
+                    setSubmitted(true);
+                }
+            } else {
+                const data = await res.json().catch(() => ({}));
+                setFormError(data.error || 'Fehler beim Hinzufügen');
+            }
+        } catch {
+            setFormError('Netzwerkfehler — bitte erneut versuchen');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleReset = () => {
+        setJobTitle('');
+        setCompany('');
+        setWebsiteUrl('');
+        setJobDescription('');
+        setSubmitted(false);
+        setFormError(null);
+    };
+
+    if (submitted) {
+        return (
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center justify-center py-8 text-center"
+            >
+                <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
+                    <CheckCircle2 className="w-7 h-7 text-green-500" />
+                </div>
+                <h3 className="text-base font-bold text-[#37352F] mb-1">
+                    Job hinzugefügt
+                </h3>
+                <p className="text-sm text-[#73726E] mb-5">
+                    <strong>{jobTitle}</strong> bei <strong>{company}</strong> wird jetzt analysiert.
+                </p>
+                <div className="flex gap-3">
+                    <a
+                        href="/dashboard/job-queue"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#002e7a] text-white text-sm font-medium hover:bg-[#001f5c] transition-colors"
+                    >
+                        <ArrowRight className="w-4 h-4" />
+                        Zur Job Queue
+                    </a>
+                    <button
+                        onClick={handleReset}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#E7E7E5] text-sm text-[#73726E] font-medium hover:bg-[#F7F7F5] transition-colors"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Weiteren Job hinzufügen
+                    </button>
+                </div>
+            </motion.div>
+        );
+    }
+
+    return (
+        <>
+            {showQueueFull && <QueueFullModal onClose={() => setShowQueueFull(false)} />}
+            <div className="max-w-3xl space-y-4 pt-1">
+                {/* Row 1: Job Title + Company */}
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Jobtitel *</label>
+                        <input
+                            type="text"
+                            placeholder="z.B. Senior Product Manager"
+                            value={jobTitle}
+                            onChange={e => setJobTitle(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Unternehmen *</label>
+                        <input
+                            type="text"
+                            placeholder="z.B. Siemens AG"
+                            value={company}
+                            onChange={e => setCompany(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
+                        />
+                    </div>
+                </div>
+
+                {/* Row 2: Website URL */}
+                <div>
+                    <label className="text-xs font-medium text-[#73726E] mb-1.5 block">
+                        Unternehmens-Website *
+                    </label>
+                    <input
+                        type="url"
+                        placeholder="https://www.bundesdruckerei.de/de"
+                        value={websiteUrl}
+                        onChange={e => setWebsiteUrl(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
+                    />
+                </div>
+
+                {/* Row 3: Job Description */}
+                <div>
+                    <label className="text-xs font-medium text-[#73726E] mb-1.5 block">
+                        Job-Beschreibung *
+                        <span className="text-[#A8A29E] ml-1">(Copy & Paste)</span>
+                    </label>
+                    <textarea
+                        placeholder="Füge hier die komplette Stellenbeschreibung ein — je mehr Details, desto besser die Analyse..."
+                        value={jobDescription}
+                        onChange={e => setJobDescription(e.target.value)}
+                        rows={9}
+                        className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all resize-none"
+                    />
+                    <div className="flex items-center justify-between mt-1">
+                        <span className={`text-[10px] font-medium ${wordCount === 0 ? 'text-[#A8A29E]'
+                            : wordCount < MIN_WORDS ? 'text-amber-500'
+                                : wordCount > MAX_WORDS ? 'text-red-500'
+                                    : 'text-green-600'
+                            }`}>
+                            {wordCount === 0
+                                ? `Min. ${MIN_WORDS} Wörter erforderlich`
+                                : wordCount > MAX_WORDS
+                                    ? `${wordCount} / ${MAX_WORDS} Wörter — zu lang`
+                                    : `${wordCount} / ${MAX_WORDS} Wörter${wordCount < MIN_WORDS ? ` — noch ${MIN_WORDS - wordCount} mehr` : ' ✓'}`
+                            }
+                        </span>
+                        <span className="text-[10px] text-[#A8A29E]">
+                            Höchste Qualität — du steuerst die Daten
+                        </span>
+                    </div>
+                </div>
+
+                {/* Error */}
+                {formError && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        {formError}
+                    </div>
+                )}
+
+                {/* Submit */}
+                <div className="relative w-1/2">
+                    <motion.button
+                        whileHover={canSubmit && !showPulse ? { scale: 1.01, y: -1 } : undefined}
+                        whileTap={canSubmit && !showPulse ? { scale: 0.98 } : undefined}
+                        onClick={handleSubmit}
+                        disabled={!canSubmit || submitting || showPulse}
+                        animate={{
+                            backgroundColor: showPulse ? '#16a34a' : '#002e7a',
+                        }}
+                        transition={{ duration: 0.3 }}
+                        className="w-full py-2.5 text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 relative overflow-hidden"
+                    >
+                        {/* Swipe-style progress bar fill */}
+                        {submitting && !showPulse && (
+                            <motion.div
+                                className="absolute inset-0 bg-[#0050d4]"
+                                initial={{ x: '-100%' }}
+                                animate={{ x: '0%' }}
+                                transition={{ duration: 3, ease: 'easeInOut' }}
+                            />
+                        )}
+                        <AnimatePresence mode="wait">
+                            {showPulse ? (
+                                <motion.span
+                                    key="check"
+                                    initial={{ scale: 0, rotate: -90 }}
+                                    animate={{ scale: 1, rotate: 0 }}
+                                    transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                                    className="relative z-10 flex items-center gap-2"
+                                >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    Hinzugefügt!
+                                </motion.span>
+                            ) : submitting ? (
+                                <motion.span key="loading" className="relative z-10 flex items-center gap-2">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Job wird analysiert...
+                                </motion.span>
+                            ) : (
+                                <motion.span key="default" className="relative z-10">
+                                    Job hinzufügen & analysieren
+                                </motion.span>
+                            )}
+                        </AnimatePresence>
+                    </motion.button>
+
+                    {/* Pulse Rings on success */}
+                    {showPulse && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <motion.div
+                                className="absolute w-full h-full rounded-lg border-2 border-green-400"
+                                initial={{ scale: 1, opacity: 0.5 }}
+                                animate={{ scale: 2.5, opacity: 0 }}
+                                transition={{ duration: 0.7, ease: 'easeOut' }}
+                            />
+                            <motion.div
+                                className="absolute w-full h-full rounded-lg border-2 border-green-400"
+                                initial={{ scale: 1, opacity: 0.35 }}
+                                animate={{ scale: 2, opacity: 0 }}
+                                transition={{ duration: 0.55, ease: 'easeOut', delay: 0.1 }}
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+        </>
+    );
+}
+
+// ─── Queue Full Modal ────────────────────────────────────────────
+
+function QueueFullModal({ onClose }: { onClose: () => void }) {
+    return (
+        <AnimatePresence>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(4px)' }}
+                onClick={onClose}
+            >
+                <motion.div
+                    initial={{ scale: 0.92, opacity: 0, y: 12 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.92, opacity: 0, y: 12 }}
+                    transition={{ type: 'spring', damping: 22, stiffness: 320 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative"
+                >
+                    {/* Close */}
+                    <button
+                        onClick={onClose}
+                        className="absolute top-4 right-4 p-1.5 rounded-lg text-[#A8A29E] hover:text-[#37352F] hover:bg-[#F7F7F5] transition-colors"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+
+                    {/* Icon */}
+                    <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
+                        <BriefcaseBusiness className="w-6 h-6 text-amber-500" />
+                    </div>
+
+                    {/* Text */}
+                    <h3 className="text-base font-bold text-[#37352F] mb-1.5">
+                        Job Queue ist voll
+                    </h3>
+                    <p className="text-sm text-[#73726E] leading-relaxed mb-5">
+                        Du hast bereits <strong>5 aktive Jobs</strong> in deiner Job Queue.
+                        Schliesse bestehende Jobs ab oder lösche sie, bevor du neue hinzufügst.
+                    </p>
+
+                    {/* Actions */}
+                    <div className="flex flex-col gap-2">
+                        <a
+                            href="/dashboard/job-queue"
+                            className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-[#002e7a] text-white text-sm font-semibold hover:bg-[#001f5c] transition-colors"
+                        >
+                            <ArrowRight className="w-4 h-4" />
+                            Zur Job Queue
+                        </a>
+                        <button
+                            onClick={onClose}
+                            className="w-full py-2.5 px-4 rounded-xl border border-[#E7E7E5] text-sm text-[#73726E] font-medium hover:bg-[#F7F7F5] transition-colors"
+                        >
+                            Schließen
+                        </button>
+                    </div>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
+    );
+}
+
 // ─── Add to Queue Button — Pulse Ring + Morph Animation ─────────────
 
 function AddToQueueButton({ job }: { job: EnrichedJob }) {
     const [adding, setAdding] = useState(false);
     const [added, setAdded] = useState(false);
     const [showPulse, setShowPulse] = useState(false);
+    const [showQueueFull, setShowQueueFull] = useState(false);
     const increment = useJobQueueCount(s => s.increment);
 
     const handleAdd = async (e: React.MouseEvent) => {
@@ -925,19 +1301,29 @@ function AddToQueueButton({ job }: { job: EnrichedJob }) {
 
         setAdding(true);
         try {
-            const res = await fetch('/api/jobs/ingest', {
+            // Use the full enrichment pipeline (Firecrawl/Jina → Harvester → Judge)
+            // instead of the basic ingest route
+            const res = await fetch('/api/jobs/search/process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    jobTitle: job.title,
-                    company: job.company_name,
-                    location: job.location,
-                    jobDescription: job.description || 'Keine Beschreibung verfügbar',
-                    source_url: job.apply_link,
-                    source: 'job_search',
+                    serpApiJob: {
+                        title: job.title,
+                        company_name: job.company_name,
+                        location: job.location,
+                        description: job.description || 'Keine Beschreibung verfügbar',
+                        apply_link: job.apply_link,
+                        detected_extensions: job.detected_extensions || {},
+                        raw: job.raw || {},
+                    },
+                    searchQuery: job.title,
                 }),
             });
 
+            if (res.status === 429) {
+                setShowQueueFull(true);
+                return;
+            }
             if (res.ok) {
                 const data = await res.json();
                 if (!data.duplicate) {
@@ -974,62 +1360,65 @@ function AddToQueueButton({ job }: { job: EnrichedJob }) {
     }
 
     return (
-        <div className="relative">
-            <motion.button
-                whileHover={!showPulse ? { scale: 1.02 } : undefined}
-                whileTap={!showPulse ? { scale: 0.98 } : undefined}
-                onClick={handleAdd}
-                disabled={adding || showPulse}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-medium disabled:opacity-50 transition-colors relative overflow-visible"
-                animate={{
-                    backgroundColor: showPulse ? '#16a34a' : '#002e7a',
-                }}
-                transition={{ duration: 0.3 }}
-            >
-                <AnimatePresence mode="wait">
-                    {showPulse ? (
-                        <motion.span
-                            key="check"
-                            initial={{ scale: 0, rotate: -90 }}
-                            animate={{ scale: 1, rotate: 0 }}
-                            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                            className="flex items-center gap-1.5"
-                        >
-                            <CheckCircle2 className="w-3 h-3" />
-                            Hinzugefügt
-                        </motion.span>
-                    ) : adding ? (
-                        <motion.span key="loading" className="flex items-center gap-1.5">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Hinzufügen
-                        </motion.span>
-                    ) : (
-                        <motion.span key="default" className="flex items-center gap-1.5">
-                            <Plus className="w-3 h-3" />
-                            Hinzufügen
-                        </motion.span>
-                    )}
-                </AnimatePresence>
-            </motion.button>
+        <>
+            {showQueueFull && <QueueFullModal onClose={() => setShowQueueFull(false)} />}
+            <div className="relative">
+                <motion.button
+                    whileHover={!showPulse ? { scale: 1.02 } : undefined}
+                    whileTap={!showPulse ? { scale: 0.98 } : undefined}
+                    onClick={handleAdd}
+                    disabled={adding || showPulse}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-medium disabled:opacity-50 transition-colors relative overflow-visible"
+                    animate={{
+                        backgroundColor: showPulse ? '#16a34a' : '#002e7a',
+                    }}
+                    transition={{ duration: 0.3 }}
+                >
+                    <AnimatePresence mode="wait">
+                        {showPulse ? (
+                            <motion.span
+                                key="check"
+                                initial={{ scale: 0, rotate: -90 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                                className="flex items-center gap-1.5"
+                            >
+                                <CheckCircle2 className="w-3 h-3" />
+                                Hinzugefügt
+                            </motion.span>
+                        ) : adding ? (
+                            <motion.span key="loading" className="flex items-center gap-1.5">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Hinzufügen
+                            </motion.span>
+                        ) : (
+                            <motion.span key="default" className="flex items-center gap-1.5">
+                                <Plus className="w-3 h-3" />
+                                Hinzufügen
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                </motion.button>
 
-            {/* Pulse Rings — expand outward from button center */}
-            {showPulse && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <motion.div
-                        className="absolute w-full h-full rounded-lg border-2 border-green-400"
-                        initial={{ scale: 1, opacity: 0.5 }}
-                        animate={{ scale: 2.5, opacity: 0 }}
-                        transition={{ duration: 0.7, ease: 'easeOut' }}
-                    />
-                    <motion.div
-                        className="absolute w-full h-full rounded-lg border-2 border-green-400"
-                        initial={{ scale: 1, opacity: 0.35 }}
-                        animate={{ scale: 2, opacity: 0 }}
-                        transition={{ duration: 0.55, ease: 'easeOut', delay: 0.1 }}
-                    />
-                </div>
-            )}
-        </div>
+                {/* Pulse Rings — expand outward from button center */}
+                {showPulse && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <motion.div
+                            className="absolute w-full h-full rounded-lg border-2 border-green-400"
+                            initial={{ scale: 1, opacity: 0.5 }}
+                            animate={{ scale: 2.5, opacity: 0 }}
+                            transition={{ duration: 0.7, ease: 'easeOut' }}
+                        />
+                        <motion.div
+                            className="absolute w-full h-full rounded-lg border-2 border-green-400"
+                            initial={{ scale: 1, opacity: 0.35 }}
+                            animate={{ scale: 2, opacity: 0 }}
+                            transition={{ duration: 0.55, ease: 'easeOut', delay: 0.1 }}
+                        />
+                    </div>
+                )}
+            </div>
+        </>
     );
 }
 

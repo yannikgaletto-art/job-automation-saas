@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 /**
  * GET  /api/job-search/saved — List saved searches (max 10, newest first)
  * DELETE /api/job-search/saved?id={uuid} — Delete a specific saved search
+ * PATCH /api/job-search/saved — Remove a single job from a saved search's results
+ *       Body: { search_id: string, job_apply_link: string }
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -41,11 +43,13 @@ export async function GET() {
             }
 
             if (allLinks.size > 0) {
+                // Cap at 200 to prevent oversized IN clauses on large result sets
+                const linksArray = Array.from(allLinks).slice(0, 200);
                 const { data: queuedJobs } = await supabase
                     .from('job_queue')
                     .select('source_url')
                     .eq('user_id', user.id)
-                    .in('source_url', Array.from(allLinks));
+                    .in('source_url', linksArray);
 
                 const queuedUrls = new Set((queuedJobs || []).map((j: any) => j.source_url));
 
@@ -94,6 +98,57 @@ export async function DELETE(request: NextRequest) {
         }
 
         return NextResponse.json({ success: true });
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        return NextResponse.json({ error: errMsg }, { status: 500 });
+    }
+}
+
+export async function PATCH(request: NextRequest) {
+    try {
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const { search_id, job_apply_link } = body;
+
+        if (!search_id || !job_apply_link) {
+            return NextResponse.json({ error: 'Missing search_id or job_apply_link' }, { status: 400 });
+        }
+
+        // Fetch the current search to get the results array
+        const { data: search, error: fetchError } = await supabase
+            .from('saved_job_searches')
+            .select('results, result_count')
+            .eq('id', search_id)
+            .eq('user_id', user.id)
+            .single();
+
+        if (fetchError || !search) {
+            return NextResponse.json({ error: 'Search not found' }, { status: 404 });
+        }
+
+        const updatedResults = (search.results as any[]).filter(
+            (job: any) => job.apply_link !== job_apply_link
+        );
+
+        const { error: updateError } = await supabase
+            .from('saved_job_searches')
+            .update({
+                results: updatedResults,
+                result_count: updatedResults.length,
+            })
+            .eq('id', search_id)
+            .eq('user_id', user.id);
+
+        if (updateError) {
+            return NextResponse.json({ error: updateError.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, remaining: updatedResults.length });
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
         return NextResponse.json({ error: errMsg }, { status: 500 });

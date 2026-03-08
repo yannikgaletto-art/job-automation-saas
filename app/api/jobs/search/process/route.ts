@@ -48,6 +48,19 @@ export async function POST(request: NextRequest) {
 
         console.log(`✅ [Process] Starting pipeline for: ${serpApiJob.title} @ ${serpApiJob.company_name}`);
 
+        // ─── Max 5 active jobs per user ──────────────────────────────
+        const { count: activeJobCount } = await supabaseAdmin
+            .from('job_queue')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id);
+
+        if ((activeJobCount ?? 0) >= 5) {
+            return NextResponse.json(
+                { success: false, error: 'Max. 5 aktive Jobs erreicht. Bitte schliesse bestehende Jobs ab oder loesche sie.' },
+                { status: 429 }
+            );
+        }
+
         // ─── Duplicate check ────────────────────────────────────────
         const { data: existing } = await supabaseAdmin
             .from('job_queue')
@@ -126,9 +139,10 @@ export async function POST(request: NextRequest) {
             company_name: serpApiJob.company_name,
             location: harvested?.location || serpApiJob.location || null,
             description: serpApiJob.description,
-            platform: 'google_jobs',
-            source: 'search',
+            platform: 'unknown',
+            source: 'job_search',
             search_query: searchQuery,
+            source_url: serpApiJob.apply_link || null,
             apply_link: serpApiJob.apply_link || null,
             serpapi_raw: serpApiJob.raw || null,
             firecrawl_markdown: firecrawlMarkdown,
@@ -173,8 +187,13 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (insertError) {
-            console.error('❌ [Process] DB insert error:', insertError);
-            return NextResponse.json({ error: 'Database error' }, { status: 500 });
+            // Graceful duplicate handling via unique constraint
+            if (insertError.code === '23505') {
+                console.log(`⚠️ [Process] Duplicate via constraint, source_url=${serpApiJob.apply_link}`);
+                return NextResponse.json({ success: true, duplicate: true });
+            }
+            console.error(`❌ [Process] DB insert error: message=${insertError.message} code=${insertError.code} details=${JSON.stringify(insertError.details)} hint=${insertError.hint}`);
+            return NextResponse.json({ error: 'Database error', details: insertError.message }, { status: 500 });
         }
 
         const duration = Date.now() - startTime;

@@ -127,6 +127,7 @@ export default function JobQueuePage() {
                     // ✅ Pass through metadata so cv_match cache is available in CVMatchTab
                     metadata: (j.metadata as Record<string, unknown>) || null,
                     source_url: (j.source_url as string) || null,
+                    source: (j.source as string) || null,
                 }));
                 setJobs(dbJobs);
                 return dbJobs;
@@ -305,6 +306,7 @@ export default function JobQueuePage() {
                     {optimizationResult && (
                         <CVComparison
                             optimizationResult={optimizationResult}
+                            onAcceptAll={async () => { setShowOptimization(false); }}
                             onRejectAll={() => setShowOptimization(false)}
                             onDownload={async () => {
                                 try {
