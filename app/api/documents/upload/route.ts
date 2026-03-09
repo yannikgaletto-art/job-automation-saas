@@ -250,7 +250,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 2. Upload cover letters
+        // 2. Upload cover letters (with Azure EU extraction + writing style analysis)
         const coverLetterIds: string[] = []
         const coverLetterUrls: string[] = []
 
@@ -272,6 +272,27 @@ export async function POST(req: NextRequest) {
             } else if (data) {
                 coverLetterUrls.push(data.path)
 
+                // ── Azure EU extraction + writing style analysis (non-blocking) ──
+                let clMetadata: Record<string, unknown> = { original_name: file.name };
+                let clPii: Record<string, unknown> = {};
+
+                try {
+                    console.log(`[${requestId}] route=documents/upload step=process_cl index=${j}`);
+                    const clBuffer = Buffer.from(bytes);
+                    const processedCl = await processDocument(clBuffer, file.type, 'cover_letter');
+                    clMetadata = {
+                        ...processedCl.metadata,
+                        extracted_text: processedCl.sanitizedText,
+                        original_name: file.name,
+                    };
+                    clPii = processedCl.encryptedPii;
+                    console.log(`[${requestId}] route=documents/upload step=process_cl success chars=${processedCl.sanitizedText.length}`);
+                } catch (clProcErr) {
+                    const msg = clProcErr instanceof Error ? clProcErr.message : String(clProcErr);
+                    console.warn(`[${requestId}] route=documents/upload step=process_cl failed (non-blocking): ${msg}`);
+                    // Keep minimal metadata — file is still saved
+                }
+
                 // Save to DB
                 console.log(`[${requestId}] route=documents/upload step=db_insert_cl index=${j}`)
                 const { data: clDoc, error: clDbError } = await supabaseAdmin
@@ -280,8 +301,8 @@ export async function POST(req: NextRequest) {
                         user_id: userId,
                         document_type: 'cover_letter',
                         file_url_encrypted: data.path,
-                        metadata: { original_name: file.name }, // ✅ original_name für Cover Letters
-                        pii_encrypted: {}
+                        metadata: clMetadata,
+                        pii_encrypted: clPii,
                     })
                     .select()
                     .single()

@@ -198,27 +198,15 @@ function ATSKeywords({ buzzwords }: { buzzwords: string[] }) {
     );
 }
 
-/** Benefits compact grid */
+/** Benefits compact grid — all items, font matches ATS Keywords pills */
 function BenefitsGrid({ benefits }: { benefits: string[] }) {
-    const [showAll, setShowAll] = useState(false);
-    const visible = showAll ? benefits : benefits.slice(0, 4);
-    const rest = benefits.length - 4;
-
     return (
-        <div className="grid grid-cols-2 gap-1.5">
-            {visible.map((b, i) => (
-                <span key={i} className="text-[10px] bg-slate-50 text-slate-600 border border-slate-200 px-2 py-1 rounded truncate">
+        <div className="flex flex-wrap gap-2 mt-2">
+            {benefits.map((b, i) => (
+                <span key={i} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
                     {b}
                 </span>
             ))}
-            {rest > 0 && !showAll && (
-                <button
-                    onClick={(e) => { e.stopPropagation(); setShowAll(true); }}
-                    className="text-[10px] text-blue-600 hover:underline col-span-2"
-                >
-                    +{rest} mehr
-                </button>
-            )}
         </div>
     );
 }
@@ -338,71 +326,70 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                         {/* ===== TAB 0: STECKBRIEF (2-column layout) ===== */}
                         {displayTab === 0 && (
                             <div className="px-5 py-3 space-y-3">
-                                {/* Seniority chip only — title is already in the row header */}
-                                {formatLevel(job.seniority) && (
-                                    <span className="inline-block bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 text-[10px] font-medium">
-                                        {formatLevel(job.seniority)}
-                                    </span>
-                                )}
+                                {/* Seniority + Source URL — inline with spacing */}
+                                <div className="flex items-center gap-3">
+                                    {formatLevel(job.seniority) && (
+                                        <span className="inline-block bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 text-[10px] font-medium">
+                                            {formatLevel(job.seniority)}
+                                        </span>
+                                    )}
 
-                                {/* Source URL — direct link to job posting or company site */}
-                                {job.source_url && (
-                                    <a
-                                        href={job.source_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="inline-flex items-center gap-1.5 mt-1 text-xs text-[#002e7a] hover:text-[#003d99] hover:underline transition-colors"
-                                    >
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                        </svg>
-                                        {job.source === 'manual_entry' ? 'Unternehmenseite ansehen' : 'Originalanzeige ansehen'}
-                                    </a>
-                                )}
+                                    {/* Link to job posting (scraped) or company website (manual) */}
+                                    {(() => {
+                                        const isManual = job.source === 'manual_entry';
+                                        const href = isManual
+                                            ? (job.metadata?.company_url || job.source_url || null)
+                                            : job.source_url;
+                                        if (!href) return null;
+                                        return (
+                                            <a
+                                                href={href}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="inline-flex items-center gap-1.5 text-xs text-[#002e7a] hover:text-[#003d99] hover:underline transition-colors"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                </svg>
+                                                {isManual ? 'Unternehmenswebsite' : 'Stellenanzeige'}
+                                            </a>
+                                        );
+                                    })()}
+                                </div>
 
-                                {/* 2-Column Split */}
+                                {/* Summary — full width above the grid */}
+                                {job.summary && <SummaryBlock summary={job.summary} />}
+
+                                {/* Row-aligned 2-column grid: left sections ↔ right sections */}
                                 <div className="grid grid-cols-[3fr_2fr] gap-4">
-                                    {/* LEFT COLUMN (60%) */}
-                                    <div className="space-y-3">
-                                        {/* Summary */}
-                                        {job.summary && <SummaryBlock summary={job.summary} />}
+                                    {/* Row 1: Aufgaben (left) + ATS Keywords (right) — same start height */}
+                                    {job.responsibilities && job.responsibilities.length > 0 && (
+                                        <div className="rounded-lg border border-slate-200 p-4">
+                                            <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Aufgaben</h4>
+                                            <CollapsibleList items={job.responsibilities} limit={3} />
+                                        </div>
+                                    )}
+                                    {job.buzzwords && job.buzzwords.length > 0 && (
+                                        <div className="rounded-lg border border-slate-200 p-4">
+                                            <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">ATS Keywords</h4>
+                                            <ATSKeywords buzzwords={job.buzzwords} />
+                                        </div>
+                                    )}
 
-                                        {/* Aufgaben */}
-                                        {job.responsibilities && job.responsibilities.length > 0 && (
-                                            <div className="rounded-lg border border-slate-200 p-4">
-                                                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Aufgaben</h4>
-                                                <CollapsibleList items={job.responsibilities} limit={3} />
-                                            </div>
-                                        )}
-
-                                        {/* Qualifikationen */}
-                                        {job.qualifications && job.qualifications.length > 0 && (
-                                            <div className="rounded-lg border border-slate-200 p-4">
-                                                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Qualifikationen</h4>
-                                                <CollapsibleList items={job.qualifications} limit={3} />
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* RIGHT COLUMN (40%) */}
-                                    <div className="space-y-3">
-                                        {/* ATS Keywords */}
-                                        {job.buzzwords && job.buzzwords.length > 0 && (
-                                            <div>
-                                                <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">ATS Keywords</h4>
-                                                <ATSKeywords buzzwords={job.buzzwords} />
-                                            </div>
-                                        )}
-
-                                        {/* Benefits Grid */}
-                                        {job.benefits && job.benefits.length > 0 && (
-                                            <div>
-                                                <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Benefits</h4>
-                                                <BenefitsGrid benefits={job.benefits} />
-                                            </div>
-                                        )}
-                                    </div>
+                                    {/* Row 2: Qualifikationen (left) + Benefits (right) — same start height */}
+                                    {job.qualifications && job.qualifications.length > 0 && (
+                                        <div className="rounded-lg border border-slate-200 p-4">
+                                            <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Qualifikationen</h4>
+                                            <CollapsibleList items={job.qualifications} limit={3} />
+                                        </div>
+                                    )}
+                                    {job.benefits && job.benefits.length > 0 && (
+                                        <div className="rounded-lg border border-slate-200 p-4">
+                                            <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Benefits</h4>
+                                            <BenefitsGrid benefits={job.benefits} />
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Confirm / Navigate */}
@@ -414,12 +401,12 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#002e7a] text-white text-xs font-medium rounded-md hover:bg-[#002e7a]/90 transition-colors"
                                             >
                                                 <Check className="w-3.5 h-3.5" />
-                                                Steckbrief bestaetigen
+                                                Steckbrief bestätigen
                                             </button>
                                         ) : (
                                             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-md border border-green-100">
                                                 <Check className="w-3.5 h-3.5" />
-                                                Steckbrief bestaetigt
+                                                Steckbrief bestätigt
                                             </div>
                                         )}
                                         <button

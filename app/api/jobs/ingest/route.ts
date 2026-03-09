@@ -5,9 +5,9 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import crypto from 'crypto';
-import Anthropic from '@anthropic-ai/sdk';
 import { deepScrapeJob } from '@/lib/services/job-search-pipeline';
 import { inngest } from '@/lib/inngest/client';
+import { complete } from '@/lib/ai/model-router';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,9 +15,7 @@ const supabaseAdmin = createAdminClient(
     { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
-const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY || '',
-});
+// AI extraction handled by Model Router (lib/ai/model-router.ts)
 
 const IngestRequestSchema = z.object({
     company: z.string().min(2, 'Company name must be at least 2 characters'),
@@ -126,13 +124,11 @@ export async function POST(request: NextRequest) {
         // STEP 2: Extract requirements with LLM (with timeout)
         // ================================================================
         let extractedData: any = {};
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // Increased timeout for deeper extraction
 
         try {
             console.log(`[${requestId}] route=jobs/ingest step=ai_parse_requirements`);
 
-            if (process.env.ANTHROPIC_API_KEY) {
+            if (process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY) {
                 const extractionSchema = {
                     company: "string — Unternehmensname",
                     jobTitle: "string — exakter Stellentitel",
@@ -146,43 +142,36 @@ export async function POST(request: NextRequest) {
                     buzzwords: "string[] — ATS/Robot-Keywords: Tools, Methoden, Frameworks (max 12)"
                 };
 
-                const message = await anthropic.messages.create({
-                    model: 'claude-3-haiku-20240307',
-                    max_tokens: 1500,
+                const response = await complete({
+                    taskType: 'extract_job_fields',
+                    systemPrompt: `Extrahiere aus der folgenden Stellenbeschreibung die Informationen als JSON. Alle Felder auf Deutsch. Wenn ein Feld nicht erkennbar ist, nutze null oder leeres Array. Gib NUR valides JSON zurück, kein Markdown. Schema: ${JSON.stringify(extractionSchema)}`,
+                    prompt: enrichedDescription,
                     temperature: 0,
-                    system: `Extrahiere aus der folgenden Stellenbeschreibung die Informationen als JSON. Alle Felder auf Deutsch. Wenn ein Feld nicht erkennbar ist, nutze null oder leeres Array. Gib NUR valides JSON zurück, kein Markdown. Schema: ${JSON.stringify(extractionSchema)}`,
-                    messages: [{ role: 'user', content: enrichedDescription }]
-                }, { signal: controller.signal });
+                    maxTokens: 1500,
+                });
 
-                if (message.content[0].type === 'text') {
-                    const text = message.content[0].text.trim();
-                    try {
-                        extractedData = JSON.parse(text);
-                    } catch (parseError) {
-                        const jsonMatch = text.match(/\{[\s\S]*\}/);
-                        if (jsonMatch) {
-                            try {
-                                extractedData = JSON.parse(jsonMatch[0]);
-                            } catch (e) {
-                                console.warn(`[${requestId}] route=jobs/ingest step=ai_parse JSON fallback parse failed`);
-                            }
-                        } else {
-                            console.warn(`[${requestId}] route=jobs/ingest step=ai_parse JSON parse failed, text=${text.substring(0, 50)}...`);
+                const text = response.text.trim();
+                try {
+                    extractedData = JSON.parse(text);
+                } catch (parseError) {
+                    const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        try {
+                            extractedData = JSON.parse(jsonMatch[0]);
+                        } catch (e) {
+                            console.warn(`[${requestId}] route=jobs/ingest step=ai_parse JSON fallback parse failed`);
                         }
+                    } else {
+                        console.warn(`[${requestId}] route=jobs/ingest step=ai_parse JSON parse failed, text=${text.substring(0, 50)}...`);
                     }
                 }
+                console.log(`[${requestId}] route=jobs/ingest step=ai_parse model=${response.model} cost_cents=${response.costCents}`);
             } else {
                 console.warn(`[${requestId}] route=jobs/ingest step=ai_parse no_api_key skipped`);
             }
         } catch (aiError: any) {
-            if (aiError.name === 'AbortError') {
-                console.warn(`[${requestId}] route=jobs/ingest step=ai_parse timeout=12000ms`);
-            } else {
-                console.warn(`[${requestId}] route=jobs/ingest step=ai_parse error=${aiError.message}`);
-            }
+            console.warn(`[${requestId}] route=jobs/ingest step=ai_parse error=${aiError.message}`);
             // Proceed with empty extraction rather than failing the ingest
-        } finally {
-            clearTimeout(timeoutId);
         }
 
         // ================================================================

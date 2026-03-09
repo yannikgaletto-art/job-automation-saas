@@ -117,7 +117,8 @@ export function ActiveCVCard() {
                     if (e.lengthComputable) {
                         const pct = Math.round((e.loaded / e.total) * 80);
                         setUploadProgress(pct);
-                        if (pct >= 30) setUploadStatus('Wird gespeichert...');
+                        if (pct >= 50) setUploadStatus('🔵 KI-Analyse & Speicherung läuft...');
+                        else if (pct >= 20) setUploadStatus('🔵 Azure EU liest deinen Lebenslauf aus...');
                         else setUploadStatus('Datei wird hochgeladen...');
                     }
                 };
@@ -299,9 +300,17 @@ export function ActiveCVCard() {
             {/* Upload Progress Bar */}
             {uploading && (
                 <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-[#73726E]">
-                        <span>{uploadStatus || 'Datei wird hochgeladen...'}</span>
-                        <span className="font-mono">{uploadProgress}%</span>
+                    <div className="flex justify-between items-center text-xs">
+                        <span className="text-[#73726E]">{uploadStatus || 'Datei wird hochgeladen...'}</span>
+                        <div className="flex items-center gap-2">
+                            {uploadProgress >= 20 && uploadProgress < 100 && (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 font-medium">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block" />
+                                    Azure EU
+                                </span>
+                            )}
+                            <span className="font-mono text-[#73726E]">{uploadProgress}%</span>
+                        </div>
                     </div>
                     <div className="w-full bg-[#F7F7F5] rounded-full h-1.5">
                         <div
@@ -309,6 +318,11 @@ export function ActiveCVCard() {
                             style={{ width: `${uploadProgress}%` }}
                         />
                     </div>
+                    {uploadProgress >= 20 && uploadProgress < 100 && (
+                        <p className="text-[10px] text-slate-400">
+                            Deine Daten werden auf EU-Servern (Microsoft Azure) verarbeitet.
+                        </p>
+                    )}
                 </div>
             )}
 

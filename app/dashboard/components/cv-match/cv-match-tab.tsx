@@ -152,27 +152,19 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     const notify = useNotification();
     const [matchData, setMatchData] = useState<CVMatchResult | null>(null);
     const [loadingStep, setLoadingStep] = useState(0);
-    const [progressText, setProgressText] = useState("Profil wird mit Stellenausschreibung abgeglichen...");
+    const [progressText, setProgressText] = useState('Lebenslauf wird eingelesen...');
+
+    // AI steps shown during loading — matches Cover Letter transparency pattern
+    const CV_STEPS = [
+        { label: 'Lebenslauf einlesen', detail: 'Dein CV wird geladen \u0026 aufbereitet', pct: 15, model: null },
+        { label: 'Steckbrief abrufen', detail: 'Stelle \u0026 Anforderungen werden analysiert', pct: 30, model: null },
+        { label: 'CV Match berechnen', detail: 'Claude Haiku 4.5 vergleicht Profil \u0026 Stelle', pct: 65, model: 'claude-haiku-4-5' },
+        { label: 'Realism Check', detail: 'Zweite KI-Instanz prüft den Score auf Plausibilität', pct: 88, model: 'claude-haiku-4-5' },
+        { label: 'Ergebnis speichern', detail: 'Gegenüberstellung wird vorbereitet', pct: 96, model: null },
+    ];
 
     useEffect(() => {
-        if (state === 'loading' && loadingStep === 2) {
-            const messages = [
-                "Profil wird mit Stellenausschreibung abgeglichen...",
-                "Analysiere fachliche Anforderungen...",
-                "Pruefe relevante Erfahrungen...",
-                "Berechne Match-Score...",
-                "Identifiziere fehlende Keywords...",
-                "Fasse Kompetenzen zusammen..."
-            ];
-            let index = 1;
-            const interval = setInterval(() => {
-                setProgressText(messages[index]);
-                index = (index + 1) % messages.length;
-            }, 3000);
-            return () => clearInterval(interval);
-        } else {
-            setProgressText("Profil wird mit Stellenausschreibung abgeglichen...");
-        }
+        // No-op — progress is driven by the CV_STEPS array via loadingStep
     }, [state, loadingStep]);
 
     useEffect(() => {
@@ -286,7 +278,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
 
             // Poll for results (Inngest processes in background)
             let attempts = 0;
-            const maxAttempts = 20; // 20 × 3s = 60s max
+            const maxAttempts = 50; // 50 × 3s = 150s max — CV Match takes 60-80s
 
             pollingRef.current = setInterval(async () => {
                 attempts++;
@@ -412,13 +404,11 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                     onClose={() => setShowCVSelect(false)}
                 />
                 <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
-                    <div className="bg-white p-4 rounded-full shadow-sm mb-4 border border-slate-200">
-                        <Sparkles className="w-8 h-8 text-[#002e7a]" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">CV Check & Optimierung</h3>
+
+                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">CV Match & Optimierung</h3>
                     <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
-                        Wir vergleichen deinen Lebenslauf mit den Anforderungen dieser Stelle.
-                        Du erhaeltst einen detaillierten Bericht, auf dessen Basis wir einen optimierten CV generieren koennen.
+                        Wir <strong>vergleichen</strong> deinen <strong>Lebenslauf</strong> mit den <strong>Anforderungen</strong> dieser <strong>Stelle</strong>.
+                        Du erhältst eine <strong>Gegenüberstellung</strong>, auf deren Basis wir einen <strong>optimierten CV</strong> generieren können.
                     </p>
                     {state === 'error' && (
                         <div className="mb-4 text-sm text-red-600 flex items-center gap-2 bg-red-50 px-3 py-2 rounded-md border border-red-100">
@@ -436,45 +426,64 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
 
     // ── LOADING ────────────────────────────────────────────────
     if (state === 'loading') {
-        return (
-            <div className="px-6 py-16 flex flex-col items-center justify-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
-                <div className="w-72">
-                    {/* Label + percent */}
-                    <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-xs font-semibold" style={{ color: '#002e7a' }}>
-                            <AnimatePresence mode="popLayout">
-                                <motion.span
-                                    key={loadingStep === 2 ? progressText : loadingStep}
-                                    initial={{ opacity: 0, y: 6 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -6 }}
-                                    transition={{ duration: 0.35 }}
-                                    className="inline-block"
-                                >
-                                    {loadingStep === 1 && 'Lebenslauf wird gelesen...'}
-                                    {loadingStep === 2 && progressText}
-                                    {loadingStep === 3 && 'Match-Bericht wird erstellt...'}
-                                </motion.span>
-                            </AnimatePresence>
-                        </span>
-                        <span className="text-xs" style={{ color: '#A8A29E' }}>
-                            {loadingStep === 1 ? '30' : loadingStep === 2 ? '70' : '95'}%
-                        </span>
-                    </div>
+        // Derive active step from loadingStep: 1=load-cv, 2=analyze, 3=done
+        const activeStep = loadingStep === 1 ? 0 : loadingStep === 2 ? 2 : 4;
+        const pct = loadingStep === 1 ? 15 : loadingStep === 2 ? 55 : 96;
+        const current = CV_STEPS[Math.min(activeStep, CV_STEPS.length - 1)];
 
-                    {/* Progress bar */}
-                    <div className="w-full h-2 bg-[#E7E7E5] rounded-full overflow-hidden">
-                        <motion.div
+        return (
+            <div className="px-6 py-10 flex flex-col items-center justify-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200 gap-4">
+                {/* Skeleton shimmer rows */}
+                <div className="w-full max-w-sm space-y-3">
+                    {[1, 0.85, 1, 0.72, 0.9, 0.6].map((w, i) => (
+                        <div
+                            key={i}
+                            className="h-3.5 rounded-full bg-gradient-to-r from-[#E7E7E5] via-[#F0F0EE] to-[#E7E7E5] animate-pulse"
+                            style={{ width: `${w * 100}%`, animationDelay: `${i * 80}ms` }}
+                        />
+                    ))}
+                </div>
+
+                {/* Progress bar + label */}
+                <div className="w-full max-w-sm">
+                    <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs font-semibold text-[#002e7a]">{current.label}</span>
+                        <span className="text-xs text-[#A8A29E]">{pct}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-[#E7E7E5] rounded-full overflow-hidden">
+                        <div
                             className="h-full bg-gradient-to-r from-[#002e7a] to-[#3B82F6] rounded-full"
-                            initial={{ width: '5%' }}
-                            animate={{ width: loadingStep === 1 ? '30%' : loadingStep === 2 ? '70%' : '95%' }}
-                            transition={{ duration: 0.5 }}
+                            style={{ width: `${pct}%`, transition: 'width 600ms ease-out' }}
                         />
                     </div>
-
-                    {/* Time estimate */}
-                    <p className="text-[11px] text-center mt-3" style={{ color: '#A8A29E' }}>Dauert ca. 15–30 Sekunden</p>
+                    {/* Detail text — shows which AI / what is happening */}
+                    <p className="text-[11px] text-[#73726E] mt-1.5 text-center">{current.detail}</p>
+                    {current.model && (
+                        <p className="text-[10px] text-slate-400 text-center mt-0.5">Modell: {current.model}</p>
+                    )}
                 </div>
+
+                {/* Step dot indicators */}
+                <div className="flex items-center gap-1.5 justify-center">
+                    {CV_STEPS.map((step, i) => (
+                        <div key={i} className="flex items-center gap-1.5">
+                            <div className={[
+                                'w-2 h-2 rounded-full transition-all duration-300',
+                                i < activeStep ? 'bg-[#22C55E]' :
+                                    i === activeStep ? 'bg-[#002e7a] scale-125' :
+                                        'bg-[#E7E7E5]',
+                            ].join(' ')} />
+                            {i < CV_STEPS.length - 1 && (
+                                <div className={[
+                                    'h-px w-5 transition-colors duration-500',
+                                    i < activeStep ? 'bg-[#22C55E]' : 'bg-[#E7E7E5]',
+                                ].join(' ')} />
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                <p className="text-[11px] text-[#A8A29E]">Dauert ca. 45–90 Sekunden</p>
             </div>
         );
     }
@@ -636,6 +645,9 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                     <h4 className="text-xs font-semibold text-[#37352F] mb-2">
                         ATS Keywords <span className="text-[10px] text-slate-400 font-normal ml-1">(Applicant Tracking System)</span>
                     </h4>
+                    <p className="text-xs text-slate-500 leading-relaxed mb-3">
+                        In der Regel ist die erste Instanz, die deinen Lebenslauf prüft, ein <strong className="font-semibold text-slate-700">Algorithmus</strong>. Die Applicant Tracking Systems (ATS) suchen gezielt nach <strong className="font-semibold text-slate-700">Keywords</strong>, die für die Stelle relevant sind. Fehlen diese Begriffe, wird deine Bewerbung oft automatisch aussortiert. Wir empfehlen dir daher, die Schlagworte aus der Stellenanzeige direkt in deinen Lebenslauf zu <strong className="font-semibold text-slate-700">integrieren</strong>.
+                    </p>
                     <div className="flex flex-wrap gap-1.5">
                         {keywordsFound.map(kw => (
                             <span key={kw} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
@@ -657,7 +669,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 <div className="bg-blue-50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between border border-blue-100">
                     <div>
                         <h4 className="font-semibold text-[#002e7a] text-sm">Zur Erstellung deines Lebenslaufs</h4>
-                        <p className="text-xs text-[#002e7a]/70 mt-0.5">Gehe zum naechsten Schritt, um deinen Lebenslauf basierend auf dieser Analyse zu aktualisieren.</p>
+                        <p className="text-xs text-[#002e7a]/70 mt-0.5">Gehe zum nächsten Schritt, um deinen Lebenslauf basierend auf dieser Analyse zu aktualisieren.</p>
                     </div>
                     <div className="flex gap-3 mt-3 sm:mt-0">
                         <Button variant="primary" onClick={() => onNextStep?.()} className="shadow-sm text-sm">

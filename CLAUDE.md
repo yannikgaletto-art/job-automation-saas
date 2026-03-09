@@ -95,8 +95,40 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | Job Search | AI-Suche, Delete Buttons, Saved Searches Unique Constraint Fix |
 | Colors | Global #0066FF → #012e7a replacement |
 | Documentation | schema.sql V4.0, ARCHITECTURE.md V5.0 (13 neue Tabellen, 60+ API Endpoints) |
+| **Azure Document Intelligence** | **PRIMARY CV/Cover Letter extractor (EU, DSGVO-konform). Claude Haiku = Fallback. Neue Datei: `lib/services/azure-document-extractor.ts`** |
+| **Steckbrief UI** | **Unternehmenswebsite Hyperlink, ATS/Benefits Schriftgröße, Umlaute (ä/ö/ü), Layout-Alignment** |
+| **CV Match Tab** | **Rename 'CV Check' → 'CV Match', Icon entfernt, Loading-UI (Cover-Letter-Style), Polling 60s→150s Bug-Fix, ATS-Keywords Erklärungstext** |
+| **Upload UI** | **Azure EU Fortschrittsanzeige: Badge + Status-Texte für CV & Cover Letter Upload** |
 
 ---
+
+## 🤖 AI STACK (AKTUELL — Stand 2026-03-09)
+
+### Document Extraction (PRIMARY: EU, DSGVO-konform)
+```
+Azure Document Intelligence (prebuilt-read)
+  Endpoint: https://pathly.cognitiveservices.azure.com/
+  Region: West Europe (EU)
+  Env: AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT / AZURE_DOCUMENT_INTELLIGENCE_KEY
+  Fallback: pdf-parse (lokal, kein API)
+```
+
+### Metadata & PII Extraction (nach Azure-Extraktion)
+```
+Claude Haiku 4.5 (Anthropic US)
+  Task: PII erkennen + Skills + Schreibstil
+  Env: ANTHROPIC_API_KEY
+```
+
+### Routing-Logik (lib/ai/model-router.ts)
+```
+parse_html, extract_job_fields, detect_ats_system       → GPT-4o-mini (cheap)
+write_cover_letter, personalize_intro, optimize_cv      → Claude Sonnet 4.5 (premium)
+cv_match, cv_parse, analyze_skill_gaps                  → Claude Haiku 4.5 (structured)
+document_extraction (PRIMARY)                           → Azure Document Intelligence (EU)
+```
+
+
 
 ## 🎯 RULE #0: REDUCE COMPLEXITY
 

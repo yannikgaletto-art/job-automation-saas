@@ -132,7 +132,7 @@ export async function generateCoverLetterWithQuality(
                 jobData.company_name,
                 false,
                 {
-                    website: jobData.metadata?.company_url || undefined,
+                    website: jobData.metadata?.company_url || jobData.company_website || undefined,
                     industry: jobData.field || jobData.metadata?.field || undefined,
                     description: jobData.job_description?.substring(0, 200) || undefined,
                 }

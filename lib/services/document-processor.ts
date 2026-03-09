@@ -1,4 +1,5 @@
 import { extractText } from './text-extractor';
+import { extractTextWithAzure } from './azure-document-extractor';
 import { encrypt } from '@/lib/utils/encryption';
 import Anthropic from '@anthropic-ai/sdk';
 import { analyzeWritingStyle, StyleAnalysis, getDefaultStyleAnalysis } from './writing-style-analyzer';
@@ -25,18 +26,39 @@ export interface ProcessedDocument {
 export async function processDocument(
     fileBuffer: Buffer,
     mimeType: string,
-    documentType: 'cv' | 'cover_letter' = 'cv' // Default to CV for backwards compatibility
+    documentType: 'cv' | 'cover_letter' = 'cv'
 ): Promise<ProcessedDocument> {
-    const rawText = await extractText(fileBuffer, mimeType);
+
+    // ================================================================
+    // Step 1: Text Extraction
+    // PRIMARY:  Azure Document Intelligence (EU — DSGVO-konform)
+    // FALLBACK: pdf-parse / mammoth (local, no API)
+    // ================================================================
+    let rawText: string | null = null;
+    let extractionSource: 'azure' | 'local' = 'azure';
+
+    // Try Azure first (layout-aware OCR, handles visual/scanned PDFs)
+    rawText = await extractTextWithAzure(fileBuffer, mimeType);
+
+    if (!rawText) {
+        // Azure unavailable or insufficient text — fall back to local extraction
+        console.warn('⚠️ [document-processor] Azure extraction failed or insufficient — falling back to local extractor');
+        extractionSource = 'local';
+        rawText = await extractText(fileBuffer, mimeType);
+    }
+
+    console.log(`📝 [document-processor] Text extracted via ${extractionSource}: ${rawText.length} chars`);
 
     if (rawText.trim().length < 50) {
         throw new Error('PDF konnte nicht gelesen werden. Bitte als Text-PDF exportieren.');
     }
 
-    // 2. Intelligent Analysis (PII & Metadata) via Claude
-    // We send a portion of text (first 4k chars usually enough for PII/Skills header) to save tokens/cost
-    // provided the CV isn't huge. For full analysis, we might send more.
-    const textToAnalyze = rawText.slice(0, 15000); // Analyze first ~15k chars (approx 3-4 pages)
+    // ================================================================
+    // Step 2: AI Metadata Extraction (PII + Skills)
+    // Still uses Claude Haiku — this is metadata only, not full CV text
+    // The PII is immediately encrypted after this step.
+    // ================================================================
+    const textToAnalyze = rawText.slice(0, 15000);
 
     let analysisResult: any;
 
