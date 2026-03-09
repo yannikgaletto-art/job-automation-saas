@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { HookCard } from '../cards/HookCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse, SelectedHook, SelectedQuote } from '@/types/cover-letter-setup';
-import { Sparkles, ChevronRight, ChevronDown, Search, SkipForward, RefreshCw, Quote, ExternalLink } from 'lucide-react';
+import { Sparkles, ChevronRight, ChevronDown, Search, SkipForward, RefreshCw, Quote, ExternalLink, Globe } from 'lucide-react';
 
 // ─── State Machine ─────────────────────────────────────────────────
 type Phase = 'idle' | 'analyzing' | 'results' | 'quotePrompt' | 'quoteSearching' | 'quoteResults';
@@ -23,6 +23,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     const [manualText, setManualText] = useState('');
     const [quoteError, setQuoteError] = useState<string | null>(null);
     const [openAccordion, setOpenAccordion] = useState<string | null>(null);
+    const [websiteInput, setWebsiteInput] = useState(setupData.companyWebsite || '');
 
     // ─── State Machine: resume at correct phase ────────────────────
     const getInitialPhase = (): Phase => {
@@ -54,14 +55,27 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     };
 
     // ─── Phase A: Company Analysis ─────────────────────────────────
-    const handleAnalyze = async () => {
+    const handleAnalyze = async (websiteOverride?: string) => {
+        const website = websiteOverride || websiteInput || setupData.companyWebsite;
+        if (!website || website.trim().length < 4) {
+            alert('Bitte gib die Unternehmenswebsite ein.');
+            return;
+        }
+
         setPhase('analyzing');
         setAnalysisStep(1);
         try {
+            // First: save the website to the job so it's persisted for future use
+            await fetch(`/api/jobs/${jobId}/context`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ company_website: website.trim() }),
+            });
+
             const res = await fetch('/api/jobs/enrich', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId, companyName, website: setupData.companyWebsite ?? undefined })
+                body: JSON.stringify({ jobId, companyName, website: website.trim() })
             });
             if (!res.ok) throw new Error('Enrichment failed');
 
@@ -74,7 +88,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
         } catch (err) {
             console.error('❌ [StepHook] Analysis failed:', err);
             setPhase('idle');
-            alert('Analyse fehlgeschlagen. Bitte Perplexity API Key prüfen.');
+            alert('Analyse fehlgeschlagen. Bitte überprüfe die Website-URL und versuche es erneut.');
         }
     };
 
@@ -150,15 +164,37 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 <h3 className="text-xl font-semibold text-[#37352F] mb-2">
                     Unternehmensanalyse für <span className="text-[#002e7a]">{companyName}</span>
                 </h3>
-                <p className="text-[#73726E] text-sm max-w-md mb-2 leading-relaxed">
-                    Um deinen Cover Letter so individuell wie möglich zu machen, analysieren wir Vision, Meilensteine, aktuelle Projekte, Seed Funding und Wachstum von {companyName}.
+                <p className="text-[#73726E] text-sm max-w-md mb-4 leading-relaxed">
+                    Um deinen Cover Letter so individuell wie möglich zu machen, analysieren wir Vision, Meilensteine, aktuelle Projekte und Wachstum von {companyName}.
                 </p>
-                <p className="text-[#A8A29E] text-xs mb-6">
-                    Klicke auf &quot;Analysieren&quot; um zu starten
-                </p>
+
+                {/* Website Input */}
+                <div className="w-full max-w-md mb-4">
+                    <label className="text-xs font-medium text-[#37352F] mb-1.5 block text-left">
+                        <Globe className="w-3.5 h-3.5 inline mr-1" />
+                        Unternehmenswebsite
+                    </label>
+                    <input
+                        type="url"
+                        value={websiteInput}
+                        onChange={(e) => setWebsiteInput(e.target.value)}
+                        placeholder="z.B. https://www.replug.io"
+                        className="w-full text-sm text-[#37352F] border border-[#E7E7E5] rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#002e7a]/20 focus:border-[#002e7a] placeholder-[#A8A29E] transition-all"
+                    />
+                    <p className="text-[10px] text-[#A8A29E] mt-1 text-left">
+                        Die Website wird für die Analyse benötigt. Sie wird gespeichert für zukünftige Schritte.
+                    </p>
+                </div>
+
                 <button
-                    onClick={handleAnalyze}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-[#002e7a] text-white text-sm font-semibold rounded-lg hover:bg-[#001e5a] transition-colors shadow-sm"
+                    onClick={() => handleAnalyze()}
+                    disabled={!websiteInput || websiteInput.trim().length < 4}
+                    className={[
+                        'flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg transition-colors shadow-sm',
+                        websiteInput && websiteInput.trim().length >= 4
+                            ? 'bg-[#002e7a] text-white hover:bg-[#001e5a]'
+                            : 'bg-[#E7E7E5] text-[#A8A29E] cursor-not-allowed',
+                    ].join(' ')}
                 >
                     <Sparkles className="w-4 h-4" />
                     {companyName} analysieren
@@ -172,7 +208,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
         const steps = [
             'Unternehmenswebsite wird gelesen…',
             'Vision & Projekte werden analysiert…',
-            'Aktuelle News & Funding werden geprüft…',
+            'Werte & Wachstum werden geprüft…',
             'Ergebnisse werden aufbereitet…',
         ];
         const progress = analysisStep === 1 ? '20%' : analysisStep === 2 ? '50%' : analysisStep === 3 ? '80%' : '95%';
@@ -216,11 +252,11 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                         Ergebnisse für <span className="text-[#002e7a]">{companyName}</span>
                     </h3>
                     <p className="text-xs text-[#73726E] mt-1 max-w-xl leading-relaxed">
-                        Damit wir aus der Masse herausstechen, empfehlen wir eine personalisierte Einleitung. Dazu analysierten wir die derzeitigen News des Unternehmens. Wähle eine aus, die du spannend findest.
+                        Damit wir aus der Masse herausstechen, empfehlen wir eine personalisierte Einleitung. Wähle einen Aspekt des Unternehmens, der dich anspricht.
                     </p>
                 </div>
                 <button
-                    onClick={handleAnalyze}
+                    onClick={() => handleAnalyze()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium transition-colors border border-[#E7E7E5] text-[#73726E] hover:bg-gray-50 shrink-0"
                     title="Analyse wiederholen"
                 >
@@ -232,12 +268,10 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
             {(() => {
                 const filteredHooks = setupData.hooks.filter(h => h.type !== 'quote');
                 const groups: { label: string; icon: string; types: string[] }[] = [
-                    { label: 'News', icon: '📰', types: ['news'] },
-                    { label: 'Werte', icon: '✦', types: ['value'] },
                     { label: 'Vision', icon: '🎯', types: ['vision'] },
+                    { label: 'Werte', icon: '✦', types: ['value'] },
                     { label: 'Projekte', icon: '🚀', types: ['project'] },
                     { label: 'Wachstum & Funding', icon: '📈', types: ['funding'] },
-                    { label: 'LinkedIn', icon: '🔗', types: ['linkedin'] },
                     { label: 'Eigener Text', icon: '✏️', types: ['manual'] },
                 ];
 

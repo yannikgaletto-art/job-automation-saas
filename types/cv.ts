@@ -49,7 +49,7 @@ import { z } from 'zod';
 export const changeTypeSchema = z.enum(['add', 'modify', 'remove']);
 
 export const cvStructuredDataSchema = z.object({
-    version: z.string(),
+    version: z.string().optional(),
     personalInfo: z.object({
         name: z.string().nullish(),
         email: z.string().nullish(),

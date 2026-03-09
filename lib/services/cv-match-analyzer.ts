@@ -1,5 +1,12 @@
 import { complete } from '@/lib/ai/model-router';
-import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+
+// Admin client: works in both API routes AND Inngest background context (no cookie/session required)
+const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+);
 
 /**
  * Attempts to parse JSON, with a fallback that truncates the string at the
@@ -272,7 +279,6 @@ Setze "realismScore" auf 0-100 (wie realistisch war die erste Analyse?).
 
 export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchResult> {
     const startTime = Date.now();
-    const supabase = await createClient();
 
     try {
         const result = await complete({
@@ -296,7 +302,7 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
         // Ensure issues object exists to hold realism score without schema change
         const issuesPayload = finalResult.realismScore ? { realism_score: finalResult.realismScore } : null;
 
-        await supabase.from('generation_logs').insert({
+        await supabaseAdmin.from('generation_logs').insert({
             user_id: req.userId,
             job_id: req.jobId,
             generation_type: 'cv_match',
@@ -317,7 +323,7 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
         return cleanResult;
 
     } catch (error: any) {
-        await supabase.from('generation_logs').insert({
+        await supabaseAdmin.from('generation_logs').insert({
             user_id: req.userId,
             job_id: req.jobId,
             generation_type: 'cv_match',

@@ -311,12 +311,24 @@ async function fetchCompanyIntel(
                 confidence += 0.1;
             }
 
+            // +0.1 wenn description/job context vorkommt (z.B. Position: Content & Inbound Marketing)
+            if (context?.description) {
+                // Check if any meaningful word from the description appears in the response
+                const descWords = context.description.toLowerCase().split(/[\s:,]+/).filter(w => w.length > 4);
+                if (descWords.some(w => responseTextLower.includes(w))) {
+                    confidence += 0.1;
+                }
+            }
+
             console.log(`📊 [Enrichment] Confidence for "${companyName}": ${confidence.toFixed(2)} (valid citations: ${validSources.length}/${citations.length})`);
 
-            // Threshold: confidence < 0.9 → Empty State
-            // 0.9 is achievable via: domain-match(0.4) + name-in-text(0.3) + 2-citations(0.2) = 0.9 ✅
-            if (confidence < 0.9) {
-                console.warn(`⚠️ Confidence ${confidence.toFixed(2)} < 0.9 for "${companyName}". Returning empty state.`);
+            // Threshold: context-dependent
+            // With website: require 0.9 (domain-match(0.4) + name-in-text(0.3) + 2-citations(0.2) = 0.9)
+            // Without website but with description: accept 0.7 (name-match(0.2) + name-in-text(0.3) + 2-citations(0.2) = 0.7)
+            // Without any context: require 0.9 (stricter — no way to verify correctness)
+            const requiredConfidence = (!context?.website && context?.description) ? 0.7 : 0.9;
+            if (confidence < requiredConfidence) {
+                console.warn(`⚠️ Confidence ${confidence.toFixed(2)} < ${requiredConfidence} for "${companyName}". Returning empty state.`);
                 return getEmptyEnrichmentResult(companyName, !context?.website);
             }
 
@@ -398,135 +410,96 @@ async function saveToCache(
 }
 
 /**
- * STEP 2b: Firecrawl + OpenAI Fallback Chain
+ * STEP 2b: Jina AI Reader + Claude Haiku Fallback Chain
  *
  * When Perplexity returns empty (confidence < 0.9) AND we have a company_website:
- *   1. Firecrawl scrapes the company website for markdown content
- *   2. OpenAI GPT-4o-mini extracts structured intel_data from the scraped text
+ *   1. Jina AI reader (r.jina.ai) scrapes the company website — FREE, no API key needed
+ *   2. Claude Haiku extracts structured intel_data from the scraped text
  *
- * Returns null if the fallback chain fails entirely.
+ * Much more reliable than Firecrawl+OpenAI: Jina is free and always available,
+ * Claude Haiku is already used throughout the app.
  */
-async function fetchViaFirecrawlAndOpenAI(
+async function fetchViaJinaAndClaude(
     companyName: string,
     websiteUrl: string
 ): Promise<Partial<EnrichmentResult> & { needs_company_context: boolean } | null> {
-    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-
-    if (!firecrawlApiKey || !openaiApiKey) {
-        console.warn('⚠️ [Fallback] Missing FIRECRAWL_API_KEY or OPENAI_API_KEY — skipping fallback chain.');
-        return null;
-    }
-
-    // ── Step 1: Firecrawl Scrape ──────────────────────────────────────────
+    // ── Step 1: Jina AI Reader scrape ─────────────────────────────────────
     let scrapedMarkdown = '';
     try {
-        console.log(`🔥 [Fallback] Firecrawl scraping: ${websiteUrl}`);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+        const normalizedUrl = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
+        const jinaUrl = `https://r.jina.ai/${normalizedUrl}`;
+        console.log(`🔍 [Fallback] Jina AI scraping: ${jinaUrl}`);
 
-        const firecrawlRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
-            method: 'POST',
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+        const jinaRes = await fetch(jinaUrl, {
             headers: {
-                'Authorization': `Bearer ${firecrawlApiKey}`,
-                'Content-Type': 'application/json',
+                'Accept': 'text/plain',
+                'X-Return-Format': 'markdown',
             },
-            body: JSON.stringify({
-                url: websiteUrl,
-                formats: ['markdown'],
-            }),
             signal: controller.signal,
         });
         clearTimeout(timeoutId);
 
-        if (!firecrawlRes.ok) {
-            console.warn(`⚠️ [Fallback] Firecrawl HTTP ${firecrawlRes.status} for ${websiteUrl}`);
+        if (!jinaRes.ok) {
+            console.warn(`⚠️ [Fallback] Jina HTTP ${jinaRes.status} for ${jinaUrl}`);
             return null;
         }
 
-        const firecrawlData = await firecrawlRes.json();
-        scrapedMarkdown = firecrawlData?.data?.markdown || '';
+        scrapedMarkdown = await jinaRes.text();
 
         if (scrapedMarkdown.length < 100) {
-            console.warn(`⚠️ [Fallback] Firecrawl returned too little content (${scrapedMarkdown.length} chars)`);
+            console.warn(`⚠️ [Fallback] Jina returned too little content (${scrapedMarkdown.length} chars)`);
             return null;
         }
 
-        console.log(`✅ [Fallback] Firecrawl scraped ${scrapedMarkdown.length} chars from ${websiteUrl}`);
+        console.log(`✅ [Fallback] Jina scraped ${scrapedMarkdown.length} chars from ${websiteUrl}`);
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
-        console.error(`❌ [Fallback] Firecrawl error for ${websiteUrl}:`, errMsg);
+        console.error(`❌ [Fallback] Jina error for ${websiteUrl}:`, errMsg);
         return null;
     }
 
-    // ── Step 2: OpenAI Structured Extraction ──────────────────────────────
+    // ── Step 2: Claude Haiku structured extraction ─────────────────────────
     try {
-        console.log(`🤖 [Fallback] OpenAI extracting structured data for "${companyName}"`);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        console.log(`🤖 [Fallback] Claude Haiku extracting intel for "${companyName}"...`);
+        const { complete } = await import('@/lib/ai/model-router');
 
         // Truncate to ~8000 chars to stay within token limits
         const truncatedContent = scrapedMarkdown.substring(0, 8000);
 
-        const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${openaiApiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o-mini',
-                temperature: 0,
-                messages: [
-                    {
-                        role: 'system',
-                        content: `Du bist ein Unternehmens-Analyst. Extrahiere strukturierte Informationen aus dem Website-Inhalt. Antworte NUR mit validem JSON. Wenn eine Information nicht verfügbar ist, verwende ein leeres Array oder leeren String.`,
-                    },
-                    {
-                        role: 'user',
-                        content: `Extrahiere aus dem folgenden Website-Inhalt von "${companyName}" (${websiteUrl}) die Informationen:
+        const prompt = `Du bist ein Unternehmens-Analyst. Extrahiere strukturierte Informationen aus dem folgenden Website-Inhalt von "${companyName}" (${websiteUrl}).
 
+WEBSITE-INHALT:
 ${truncatedContent}
 
-JSON-Format:
+Antworte NUR mit validem JSON (kein Markdown, keine Erklärungen):
 {
-  "vision_and_mission": "string — Mission/Vision des Unternehmens",
-  "recent_news": ["string — aktuelle Neuigkeiten, max 3"],
-  "company_values": ["string — Werte des Unternehmens, max 5"],
-  "key_projects": ["string — Hauptprodukte oder Projekte, max 3"],
-  "funding_status": "string — Wachstums-/Funding-Status falls erkennbar, sonst leer"
-}`,
-                    },
-                ],
-            }),
-            signal: controller.signal,
+  "vision_and_mission": "Mission/Vision des Unternehmens (1-2 Sätze)",
+  "recent_news": ["Neuigkeit 1", "Neuigkeit 2"],
+  "company_values": ["Wert 1", "Wert 2", "Wert 3"],
+  "key_projects": ["Hauptprodukt/Projekt 1", "Hauptprodukt/Projekt 2"],
+  "funding_status": "Wachstums-/Funding-Status falls erkennbar, sonst leer"
+}
+
+Wenn eine Information nicht verfügbar ist, verwende ein leeres Array oder leeren String.`;
+
+        const result = await complete({
+            taskType: 'cv_parse',
+            prompt,
+            temperature: 0,
+            maxTokens: 1024,
         });
-        clearTimeout(timeoutId);
 
-        if (!openaiRes.ok) {
-            console.warn(`⚠️ [Fallback] OpenAI HTTP ${openaiRes.status}`);
-            return null;
-        }
-
-        const openaiData = await openaiRes.json();
-        const rawContent = openaiData.choices?.[0]?.message?.content || '';
-
-        let parsed;
+        let parsed: any;
         try {
-            parsed = JSON.parse(rawContent);
+            const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error('No JSON in Claude response');
+            parsed = JSON.parse(jsonMatch[0]);
         } catch {
-            const jsonMatch = rawContent.match(/```json?\s*([\s\S]*?)```/);
-            if (jsonMatch) {
-                parsed = JSON.parse(jsonMatch[1]);
-            } else {
-                const firstOpen = rawContent.indexOf('{');
-                const lastClose = rawContent.lastIndexOf('}');
-                if (firstOpen !== -1 && lastClose !== -1) {
-                    parsed = JSON.parse(rawContent.substring(firstOpen, lastClose + 1));
-                } else {
-                    throw new Error('No JSON found in OpenAI response');
-                }
-            }
+            console.warn(`⚠️ [Fallback] Claude JSON parse failed for "${companyName}"`);
+            return null;
         }
 
         const sourcesFound = [
@@ -536,10 +509,10 @@ JSON-Format:
             parsed.key_projects?.length > 0 ? 'projects' : null,
         ].filter(Boolean);
 
-        console.log(`✅ [Fallback] OpenAI extracted ${sourcesFound.length} categories: [${sourcesFound.join(', ')}] for "${companyName}"`);
+        console.log(`✅ [Fallback] Claude extracted ${sourcesFound.length} categories: [${sourcesFound.join(', ')}] for "${companyName}"`);
 
         if (sourcesFound.length === 0) {
-            console.warn(`⚠️ [Fallback] OpenAI found 0 categories for "${companyName}" — returning null`);
+            console.warn(`⚠️ [Fallback] Claude found 0 categories for "${companyName}"`);
             return null;
         }
 
@@ -549,35 +522,34 @@ JSON-Format:
             tech_stack: [],
             linkedin_activity: [],
             suggested_quotes: [],
-            perplexity_citations: [websiteUrl], // The source is the scraped website itself
-            confidence_score: 0.9, // Meets threshold: we have a first-party source
+            perplexity_citations: [websiteUrl],
+            confidence_score: 0.9,
             vision_and_mission: parsed.vision_and_mission || '',
-            key_projects: parsed.key_projects || [],
+            key_projects: parsed.key_projects || '',
             funding_status: parsed.funding_status || '',
             needs_company_context: false,
         } as any;
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
-        console.error(`❌ [Fallback] OpenAI extraction error for "${companyName}":`, errMsg);
+        console.error(`❌ [Fallback] Claude extraction error for "${companyName}":`, errMsg);
         return null;
     }
 }
 
+
 /**
- * MAIN: Enrich company (with cache + graceful degradation + Zero-Fake-Data)
+ * MAIN: Enrich company (with cache + graceful degradation)
  *
- * Fallback Chain:
+ * Enrichment Chain:
  *   1. Cache (7-day TTL)
- *   2. Perplexity (Zero-Fake-Data validated)
- *   3. Firecrawl + OpenAI (if company_website available)
- *   4. Empty state (needs_company_context=true if no website, false otherwise)
+ *   2. Jina+Claude (PRIMARY — when website is provided)
+ *   3. Perplexity (FALLBACK — only if no website)
+ *   4. Empty state (needs_company_context=true if no website)
  *
  * @param companySlug  Kept for caller compatibility (unused)
- * @param companyName  Canonical name used as cache key and Perplexity query
+ * @param companyName  Canonical name used as cache key
  * @param forceRefresh Skip cache lookup
  * @param context      Steckbrief context (website, industry, description).
- *                     Pass Stufe 0 from job Steckbrief, Stufe 1 from CV Match.
- *                     Without context, the Unsicherheits-Gate may return empty.
  */
 export async function enrichCompany(
     companySlug: string,
@@ -585,7 +557,7 @@ export async function enrichCompany(
     forceRefresh: boolean = false,
     context?: EnrichmentContext
 ): Promise<EnrichmentResult> {
-    // Step 1: Check cache using companyName (Schema v3.0 uses name as key)
+    // Step 1: Check cache
     if (!forceRefresh) {
         const cached = await checkCache(companyName);
         if (cached) return cached;
@@ -594,25 +566,28 @@ export async function enrichCompany(
         recordCacheMiss();
     }
 
-    // Step 2: Fetch fresh data with Zero-Fake-Data validation (Perplexity)
-    const intel = await fetchCompanyIntel(companyName, context);
+    let intel: Partial<EnrichmentResult> & { needs_company_context: boolean };
 
-    // Step 2b: If Perplexity returned empty AND we have a website → Firecrawl+OpenAI fallback
-    if (intel.confidence_score === 0 && context?.website) {
-        console.log(`🔄 [Enrichment] Perplexity empty for "${companyName}" — trying Firecrawl+OpenAI fallback with ${context.website}`);
-
-        // Ensure the URL has a protocol
+    // Step 2: PRIMARY — Jina+Claude (when website is available)
+    if (context?.website) {
         const normalizedUrl = context.website.startsWith('http')
             ? context.website
             : `https://${context.website}`;
 
-        const fallbackIntel = await fetchViaFirecrawlAndOpenAI(companyName, normalizedUrl);
+        console.log(`🔍 [Enrichment] Using Jina+Claude (primary) for "${companyName}" with ${normalizedUrl}`);
+        const jinaResult = await fetchViaJinaAndClaude(companyName, normalizedUrl);
 
-        if (fallbackIntel && fallbackIntel.confidence_score && fallbackIntel.confidence_score > 0) {
-            console.log(`✅ [Enrichment] Firecrawl+OpenAI fallback succeeded for "${companyName}"`);
-            // Use fallback result — proceed to quotes + cache
-            Object.assign(intel, fallbackIntel);
+        if (jinaResult && jinaResult.confidence_score && jinaResult.confidence_score > 0) {
+            console.log(`✅ [Enrichment] Jina+Claude succeeded for "${companyName}" (confidence: ${jinaResult.confidence_score})`);
+            intel = jinaResult;
+        } else {
+            console.warn(`⚠️ [Enrichment] Jina+Claude returned empty for "${companyName}" — returning empty state`);
+            intel = getEmptyEnrichmentResult(companyName, false);
         }
+    } else {
+        // Step 2 FALLBACK: Perplexity (only when NO website — legacy path)
+        console.log(`🔍 [Enrichment] No website for "${companyName}" — trying Perplexity fallback`);
+        intel = await fetchCompanyIntel(companyName, context);
     }
 
     // If still empty after all attempts, return empty state
@@ -632,7 +607,6 @@ export async function enrichCompany(
     }
 
     // Step 2.5: Quotes werden jetzt on-demand via /api/cover-letter/quotes geladen
-    // und nicht mehr im Enrichment-Flow blockiert (Lazy Quote Architecture)
     intel.suggested_quotes = [];
 
     // Step 3: Save to cache (only writes if confidence >= 0.9)

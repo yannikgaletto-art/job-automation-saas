@@ -38,12 +38,18 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });
         }
 
-        const cvMatch = (job.metadata as Record<string, unknown> | null)?.cv_match ?? null;
+        const metadata = job.metadata as Record<string, unknown> | null;
+        const cvMatch = metadata?.cv_match ?? null;
+        const cvMatchStatus = (metadata?.cv_match_status as string) ?? null;
+        const cvMatchStartedAt = (metadata?.cv_match_started_at as string) ?? null;
+
         console.log('🔍 CV Match cache lookup:', jobId, cvMatch ? '✅ HIT' : '❌ MISS');
 
         return NextResponse.json({
             success: true,
             cached: cvMatch,
+            cvMatchStatus,
+            cvMatchStartedAt,
         });
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);

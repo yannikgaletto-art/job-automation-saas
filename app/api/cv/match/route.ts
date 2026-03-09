@@ -3,6 +3,11 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { getCVText } from '@/lib/services/cv-text-retriever';
 import { inngest } from '@/lib/inngest/client';
+import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { logger } from '@/lib/logging';
+
+// Rate limit: 5 CV match requests per minute per user
+const cvMatchLimiter = createRateLimiter({ maxRequests: 5, windowMs: 60_000 });
 
 /**
  * POST /api/cv/match — Smart Trigger
@@ -33,6 +38,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // Rate limit check (5 req/min per user)
+        const rateLimited = checkRateLimit(cvMatchLimiter, user.id, 'cv/match');
+        if (rateLimited) return rateLimited;
+
+        const log = logger.forRequest(undefined, user.id, '/api/cv/match');
+        log.info('CV Match requested', { jobId });
+
         // §3: Ownership check (user-scoped)
         const { data: job } = await supabaseAdmin
             .from('job_queue')
@@ -54,14 +66,33 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        // Set processing status in metadata (JSONB Merge!)
+        // ── Stale-Recovery Check (Batch 2.1) ────────────────────────────
+        // If already processing, check if it's stale (> 5 min)
         const currentMetadata = (job.metadata as Record<string, unknown>) || {};
+        const existingStatus = currentMetadata.cv_match_status as string | undefined;
+        const startedAt = currentMetadata.cv_match_started_at as string | undefined;
+
+        if (existingStatus === 'processing' && startedAt) {
+            const elapsed = Date.now() - new Date(startedAt).getTime();
+            const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+            if (elapsed < STALE_THRESHOLD_MS) {
+                // Still within threshold — don't re-trigger
+                console.log(`⏳ [CV Match] Already processing for ${Math.round(elapsed / 1000)}s — skipping re-trigger`);
+                return NextResponse.json({ success: true, status: 'processing' });
+            }
+            // Stale — reset and re-trigger below
+            console.warn(`⚠️ [CV Match] Stale processing detected (${Math.round(elapsed / 1000)}s) — re-triggering`);
+        }
+
+        // Set processing status + timestamp in metadata (JSONB Merge!)
         await supabaseAdmin
             .from('job_queue')
             .update({
                 metadata: {
                     ...currentMetadata,
                     cv_match_status: 'processing',
+                    cv_match_started_at: new Date().toISOString(),
                 },
             })
             .eq('id', jobId)

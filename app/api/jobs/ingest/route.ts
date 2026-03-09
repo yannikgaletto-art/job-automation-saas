@@ -1,3 +1,5 @@
+export const maxDuration = 60; // Vercel timeout protection — Firecrawl + Haiku can take 20-30s
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';

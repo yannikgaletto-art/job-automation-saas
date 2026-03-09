@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { complete } from '@/lib/ai/model-router';
 import { cvOptimizationProposalSchema, CvOptimizationProposal, CvStructuredData, CvChange } from '@/types/cv';
 import crypto from 'crypto';
+import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { logger } from '@/lib/logging';
+
+// Rate limit: 3 CV optimize requests per minute per user
+const cvOptimizeLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
+
+export const maxDuration = 60; // Vercel timeout protection — Claude Sonnet can take 20-40s
+
+// Admin client for bypassing RLS (used after Auth Guard verification)
+const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+);
 
 /**
  * Attempts to parse JSON, with a fallback that truncates the string at the
@@ -80,12 +95,30 @@ function applyCvChanges(cv: CvStructuredData, changes: CvChange[]): CvStructured
 
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json();
-        const { cv_structured_data, cv_match_result, template_id, job_id, user_id, station_metrics, cv_opt_settings } = body;
+        // §8: Auth Guard — verify session before any processing
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
-        if (!cv_structured_data || !cv_match_result || !job_id || !user_id) {
+        // Rate limit check (3 req/min per user)
+        const rateLimited = checkRateLimit(cvOptimizeLimiter, user.id, 'cv/optimize');
+        if (rateLimited) return rateLimited;
+
+        const log = logger.forRequest(undefined, user.id, '/api/cv/optimize');
+
+        const body = await req.json();
+        const { cv_structured_data, cv_match_result, template_id, job_id, station_metrics, cv_opt_settings } = body;
+
+        if (!cv_structured_data || !cv_match_result || !job_id) {
             return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
         }
+
+        log.info('CV Optimize requested', { job_id });
+
+        // §3: User-scoped — always use session user.id, never trust body
+        const user_id = user.id;
 
         const summaryInstruction = cv_opt_settings?.summaryMode === 'compact'
             ? `\nSUMMARY-INSTRUKTION: Schreibe die Zusammenfassung in MAXIMAL 2 Sätzen.
@@ -187,12 +220,17 @@ Muss folgendem Zod Schema entsprechen:
             changes: rawJson.changes
         };
 
-        // Schema validation to ensure everything is perfectly typed
-        const validated = cvOptimizationProposalSchema.parse(proposalPayload);
+        // Schema validation — use safeParse to get a clean error instead of a thrown ZodError
+        const parseResult = cvOptimizationProposalSchema.safeParse(proposalPayload);
+        if (!parseResult.success) {
+            const zodMsg = parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
+            console.error('[CV Optimize] Zod validation failed:', zodMsg);
+            throw new Error(`AI output validation failed: ${zodMsg}`);
+        }
+        const validated = parseResult.data;
 
-        // Store the proposal in DB
-        const supabase = await createClient();
-        const { error: dbError } = await supabase
+        // Store the proposal in DB (§3: user-scoped write)
+        const { error: dbError } = await supabaseAdmin
             .from('job_queue')
             .update({
                 cv_optimization_proposal: validated,
@@ -203,7 +241,20 @@ Muss folgendem Zod Schema entsprechen:
 
         if (dbError) {
             console.error('Failed to save optimized CV to DB', dbError);
-            throw dbError; // Bubble up
+            throw dbError;
+        }
+
+        // §2: Read-Back — verify the write was successful (Double-Assurance)
+        const { data: readBack } = await supabaseAdmin
+            .from('job_queue')
+            .select('cv_optimization_proposal')
+            .eq('id', job_id)
+            .eq('user_id', user_id)
+            .single();
+
+        if (!readBack?.cv_optimization_proposal) {
+            console.error('❌ [CV Optimize] Read-back verification FAILED — proposal not saved');
+            return NextResponse.json({ error: 'Verification failed', success: false }, { status: 500 });
         }
 
         return NextResponse.json({
@@ -212,9 +263,10 @@ Muss folgendem Zod Schema entsprechen:
         });
 
     } catch (error: any) {
-        console.error('Error handling optimizer API:', error);
+        const errDetail = error?.errors ? JSON.stringify(error.errors) : (error?.message || String(error));
+        console.error('❌ [CV Optimize] Error:', errDetail);
         return NextResponse.json(
-            { error: 'Internal server error', details: error.message },
+            { error: 'Internal server error', details: errDetail },
             { status: 500 }
         );
     }

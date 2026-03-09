@@ -240,6 +240,10 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
 
             const metricsToSend = metricsOverride?.filter(s => s.metrics.trim().length > 0);
 
+            // 60s client-side timeout (Batch 2.3 — Stale-Recovery)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
             const res = await fetch('/api/cv/optimize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -252,7 +256,9 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                     ...(metricsToSend && metricsToSend.length > 0 ? { station_metrics: metricsToSend } : {}),
                     cv_opt_settings: { summaryMode: cvOptSettings.summaryMode },
                 }),
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
 
             const data = await res.json();
             if (!res.ok || !data.success) {
@@ -261,8 +267,12 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
 
             setProposal(data.proposal);
         } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : 'Unbekannter Fehler';
-            console.error("Optimizer error:", msg);
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                console.error("Optimizer timeout (60s)");
+            } else {
+                const msg = error instanceof Error ? error.message : 'Unbekannter Fehler';
+                console.error("Optimizer error:", msg);
+            }
         } finally {
             setIsOptimizing(false);
         }

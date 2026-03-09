@@ -83,7 +83,16 @@ export const analyzeCVMatch = inngest.createFunction(
 
         // Step 4: Save result to DB (JSONB Merge! + Status → cv_matched per DB constraint)
         await step.run('save-results', async () => {
-            const currentMetadata = (job.metadata as Record<string, unknown>) || {};
+            // Re-read CURRENT metadata to avoid overwriting changes made between Step 1 and now
+            // (e.g. cv_match_started_at written by /api/cv/match/route.ts)
+            const { data: freshJob } = await supabaseAdmin
+                .from('job_queue')
+                .select('metadata')
+                .eq('id', jobId)
+                .eq('user_id', userId)
+                .single();
+
+            const currentMetadata = (freshJob?.metadata as Record<string, unknown>) || {};
 
             // Normalize matchResult — restore §7 compliance: validate before flagging done
             const missingFields: string[] = [];
@@ -115,7 +124,7 @@ export const analyzeCVMatch = inngest.createFunction(
                 .from('job_queue')
                 .update({
                     metadata: {
-                        ...currentMetadata, // JSONB Merge Pflicht — preserve existing keys
+                        ...currentMetadata, // JSONB Merge — fresh read, no data loss
                         cv_match: {
                             analyzed_at: new Date().toISOString(),
                             cv_document_id: cvData.documentId,

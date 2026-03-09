@@ -192,6 +192,10 @@ export function Step4CoverLetter({
                 console.warn('⚠️ [CoverLetter] No setupContext available — generation quality will be reduced')
             }
 
+            // 60s client-side timeout (Batch 2.3 — Stale-Recovery)
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 180_000) // 3 min — Cover Letter AI generation is slow
+
             const response = await fetch('/api/cover-letter/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -199,8 +203,10 @@ export function Step4CoverLetter({
                     jobId,
                     userId: currentUserId,
                     setupContext: resolvedContext,
-                })
+                }),
+                signal: controller.signal,
             })
+            clearTimeout(timeoutId)
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}))
@@ -245,7 +251,11 @@ export function Step4CoverLetter({
 
         } catch (err) {
             console.error('❌ Cover letter generation failed:', err)
-            setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+            if (err instanceof DOMException && err.name === 'AbortError') {
+                setError('Zeitüberschreitung (60s) — bitte erneut versuchen.')
+            } else {
+                setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+            }
         } finally {
             setIsLoading(false)
             setIsRegenerating(false)

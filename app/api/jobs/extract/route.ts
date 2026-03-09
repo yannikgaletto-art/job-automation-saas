@@ -1,3 +1,5 @@
+export const maxDuration = 60; // Vercel timeout protection — DEV sync LLM call can take 15-25s
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';

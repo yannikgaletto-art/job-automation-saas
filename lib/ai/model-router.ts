@@ -178,7 +178,7 @@ export async function complete(
         (result.tokensUsed / 1_000_000) * model.cost_per_1m_tokens * 100
     );
 
-    // Track costs
+    // Track costs in memory (dev convenience — resets on serverless cold starts!)
     if (!costStats.taskBreakdown[request.taskType]) {
         costStats.taskBreakdown[request.taskType] = { count: 0, costCents: 0 };
     }
@@ -186,9 +186,20 @@ export async function complete(
     costStats.taskBreakdown[request.taskType].costCents += costCents;
     costStats.totalCostCents += costCents;
 
-    console.log(
-        `[Model Router] ${request.taskType} | ${model.id} | €${(costCents / 100).toFixed(4)} | ${latencyMs}ms`
-    );
+    // Structured cost log — this is the primary cost tracking mechanism for production.
+    // Vercel log drains (Datadog, Axiom) can parse this JSON and aggregate costs.
+    // Format: parseable by standard log aggregation tools.
+    console.log(JSON.stringify({
+        type: 'ai_cost',
+        timestamp: new Date().toISOString(),
+        task: request.taskType,
+        model: model.id,
+        provider: model.provider,
+        tokens: result.tokensUsed,
+        costCents,
+        costEur: +(costCents / 100).toFixed(4),
+        latencyMs,
+    }));
 
     return {
         text: result.text,
@@ -200,8 +211,17 @@ export async function complete(
 }
 
 // ============================================================================
-// COST TRACKING
+// COST TRACKING (IN-MEMORY — DEV ONLY)
 // ============================================================================
+//
+// ⚠️ SERVERLESS WARNING: On Vercel/serverless, in-memory state resets on
+// every cold start. For production cost tracking, use the structured JSON
+// logs emitted by `complete()` above — pipe them into a log drain
+// (Datadog, Axiom) or aggregate via Vercel's built-in log viewer.
+//
+// To add DB-based tracking: create an `ai_cost_tracking` table and
+// INSERT from the `complete()` function above (add ~5ms latency per call).
+//
 
 interface CostStats {
     totalCostCents: number;

@@ -182,8 +182,14 @@ if (!verify) throw new Error('CV_SAFETY: Upload verification failed — document
 ## 3. SESSION & DATA PERSISTENCE CONTRACT
 
 ### Invariante: ALLE User-Daten-Queries sind user-scoped
-- Jede Abfrage/Mutation auf `job_queue`, `documents`, `application_history`, `generation_logs`, `company_research` **braucht zwingend** `.eq('user_id', userId)`
-- RLS MUSS für alle diese Tabellen aktiviert sein
+- Jede Abfrage/Mutation auf folgende Tabellen **braucht zwingend** `.eq('user_id', userId)`:
+  - `job_queue`, `documents`, `application_history`, `generation_logs`, `company_research`
+  - `user_settings`, `user_values`, `saved_job_searches`
+  - `tasks`, `pomodoro_sessions`, `mood_checkins`, `daily_energy`, `daily_briefings`
+  - `coaching_sessions`, `job_certificates`, `validation_logs`
+  - `community_posts`, `community_comments`, `community_upvotes` (user_id für Write)
+  - `volunteering_bookmarks`, `volunteering_votes` (user_id für Write)
+- RLS MUSS für alle diese Tabellen aktiviert sein (✅ geprüft am 2026-03-09)
 - Service Role Key: NUR serverseitig, nie im Frontend
 
 ### Korrekte Query-Signatur (Beispiel Job Queue):
@@ -342,10 +348,14 @@ if (error || !user) {
 | `processing` | 10% | Steckbrief |
 | `steckbrief_confirmed` | 30% | CV Match |
 | `cv_match_done` | 30% | CV Match |
+| `cv_matched` | 30% | CV Match |
 | `cv_optimized` | 60% | CV Opt. |
 | `cover_letter_done` | 100% | Cover Letter |
 | `ready_for_review` | 100% | Cover Letter |
 | `ready_to_apply` | 100% | Cover Letter |
+| `submitted` | 100% | — (Beworben) |
+| `rejected` | 100% | — (Abgelehnt) |
+| `archived` | 100% | — (Archiviert) |
 
 ---
 

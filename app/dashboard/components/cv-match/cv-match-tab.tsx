@@ -185,6 +185,44 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 if (data.success && data.cached && data.cached.analyzed_at) {
                     setMatchData(data.cached as CVMatchResult);
                     setState('complete');
+                } else if (data.cvMatchStatus === 'processing' && data.cvMatchStartedAt) {
+                    const elapsed = Date.now() - new Date(data.cvMatchStartedAt).getTime();
+                    if (elapsed > 5 * 60 * 1000) {
+                        // Definitively stale — show error + retry
+                        console.warn(`⚠️ [CV Match] Stale processing on mount (${Math.round(elapsed / 1000)}s) — showing retry`);
+                        setState('error');
+                    } else {
+                        // Still within threshold — resume polling (Inngest may still be running)
+                        console.log(`🔄 [CV Match] Resuming poll for in-flight job (${Math.round(elapsed / 1000)}s elapsed)`);
+                        setState('loading');
+                        setLoadingStep(2);
+
+                        // Start polling immediately — same logic as after runAnalysis() fires
+                        let resumeAttempts = 0;
+                        const maxResumeAttempts = 120; // up to ~6 minutes of polling
+                        pollingRef.current = setInterval(async () => {
+                            resumeAttempts++;
+                            try {
+                                const pollRes = await fetch(`/api/cv/match/cached?jobId=${jobId}`);
+                                const pollData = await pollRes.json();
+                                if (pollData.success && pollData.cached?.analyzed_at) {
+                                    if (pollingRef.current) clearInterval(pollingRef.current);
+                                    pollingRef.current = null;
+                                    setLoadingStep(3);
+                                    setMatchData(pollData.cached as CVMatchResult);
+                                    setState('complete');
+                                } else if (resumeAttempts >= maxResumeAttempts) {
+                                    if (pollingRef.current) clearInterval(pollingRef.current);
+                                    pollingRef.current = null;
+                                    setState('error');
+                                }
+                            } catch {
+                                if (pollingRef.current) clearInterval(pollingRef.current);
+                                pollingRef.current = null;
+                                setState('error');
+                            }
+                        }, 3000);
+                    }
                 } else {
                     setState('idle');
                 }
@@ -192,7 +230,10 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 if (!cancelled) setState('idle');
             }
         })();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            if (pollingRef.current) clearInterval(pollingRef.current);
+        };
     }, [jobId]);
 
     const [showCVSelect, setShowCVSelect] = useState(false);

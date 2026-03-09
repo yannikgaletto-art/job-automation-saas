@@ -1,8 +1,11 @@
 # Quality Report — Batch 5
 
+> ⚠️ **ARCHIV — Stand: 27. Februar 2026**
+> Dieser Report bezieht sich auf den Batch 5 Code-Stand. Für den aktuellen Stand siehe `ARCHITECTURE.md` (V5.0) und `database/schema.sql` (V4.0).
+
 **Date:** 2026-02-27
 **Basis:** Commit 9de70b4 + stale-TODO fix
-**Status:** ✅ COMPLETELY LIVE TESTED — Code audit clean, E2E successful (Score 7.75), DB Insert bug fixed.
+**Status:** ⚠️ **ARCHIVIERT** — siehe Hinweis oben
 
 ---
 

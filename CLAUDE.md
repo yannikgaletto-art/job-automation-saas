@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 2.4
-**Last Updated:** 2026-03-03
+**Version:** 3.0
+**Last Updated:** 2026-03-09
 
 ---
 
@@ -46,6 +46,14 @@ Warum das wichtig ist:
 Jedes neue Feature braucht eine Impact Map BEVOR Code geschrieben wird.
 Impact Map Yannik vorlegen und auf "Go" warten.
 
+## 🔒 DOCUMENTATION SYNC PFLICHT (ab 2026-03-09)
+Jede Änderung an der Datenbank oder den API-Routen erfordert zwingend Doku-Updates:
+- **Neue SQL-Migration in `supabase/migrations/`** → `database/schema.sql` UND `ARCHITECTURE.md` Tabellenliste aktualisieren
+- **Neue API-Route in `app/api/`** → `ARCHITECTURE.md` Route-Struktur aktualisieren
+- **Neue DB-Tabelle mit `user_id`** → `docs/SICHERHEITSARCHITEKTUR.md` §3 (SESSION CONTRACT) aktualisieren
+
+Kein PR/Commit ohne diese Updates. Diese Regel existiert, weil die Doku in den letzten Wochen vom Code abgedriftet ist und Agenten dann veraltete Informationen nutzen.
+
 ## ⚠️ CV & COVER LETTER QUALITY
 → directives/QUALITY_CV_COVER_LETTER.md
 Diese Standards sind BINDEND für alle Dokument-Generationen.
@@ -74,11 +82,19 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | Company Research | URL validation in research route |
 | Quote Quality | Enhanced quote matching prompt logic |
 | CV Match | Null guards (Array.isArray) + safeResult normalization in pipeline |
-| Certificates | `company` → `company_name` DB column fix |
-| Certificates | Sequential → Parallel Perplexity (Promise.allSettled) |
-| Certificates | Provider URL Fallback Map (14 Anbieter) |
-| Certificates | Tab-switch state persist (initialData + onDataLoaded props) |
-| Certificates | Stale processing detection (5min threshold → failed response) |
+| Certificates | `company` → `company_name` DB column fix; Parallel Perplexity; Stale detection |
+| Coaching | Text-Chat Mock Interview mit Gap-Analyse, Consent, 3 Runden (Kennenlernen/Deep Dive/Case Study) |
+| Coaching | Deterministic session end (turnCount >= maxQuestions), farewell message |
+| Coaching | Analysis page: Recommendations per company toggle, bolded keywords |
+| Community | Skill-Share / Career / Entrepreneurship boards mit Posts, Comments, Upvotes |
+| Volunteering | Ehrenamt-Feature mit Opportunities, Bookmarks, Category Voting |
+| Analytics | Redesign mit Pomodoro Heatmap, Task Completion, Coaching Stats |
+| Pomodoro | Session tracking (25/50 min), energy level, heatmap view |
+| Task-Sync | Tasks mit Pulse/Coaching source, drag-and-drop, carry-over |
+| Settings | LinkedIn URL + Target Role fields, active CV tracking |
+| Job Search | AI-Suche, Delete Buttons, Saved Searches Unique Constraint Fix |
+| Colors | Global #0066FF → #012e7a replacement |
+| Documentation | schema.sql V4.0, ARCHITECTURE.md V5.0 (13 neue Tabellen, 60+ API Endpoints) |
 
 ---
 
@@ -222,8 +238,8 @@ Chrome Extension (Plasmo)
    - Warte auf "Go" — kein Code ohne Freigabe
 
 1. **Read the docs:**
-   - `/docs/ARCHITECTURE.md` - Complete system design
-   - `/database/schema.sql` - Database structure
+   - `/ARCHITECTURE.md` - Complete system design (V5.0)
+   - `/database/schema.sql` - Database structure (⚠️ Referenz-Snapshot — autoritäre Quelle sind `supabase/migrations/`)
    - **`directives/FEATURE_COMPAT_MATRIX.md`** - Cross-Feature-Ownership (PFLICHT)
 
 2. **Check existing code:**

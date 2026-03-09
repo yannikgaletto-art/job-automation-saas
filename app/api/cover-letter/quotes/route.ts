@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
             const { error: dbError } = await supabaseAdmin
                 .from('company_research')
                 .update({ suggested_quotes: quotes.slice(0, 3) })
-                .ilike('company_name', companyName.trim());
+                .eq('company_name', companyName.trim());
 
             if (dbError) {
                 console.error('⚠️ [Quotes] Failed to persist quotes to DB:', dbError.message);
