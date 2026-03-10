@@ -1,19 +1,28 @@
 # Past — UI Änderungen
 
-## [2026-03-10] Architecture Review V2 — CV Generation Engine
+## [2026-03-10] CV Generation Engine V2 — Complete Implementation
 
-Directive: `directives/cv_generation.md` (V2.0 — QA-Review integriert)
+Directive: `directives/cv_generation.md` (V2.1 — QA-Review + Polish integriert)
 
 ### Entscheidungen
-- **PDF Engine:** @react-pdf/renderer bleibt (Status Quo bestätigt). Puppeteer/Modal abgelehnt.
-- **Template Consolidation:** Classic wird deprecated. Verbleibend: Valley, Modern, Tech.
-- **80% → 100% Quality Gap:** Root Cause ist Layout-Dichte + Daten-Schicht.
-  Fix: Page Budget Engine, 2-Spalten CertGrid, Skill-Tags, Education Truncation.
-- **QA-Review:** 6/7 Blind Spots akzeptiert (gap→margin PFLICHT, DB-Migration PFLICHT, Git-Tag Rollback).
-  1/7 abgelehnt: "Modern Template existiert nicht" war faktisch falsch (ModernTemplate.tsx existiert).
-- **Neue Sections:** §8 Page Layout Engine, §9 Visual Density Rules
+- **PDF Engine:** @react-pdf/renderer bleibt.
+- **Template Consolidation:** Classic + Modern entfernt. Verbleibend: **Valley + Tech** only.
+- **Content Budget System:** 3-Layer — AI Guardrails (Prompt v2.1) → Template Structure → Optional AI Judge
+- **Summary Bold:** AI-driven via `**markdown**` in optimizer output. Kein Regex.
+- **CertGrid Overflow:** JS truncation (45 chars) + `maxColumns` prop. Kein fixed-height Hack.
+- **cv-parser V2:** targetRole, level (1-5), credentialUrl, website, grade, displayMode
 
-### Status: PLAN V2 — Awaiting Implementation Go
+### Geänderte Dateien
+- `app/api/cv/optimize/route.ts` — PROMPT_VERSION v2.1, content guardrails, summary bold
+- `lib/services/cv-parser.ts` — V2 schema + prompt
+- `components/cv-templates/ValleyTemplate.tsx` — Rewrite, padding 48px, Summary section
+- `components/cv-templates/TechTemplate.tsx` — RenderMarkdownText, CertGrid maxColumns=1
+- `components/cv-templates/shared/RenderMarkdownText.tsx` — NEW
+- `components/cv-templates/shared/CertGrid.tsx` — Truncation, maxColumns
+- `directives/Feature_Impact_Analysis.md` — NEW
+- `directives/DEFERRED_FEATURES.md` — D6 DOCX Export
+
+### Status: ✅ IMPLEMENTIERT + GEPUSHT
 
 
 ## [2026-02-25] UI Final Pass — Steckbrief, CV Match, Sidebar
