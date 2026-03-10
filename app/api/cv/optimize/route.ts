@@ -12,6 +12,9 @@ const cvOptimizeLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 }
 
 export const maxDuration = 60; // Vercel timeout protection — Claude Sonnet can take 20-40s
 
+// Prompt version for tracking and rollback
+const PROMPT_VERSION = 'v2.1';
+
 // Admin client for bypassing RLS (used after Auth Guard verification)
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -163,6 +166,25 @@ Deine Aufgabe ist es, einen Lebenslauf-JSON (CV SSoT) und eine Analyse (CV Match
    - "reason": WARUM
    - "requirementRef.requirement": Aus welchem "requirement" des CV Match abgeleitet.
 ${summaryInstruction}
+
+[LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION}]
+- Max 4 bullet points per experience entry
+- Max 20 words per bullet point (1 line when printed). Be concise. Quality over quantity.
+- Summary: max 3 sentences
+- If >5 experience entries: oldest entries get max 2 bullets
+- If >3 education entries: only 2 most relevant get full description
+- Target: full CV fits in 1.5–2 pages:
+  → Page 1: Experience + Education
+  → Page 2: Skills, Languages, Certifications
+- LESS IS MORE. The user can always add more later.
+[END LAYOUT CONSTRAINTS]
+
+SUMMARY FORMATTING:
+- In the summary text field, wrap the 3-5 most impactful phrases in **double asterisks** for bold rendering.
+- Bold: quantified achievements ("**3+ Jahre**"), key competencies ("**Stakeholder-Management**"), and the target role/industry.
+- Example: "**Innovation Manager** mit **3+ Jahren** Erfahrung in **strategischem Stakeholder-Management**."
+- Do NOT bold entire sentences. Only 3-5 key phrases.
+
 **EINGABEDATEN:**
 
 1. CV SSoT (AKTUELLER LEBENSLAUF):

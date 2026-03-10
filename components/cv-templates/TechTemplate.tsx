@@ -4,6 +4,7 @@ import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
 import { CvStructuredData } from '@/types/cv';
 import { ProficiencyDots } from './shared/ProficiencyDots';
 import { CertGrid } from './shared/CertGrid';
+import { RenderMarkdownText } from './shared/RenderMarkdownText';
 import { inferLanguageLevel } from '@/lib/utils/cv-template-helpers';
 
 registerPdfFonts();
@@ -221,7 +222,7 @@ export function TechTemplate({ data }: { data: CvStructuredData }) {
                         {pi.summary && (
                             <View style={{ marginBottom: 20 }}>
                                 <Text style={s.sectionTitle}>Summary</Text>
-                                <Text style={{ fontSize: 9, color: GRAY, lineHeight: 1.5 }}>{pi.summary}</Text>
+                                <RenderMarkdownText text={pi.summary} style={{ fontSize: 9, color: GRAY, lineHeight: 1.5 }} />
                             </View>
                         )}
 
@@ -285,7 +286,7 @@ export function TechTemplate({ data }: { data: CvStructuredData }) {
                         {data.certifications && data.certifications.length > 0 && (
                             <View style={{ marginBottom: 20 }} wrap={false} minPresenceAhead={40}>
                                 <Text style={s.sectionTitle}>Certifications</Text>
-                                <CertGrid certs={data.certifications} />
+                                <CertGrid certs={data.certifications} maxColumns={1} />
                             </View>
                         )}
 

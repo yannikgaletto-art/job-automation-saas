@@ -1,6 +1,9 @@
 import React from 'react';
 import { View, Text, Link, StyleSheet } from '@react-pdf/renderer';
 
+const truncate = (str: string, max: number) =>
+    str.length > max ? str.slice(0, max - 1) + '…' : str;
+
 const DARK = '#0F172A';
 const GRAY = '#6B7280';
 
@@ -49,7 +52,7 @@ interface CertEntry {
 function CertItem({ cert }: { cert: CertEntry }) {
     return (
         <View style={s.item}>
-            <Text style={s.name}>{cert.name || ''}</Text>
+            <Text style={s.name}>{truncate(cert.name || '', 45)}</Text>
             <Text style={s.detail}>
                 {[cert.issuer, cert.dateText].filter(Boolean).join(' · ')}
             </Text>
@@ -66,8 +69,8 @@ function CertItem({ cert }: { cert: CertEntry }) {
  * Renders certifications in a 2-column grid when > 3 certs,
  * single column otherwise. Optimizes vertical space.
  */
-export function CertGrid({ certs }: { certs: CertEntry[] }) {
-    if (certs.length <= 3) {
+export function CertGrid({ certs, maxColumns = 2 }: { certs: CertEntry[]; maxColumns?: 1 | 2 }) {
+    if (certs.length <= 3 || maxColumns === 1) {
         return (
             <View>
                 {certs.map(cert => <CertItem key={cert.id} cert={cert} />)}

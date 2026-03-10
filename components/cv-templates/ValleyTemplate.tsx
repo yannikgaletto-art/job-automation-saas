@@ -4,6 +4,7 @@ import { CvStructuredData } from '@/types/cv';
 import { SkillTagGroup } from './shared/SkillTag';
 import { ProficiencyDots } from './shared/ProficiencyDots';
 import { CertGrid } from './shared/CertGrid';
+import { RenderMarkdownText } from './shared/RenderMarkdownText';
 import { truncateDescription, inferLanguageLevel } from '@/lib/utils/cv-template-helpers';
 
 /**
@@ -20,7 +21,7 @@ const s = StyleSheet.create({
         fontFamily: 'Helvetica',
         fontSize: 9,
         backgroundColor: '#FFFFFF',
-        paddingHorizontal: 40,
+        paddingHorizontal: 48,
         paddingTop: 36,
         paddingBottom: 36,
         color: DARK,
@@ -38,7 +39,7 @@ const s = StyleSheet.create({
     headerName: { fontSize: 22, fontWeight: 700, color: DARK, letterSpacing: 0.5 },
     headerContact: { alignItems: 'flex-end' },
     contactLine: { fontSize: 8.5, color: MUTED, marginBottom: 2.5, textAlign: 'right' },
-    sectionContainer: { marginBottom: 16 },
+    sectionContainer: { marginBottom: 12 },
     sectionTitle: {
         fontSize: 10.5, fontWeight: 700, color: DARK, textTransform: 'uppercase',
         letterSpacing: 2, paddingBottom: 4, borderBottomWidth: 0.75,
@@ -140,6 +141,16 @@ export function ValleyTemplate({ data }: { data: CvStructuredData }) {
                         )}
                     </View>
                 </View>
+
+                {/* ===== SUMMARY (V2: AI-driven bold via **markdown**) ===== */}
+                {pi.summary && (
+                    <View style={s.sectionContainer}>
+                        <RenderMarkdownText
+                            text={pi.summary}
+                            style={{ fontSize: 9, color: MUTED, lineHeight: 1.5 }}
+                        />
+                    </View>
+                )}
 
                 {/* ===== EXPERIENCE ===== */}
                 {data.experience.length > 0 && (

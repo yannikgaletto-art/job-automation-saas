@@ -154,6 +154,28 @@ Verbessert Generierungsvorschläge für neue User ohne viele Trainingsdaten.
 | D3 Multi-Doc Averaging | Nach Batch 2 | Wenn B1.1 stabil |
 | D4 90-Days Dokument | Q4 2026 | User-Research Ergebnis |
 | D5 Semantic Similarity | Q1 2027 | Nach 500+ User-Profiles |
+| D6 DOCX Export | Q3 2026 | Recruiter-Feedback zu PDF-Parsing |
+
+---
+
+## 📄 Feature D6 — DOCX Export
+
+**Original-Idee:** CV als .docx-Datei exportieren für maximale ATS-Kompatibilität.
+Manche Recruiting-Systeme parsen PDFs fehlerhaft — DOCX würde das umgehen.
+
+**Warum zurückgestellt:**
+- @react-pdf/renderer erzeugt bereits ATS-lesbare PDFs ✅
+- DOCX-Generierung braucht eigene Engine (docx-templater oder ähnlich)
+- Separates Template-System nötig (react-pdf ≠ DOCX-Renderer)
+- Kein User-Feedback das PDF-Parsing-Probleme meldet
+
+**Fehlerwahrscheinlichkeit:** ~25% (technisch lösbar, aber hoher Aufwand)
+**Aufwand:** docx-templater Setup + separate Templates + Download-Logik
+
+**Revisit-Bedingung:**
+- >100 CV-Downloads und Recruiter-Feedback gesammelt
+- Wenn >10% der Recruiter PDF-Parsing-Probleme melden
+- Oder wenn ein Enterprise-Kunde DOCX explizit fordert
 
 ---
 

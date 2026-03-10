@@ -1,159 +1,77 @@
----
-Version: 1.1.0
-Last Updated: 2026-02-26
-Status: AKTIV — PFLICHTLEKTÜRE vor jedem neuen Feature
-Gehört zu: CLAUDE.md, SICHERHEITSARCHITEKTUR.md
----
+# Feature Impact Analysis: Consistent 2-Page CV System
 
-# 🗺️ FEATURE_IMPACT_ANALYSIS — Pathly V2.0
-
-> **GOLDEN RULE:** Kein neues Feature ohne vollständige Impact Map.
-> Diese Analyse passiert VOR dem ersten Code-Commit — nicht danach.
-> Antigravity präsentiert die Impact Map und wartet auf Yannik's "Go" bevor Code geschrieben wird.
+**Status:** Design Approved — Teilweise implementiert  
+**Owner:** Yannik Galetto  
+**Erstellt:** 2026-03-10  
 
 ---
 
-## SCHRITT 1 — FEATURE FOOTPRINT KARTIEREN (Pflicht)
+## Problem Statement
 
-Für jedes neue Feature MUSS der Agent diese 5 Fragen schriftlich beantworten,
-bevor Code geschrieben wird:
+CVs mit unterschiedlichen Inhaltsmengen (3 vs. 8 Berufserfahrungen, 5 vs. 15 Skills, etc.) 
+erzeugen inkonsistente Seitenlayouts: manche CVs haben 1.5 Seiten, andere 4+ Seiten.
 
-### 1.1 Upstream-Abhängigkeiten (Daten-Input)
-- Welche DB-Tabellen liest dieses Feature?
-- Welche bestehenden Services/APIs ruft es auf?
-- Welche User-Daten müssen zwingend existieren, damit das Feature funktioniert?
-  → Für jede Pflichtvoraussetzung: Was passiert, wenn sie fehlt? (→ Empty/Blocking State definieren)
-
-### 1.2 Downstream-Auswirkungen & Side Effects (Daten-Output)
-- Welche bestehenden Routes/Pages sind betroffen?
-- **Side Effects:** Triggert dieses Feature Inngest-Background-Jobs oder externe APIs (Claude/Perplexity)?
-- Verändert es bestehende Status-Felder (z.B. in `job_queue`), auf die andere Frontend-Teile lauschen?
-- Verändert es bestehende API-Response-Formate? (Breaking Changes → Downstream-Consumers prüfen)
-
-### 1.3 Security & Database (RLS Pflicht)
-- Muss `middleware.ts` angepasst werden? (Neue Route → Auth-Guard zwingend eintragen)
-- Muss `ARCHITECTURE.md` (Route-Struktur) aktualisiert werden?
-- Muss `database/schema.sql` oder eine Migration erstellt werden?
-- **KRITISCH:** Wenn eine neue DB-Tabelle oder Spalte erstellt wird:
-  Wurden RLS-Policies (`.eq('user_id', auth.uid())`) explizit eingeplant?
-  → Ohne RLS = Blocker. Kein Merge ohne verifizierte RLS.
-
-### 1.4 Empty & Blocking States (Pflicht — kein Feature ohne diese Planung)
-Für jeden Upstream-Datenpunkt gilt: Was sieht der User, wenn er fehlt?
-
-| Fehlender Datenpunkt | UI-Reaktion | CTA |
-|---|---|---|
-| Kein CV hochgeladen | Blocking State mit Warnung | → Settings: CV hochladen |
-| Onboarding nicht abgeschlossen | Redirect zu /onboarding | — |
-| Keine Jobs in der Queue | Empty State mit Illustration | → Job Search starten |
-| (Neues Feature: Zeilen hier ergänzen) | ... | ... |
-
-### 1.5 Component Audit (Reduce Complexity — Pflicht)
-- Welche UI-Elemente werden benötigt (Cards, Modals, Buttons, Tabs)?
-- **WICHTIG:** Welche *existierenden* Komponenten aus `components/` können
-  wiederverwendet werden, statt neue zu schreiben?
-- Erst wenn keine passende Komponente existiert, darf eine neue gebaut werden.
+**Ziel:** Jeder CV soll konsistent 2 Seiten haben:
+- **Seite 1:** Berufserfahrung + Ausbildung
+- **Seite 2:** Skills, Sprachen, Zertifikate
 
 ---
 
-## SCHRITT 2 — IMPACT MAP DOKUMENTIEREN (Pflicht vor dem Coding)
-
-Der Agent schreibt die Impact Map als Block BEVOR er mit der Implementierung beginnt.
-Diese Map wird Yannik zur Freigabe vorgelegt. Erst nach "Go" wird Code geschrieben.
-
-**Format (immer exakt so):**
+## Architecture: 3-Layer Content Budget System
 
 ```
-## IMPACT MAP — [Feature Name]
-
-Upstream:              documents(cv), user_settings(onboarding_completed), job_queue(status/count)
-Downstream & Side Effects: neue API Route /api/roadmap, keine Inngest-Trigger, KEIN Breaking Change
-Security/DB:           Neue Route in middleware.ts eintragen. Keine neuen Tabellen (RLS safe).
-Contracts berührt:     Abschnitt 2 (Documents), Abschnitt 3 (Session), Abschnitt 8 (API Auth)
-Empty States:          kein CV → Blocking "Lade deinen Lebenslauf hoch" + CTA zu Settings
-                       keine Jobs → Empty State "Starte deine erste Jobsuche"
-Component Audit:       Nutzt existierende <Button>, <Card>, <EmptyState>. Kein neues UI-Pattern.
-Breaking Changes:      KEINE
-Parallelisierung:      Kann parallel laufen. middleware.ts wird berührt → kein anderer Agent gleichzeitig.
+┌──────────────────────────────────────────────────┐
+│  Layer 1: AI Content-Length Guardrails            │
+│  (cv/optimize/route.ts — PROMPT v2.1)            │
+│                                                   │
+│  ├─ Max 4 Bullets pro Erfahrung                   │
+│  ├─ Max 20 Wörter pro Bullet                      │
+│  ├─ Max 3 Sätze Summary                           │
+│  ├─ >5 Erfahrungen → ältere auf 2 Bullets         │
+│  └─ >3 Ausbildungen → nur 2 vollständig           │
+├──────────────────────────────────────────────────┤
+│  Layer 2: Template Page Structure                 │
+│  (ValleyTemplate.tsx / TechTemplate.tsx)           │
+│                                                   │
+│  ├─ Page 1: Header + Summary + Experience + Edu   │
+│  ├─ Page 2: Skills + Languages + Certifications   │
+│  ├─ wrap={false} auf Experience-Blöcken            │
+│  └─ minPresenceAhead={40} auf Skills/Certs         │
+├──────────────────────────────────────────────────┤
+│  Layer 3: OPTIONAL FUTURE — AI Layout Judge       │
+│  (Nicht implementiert — nur bei Bedarf)            │
+│                                                   │
+│  └─ Post-render: PDF Seitenzahl prüfen            │
+│  └─ If >2 Seiten → re-run optimizer mit           │
+│     strengeren Constraints                         │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
 
-## SCHRITT 3 — PARALLELISIERUNGS-CHECK
+## Implementation Status
 
-Bevor das Feature gestartet wird, diese Fragen beantworten:
-
-- Verändert dieses Feature `middleware.ts`?
-  → Kein anderer Agent darf gleichzeitig daran arbeiten.
-- Verändert es `database/schema.sql` oder eine Migration?
-  → Dieser Batch muss isoliert und alleine laufen.
-- Verändert es bestehende API-Response-Formate?
-  → Alle Frontend-Stellen prüfen, die diesen Endpoint konsumieren.
+| Layer | Status | Datei |
+|-------|--------|-------|
+| Layer 1 (AI Guardrails) | ✅ Implementiert | `app/api/cv/optimize/route.ts` |
+| Layer 2 (Template Structure) | ✅ Implementiert | `ValleyTemplate.tsx`, `TechTemplate.tsx` |
+| Layer 3 (AI Layout Judge) | ⏸ Deferred | Nur bei User-Feedback zu >2-Seiten-CVs |
 
 ---
 
-## SCHRITT 4 — VERIFICATION GATES (nach Implementierung)
+## Was muss VORHER passieren
 
-Zusätzlich zu den Gates A–F aus `docs/SICHERHEITSARCHITEKTUR.md`:
-
-- [ ] **Gate G** — Neues Feature funktioniert mit leerem User-Account (Empty/Blocking States greifen korrekt)
-- [ ] **Gate H** — RLS verifiziert: User sieht ausschließlich eigene Daten (kein Cross-User-Leak möglich)
-- [ ] **Gate I** — Alle Upstream-Abhängigkeiten haben definierten Error/Blocking State
-- [ ] **Gate J** — `ARCHITECTURE.md` und `MASTER_PLAN.md` wurden aktualisiert
-- [ ] **Gate K** — `npx tsc --noEmit` passes (kein neuer TypeScript-Fehler durch dieses Feature)
+1. **cv-parser** muss V2-Felder extrahieren (targetRole, level, credentialUrl) ✅
+2. **cv/optimize** muss Content-Length Guardrails enforced ✅
+3. **Template** nutzt `minPresenceAhead` für Orphan Prevention ✅
+4. **User** kann im DiffReview Änderungen übernehmen/ablehnen ✅
 
 ---
 
-## BEISPIEL — Roadmap-Reiter (Referenz für künftige Features)
+## Risiken
 
-**Feature:** Neuer Dashboard-Reiter `/dashboard/roadmap`
-
-```
-## IMPACT MAP — Roadmap-Reiter
-
-Upstream:              user_settings(onboarding_completed), documents(cv, document_type='cv'),
-                       job_queue(status/count), application_history(count)
-Downstream & Side Effects: neue Route /dashboard/roadmap, neue API /api/roadmap/status,
-                       kein Inngest-Trigger, KEIN Breaking Change an bestehenden APIs
-Security/DB:           Route in middleware.ts absichern. Keine neuen Tabellen.
-                       RLS: alle Queries über bestehende user_id-gefilterte Services.
-Contracts berührt:     Abschnitt 2 (CV-Lookup), Abschnitt 3 (user_id Filter zwingend),
-                       Abschnitt 8 (Auth Guard für neue API Route)
-Empty States:          kein CV → Blocking Banner "Lade deinen Lebenslauf hoch" + CTA Settings
-                       keine Jobs gestartet → "Starte deine erste Jobsuche" mit CTA
-                       keine Bewerbungen → "Noch keine Bewerbungen" Empty State
-Component Audit:       Nutzt existierende <Card>, <Button>, <Badge>, <Progress>.
-                       Neue Komponente: <RoadmapMilestone> (kein Äquivalent vorhanden).
-Breaking Changes:      KEINE
-Parallelisierung:      Kann parallel zu anderen Features laufen.
-                       AUSNAHME: middleware.ts wird berührt → nicht parallel zu anderen Routes.
-```
-
-**Gate G:** Frisch registrierter User sieht Blocking State "CV fehlt" — kein leeres Dashboard.
-**Gate H:** RLS geprüft via SQL: User sieht nur eigene Dokumente und Jobs.
-
----
-
-## ⚠️ VERBOTENE ANTI-PATTERNS (gelten auch für neue Features)
-
-```typescript
-// ❌ VERBOTEN: Neue Feature-Route ohne Auth-Guard in middleware.ts
-// → Route ist öffentlich zugänglich
-
-// ❌ VERBOTEN: Neue Tabelle ohne RLS-Policy
-// → Alle User-Daten für alle sichtbar
-
-// ❌ VERBOTEN: Feature ohne Empty State für fehlende Upstream-Daten
-// → User sieht leeres / kaputtes UI ohne Erklärung
-
-// ❌ VERBOTEN: Neue UI-Komponenten ohne Component Audit
-// → Code-Duplizierung, Inkonsistenz im Design System
-
-// ❌ VERBOTEN: Impact Map überspringen weil "das Feature ist klein"
-// → Kleine Features verursachen die größten Bugs in bestehenden Workflows
-```
-
----
-
-> Dieses Dokument wird nach jedem neuen Feature um neue Learnings erweitert.
-> Letzte Aktualisierung: 2026-02-26
+| Risiko | Wahrscheinlichkeit | Mitigation |
+|--------|--------------------| ------------|
+| Claude ignoriert Constraints | 15% | `PROMPT_VERSION` tracking, Git-Tag `cv-optimizer-v2-pre` für Rollback |
+| 20-Wort-Limit zu restriktiv | 20% | User-Feedback beobachten, ggf. auf 25 erhöhen |
+| Bestehende CVs haben V1-Format | 100% (erwartet) | Alle V2-Felder sind `nullish()` — backward compatible |
