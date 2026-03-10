@@ -1,5 +1,18 @@
 # Past — UI Änderungen
 
+## [2026-03-10] Architecture Review — CV Generation Engine
+
+Neue Directive: `directives/cv_generation.md`
+
+### Entscheidungen
+- **PDF Engine:** @react-pdf/renderer bleibt (Status Quo bestätigt). Puppeteer/Modal abgelehnt.
+- **Template Consolidation:** Classic wird deprecated (90% Duplikat von Valley). Verbleibend: Valley, Modern, Tech.
+- **80% → 100% Quality Gap:** Root Cause ist die Daten-Schicht, nicht die Engine. Skills als flache Strings, Zertifikate ohne visuelle Strukturierung. Fix: Structured Data Schema V2 + Template Rendering Components (SkillTag, ProficiencyDots, CertCard).
+- **DOCX-Export:** Deferred als D6 in DEFERRED_FEATURES.md.
+
+### Status: PLAN APPROVED — Awaiting Implementation Go
+
+
 ## [2026-02-25] UI Final Pass — Steckbrief, CV Match, Sidebar
 
 Geänderte Dateien:
