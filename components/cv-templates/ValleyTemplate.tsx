@@ -171,7 +171,7 @@ export function ValleyTemplate({ data }: { data: CvStructuredData }) {
                                         {exp.company}{exp.location ? ` \u2022 ${exp.location}` : ''}
                                     </Text>
                                 )}
-                                {exp.description?.map((b) => (
+                                {exp.description?.slice(0, 3).map((b) => (
                                     <View key={b.id} style={s.bulletRow}>
                                         <Text style={s.bulletDot}>{'\u2022'}</Text>
                                         <RenderBullet text={b.text} />
@@ -217,36 +217,24 @@ export function ValleyTemplate({ data }: { data: CvStructuredData }) {
                     </View>
                 )}
 
-                {/* ===== SKILLS + LANGUAGES (dual-column when both exist) ===== */}
-                {hasSkills && hasLanguages ? (
+                {/* ===== SKILLS + LANGUAGES + CERTIFICATES (dual-column layout) ===== */}
+                {/* Left column: Skills — Right column: Languages + Certificates underneath */}
+                {(hasSkills || hasLanguages || hasCerts) && (
                     <View style={s.dualColumn} minPresenceAhead={40}>
+                        {/* Left column: Skills */}
                         <View style={s.dualColumnLeft}>
-                            <SkillsSection skills={data.skills} />
+                            {hasSkills && <SkillsSection skills={data.skills} />}
                         </View>
+                        {/* Right column: Languages + Certificates */}
                         <View style={s.dualColumnRight}>
-                            <LanguagesSection languages={data.languages} />
+                            {hasLanguages && <LanguagesSection languages={data.languages} />}
+                            {hasCerts && (
+                                <View style={{ marginTop: hasLanguages ? 12 : 0 }}>
+                                    <Text style={s.sectionTitle}>Zertifikate</Text>
+                                    <CertGrid certs={data.certifications!} />
+                                </View>
+                            )}
                         </View>
-                    </View>
-                ) : (
-                    <>
-                        {hasSkills && (
-                            <View style={s.sectionContainer} wrap={false} minPresenceAhead={40}>
-                                <SkillsSection skills={data.skills} />
-                            </View>
-                        )}
-                        {hasLanguages && (
-                            <View style={s.sectionContainer} wrap={false} minPresenceAhead={40}>
-                                <LanguagesSection languages={data.languages} />
-                            </View>
-                        )}
-                    </>
-                )}
-
-                {/* ===== CERTIFICATIONS (V2: Grid) ===== */}
-                {hasCerts && (
-                    <View style={s.sectionContainer} wrap={false} minPresenceAhead={40}>
-                        <Text style={s.sectionTitle}>Zertifikate</Text>
-                        <CertGrid certs={data.certifications!} />
                     </View>
                 )}
 

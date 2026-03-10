@@ -109,17 +109,17 @@ export const cvStructuredDataSchema = z.object({
 export const cvChangeSchema = z.object({
     id: z.string(),
     target: z.object({
-        section: z.enum(['experience', 'education', 'skills', 'languages', 'personalInfo']),
+        section: z.string(), // Accept any section string — AI may produce 'certifications', 'certificates', 'summary', etc.
         entityId: z.string().nullish(),
         field: z.string().nullish(),
         bulletId: z.string().nullish(),
     }),
     type: changeTypeSchema,
-    before: z.string().nullish(),
-    after: z.string().nullish(),
-    reason: z.string(),
+    before: z.any().transform(v => v == null ? undefined : String(v)).optional(), // Coerce to string — AI sometimes returns null or arrays
+    after: z.any().transform(v => v == null ? undefined : String(v)).optional(),
+    reason: z.string().nullish().default('KI-Optimierung'),
     requirementRef: z.object({
-        requirement: z.string()
+        requirement: z.string().nullish()
     }).nullish()
 });
 

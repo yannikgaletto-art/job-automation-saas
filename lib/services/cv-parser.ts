@@ -66,6 +66,8 @@ Deine Aufgabe ist es, den folgenden rohen CV-Text in eine strikt strukturierte J
 3. **WICHTIG (IDs)**: Generiere für jedes Element in Listen (experience, education, skills, languages) eine eindeutige ID (z.B. "exp-1", "edu-2", "skill-3").
 4. Generiere auch für JEDEN Bullet Point in \`experience[].description\` eine eindeutige ID (z.B. "bullet-1-1").
 5. Setze "version" auf "2.0".
+6. **CHRONOLOGICAL ORDER (CRITICAL):** Die \`experience\`-Einträge MÜSSEN nach Datum absteigend sortiert sein (neueste zuerst). "Heute"/"Present" = aktuellste Position = Array-Index 0. Achte auf korrekte Zuordnung: Jede Firma muss mit ihrem korrekten Datumsbereich verknüpft werden — NICHT einfach in der Reihenfolge des Textes übernehmen, sondern semantisch korrekt zuordnen.
+7. **DATE-COMPANY MATCHING**: Lies den gesamten CV-Text zuerst vollständig, bevor du die Zuordnung machst. Stelle sicher, dass jede Firma/Rolle mit dem korrekten Datumsbereich (Start - Ende) verknüpft wird. Bei OCR-extrahiertem Text kann die Textreihenfolge FALSCH sein — prüfe die logische Konsistenz.
 
 **ZUSÄTZLICHE HINWEISE ZUR DATENSTRUKTUR:**
 - \`dateRangeText\`: z.B. "01/2020 - 12/2022" oder "2018 - Heute"
@@ -133,9 +135,51 @@ ${text}
     const validated = cvStructuredDataSchema.parse(rawJson);
     console.log('✅ Zod validation passed for structured CV data');
 
-    return validated as CvStructuredData;
+    // Post-processing: sort experience by end-date descending (newest first)
+    // This is a safety net in case Claude returns entries in wrong order
+    const sorted = {
+      ...validated,
+      experience: sortExperienceByDate(validated.experience),
+    };
+
+    return sorted as CvStructuredData;
   } catch (error: any) {
     console.error('❌ Failed to parse CV to JSON:', error.message);
     throw error;
   }
+}
+
+/**
+ * Sort experience entries by end-date descending (newest first).
+ * Handles: "09.2025 - Heute", "01/2023 - 12/2024", "2020 - 2022", "09.2025 - Present"
+ * Falls back to original order if dates can't be parsed.
+ */
+function sortExperienceByDate(
+  entries: Array<{ id: string; dateRangeText?: string | null;[key: string]: any }>
+): typeof entries {
+  const parseEndDate = (dateRange: string | null | undefined): number => {
+    if (!dateRange) return 0;
+    const lower = dateRange.toLowerCase().trim();
+
+    // "Heute" / "Present" / "current" = far future
+    if (/heute|present|current|aktuell/i.test(lower)) return 99999999;
+
+    // Find the end part (after " - " or " – " or "–")
+    const parts = dateRange.split(/\s*[-–]\s*/);
+    const endPart = (parts.length > 1 ? parts[parts.length - 1] : parts[0]).trim();
+
+    if (/heute|present|current|aktuell/i.test(endPart)) return 99999999;
+
+    // Try MM.YYYY or MM/YYYY format
+    const mmYyyy = endPart.match(/(\d{1,2})[./](\d{4})/);
+    if (mmYyyy) return parseInt(mmYyyy[2]) * 100 + parseInt(mmYyyy[1]);
+
+    // Try just YYYY
+    const yyyy = endPart.match(/(\d{4})/);
+    if (yyyy) return parseInt(yyyy[1]) * 100;
+
+    return 0;
+  };
+
+  return [...entries].sort((a, b) => parseEndDate(b.dateRangeText) - parseEndDate(a.dateRangeText));
 }

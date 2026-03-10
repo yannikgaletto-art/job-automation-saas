@@ -74,10 +74,13 @@ function ChangeRow({
                 isRejected ? "border-gray-200 opacity-45" :
                     "border-gray-200 bg-white"
         )}>
-            {/* Row header — clickable toggle */}
-            <button
+            {/* Row header — clickable toggle (div, not button, to avoid nested-button hydration error) */}
+            <div
+                role="button"
+                tabIndex={0}
                 onClick={() => setOpen(o => !o)}
-                className="w-full flex items-start gap-2 px-4 py-3 text-left group"
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setOpen(o => !o)}
+                className="w-full flex items-start gap-2 px-4 py-3 text-left group cursor-pointer"
             >
                 <ChevronRight className={cn(
                     "w-4 h-4 mt-0.5 text-gray-400 shrink-0 transition-transform duration-200",
@@ -117,7 +120,7 @@ function ChangeRow({
                         <Check className="w-3.5 h-3.5" />
                     </button>
                 </div>
-            </button>
+            </div>
 
             {/* Expandable Before / After table */}
             <AnimatePresence initial={false}>

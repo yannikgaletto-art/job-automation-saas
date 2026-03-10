@@ -10,7 +10,7 @@ import { logger } from '@/lib/logging';
 // Rate limit: 3 CV optimize requests per minute per user
 const cvOptimizeLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
 
-export const maxDuration = 60; // Vercel timeout protection — Claude Sonnet can take 20-40s
+export const maxDuration = 120; // Vercel timeout protection — Claude Sonnet can take 40-75s on large payloads
 
 // Prompt version for tracking and rollback
 const PROMPT_VERSION = 'v2.1';
@@ -130,11 +130,16 @@ export async function POST(req: NextRequest) {
         // §3: User-scoped — always use session user.id, never trust body
         const user_id = user.id;
 
-        const summaryInstruction = cv_opt_settings?.summaryMode === 'compact'
-            ? `\nSUMMARY-INSTRUKTION: Schreibe die Zusammenfassung in MAXIMAL 2 Sätzen.
+        // Build summary instruction based on user settings
+        const showSummary = cv_opt_settings?.showSummary ?? true;
+        let summaryInstruction = '';
+        if (!showSummary) {
+            summaryInstruction = `\nSUMMARY-INSTRUKTION: Der Nutzer hat die Zusammenfassung DEAKTIVIERT. Generiere KEINE Summary-Änderungen. Lasse das summary-Feld im optimierten CV UNBERÜHRT.\n`;
+        } else if (cv_opt_settings?.summaryMode === 'compact') {
+            summaryInstruction = `\nSUMMARY-INSTRUKTION: Schreibe die Zusammenfassung in MAXIMAL 2 Sätzen.
 Kein Fließtext. Format strikt: "[Rolle] mit [konkreter Erfahrung], fokussiert auf [Wert für Arbeitgeber]."
-Keine Adjektive ohne Beleg. Kein "motiviert", "leidenschaftlich", "engagiert".\n`
-            : '';
+Keine Adjektive ohne Beleg. Kein "motiviert", "leidenschaftlich", "engagiert".\n`;
+        }
 
         // Build structured metrics context from station_metrics
         const metricsContext = station_metrics
@@ -168,15 +173,27 @@ Deine Aufgabe ist es, einen Lebenslauf-JSON (CV SSoT) und eine Analyse (CV Match
 ${summaryInstruction}
 
 [LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION}]
+HARD RULE: The final CV MUST fit on exactly 2 printed A4 pages. NEVER generate content for 3+ pages.
 - Max 3 bullet points per experience entry (quality over quantity — user can add more)
 - Max 12 words per bullet point. Must fit on ONE printed line. Be surgical and precise.
 - Summary: max 3 sentences
-- If >5 experience entries: oldest entries get max 2 bullets
+- If ≥5 experience entries: oldest entries get max 1–2 bullets
+- If ≥6 experience entries: oldest 2 entries get max 1 bullet each
 - If >3 education entries: only 2 most relevant get full description
-- Target: full CV fits in 1.5–2 pages:
-  → Page 1: Experience + Education
-  → Page 2: Skills, Languages, Certifications
+- Skills: max 3 categories, max 8 items per category
+- Certificates: keep only the 6 most relevant (drop the rest)
+- Page budget:
+  → Page 1: Header + Summary + Experience + Education
+  → Page 2: Skills, Languages, Certificates (right column)
 - LESS IS MORE. The user can always add more later.
+
+SELF-JUDGE VALIDATION (run this before returning):
+Before returning your output, mentally verify:
+1. Count total bullet points across all experience entries. If >15, cut the weakest.
+2. Count total skill items. If >24, remove least relevant.
+3. Count certificates. If >6, keep only the 6 most relevant.
+4. If total content is likely to overflow 2 pages, aggressively cut the oldest/weakest entries.
+If any check fails, revise your output before returning.
 [END LAYOUT CONSTRAINTS]
 
 SUMMARY FORMATTING:
@@ -231,28 +248,57 @@ Muss folgendem Zod Schema entsprechen:
             });
         } catch (aiErr: any) {
             const aiMsg = aiErr?.message || String(aiErr);
-            console.error('\u274c [CV Optimize] AI call failed:', aiMsg);
-            return NextResponse.json({ error: 'AI-Fehler beim Optimieren. Bitte erneut versuchen.', details: aiMsg }, { status: 500 });
+            log.error('AI call failed', { error: aiMsg });
+            return NextResponse.json(
+                { success: false, error: 'KI-Aufruf fehlgeschlagen. Bitte versuche es erneut.', details: aiMsg },
+                { status: 502 }
+            );
         }
 
         const jsonMatch = response.text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
-            console.error('\u274c [CV Optimize] No JSON in AI response. Raw text length:', response.text.length);
-            throw new Error('Claude returned no valid JSON block');
+            log.error('No JSON in AI response', { textLength: response.text.length });
+            return NextResponse.json(
+                { success: false, error: 'Die KI hat kein gültiges JSON zurückgegeben. Bitte erneut versuchen.' },
+                { status: 502 }
+            );
         }
 
         let rawJson: any;
         try {
             rawJson = safeParseJson(jsonMatch[0]);
         } catch (parseErr: any) {
-            console.error('\u274c [CV Optimize] JSON parse failed:', parseErr?.message);
-            throw parseErr;
+            log.error('JSON parse failed', { error: parseErr?.message });
+            return NextResponse.json(
+                { success: false, error: 'KI-Antwort konnte nicht verarbeitet werden. Bitte erneut versuchen.', details: parseErr?.message },
+                { status: 502 }
+            );
         }
 
         // Validate just the changes array
         if (!Array.isArray(rawJson.changes)) {
-            throw new Error('AI response missing changes array');
+            log.error('AI response missing changes array', { keys: Object.keys(rawJson) });
+            return NextResponse.json(
+                { success: false, error: 'KI-Antwort enthält keine Änderungsliste. Bitte erneut versuchen.' },
+                { status: 502 }
+            );
         }
+
+        // Sanitize changes before Zod — handle common AI output quirks
+        rawJson.changes = rawJson.changes.map((c: any, idx: number) => ({
+            id: c.id || `change-${idx + 1}`,
+            target: {
+                section: c.target?.section || 'experience',
+                entityId: c.target?.entityId ?? null,
+                field: c.target?.field ?? null,
+                bulletId: c.target?.bulletId ?? null,
+            },
+            type: c.type || 'modify',
+            before: Array.isArray(c.before) ? c.before.join(', ') : (c.before ?? undefined),
+            after: Array.isArray(c.after) ? c.after.join(', ') : (c.after ?? undefined),
+            reason: c.reason || 'KI-Optimierung',
+            requirementRef: c.requirementRef ?? null,
+        }));
 
         // Apply changes programmatically to create the optimized CV
         const optimizedCv = applyCvChanges(cv_structured_data, rawJson.changes);
@@ -267,8 +313,11 @@ Muss folgendem Zod Schema entsprechen:
         const parseResult = cvOptimizationProposalSchema.safeParse(proposalPayload);
         if (!parseResult.success) {
             const zodMsg = parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
-            console.error('[CV Optimize] Zod validation failed:', zodMsg);
-            throw new Error(`AI output validation failed: ${zodMsg}`);
+            log.error('Zod validation failed', { error: zodMsg });
+            return NextResponse.json(
+                { success: false, error: 'KI-Ausgabe hat das Validierungsschema nicht bestanden. Bitte erneut versuchen.', details: zodMsg },
+                { status: 502 }
+            );
         }
         const validated = parseResult.data;
 
@@ -283,8 +332,11 @@ Muss folgendem Zod Schema entsprechen:
             .eq('user_id', user_id);
 
         if (dbError) {
-            console.error('Failed to save optimized CV to DB', dbError);
-            throw dbError;
+            log.error('DB write failed', { error: dbError.message });
+            return NextResponse.json(
+                { success: false, error: 'Datenbankfehler beim Speichern. Bitte erneut versuchen.', details: dbError.message },
+                { status: 500 }
+            );
         }
 
         // §2: Read-Back — verify the write was successful (Double-Assurance)
@@ -296,8 +348,11 @@ Muss folgendem Zod Schema entsprechen:
             .single();
 
         if (!readBack?.cv_optimization_proposal) {
-            console.error('❌ [CV Optimize] Read-back verification FAILED — proposal not saved');
-            return NextResponse.json({ error: 'Verification failed', success: false }, { status: 500 });
+            log.error('Read-back verification FAILED');
+            return NextResponse.json(
+                { success: false, error: 'Speicher-Verifizierung fehlgeschlagen. Bitte erneut versuchen.' },
+                { status: 500 }
+            );
         }
 
         return NextResponse.json({
@@ -307,10 +362,11 @@ Muss folgendem Zod Schema entsprechen:
 
     } catch (error: any) {
         const errDetail = error?.errors ? JSON.stringify(error.errors) : (error?.message || String(error));
-        console.error('❌ [CV Optimize] Error:', errDetail);
+        console.error('❌ [CV Optimize] Unexpected error:', errDetail);
         return NextResponse.json(
-            { error: 'Internal server error', details: errDetail },
+            { success: false, error: 'Unerwarteter Serverfehler. Bitte erneut versuchen.', details: errDetail },
             { status: 500 }
         );
     }
 }
+
