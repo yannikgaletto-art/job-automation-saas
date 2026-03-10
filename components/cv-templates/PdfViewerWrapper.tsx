@@ -3,8 +3,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PDFViewer, usePDF } from '@react-pdf/renderer';
 import { CvStructuredData } from '@/types/cv';
-import { ModernTemplate } from './ModernTemplate';
-import { ClassicTemplate } from './ClassicTemplate';
 import { TechTemplate } from './TechTemplate';
 import { ValleyTemplate } from './ValleyTemplate';
 import { Download, Loader2 } from 'lucide-react';
@@ -16,15 +14,13 @@ interface PdfViewerWrapperProps {
 
 function resolveTemplate(data: CvStructuredData, templateId: string) {
     switch (templateId) {
-        case 'classic':
-            return <ClassicTemplate data={data} />;
         case 'tech':
             return <TechTemplate data={data} />;
         case 'valley':
-            return <ValleyTemplate data={data} />;
-        case 'modern':
+        case 'classic':  // deprecated — fallback to Valley
+        case 'modern':   // deprecated — fallback to Valley
         default:
-            return <ModernTemplate data={data} />;
+            return <ValleyTemplate data={data} />;
     }
 }
 
@@ -78,7 +74,7 @@ function MobileDownload({ document }: { document: React.ReactElement }) {
     if (instance.loading) {
         return (
             <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                <Loader2 className="w-8 h-8 text-[#012e7a] animate-spin" />
                 <p className="text-gray-500 text-sm">Dein PDF wird generiert...</p>
             </div>
         );
@@ -104,7 +100,7 @@ function MobileDownload({ document }: { document: React.ReactElement }) {
             </div>
             <button
                 onClick={() => instance.url && window.open(instance.url, '_blank')}
-                className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-sm transition-all w-full max-w-xs flex items-center justify-center gap-2"
+                className="px-8 py-3.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white font-medium rounded-xl shadow-sm transition-all w-full max-w-xs flex items-center justify-center gap-2"
             >
                 <Download className="w-5 h-5" />
                 PDF herunterladen

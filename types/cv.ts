@@ -8,7 +8,9 @@ export interface CvStructuredData {
         phone?: string;
         location?: string;
         linkedin?: string;
+        website?: string;        // V2: Portfolio/GitHub
         summary?: string;
+        targetRole?: string;     // V2: Header role display
     };
     experience: Array<{
         id: string;        // UUID for stable diffing
@@ -25,22 +27,27 @@ export interface CvStructuredData {
         degree?: string;
         dateRangeText?: string;
         description?: string;
+        grade?: string;    // V2: Optional GPA/Note
     }>;
     skills: Array<{
         id: string;        // UUID for stable diffing
         category?: string;
         items: string[];
+        displayMode?: 'tags' | 'comma' | 'bars'; // V2: Template rendering hint
     }>;
     languages: Array<{
         id: string;        // UUID for stable diffing
         language?: string;
         proficiency?: string;
+        level?: 1 | 2 | 3 | 4 | 5; // V2: 1=Grundkenntnisse, 5=Muttersprache
     }>;
     certifications?: Array<{
         id: string;
         name?: string;
         issuer?: string;
         dateText?: string;
+        credentialUrl?: string;  // V2: Clickable verification link
+        expiryDate?: string;     // V2: "Gültig bis 2027"
     }>;
 }
 
@@ -56,7 +63,9 @@ export const cvStructuredDataSchema = z.object({
         phone: z.string().nullish(),
         location: z.string().nullish(),
         linkedin: z.string().nullish(),
+        website: z.string().nullish(),
         summary: z.string().nullish(),
+        targetRole: z.string().nullish(),
     }),
     experience: z.array(z.object({
         id: z.string(),
@@ -73,22 +82,27 @@ export const cvStructuredDataSchema = z.object({
         degree: z.string().nullish(),
         dateRangeText: z.string().nullish(),
         description: z.string().nullish(),
+        grade: z.string().nullish(),
     })),
     skills: z.array(z.object({
         id: z.string(),
         category: z.string().nullish(),
         items: z.array(z.string()),
+        displayMode: z.enum(['tags', 'comma', 'bars']).nullish(),
     })),
     languages: z.array(z.object({
         id: z.string(),
         language: z.string().nullish(),
         proficiency: z.string().nullish(),
+        level: z.number().min(1).max(5).nullish(),
     })),
     certifications: z.array(z.object({
         id: z.string(),
         name: z.string().nullish(),
         issuer: z.string().nullish(),
         dateText: z.string().nullish(),
+        credentialUrl: z.string().nullish(),
+        expiryDate: z.string().nullish(),
     })).nullish(),
 });
 

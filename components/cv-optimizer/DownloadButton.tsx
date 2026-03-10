@@ -3,8 +3,6 @@
 import React from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { CvStructuredData } from '@/types/cv';
-import { ModernTemplate } from '../cv-templates/ModernTemplate';
-import { ClassicTemplate } from '../cv-templates/ClassicTemplate';
 import { TechTemplate } from '../cv-templates/TechTemplate';
 import { ValleyTemplate } from '../cv-templates/ValleyTemplate';
 import { Download, Loader2 } from 'lucide-react';
@@ -16,15 +14,13 @@ interface DownloadButtonProps {
 
 function resolveDocument(data: CvStructuredData, templateId: string) {
     switch (templateId) {
-        case 'classic':
-            return <ClassicTemplate data={data} />;
         case 'tech':
             return <TechTemplate data={data} />;
         case 'valley':
-            return <ValleyTemplate data={data} />;
-        case 'modern':
+        case 'classic':  // deprecated → Valley
+        case 'modern':   // deprecated → Valley
         default:
-            return <ModernTemplate data={data} />;
+            return <ValleyTemplate data={data} />;
     }
 }
 
@@ -60,7 +56,7 @@ export default function DownloadButton({ data, templateId }: DownloadButtonProps
         <button
             onClick={handleDownload}
             disabled={isDownloading}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium
+            className="px-6 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white font-medium
                        rounded-lg flex items-center justify-center gap-2 transition-colors
                        disabled:opacity-50 min-w-[200px]"
         >

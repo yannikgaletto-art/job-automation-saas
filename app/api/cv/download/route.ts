@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToBuffer } from '@react-pdf/renderer';
-import { ModernTemplate } from '@/components/cv-templates/ModernTemplate';
-import { ClassicTemplate } from '@/components/cv-templates/ClassicTemplate';
 import { TechTemplate } from '@/components/cv-templates/TechTemplate';
 import { ValleyTemplate } from '@/components/cv-templates/ValleyTemplate';
 import { CvStructuredData } from '@/types/cv';
@@ -49,11 +47,11 @@ function CoverLetterDoc({ text }: { text: string }) {
 
 function resolveTemplate(templateId: string, data: CvStructuredData) {
     switch (templateId) {
-        case 'classic': return React.createElement(ClassicTemplate, { data });
         case 'tech': return React.createElement(TechTemplate, { data });
-        case 'valley': return React.createElement(ValleyTemplate, { data });
-        case 'modern':
-        default: return React.createElement(ModernTemplate, { data });
+        case 'valley':
+        case 'classic':  // deprecated → Valley
+        case 'modern':   // deprecated → Valley
+        default: return React.createElement(ValleyTemplate, { data });
     }
 }
 

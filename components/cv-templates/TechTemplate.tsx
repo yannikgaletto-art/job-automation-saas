@@ -2,6 +2,9 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
 import { CvStructuredData } from '@/types/cv';
+import { ProficiencyDots } from './shared/ProficiencyDots';
+import { CertGrid } from './shared/CertGrid';
+import { truncateDescription, inferLanguageLevel } from '@/lib/utils/cv-template-helpers';
 
 registerPdfFonts();
 
@@ -50,7 +53,6 @@ const s = StyleSheet.create({
         alignItems: 'flex-end',
         justifyContent: 'flex-end',
         flexShrink: 0,
-        gap: 4,
     },
     contactTag: {
         backgroundColor: LIGHT,
@@ -60,16 +62,18 @@ const s = StyleSheet.create({
         fontSize: 8,
         color: GRAY,
         fontWeight: 600,
+        marginBottom: 4,
     },
     columns: {
         flexDirection: 'row',
-        gap: 24,
     },
     mainCol: {
         flex: 2,
+        paddingRight: 12,
     },
     sideCol: {
         flex: 1,
+        paddingLeft: 12,
     },
     sectionTitle: {
         fontSize: 12,
@@ -148,7 +152,6 @@ const s = StyleSheet.create({
     skillTagContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 4,
         marginTop: 4,
     },
     skillTag: {
@@ -159,7 +162,20 @@ const s = StyleSheet.create({
         paddingVertical: 3,
         borderRadius: 4,
         fontWeight: 600,
-    }
+        marginRight: 4,
+        marginBottom: 4,
+    },
+    // Language dots row
+    langRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    langLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
 });
 
 const RenderBullet = ({ text }: { text: string }) => {
@@ -187,7 +203,7 @@ export function TechTemplate({ data }: { data: CvStructuredData }) {
                 <View style={s.header}>
                     <View style={s.headerLeft}>
                         <Text style={s.name}>{pi.name || ''}</Text>
-                        <Text style={s.roleTitle}>{pi.summary ? 'Software Engineer / Tech Lead' : ''}</Text>
+                        <Text style={s.roleTitle}>{pi.targetRole || (pi.summary ? 'Software Engineer / Tech Lead' : '')}</Text>
                     </View>
                     <View style={s.headerRight}>
                         {pi.email && <Text style={s.contactTag}>{pi.email}</Text>}
@@ -265,26 +281,24 @@ export function TechTemplate({ data }: { data: CvStructuredData }) {
                             </View>
                         )}
 
-                        {/* Certifications */}
+                        {/* Certifications — V2: CertGrid */}
                         {data.certifications && data.certifications.length > 0 && (
-                            <View style={{ marginBottom: 20 }}>
+                            <View style={{ marginBottom: 20 }} wrap={false} minPresenceAhead={40}>
                                 <Text style={s.sectionTitle}>Certifications</Text>
-                                {data.certifications.map(cert => (
-                                    <View key={cert.id} style={s.sideBlock} wrap={false}>
-                                        <Text style={s.sideLabel}>{cert.name || ''}</Text>
-                                        <Text style={s.sideText}>{cert.issuer || ''}</Text>
-                                    </View>
-                                ))}
+                                <CertGrid certs={data.certifications} />
                             </View>
                         )}
 
-                        {/* Languages */}
+                        {/* Languages — V2: with ProficiencyDots */}
                         {data.languages.length > 0 && (
                             <View>
                                 <Text style={s.sectionTitle}>Languages</Text>
                                 {data.languages.map(lang => (
-                                    <View key={lang.id} style={s.sideBlock} wrap={false}>
-                                        <Text style={s.sideLabel}>{lang.language || ''}</Text>
+                                    <View key={lang.id} style={s.langRow} wrap={false}>
+                                        <View style={s.langLeft}>
+                                            <Text style={[s.sideLabel, { marginBottom: 0, marginRight: 6 }]}>{lang.language || ''}</Text>
+                                            <ProficiencyDots level={lang.level ?? inferLanguageLevel(lang.proficiency)} />
+                                        </View>
                                         <Text style={s.sideText}>{lang.proficiency || ''}</Text>
                                     </View>
                                 ))}

@@ -1,9 +1,9 @@
 # CV Generation Engine — Architecture Directive
 
 **Status:** AKTIV — PFLICHTLEKTÜRE für alle CV-Template- & PDF-Agents  
-**Version:** 2.0  
+**Version:** 2.1  
 **Erstellt:** 2026-03-10  
-**Letzte Revision:** 2026-03-10 (QA-Review integriert)  
+**Letzte Revision:** 2026-03-10 (QA-Review integriert, Modern + Classic entfernt)  
 **Owner:** Yannik Galetto  
 **Scope:** PDF Rendering Engine, Template Consolidation, Structured Data Schema, Page Layout Engine  
 
@@ -167,24 +167,21 @@ keine Queue-Belastung. Korrekt so, darf **nicht** server-side migriert werden.
 
 ### Valley — BEHALTEN ✅ (Primary Template, FAANG-optimiert)
 - Minimalistisch, Schwarz/Weiß, perfekte ATS-Lesbarkeit.
-- **Aktion:** Skill-Tags + Language-Dots + Cert-Grid + Page Budget.
-
-### Modern — BEHALTEN ✅ (2-Spalten Sidebar-Variante)
-- Sidebar-Layout (dunkelgrauer Sidebar links, weißer Content rechts).
-- **Aktion:** Skill-Tags in Sidebar aufwerten, Accent-Farbe `#2563EB` → `#012e7a`.
+- **Aktion:** Skill-Tags + Language-Dots + Cert-Grid + Page Budget. ✅ DONE
 
 ### Tech — BEHALTEN ✅ (Tech-/Developer-Variante)
 - 2-Spalten mit Accent-Color-Akzenten, Date-Tags als Badges.
 - Skill-Tags bereits vorhanden. Am nächsten an 100%.
-- **Aktion:** Language-Dots + Page Budget. Referenz-Template für andere.
+- **Aktion:** Language-Dots + CertGrid + gap→margin + Page Budget. ✅ DONE
 
-### Classic — DEPRECATEN ❌ → ENTFERNEN
-- 90% Duplikat von Valley. Verwirrt User.
-- **Migration:** Fallback `'classic'` → `'valley'` in `resolveTemplate()` + DB-Migration.
+### Modern — ENTFERNT ❌
+- Per User-Entscheidung entfernt. Fallback `'modern'` → Valley in `resolveTemplate()`.
+- `ModernTemplate.tsx` gelöscht.
 
-### 4. Template — NICHT JETZT
-- Drei differenzierte Templates (Valley, Modern, Tech) decken alle Use Cases.
-- Erst wenn User-Feedback ein spezifisches Layout-Bedürfnis zeigt.
+### Classic — ENTFERNT ❌
+- 90% Duplikat von Valley. Fallback `'classic'` → Valley in `resolveTemplate()`.
+- `ClassicTemplate.tsx` gelöscht.
+- **DB-Migration nötig:** `UPDATE job_queue SET preferred_template = 'valley' WHERE preferred_template IN ('classic', 'modern')`
 
 ---
 
@@ -580,10 +577,10 @@ Schnell (<500ms), serverless-kompatibel, durchsuchbar, klickbare Links, zero API
 
 | Template | Aktion |
 |----------|--------|
-| **Valley** | Behalten, aufrüsten (Skill-Tags, Lang-Dots, Cert-Grid, Page Budget) |
-| **Modern** | Behalten, Accent `#2563EB` → `#012e7a`, Skill-Tags in Sidebar |
-| **Tech** | Behalten, `gap` → margin, ist Referenz-Template (hat bereits Skill-Tags) |
-| **Classic** | Deprecaten + DB-Migration + File löschen |
+| **Valley** | Behalten, aufgerüstet ✅ (Skill-Tags, Lang-Dots, CertGrid, dual-column, orphan prevention) |
+| **Tech** | Behalten, aufgerüstet ✅ (gap→margin, ProficiencyDots, CertGrid, targetRole) |
+| **Modern** | ENTFERNT ❌ (User-Entscheidung) — Fallback → Valley |
+| **Classic** | ENTFERNT ❌ — Fallback → Valley + DB-Migration |
 
 ### 10.3 Implementation Sequence
 
@@ -599,12 +596,14 @@ Phase 1 (Daten & Shared Components) ─── 1 Arbeitstag
   └─ 4. gap → margin Migration (TechTemplate 3x, ClassicTemplate 1x)
 
 Phase 2 (Templates) ─── 1 Arbeitstag
-  ├─ 5. Valley: Skills→Tags, Languages→Dots, Certs→Grid, Page Budget
-  ├─ 6. Modern: Skills Sidebar→Tags, Accent→#012e7a
-  ├─ 7. Tech: Language-Dots, Page Budget (Skill-Tags hat er schon)
-  ├─ 8. Classic deprecaten: resolveTemplate() Fallback, Import entfernen
-  └─ 9. DB-Migration: UPDATE job_queue SET preferred_template = 'valley'
-         WHERE preferred_template = 'classic' (supabase/migrations/)
+  ├─ 5. Valley: Skills→Tags, Languages→Dots, Certs→Grid, Page Budget ✅
+  ├─ 6. Tech: gap→margin, ProficiencyDots, CertGrid, targetRole ✅
+  ├─ 7. Classic + Modern: Dateien gelöscht ✅
+  ├─ 8. PdfViewerWrapper: Classic/Modern entfernt, fallback→Valley ✅
+  ├─ 9. DownloadButton: Classic/Modern entfernt, fallback→Valley ✅
+  ├─ 10. cv/download/route.ts: Classic/Modern entfernt ✅
+  ├─ 11. OptimizerWizard: Template Selector bereinigt ✅
+  └─ 12. DB-Migration: UPDATE job_queue ... WHERE preferred_template IN ('classic','modern')
 
 Phase 3 (Parser & Polish) ─── 0.5 Arbeitstag
   ├─ 10. cv-parser.ts: Level + credentialUrl + targetRole extrahieren

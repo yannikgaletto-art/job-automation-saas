@@ -352,7 +352,6 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
 
     const TEMPLATES = [
         { id: 'valley', label: 'Valley', icon: <Layout className="w-4 h-4" /> },
-        { id: 'classic', label: 'Classic', icon: <FileText className="w-4 h-4" /> },
         { id: 'tech', label: 'Tech', icon: <Settings className="w-4 h-4" /> },
     ];
 
