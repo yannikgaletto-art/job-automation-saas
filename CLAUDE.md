@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 3.0
-**Last Updated:** 2026-03-09
+**Version:** 3.1
+**Last Updated:** 2026-03-10
 
 ---
 
@@ -99,6 +99,10 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **Steckbrief UI** | **Unternehmenswebsite Hyperlink, ATS/Benefits Schriftgröße, Umlaute (ä/ö/ü), Layout-Alignment** |
 | **CV Match Tab** | **Rename 'CV Check' → 'CV Match', Icon entfernt, Loading-UI (Cover-Letter-Style), Polling 60s→150s Bug-Fix, ATS-Keywords Erklärungstext** |
 | **Upload UI** | **Azure EU Fortschrittsanzeige: Badge + Status-Texte für CV & Cover Letter Upload** |
+| **CV Optimizer (2026-03-10)** | **Hydration-Fix: nested `<button>` in DiffReview.tsx → `<div role=button>`. Summary-Toggle für Valley-Template freigegeben. `showSummary` jetzt korrekt an API übermittelt + Prompt-Instruktion.** |
+| **CV Optimizer (2026-03-10)** | **Error-Handling: Alle `throw` ersetzt durch `NextResponse.json()` mit deutschen Fehlertexten. Sanitization-Layer vor Zod-Validation. Zod-Schema generisch (section=string, reason=optional).** |
+| **ValleyTemplate (2026-03-10)** | **Max 3 Bullet-Points hard-cap (`.slice(0,3)`). Zertifikate in rechte Spalte der Dual-Column-Layout (Seite 2, unter Sprachen). KI-Prompt: 2-Seiten HARD RULE + Self-Judge-Validation.** |
+| **CV Parser (2026-03-10)** | **Chrono-Sort: `sortExperienceByDate()` post-processing (Heute/MM.YYYY/MM/YYYY/YYYY). Prompt-Anweisung 6+7: korrektes Date-Company-Matching, kein OCR-Reihenfolgen-Bug mehr.** |
 
 ---
 

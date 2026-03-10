@@ -661,8 +661,114 @@ Phase 3 (Parser & Polish) ─── 0.5 Arbeitstag
 
 ---
 
-> **Letztes Update:** 2026-03-10 (V2.0)  
+> **Letztes Update:** 2026-03-10 (V2.1)  
 > **Owner:** Yannik Galetto  
 > **Engine-Entscheidung:** @react-pdf/renderer (Status Quo bestätigt)  
-> **Template-Entscheidung:** Classic deprecaten, Valley/Modern/Tech aufwerten  
+> **Template-Entscheidung:** Classic deprecaten, Valley/Tech aufwerten  
 > **Neu in V2:** Page Layout Engine (§8), Visual Density Rules (§9), gap-Migration, Orphan Prevention
+
+---
+
+## 12. CV OPTIMIZER — HARDENING PATTERNS (2026-03-10)
+
+Lessons learned aus der Deployment-Readiness-Session.
+
+### 12.1 Summary Toggle
+
+- `showSummary` MUSS explizit in der API-Request-Payload gesendet werden (nicht nur `summaryMode`)
+- API-Prompt: Unterscheide drei Zustände: `showSummary=false` → "KEIN Summary", `summaryMode='compact'` → 2-Satz-Limit, default → Standard
+- Valley-Template: `isSummaryDisabled` Gate ENTFERNT — Summary-Toggle gilt für ALLE Templates
+- `applyCVOptSettings` filtert `summary` korrekt wenn `showSummary=false` → kein Handlungsbedarf dort
+
+### 12.2 Zod-Schema — Lenienz-Gebot
+
+**REGEL:** Zod-Schemas für KI-Output MÜSSEN lenient sein. Die KI liefert korrekte Inhalte aber inkonsistente Struktur.
+
+```typescript
+// ❌ ZU STRIKT — schlägt bei jeder kleinen Claude-Variation fehl
+section: z.enum(['experience', 'education', 'skills', 'languages', 'personalInfo'])
+reason: z.string() // required
+
+// ✅ KORREKT — tolerant für AI-Output
+section: z.string()  // Akzeptiert alles (certifications, summary, etc.)
+reason: z.string().nullish().default('KI-Optimierung')
+before: z.any().transform(v => v == null ? undefined : String(v)).optional()
+after: z.any().transform(v => v == null ? undefined : String(v)).optional()
+requirementRef: z.object({ requirement: z.string().nullish() }).nullish()
+```
+
+### 12.3 Sanitization vor Zod-Validation
+
+Immer einen Sanitize-Pass **vor** Zod einbauen für KI-Output:
+
+```typescript
+rawJson.changes = rawJson.changes.map((c: any, idx: number) => ({
+    id: c.id || `change-${idx + 1}`,
+    target: {
+        section: c.target?.section || 'experience',
+        entityId: c.target?.entityId ?? null,
+        field: c.target?.field ?? null,
+        bulletId: c.target?.bulletId ?? null,
+    },
+    type: c.type || 'modify',
+    before: Array.isArray(c.before) ? c.before.join(', ') : (c.before ?? undefined),
+    after: Array.isArray(c.after) ? c.after.join(', ') : (c.after ?? undefined),
+    reason: c.reason || 'KI-Optimierung',
+    requirementRef: c.requirementRef ?? null,
+}));
+```
+
+### 12.4 Error-Handling — Deployment-Ready Pattern
+
+**REGEL:** Kein `throw` in API-Routes außer dem äußeren `catch`. Alle Fehlerzustände explizit mit `return NextResponse.json()`.
+
+```typescript
+// ❌ FALSCH — Error wird in genericem catch aufgefangen, Client sieht "Internal server error"
+if (!jsonMatch) throw new Error('Claude returned no valid JSON block');
+
+// ✅ RICHTIG — Client sieht German error message, HTTP status ist korrekt semantisch
+if (!jsonMatch) {
+    return NextResponse.json(
+        { success: false, error: 'Die KI hat kein gültiges JSON zurückgegeben. Bitte erneut versuchen.' },
+        { status: 502 } // 502 = AI/Upstream Fehler, 500 = DB/Server Fehler
+    );
+}
+```
+
+### 12.5 CV Parser — Chrono-Sort & OCR-robustheit
+
+Azure OCR kann Text aus mehrspaltigem PDF-Layout in nicht-linearer Reihenfolge liefern. Dadurch können Dates und Companies falsch zugeordnet werden.
+
+**Zwei-Schicht-Schutz in `cv-parser.ts`:**
+
+1. **Prompt-Anweisung** (Regel 6+7): Claude muss vollständigen Text lesen, semantisch zuordnen, nicht OCR-Reihenfolge übernehmen
+2. **`sortExperienceByDate()` Post-Processing** (deterministisch): Nach Claude-Output immer chronologisch sortieren
+   - Erkennt: `Heute`, `Present`, `MM.YYYY`, `MM/YYYY`, `YYYY`
+   - Sort: newest-first (Index 0 = aktuellste Position)
+
+> ⚠️ **WICHTIG bei Azure-Key-Problemen:** Azure 401 = Key abgelaufen. Neuen Key im Azure Portal holen, in `.env.local` ersetzen, `npm run dev` neu starten.
+
+### 12.6 Valley Template — 2-Seiten-Garantie
+
+- Max 3 Bullet-Points: `.slice(0, 3)` im Template (Template-Level Hard-Cap, unabhängig von KI)
+- Zertifikate: In **rechte Spalte des Dual-Column-Layouts** (unter Sprachen, Seite 2)
+- KI-Prompt: HARD RULE "2 A4 Seiten" + Self-Judge-Validation Step
+- Budget: Seite 1 = Header + Summary + Experience + Education | Seite 2 = Skills + Languages + Certs (rechte Spalte)
+
+### 12.7 Button-Hydration-Fix
+
+**REGEL:** React/Next.js erlaubt kein `<button>` als Descendant von `<button>`. Immer prüfen.
+
+```tsx
+// ❌ Verursacht Hydration-Error
+<button onClick={toggleExpand}>
+    <button onClick={handleAction}>...</button>
+</button>
+
+// ✅ Korrekt — interaktives div statt verschachteltem button
+<div role="button" tabIndex={0} onClick={handleAction} 
+     onKeyDown={e => { if (e.key === 'Enter') handleAction(); }}
+     aria-label="...">
+    ...
+</div>
+```
