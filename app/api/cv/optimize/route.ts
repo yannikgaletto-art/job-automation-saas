@@ -168,8 +168,8 @@ Deine Aufgabe ist es, einen Lebenslauf-JSON (CV SSoT) und eine Analyse (CV Match
 ${summaryInstruction}
 
 [LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION}]
-- Max 4 bullet points per experience entry
-- Max 20 words per bullet point (1 line when printed). Be concise. Quality over quantity.
+- Max 3 bullet points per experience entry (quality over quantity — user can add more)
+- Max 12 words per bullet point. Must fit on ONE printed line. Be surgical and precise.
 - Summary: max 3 sentences
 - If >5 experience entries: oldest entries get max 2 bullets
 - If >3 education entries: only 2 most relevant get full description

@@ -50,15 +50,19 @@ const s = StyleSheet.create({
     expRole: { fontSize: 10, fontWeight: 700, color: DARK, flex: 1, paddingRight: 8 },
     expDate: { fontSize: 8.5, color: '#888888', fontWeight: 'normal', flexShrink: 0 },
     expCompany: { fontSize: 9, color: MUTED, marginBottom: 4 },
-    bulletRow: { flexDirection: 'row', marginBottom: 3, paddingLeft: 2 },
+    // Bullet: paddingRight reserves space for the date column so text doesn't run edge-to-edge
+    bulletRow: { flexDirection: 'row', marginBottom: 2, paddingLeft: 2, paddingRight: 80 },
     bulletDot: { width: 10, fontSize: 9, color: DARK },
-    bulletText: { flex: 1, fontSize: 9, color: DARK, lineHeight: 1.5 },
-    eduBlock: { marginBottom: 6 },
+    bulletText: { flex: 1, fontSize: 9, color: DARK, lineHeight: 1.4 },
+    eduBlock: { marginBottom: 8 },
     eduTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 1.5 },
     eduDegree: { fontSize: 10, fontWeight: 700, color: DARK, flex: 1, paddingRight: 8 },
     eduDate: { fontSize: 8.5, color: '#888888', fontWeight: 'normal', flexShrink: 0 },
-    eduInstitution: { fontSize: 9, color: MUTED, marginBottom: 2 },
-    eduDesc: { fontSize: 9, color: MUTED, lineHeight: 1.4 },
+    eduInstitution: { fontSize: 9, color: MUTED, marginBottom: 3 },
+    eduSubRow: { flexDirection: 'row', marginBottom: 1.5, paddingLeft: 0 },
+    eduSubLabel: { fontSize: 8.5, fontWeight: 700, color: DARK },
+    eduSubText: { fontSize: 8.5, color: MUTED, flex: 1, lineHeight: 1.4 },
+    eduSubItem: { fontSize: 8.5, color: MUTED, lineHeight: 1.4, paddingLeft: 8 },
     skillGroupBlock: { marginBottom: 6 },
     skillCategoryLabel: { fontSize: 9, fontWeight: 700, color: DARK, marginBottom: 3 },
     langRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
@@ -182,18 +186,34 @@ export function ValleyTemplate({ data }: { data: CvStructuredData }) {
                 {data.education.length > 0 && (
                     <View style={s.sectionContainer}>
                         <Text style={s.sectionTitle}>Ausbildung</Text>
-                        {data.education.map((edu) => (
-                            <View key={edu.id} style={s.eduBlock} wrap={false}>
-                                <View style={s.eduTopRow}>
-                                    <Text style={s.eduDegree}>{edu.degree || ''}</Text>
-                                    <Text style={s.eduDate}>{edu.dateRangeText || ''}</Text>
+                        {data.education.map((edu) => {
+                            // Split description into sub-items (split on '. ' or ', ')
+                            const rawDesc = edu.description || '';
+                            const subItems = rawDesc
+                                .split(/\. (?=[A-ZÄÖÜ0-9])/g)
+                                .map(s => s.replace(/\.$/, '').trim())
+                                .filter(s => s.length > 2);
+                            return (
+                                <View key={edu.id} style={s.eduBlock} wrap={false}>
+                                    <View style={s.eduTopRow}>
+                                        <Text style={s.eduDegree}>{edu.degree || ''}</Text>
+                                        <Text style={s.eduDate}>{edu.dateRangeText || ''}</Text>
+                                    </View>
+                                    {edu.institution && <Text style={s.eduInstitution}>{edu.institution}</Text>}
+                                    {/* Grade as bold label */}
+                                    {edu.grade && (
+                                        <View style={s.eduSubRow}>
+                                            <Text style={s.eduSubLabel}>Abschlussnote: </Text>
+                                            <Text style={s.eduSubText}>{edu.grade}</Text>
+                                        </View>
+                                    )}
+                                    {/* Description sub-items as dash list */}
+                                    {subItems.map((item, i) => (
+                                        <Text key={i} style={s.eduSubItem}>– {item}</Text>
+                                    ))}
                                 </View>
-                                {edu.institution && <Text style={s.eduInstitution}>{edu.institution}</Text>}
-                                {edu.description && (
-                                    <Text style={s.eduDesc}>{truncateDescription(edu.description)}</Text>
-                                )}
-                            </View>
-                        ))}
+                            );
+                        })}
                     </View>
                 )}
 
