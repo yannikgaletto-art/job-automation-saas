@@ -115,6 +115,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
         }
 
+        // Guard: requirementRows must exist on the cv_match_result object
+        const requirementRows = cv_match_result?.requirementRows ?? cv_match_result?.rows ?? cv_match_result;
+        if (!requirementRows) {
+            log.warn('cv/optimize called without requirementRows', { job_id, cv_match_result_keys: Object.keys(cv_match_result || {}) });
+            return NextResponse.json({ error: 'CV Match result is missing requirementRows. Bitte führe zuerst den CV Match Schritt durch.' }, { status: 400 });
+        }
+
         log.info('CV Optimize requested', { job_id });
 
         // §3: User-scoped — always use session user.id, never trust body
@@ -162,7 +169,7 @@ ${summaryInstruction}
 ${JSON.stringify(cv_structured_data, null, 2)}
 
 2. CV MATCH RESULTAT (ANALYSE & LÜCKEN):
-${JSON.stringify(cv_match_result.requirementRows, null, 2)}
+${JSON.stringify(requirementRows, null, 2)}
 
 3. GEWÄHLTES TEMPLATE ID:
 ${template_id}
@@ -192,19 +199,33 @@ Muss folgendem Zod Schema entsprechen:
 }
 `;
 
-        const response = await complete({
-            taskType: 'optimize_cv',
-            prompt,
-            temperature: 0,
-            maxTokens: 16384,
-        });
+        let response;
+        try {
+            response = await complete({
+                taskType: 'optimize_cv',
+                prompt,
+                temperature: 0,
+                maxTokens: 16384,
+            });
+        } catch (aiErr: any) {
+            const aiMsg = aiErr?.message || String(aiErr);
+            console.error('\u274c [CV Optimize] AI call failed:', aiMsg);
+            return NextResponse.json({ error: 'AI-Fehler beim Optimieren. Bitte erneut versuchen.', details: aiMsg }, { status: 500 });
+        }
 
         const jsonMatch = response.text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
+            console.error('\u274c [CV Optimize] No JSON in AI response. Raw text length:', response.text.length);
             throw new Error('Claude returned no valid JSON block');
         }
 
-        const rawJson = safeParseJson(jsonMatch[0]);
+        let rawJson: any;
+        try {
+            rawJson = safeParseJson(jsonMatch[0]);
+        } catch (parseErr: any) {
+            console.error('\u274c [CV Optimize] JSON parse failed:', parseErr?.message);
+            throw parseErr;
+        }
 
         // Validate just the changes array
         if (!Array.isArray(rawJson.changes)) {

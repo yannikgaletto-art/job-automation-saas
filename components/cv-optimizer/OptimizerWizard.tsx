@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { TemplateSelector } from "./TemplateSelector"
 import { DiffReview } from "./DiffReview"
 import { InlineCvEditor } from "./InlineCvEditor"
@@ -43,7 +43,6 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
 
     const [isLoading, setIsLoading] = useState(true);
     const [isOptimizing, setIsOptimizing] = useState(false);
-    const [optProgressText, setOptProgressText] = useState("Lade CV-Daten...");
 
     // Inline editor state
     const [isEditing, setIsEditing] = useState(false);
@@ -54,25 +53,30 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     const [stationMetrics, setStationMetrics] = useState<StationMetrics[]>([]);
     const [metricsInput, setMetricsInput] = useState(''); // freetext fallback
 
+    const OPT_STEPS = [
+        "Lebenslauf & Match-Ergebnisse werden geladen",
+        "Schwachstellen werden analysiert",
+        "Bullet-Points werden neu formuliert",
+        "Keywords aus der Stellenanzeige werden integriert",
+        "ATS-Kompatibilität wird geprüft",
+        "Vorschläge werden finalisiert",
+    ];
+    const [optStep, setOptStep] = useState(0);
+
     useEffect(() => {
         if (isOptimizing) {
-            const messages = [
-                "Lade CV-Daten...",
-                "Analysiere Schwachstellen...",
-                "Formuliere Bullet-Points neu...",
-                "Optimiere fuer ATS-Systeme...",
-                "Integriere Job-Keywords...",
-                "Pruefe Lesbarkeit und Struktur...",
-            ];
-            let index = 1;
+            setOptStep(0);
+            let idx = 0;
             const interval = setInterval(() => {
-                setOptProgressText(messages[index]);
-                index = (index + 1) % messages.length;
-            }, 3000);
+                idx = Math.min(idx + 1, OPT_STEPS.length - 1);
+                setOptStep(idx);
+                if (idx >= OPT_STEPS.length - 1) clearInterval(interval);
+            }, 3500);
             return () => clearInterval(interval);
         } else {
-            setOptProgressText("Lade CV-Daten...");
+            setOptStep(0);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOptimizing]);
 
     const [cvData, setCvData] = useState<CvStructuredData | null>(null);
@@ -329,7 +333,7 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     const activePdfData = editablePdfData ?? pdfData;
 
     if (isLoading) {
-        return <div className="p-10 flex justify-center"><LoadingSpinner className="w-8 h-8 text-blue-600" /></div>;
+        return <div className="p-10 flex justify-center"><LoadingSpinner className="w-8 h-8 text-[#012e7a]" /></div>;
     }
 
     if (!cvData) {
@@ -356,13 +360,13 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
         <div className="w-full flex flex-col space-y-6">
             {/* Step Indicator — 2 steps only */}
             <div className="flex gap-4 items-center mb-4 px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg">
-                <div className={`flex items-center gap-2 text-sm font-medium ${step >= 1 ? 'text-blue-700' : 'text-gray-400'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 1 ? 'bg-blue-100' : 'bg-gray-200'}`}>1</span>
+                <div className={`flex items-center gap-2 text-sm font-medium ${step >= 1 ? 'text-[#012e7a]' : 'text-gray-400'}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 1 ? 'bg-blue-100 text-[#012e7a]' : 'bg-gray-200'}`}>1</span>
                     Optimize
                 </div>
                 <div className="w-8 h-[1px] bg-gray-300" />
-                <div className={`flex items-center gap-2 text-sm font-medium ${step === 2 ? 'text-blue-700' : 'text-gray-400'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step === 2 ? 'bg-blue-100' : 'bg-gray-200'}`}>2</span>
+                <div className={`flex items-center gap-2 text-sm font-medium ${step === 2 ? 'text-[#012e7a]' : 'text-gray-400'}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step === 2 ? 'bg-blue-100 text-[#012e7a]' : 'bg-gray-200'}`}>2</span>
                     Preview
                 </div>
             </div>
@@ -378,124 +382,142 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                 {step === 1 && !proposal && (
                     <div className="flex flex-col items-center justify-center p-12 bg-white border border-gray-200 rounded-xl space-y-6">
                         {isOptimizing ? (
-                            <>
-                                <LoadingSpinner className="w-12 h-12 text-blue-600 mb-6" />
-                                <div className="text-center max-w-md w-full">
-                                    <h3 className="text-lg font-medium text-gray-900 mb-6">
-                                        <AnimatePresence mode="popLayout">
-                                            <motion.span
-                                                key={optProgressText}
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: -10 }}
-                                                transition={{ duration: 0.4 }}
-                                                className="inline-block"
-                                            >
-                                                {optProgressText}
-                                            </motion.span>
-                                        </AnimatePresence>
-                                    </h3>
-                                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mx-auto mt-2">
-                                        <motion.div
-                                            className="h-full bg-blue-600"
-                                            initial={{ width: '0%' }}
-                                            animate={{ width: '85%' }}
-                                            transition={{ duration: 15, ease: "easeOut" }}
-                                        />
+                            <div className="w-full max-w-md">
+                                {/* Header */}
+                                <div className="flex items-center gap-3 mb-8">
+                                    <LoadingSpinner className="w-7 h-7 text-[#012e7a] shrink-0" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-[#012e7a]">CV wird optimiert…</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">Das dauert etwa 15–20 Sekunden</p>
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-4">Bitte warten, dies dauert etwa 15-20 Sekunden...</p>
                                 </div>
-                            </>
+
+                                {/* Step list */}
+                                <div className="space-y-3">
+                                    {OPT_STEPS.map((label, i) => {
+                                        const isDone = i < optStep;
+                                        const isActive = i === optStep;
+                                        return (
+                                            <motion.div
+                                                key={i}
+                                                initial={{ opacity: 0, x: -8 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: i * 0.08 }}
+                                                className={`flex items-center gap-3 py-2 px-3 rounded-lg transition-colors ${isDone ? 'bg-[#012e7a]/5' : isActive ? 'bg-[#012e7a]/10 border border-[#012e7a]/20' : 'opacity-30'
+                                                    }`}
+                                            >
+                                                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-all ${isDone ? 'bg-[#012e7a] text-white' : isActive ? 'border-2 border-[#012e7a] text-[#012e7a]' : 'border border-gray-300 text-gray-400'
+                                                    }`}>
+                                                    {isDone ? '✓' : i + 1}
+                                                </div>
+                                                <span className={`text-sm ${isDone ? 'text-[#012e7a] line-through opacity-60' : isActive ? 'text-[#012e7a] font-medium' : 'text-gray-400'
+                                                    }`}>
+                                                    {label}
+                                                </span>
+                                                {isActive && (
+                                                    <motion.div
+                                                        className="ml-auto w-3 h-3 rounded-full bg-[#012e7a]"
+                                                        animate={{ scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }}
+                                                        transition={{ repeat: Infinity, duration: 1.2 }}
+                                                    />
+                                                )}
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         ) : (
                             <>
-                                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
-                                    <Settings className="w-8 h-8" />
-                                </div>
                                 <div className="text-center max-w-md w-full">
-                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Bereit zur Optimierung</h3>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">CV: Was können wir besser machen?</h3>
                                     <p className="text-gray-500 mb-4">
-                                        Die KI gleicht deinen Lebenslauf mit den Match-Ergebnissen ab und formuliert Bullet Points neu, um deinen ATS-Score zu maximieren.
+                                        Wir gleichen deinen <strong className="text-gray-700">Lebenslauf</strong> mit den <strong className="text-gray-700">Match-Ergebnissen</strong> ab und geben dir <strong className="text-gray-700">Vorschläge</strong>, mit welchen Formulierungen du <strong className="text-gray-700">mehr Erfolg</strong> haben wirst.
                                     </p>
 
-                                    {/* CVOptSettings Toggle Group */}
-                                    <div className="w-full bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6 text-left space-y-3">
-                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Anzeigeoptionen</p>
+                                    {/* CVOptSettings Toggle Group — Notion-style collapsible */}
+                                    <details className="w-full mb-6 text-left group">
+                                        <summary className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-gray-600 hover:text-gray-900 transition list-none">
+                                            <span className="text-gray-400 group-open:rotate-90 transition-transform duration-200 inline-block">▶</span>
+                                            Anzeigeoptionen
+                                        </summary>
+                                        <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
 
-                                        {/* Summary toggle — disabled when Clean template is selected */}
-                                        {(() => {
-                                            const isSummaryDisabled = templateId === 'valley';
-                                            return (
-                                                <>
-                                                    <div className={`flex items-center justify-between ${isSummaryDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                                                        <span className="text-sm text-gray-700">Zusammenfassung anzeigen</span>
-                                                        <button
-                                                            onClick={() => !isSummaryDisabled && setCvOptSettings(s => ({ ...s, showSummary: !s.showSummary }))}
-                                                            className={`transition ${isSummaryDisabled ? 'cursor-not-allowed' : 'text-gray-500 hover:text-blue-600'}`}
-                                                            aria-label="Zusammenfassung umschalten"
-                                                            disabled={isSummaryDisabled}
-                                                            title={isSummaryDisabled ? 'Im Clean-Template nicht verfuegbar — dieses Format verzichtet bewusst auf einen Summary-Block.' : undefined}
-                                                        >
-                                                            {cvOptSettings.showSummary && !isSummaryDisabled
-                                                                ? <ToggleRight className="w-7 h-7 text-blue-600" />
-                                                                : <ToggleLeft className="w-7 h-7 text-gray-400" />}
-                                                        </button>
-                                                    </div>
-                                                    {cvOptSettings.showSummary && !isSummaryDisabled && (
-                                                        <div className="ml-4 flex gap-3">
-                                                            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="summaryMode"
-                                                                    checked={cvOptSettings.summaryMode === 'full'}
-                                                                    onChange={() => setCvOptSettings(s => ({ ...s, summaryMode: 'full' }))}
-                                                                    className="accent-blue-600"
-                                                                />
-                                                                Vollstaendig
-                                                            </label>
-                                                            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="summaryMode"
-                                                                    checked={cvOptSettings.summaryMode === 'compact'}
-                                                                    onChange={() => setCvOptSettings(s => ({ ...s, summaryMode: 'compact' }))}
-                                                                    className="accent-blue-600"
-                                                                />
-                                                                Kompakt (max. 2 Saetze)
-                                                            </label>
+                                            {/* Summary toggle — disabled when Clean template is selected */}
+                                            {(() => {
+                                                const isSummaryDisabled = templateId === 'valley';
+                                                return (
+                                                    <>
+                                                        <div className={`flex items-center justify-between ${isSummaryDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                                                            <span className="text-sm text-gray-700">Zusammenfassung anzeigen</span>
+                                                            <button
+                                                                onClick={() => !isSummaryDisabled && setCvOptSettings(s => ({ ...s, showSummary: !s.showSummary }))}
+                                                                className={`transition ${isSummaryDisabled ? 'cursor-not-allowed' : 'text-gray-500 hover:text-[#012e7a]'}`}
+                                                                aria-label="Zusammenfassung umschalten"
+                                                                disabled={isSummaryDisabled}
+                                                                title={isSummaryDisabled ? 'Im Clean-Template nicht verfuegbar — dieses Format verzichtet bewusst auf einen Summary-Block.' : undefined}
+                                                            >
+                                                                {cvOptSettings.showSummary && !isSummaryDisabled
+                                                                    ? <ToggleRight className="w-7 h-7 text-[#012e7a]" />
+                                                                    : <ToggleLeft className="w-7 h-7 text-gray-400" />}
+                                                            </button>
                                                         </div>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
+                                                        {cvOptSettings.showSummary && !isSummaryDisabled && (
+                                                            <div className="ml-4 flex gap-3">
+                                                                <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="summaryMode"
+                                                                        checked={cvOptSettings.summaryMode === 'full'}
+                                                                        onChange={() => setCvOptSettings(s => ({ ...s, summaryMode: 'full' }))}
+                                                                        className="accent-[#012e7a]"
+                                                                    />
+                                                                    Vollstaendig
+                                                                </label>
+                                                                <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="summaryMode"
+                                                                        checked={cvOptSettings.summaryMode === 'compact'}
+                                                                        onChange={() => setCvOptSettings(s => ({ ...s, summaryMode: 'compact' }))}
+                                                                        className="accent-[#012e7a]"
+                                                                    />
+                                                                    Kompakt (max. 2 Saetze)
+                                                                </label>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                );
+                                            })()}
 
-                                        {/* Certificates toggle */}
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-700">Zertifikate anzeigen</span>
-                                            <button
-                                                onClick={() => setCvOptSettings(s => ({ ...s, showCertificates: !s.showCertificates }))}
-                                                className="text-gray-500 hover:text-blue-600 transition"
-                                                aria-label="Zertifikate umschalten"
-                                            >
-                                                {cvOptSettings.showCertificates
-                                                    ? <ToggleRight className="w-7 h-7 text-blue-600" />
-                                                    : <ToggleLeft className="w-7 h-7 text-gray-400" />}
-                                            </button>
-                                        </div>
+                                            {/* Certificates toggle */}
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700">Zertifikate anzeigen</span>
+                                                <button
+                                                    onClick={() => setCvOptSettings(s => ({ ...s, showCertificates: !s.showCertificates }))}
+                                                    className="text-gray-500 hover:text-[#012e7a] transition"
+                                                    aria-label="Zertifikate umschalten"
+                                                >
+                                                    {cvOptSettings.showCertificates
+                                                        ? <ToggleRight className="w-7 h-7 text-[#012e7a]" />
+                                                        : <ToggleLeft className="w-7 h-7 text-gray-400" />}
+                                                </button>
+                                            </div>
 
-                                        {/* Languages toggle */}
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-700">Sprachen anzeigen</span>
-                                            <button
-                                                onClick={() => setCvOptSettings(s => ({ ...s, showLanguages: !s.showLanguages }))}
-                                                className="text-gray-500 hover:text-blue-600 transition"
-                                                aria-label="Sprachen umschalten"
-                                            >
-                                                {cvOptSettings.showLanguages
-                                                    ? <ToggleRight className="w-7 h-7 text-blue-600" />
-                                                    : <ToggleLeft className="w-7 h-7 text-gray-400" />}
-                                            </button>
+                                            {/* Languages toggle */}
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700">Sprachen anzeigen</span>
+                                                <button
+                                                    onClick={() => setCvOptSettings(s => ({ ...s, showLanguages: !s.showLanguages }))}
+                                                    className="text-gray-500 hover:text-[#012e7a] transition"
+                                                    aria-label="Sprachen umschalten"
+                                                >
+                                                    {cvOptSettings.showLanguages
+                                                        ? <ToggleRight className="w-7 h-7 text-[#012e7a]" />
+                                                        : <ToggleLeft className="w-7 h-7 text-gray-400" />}
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
+                                    </details>
 
                                     {/* Numbers Check Flow — station-based metrics prompt */}
                                     {showMetricsPrompt && (
@@ -568,7 +590,7 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
 
                                     <button
                                         onClick={handleOptimizeClick}
-                                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 transition flex items-center gap-2 font-medium text-white rounded-lg shadow-sm w-full justify-center"
+                                        className="px-6 py-3 bg-[#012e7a] hover:bg-[#01246b] transition flex items-center gap-2 font-medium text-white rounded-lg shadow-sm w-full justify-center"
                                     >
                                         <Sparkles className="w-5 h-5" />
                                         Optimierung starten
