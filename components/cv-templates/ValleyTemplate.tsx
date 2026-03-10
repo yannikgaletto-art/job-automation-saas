@@ -188,7 +188,7 @@ export function ValleyTemplate({ data }: { data: CvStructuredData }) {
 
                 {/* ===== SKILLS + LANGUAGES (dual-column when both exist) ===== */}
                 {hasSkills && hasLanguages ? (
-                    <View style={s.dualColumn} wrap={false} minPresenceAhead={40}>
+                    <View style={s.dualColumn} minPresenceAhead={40}>
                         <View style={s.dualColumnLeft}>
                             <SkillsSection skills={data.skills} />
                         </View>

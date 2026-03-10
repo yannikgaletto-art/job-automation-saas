@@ -15,7 +15,7 @@ export interface CVOptSettings {
     /** Whether to show the languages section. Default: true */
     showLanguages: boolean;
     /** Active template ID. FAANG-optimized template. Default: 'valley' */
-    templateId: 'classic' | 'tech' | 'valley';
+    templateId: 'tech' | 'valley';
 }
 
 export const DEFAULT_CV_OPT_SETTINGS: CVOptSettings = {

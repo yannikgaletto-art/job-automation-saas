@@ -4,7 +4,7 @@ import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
 import { CvStructuredData } from '@/types/cv';
 import { ProficiencyDots } from './shared/ProficiencyDots';
 import { CertGrid } from './shared/CertGrid';
-import { truncateDescription, inferLanguageLevel } from '@/lib/utils/cv-template-helpers';
+import { inferLanguageLevel } from '@/lib/utils/cv-template-helpers';
 
 registerPdfFonts();
 
