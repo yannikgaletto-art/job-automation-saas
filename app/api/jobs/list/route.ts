@@ -51,6 +51,7 @@ export async function GET() {
                 )
             `)
             .eq('user_id', user.id)
+            .neq('status', 'pending_review') // §12.5: exclude Steckbrief Preview jobs
             .order('created_at', { ascending: false })
             .limit(50);
 

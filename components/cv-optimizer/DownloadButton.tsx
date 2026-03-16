@@ -10,27 +10,28 @@ import { Download, Loader2 } from 'lucide-react';
 interface DownloadButtonProps {
     data: CvStructuredData;
     templateId: string;
+    qrBase64?: string;
 }
 
-function resolveDocument(data: CvStructuredData, templateId: string) {
+function resolveDocument(data: CvStructuredData, templateId: string, qrBase64?: string) {
     switch (templateId) {
         case 'tech':
-            return <TechTemplate data={data} />;
+            return <TechTemplate data={data} qrBase64={qrBase64} />;
         case 'valley':
         case 'classic':  // deprecated → Valley
         case 'modern':   // deprecated → Valley
         default:
-            return <ValleyTemplate data={data} />;
+            return <ValleyTemplate data={data} qrBase64={qrBase64} />;
     }
 }
 
-export default function DownloadButton({ data, templateId }: DownloadButtonProps) {
+export default function DownloadButton({ data, templateId, qrBase64 }: DownloadButtonProps) {
     const [isDownloading, setIsDownloading] = React.useState(false);
 
     const handleDownload = async () => {
         setIsDownloading(true);
         try {
-            const document = resolveDocument(data, templateId);
+            const document = resolveDocument(data, templateId, qrBase64);
             const blob = await pdf(document).toBlob();
 
             const url = URL.createObjectURL(blob);
@@ -63,7 +64,7 @@ export default function DownloadButton({ data, templateId }: DownloadButtonProps
             {isDownloading ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> PDF wird generiert...</>
             ) : (
-                <><Download className="w-4 h-4" /> Download & Cover Letter</>
+                <><Download className="w-4 h-4" /> Download</>
             )}
         </button>
     );

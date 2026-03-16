@@ -90,11 +90,19 @@ export async function POST(request: NextRequest) {
 
             const response = await complete({
                 taskType: 'parse_html',
-                systemPrompt: `Extrahiere aus der Stellenbeschreibung diese JSON-Struktur. NUR JSON zurückgeben, kein Markdown, keine Erklärungen:
-{"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben"],"qualifications":["max 8 Anforderungen"],"benefits":["max 5"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["max 12 ATS Keywords"]}`,
+                systemPrompt: `Extrahiere aus der Stellenbeschreibung diese JSON-Struktur. NUR JSON zurückgeben, kein Markdown, keine Erklärungen.
+
+WICHTIG für Listen (responsibilities, qualifications, benefits):
+- Schreibe verdichtete, vollständige Sätze — ca. 20% kürzer als das Original.
+- Erhalte die Kernaussage jedes Punktes. Kein Abkürzen auf bloße Stichworte.
+- KEIN Copy-Paste des Originals, sondern eine informierte Verdichtung.
+- Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
+- Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
+
+{"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben als verdichtete vollständige Sätze"],"qualifications":["max 8 Anforderungen als verdichtete vollständige Sätze"],"benefits":["max 5"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["max 12 ATS Keywords"]}`,
                 prompt: job.description,
                 temperature: 0,
-                maxTokens: 1500,
+                maxTokens: 2000,
             });
 
             const extracted = safeParseJSON(response.text);

@@ -290,6 +290,63 @@ function deduplicateRawJobs(jobs: any[]): any[] {
 
 // ─── Step 2: Deep Scrape (Jina Reader primary, Firecrawl fallback) ─
 
+// §12.3 Expired job detection — precise sentence-level patterns (avoids false positives)
+const EXPIRED_PATTERNS = [
+    'this job has expired',
+    'this job has been removed',
+    'this position has been filled',
+    'this job is no longer available',
+    'job has either expired or been removed',
+    'stelle ist nicht mehr verfügbar',
+    'stellenangebot ist abgelaufen',
+    'diese stelle wurde bereits besetzt',
+    'anzeige ist nicht mehr aktiv',
+    'see similar jobs',       // common CTA on expired pages
+    'ähnliche jobs anzeigen', // German equivalent
+];
+
+function detectExpiredJob(content: string): boolean {
+    const lower = content.toLowerCase();
+    return EXPIRED_PATTERNS.some(p => lower.includes(p));
+}
+
+// ─── §12.5 SerpAPI Full Description (Primary Source) ──────────────
+// Fetches the full job description from Google Jobs listing.
+// This is GUARANTEED to match the displayed job title (unlike scraped links).
+export async function fetchSerpApiFullDescription(
+    jobId: string | undefined,
+    apiKey: string | undefined,
+): Promise<string | null> {
+    if (!jobId || !apiKey) return null;
+
+    try {
+        const params = new URLSearchParams({
+            engine: 'google_jobs_listing',
+            q: jobId,
+            api_key: apiKey,
+        });
+        const res = await fetch(`https://serpapi.com/search?${params.toString()}`);
+        if (!res.ok) {
+            console.warn(`⚠️ [Pipeline] SerpAPI listing fetch failed: ${res.status}`);
+            return null;
+        }
+        const data = await res.json();
+        const desc = data.search_information?.job_description
+            || data.description
+            || null;
+        if (desc) {
+            console.log(`✅ [Pipeline] SerpAPI full description: ${desc.length} chars`);
+        }
+        return desc;
+    } catch (err: any) {
+        console.warn(`⚠️ [Pipeline] SerpAPI listing error: ${err.message}`);
+        return null;
+    }
+}
+
+// ─── §12.5 Deep Scrape (Enrichment only — Jina Reader) ───────────
+// Jina is used as ENRICHMENT, not as primary source.
+// SerpAPI full description is the Ground Truth (see fetchSerpApiFullDescription).
 export async function deepScrapeJob(applyLink: string): Promise<string | null> {
     // Skip unsupported URLs
     if (applyLink.includes('linkedin.com')) {
@@ -302,19 +359,18 @@ export async function deepScrapeJob(applyLink: string): Promise<string | null> {
         return null;
     }
 
-    // ── Primary: Jina Reader (free, reliable, handles most ATS) ──
+    // Jina Reader (free, reliable, handles most ATS)
     const jinaResult = await scrapeWithJina(applyLink);
-    if (jinaResult && jinaResult.length >= 200) {
-        return jinaResult;
+    if (jinaResult) {
+        // §12.3 Check for expired BEFORE length threshold
+        if (detectExpiredJob(jinaResult)) {
+            console.warn('⚠️ [Pipeline] Expired job detected via Jina scrape');
+            return '__EXPIRED__';
+        }
+        if (jinaResult.length >= 200) return jinaResult;
     }
 
-    // ── Fallback: Firecrawl (for JS-heavy pages Jina can't render) ──
-    const firecrawlResult = await scrapeWithFirecrawl(applyLink);
-    if (firecrawlResult && firecrawlResult.length >= 200) {
-        return firecrawlResult;
-    }
-
-    console.warn('⚠️ [Pipeline] Both scrapers failed or returned too little data');
+    console.warn('⚠️ [Pipeline] Jina scrape failed or returned too little data');
     return null;
 }
 
@@ -401,7 +457,32 @@ export async function harvestJobData(
         return null;
     }
 
-    const textToAnalyze = markdown || fallbackDescription;
+    // Quality check: does the scraped markdown contain any job-related content?
+    const JOB_SIGNAL_WORDS = [
+        'responsibilities', 'qualifications', 'requirements', 'experience',
+        'aufgaben', 'anforderungen', 'qualifikationen', 'erfahrung',
+        'benefits', 'position', 'role', 'stelle', 'bewerbung', 'apply',
+        'salary', 'gehalt', 'team', 'skills', 'about us', 'über uns',
+    ];
+    const markdownLower = (markdown || '').toLowerCase();
+    const hasJobContent = JOB_SIGNAL_WORDS.some(w => markdownLower.includes(w));
+
+    // Combine both sources for maximum context:
+    // If scraped markdown has job content, use it as primary + append SerpAPI description
+    // If scraped markdown is garbage/empty, use SerpAPI description as primary
+    let textToAnalyze: string;
+    if (markdown && markdown.length >= 200 && hasJobContent) {
+        // Good scrape — use as primary, append description for extra context
+        textToAnalyze = `${markdown}\n\n--- ZUSÄTZLICHE INFORMATIONEN AUS DER STELLENANZEIGE ---\n${fallbackDescription}`;
+        console.log(`✅ [Pipeline] Harvester: using scraped markdown (${markdown.length} chars) + SerpAPI description (${fallbackDescription?.length || 0} chars)`);
+    } else {
+        // Scrape failed or returned garbage — use SerpAPI description
+        textToAnalyze = fallbackDescription;
+        if (markdown && markdown.length >= 200 && !hasJobContent) {
+            console.warn(`⚠️ [Pipeline] Scraped content has no job signals (${markdown.length} chars) — using SerpAPI description instead`);
+        }
+    }
+
     if (!textToAnalyze || textToAnalyze.length < 50) {
         console.warn('⚠️ [Pipeline] Text too short for harvesting');
         return null;
@@ -413,7 +494,14 @@ export async function harvestJobData(
 Extrahiere die folgenden Felder aus dem Markdown einer Stellenanzeige.
 Halte dich STRIKT an das JSON-Schema.
 Erfinde NICHTS. Wenn ein Feld im Text nicht vorkommt: null zurückgeben.
-Antworte NUR mit validem JSON, kein Markdown.`;
+Antworte NUR mit validem JSON, kein Markdown.
+
+WICHTIG für Listen (hard_requirements, soft_requirements, tasks, benefits_and_perks):
+- Schreibe verdichtete, vollständige Sätze — ca. 20% kürzer als das Original.
+- Erhalte die Kernaussage jedes Punktes. Kein Abkürzen auf bloße Stichworte.
+- KEIN Copy-Paste des Originals, sondern eine informierte Verdichtung.
+- Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
+- Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."`;
 
     const userPrompt = `Extrahiere aus diesem Stellenanzeigen-Text:
 
@@ -450,7 +538,7 @@ JSON-Schema:
             openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 temperature: 0,
-                max_tokens: 2000,
+                max_tokens: 2500,
                 response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: systemPrompt },

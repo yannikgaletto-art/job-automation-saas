@@ -6,6 +6,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
 import { logger } from '@/lib/logging';
+import { inngest } from '@/lib/inngest/client';
 
 export const maxDuration = 120; // Vercel timeout — frontend client waits 180s, server allows 120s
 
@@ -56,7 +57,18 @@ export async function POST(request: NextRequest) {
             console.warn(`[${requestId}] ⚠️ No setupContext provided — generation quality will be reduced`);
         }
 
+        // Collect warnings for transparent user communication
+        const warnings: string[] = [];
+        if (!setupContext && fixMode !== 'targeted') {
+            warnings.push('Kein Setup-Kontext — generische Qualität.');
+        }
+
         const result = await generateCoverLetterWithQuality(jobId, userId, setupContext, fixMode, targetFix, currentLetter);
+
+        // Merge generator-level warnings (orphan-guard, style-fallback) into the route warnings array
+        if (result.generationWarnings?.length) {
+            warnings.push(...result.generationWarnings);
+        }
 
         console.log(`[${requestId}] step=complete iterations=${result.iterations} judge=${result.judgePassed ? 'PASS' : 'FAIL'} cost=${result.costCents}¢`);
 
@@ -78,10 +90,9 @@ export async function POST(request: NextRequest) {
                 setup_context: setupContext ?? null,
                 cost_cents: result.costCents,
                 fluff_warning: result.fluffWarning ?? false,
-                audit_trail: result.auditTrail ?? null,
-                pipeline_warnings: result.pipelineWarnings ?? [],
-                pipeline_improved: result.pipelineImproved ?? false,
+                polish_status: 'pending', // Will be updated by Inngest cover-letter/polish job
             },
+            origin: 'generated', // Data Hygiene: distinguish AI drafts from user uploads
             pii_encrypted: {}
         }).select('id').single();
 
@@ -108,6 +119,39 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // P5: Update job_queue status so stepper and other features know CL is done
+        const { error: statusError } = await supabaseAdmin
+            .from('job_queue')
+            .update({ status: 'cover_letter_done', updated_at: new Date().toISOString() })
+            .eq('id', jobId)
+            .eq('user_id', userId);
+
+        if (statusError) {
+            console.warn(`[${requestId}] ⚠️ Failed to update job_queue status: ${statusError.message}`);
+        }
+
+        // ─── Dispatch Inngest cover-letter/polish for async improvements ────────
+        if (draftId && fixMode !== 'targeted') {
+            try {
+                await inngest.send({
+                    name: 'cover-letter/polish',
+                    data: {
+                        draftId,
+                        userId,
+                        coverLetter: result.coverLetter,
+                        fluffFound: result.fluffWarning ?? false,
+                        jobData: undefined, // Job data already in DB — polish job reads it
+                        companyResearch: undefined,
+                        setupContext: setupContext ?? undefined,
+                    },
+                });
+                console.log(`[${requestId}] ✅ Polish job dispatched for draft ${draftId}`);
+            } catch (inngestErr) {
+                // Non-fatal: polish is best-effort improvement
+                console.warn(`[${requestId}] ⚠️ Failed to dispatch polish job:`, inngestErr);
+            }
+        }
+
         return NextResponse.json({
             success: true,
             requestId,
@@ -119,9 +163,8 @@ export async function POST(request: NextRequest) {
             iterations: result.iterations,
             iteration_log: result.iterationLog,
             fluff_warning: result.fluffWarning ?? false,
-            pipeline_warnings: result.pipelineWarnings ?? [],
-            pipeline_improved: result.pipelineImproved ?? false,
-            audit_trail: result.auditTrail ?? [],
+            polish_status: draftId ? 'pending' : null, // Frontend uses this to show polish banner
+            warnings, // Transparent fallback communication to frontend
         });
 
     } catch (error: unknown) {

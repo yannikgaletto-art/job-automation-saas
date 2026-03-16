@@ -19,19 +19,34 @@ const supabase = createClient(supabaseUrl, serviceRoleKey)
 async function initStorage() {
     console.log('Initializing Supabase Storage Buckets...')
 
-    const buckets = ['cvs', 'cover-letters']
+    // Document buckets (PDF/Word, 5MB)
+    const documentBuckets = ['cvs', 'cover-letters']
+    // Video bucket (MP4/WebM, 50MB)
+    const videoBuckets = ['videos']
 
-    for (const bucket of buckets) {
+    const BUCKET_CONFIGS: Record<string, { public: boolean; fileSizeLimit: number; allowedMimeTypes: string[] }> = {
+        default: {
+            public: false,
+            fileSizeLimit: 5242880, // 5MB
+            allowedMimeTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        },
+        videos: {
+            public: false,
+            fileSizeLimit: 52428800, // 50MB
+            allowedMimeTypes: ['video/mp4', 'video/webm']
+        }
+    }
+
+    const allBuckets = [...documentBuckets, ...videoBuckets]
+
+    for (const bucket of allBuckets) {
         console.log(`Checking bucket: ${bucket}...`)
         const { data, error } = await supabase.storage.getBucket(bucket)
 
         if (error && error.message.includes('not found')) {
             console.log(`Bucket ${bucket} not found. Creating...`)
-            const { data: newBucket, error: createError } = await supabase.storage.createBucket(bucket, {
-                public: false,
-                fileSizeLimit: 5242880, // 5MB
-                allowedMimeTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-            })
+            const config = BUCKET_CONFIGS[bucket] || BUCKET_CONFIGS.default
+            const { data: newBucket, error: createError } = await supabase.storage.createBucket(bucket, config)
 
             if (createError) {
                 console.error(`Failed to create bucket ${bucket}:`, createError.message)

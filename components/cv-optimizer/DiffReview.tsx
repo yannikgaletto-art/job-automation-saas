@@ -24,6 +24,7 @@ const SECTION_LABELS: Record<string, string> = {
     personalInfo: "Persönliche Info",
     languages: "Sprachen",
     certificates: "Zertifikate",
+    certifications: "Zertifikate",
     summary: "Zusammenfassung",
 };
 
@@ -63,7 +64,7 @@ function ChangeRow({
     decision: 'accepted' | 'rejected' | undefined;
     onDecide: (id: string, d: 'accepted' | 'rejected') => void;
 }) {
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(false);
     const isRejected = decision === 'rejected';
     const isAccepted = decision === 'accepted';
 
@@ -132,28 +133,39 @@ function ChangeRow({
                         transition={{ duration: 0.18 }}
                         className="overflow-hidden"
                     >
-                        <div className="mx-4 mb-4 border border-gray-100 rounded-lg overflow-hidden text-sm">
-                            <table className="w-full table-fixed">
-                                <thead>
-                                    <tr className="bg-gray-50 border-b border-gray-100">
-                                        <th className="w-1/2 px-3 py-2 text-left text-xs font-semibold text-gray-500 tracking-wide">Vorher</th>
-                                        <th className="w-1/2 px-3 py-2 text-left text-xs font-semibold text-[#012e7a] tracking-wide border-l border-gray-100">Nachher</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr className="align-top">
-                                        <td className="px-3 py-3 text-gray-500 leading-relaxed">
-                                            {change.before || <span className="text-gray-300 italic">—</span>}
-                                        </td>
-                                        <td className="px-3 py-3 leading-relaxed border-l border-gray-100 text-gray-800">
-                                            {change.before
-                                                ? highlightNew(change.before, change.after || "")
-                                                : <span className="text-[#012e7a]">{change.after}</span>}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        {change.type === 'remove' ? (
+                            /* Remove layout: single box with strikethrough + explanation */
+                            <div className="mx-4 mb-4 border border-red-100 rounded-lg overflow-hidden text-sm bg-red-50/30">
+                                <div className="px-3 py-3">
+                                    <p className="text-gray-400 line-through leading-relaxed">{change.before}</p>
+                                    <p className="text-xs text-red-600/70 mt-2 font-medium">Wird entfernt — {change.reason}</p>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Modify/Add layout: Vorher/Nachher table */
+                            <div className="mx-4 mb-4 border border-gray-100 rounded-lg overflow-hidden text-sm">
+                                <table className="w-full table-fixed">
+                                    <thead>
+                                        <tr className="bg-gray-50 border-b border-gray-100">
+                                            <th className="w-1/2 px-3 py-2 text-left text-xs font-semibold text-gray-500 tracking-wide">Vorher</th>
+                                            <th className="w-1/2 px-3 py-2 text-left text-xs font-semibold text-[#012e7a] tracking-wide border-l border-gray-100">Nachher</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr className="align-top">
+                                            <td className="px-3 py-3 text-gray-500 leading-relaxed">
+                                                {change.before || <span className="text-gray-300 italic">—</span>}
+                                            </td>
+                                            <td className="px-3 py-3 leading-relaxed border-l border-gray-100 text-gray-800">
+                                                {change.before
+                                                    ? highlightNew(change.before, change.after || "")
+                                                    : <span className="text-[#012e7a]">{change.after}</span>}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -174,7 +186,7 @@ function TypeGroup({
     onDecide: (id: string, d: 'accepted' | 'rejected') => void;
     onBulkDecide: (ids: string[], d: 'accepted' | 'rejected') => void;
 }) {
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(false);
     const ids = changes.map(c => c.id);
     const pending = changes.filter(c => !decisions[c.id]).length;
 
@@ -256,7 +268,7 @@ function SectionGroup({
     onDecide: (id: string, d: 'accepted' | 'rejected') => void;
     onBulkDecide: (ids: string[], d: 'accepted' | 'rejected') => void;
 }) {
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(false);
     const total = Object.values(changesByType).flat().length;
     const pending = Object.values(changesByType).flat().filter(c => !decisions[c.id]).length;
 

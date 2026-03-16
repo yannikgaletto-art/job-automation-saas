@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, View, Text, Link, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, View, Text, Link, Image, StyleSheet } from '@react-pdf/renderer';
 import { CvStructuredData } from '@/types/cv';
 import { SkillTagGroup } from './shared/SkillTag';
 import { ProficiencyDots } from './shared/ProficiencyDots';
@@ -114,7 +114,7 @@ const LanguagesSection = ({ languages }: { languages: CvStructuredData['language
     </>
 );
 
-export function ValleyTemplate({ data }: { data: CvStructuredData }) {
+export function ValleyTemplate({ data, qrBase64 }: { data: CvStructuredData; qrBase64?: string }) {
     const pi = data.personalInfo;
     const hasSkills = data.skills.length > 0;
     const hasLanguages = data.languages.length > 0;
@@ -127,22 +127,31 @@ export function ValleyTemplate({ data }: { data: CvStructuredData }) {
                 {/* ===== HEADER ===== */}
                 <View style={s.header}>
                     <Text style={s.headerName}>{pi.name || ''}</Text>
-                    <View style={s.headerContact}>
-                        {pi.location && <Text style={s.contactLine}>{pi.location}</Text>}
-                        {pi.email && (
-                            <Link src={`mailto:${pi.email}`} style={s.contactLine}>{pi.email}</Link>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {/* QR Code — Video Approach (page 1 only, left of contact) */}
+                        {qrBase64 && (
+                            <View style={{ alignItems: 'center', marginRight: 10 }}>
+                                <Image src={qrBase64} style={{ width: 46, height: 46 }} />
+                                <Text style={{ fontSize: 5, color: MUTED, marginTop: 2, textAlign: 'center' }}>Video-Vorstellung{"\n"}14 Tage verfügbar</Text>
+                            </View>
                         )}
-                        {pi.phone && <Text style={s.contactLine}>{pi.phone}</Text>}
-                        {pi.linkedin && (
-                            <Link src={pi.linkedin.startsWith('http') ? pi.linkedin : `https://${pi.linkedin}`} style={s.contactLine}>
-                                {pi.linkedin}
-                            </Link>
-                        )}
-                        {pi.website && (
-                            <Link src={pi.website.startsWith('http') ? pi.website : `https://${pi.website}`} style={s.contactLine}>
-                                {pi.website}
-                            </Link>
-                        )}
+                        <View style={s.headerContact}>
+                            {pi.location && <Text style={s.contactLine}>{pi.location}</Text>}
+                            {pi.email && (
+                                <Link src={`mailto:${pi.email}`} style={s.contactLine}>{pi.email}</Link>
+                            )}
+                            {pi.phone && <Text style={s.contactLine}>{pi.phone}</Text>}
+                            {pi.linkedin && (
+                                <Link src={pi.linkedin.startsWith('http') ? pi.linkedin : `https://${pi.linkedin}`} style={s.contactLine}>
+                                    {pi.linkedin}
+                                </Link>
+                            )}
+                            {pi.website && (
+                                <Link src={pi.website.startsWith('http') ? pi.website : `https://${pi.website}`} style={s.contactLine}>
+                                    {pi.website}
+                                </Link>
+                            )}
+                        </View>
                     </View>
                 </View>
 
@@ -237,6 +246,7 @@ export function ValleyTemplate({ data }: { data: CvStructuredData }) {
                         </View>
                     </View>
                 )}
+
 
             </Page>
         </Document>

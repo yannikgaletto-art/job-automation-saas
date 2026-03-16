@@ -95,6 +95,15 @@ Last Updated: 2026-03-09
 - `/api/certificates/generate` (POST — Zertifikats-Empfehlungen generieren)
 - `/api/certificates/[jobId]` (GET — Zertifikats-Empfehlungen abrufen)
 
+#### Video (7 Endpunkte)
+- `/api/video/create-token` (POST — Video Token erstellen)
+- `/api/video/status` (GET — Video Status abfragen)
+- `/api/video/talking-points` (POST — Talking Points generieren, deprecated by scripts/generate)
+- `/api/video/upload` (POST — Video Upload + Confirm)
+- `/api/video/scripts` (GET — Script für Job laden)
+- `/api/video/scripts/generate` (POST — Script + Keywords via Claude Haiku)
+- `/api/video/scripts/save` (PUT — Script speichern + validieren)
+
 #### Coaching (6 Endpunkte)
 - `/api/coaching/session` (POST — neue Session starten)
 - `/api/coaching/session/[id]/message` (POST — Nachricht senden)
@@ -198,6 +207,9 @@ Zwei separate Terminal-Prozesse sind **IMMER** erforderlich:
 - `coaching_sessions` (Interview-Training Sessions)
 - `community_profiles`, `community_posts`, `community_comments`, `community_upvotes`
 - `volunteering_opportunities`, `volunteering_bookmarks`, `volunteering_votes`
+- `video_approaches` (Video-Token, Upload-Status, Expiry)
+- `video_scripts` (Script Studio: Blocks, Mode, Keywords)
+- `script_block_templates` (System- und Custom-Blockvorlagen)
 - `schema_version` (Interne Versionierung)
 
 ---

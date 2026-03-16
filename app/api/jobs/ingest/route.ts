@@ -144,10 +144,19 @@ export async function POST(request: NextRequest) {
 
                 const response = await complete({
                     taskType: 'extract_job_fields',
-                    systemPrompt: `Extrahiere aus der folgenden Stellenbeschreibung die Informationen als JSON. Alle Felder auf Deutsch. Wenn ein Feld nicht erkennbar ist, nutze null oder leeres Array. Gib NUR valides JSON zurück, kein Markdown. Schema: ${JSON.stringify(extractionSchema)}`,
+                    systemPrompt: `Extrahiere aus der folgenden Stellenbeschreibung die Informationen als JSON. Alle Felder auf Deutsch. Wenn ein Feld nicht erkennbar ist, nutze null oder leeres Array. Gib NUR valides JSON zurück, kein Markdown.
+
+WICHTIG für Listen (responsibilities, qualifications, benefits):
+- Schreibe verdichtete, vollständige Sätze — ca. 20% kürzer als das Original.
+- Erhalte die Kernaussage jedes Punktes. Kein Abkürzen auf bloße Stichworte.
+- KEIN Copy-Paste des Originals, sondern eine informierte Verdichtung.
+- Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
+- Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
+
+Schema: ${JSON.stringify(extractionSchema)}`,
                     prompt: enrichedDescription,
                     temperature: 0,
-                    maxTokens: 1500,
+                    maxTokens: 2000,
                 });
 
                 const text = response.text.trim();

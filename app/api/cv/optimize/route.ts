@@ -53,13 +53,34 @@ function applyCvChanges(cv: CvStructuredData, changes: CvChange[]): CvStructured
     const optimized: CvStructuredData = JSON.parse(JSON.stringify(cv)); // deep clone
 
     for (const change of changes || []) {
-        if (!change || (change.type !== 'modify' && change.type !== 'add')) continue;
+        if (!change) continue;
 
         const target = change.target || {};
         const { section, entityId, field, bulletId } = target;
         if (!section) continue;
 
-        // Ignore changes with no actionable 'after' text unless it's a remove operation (which we don't fully support yet but skip anyway)
+        // ── REMOVE ──────────────────────────────────────────────────────
+        if (change.type === 'remove') {
+            if (section === 'personalInfo') continue; // never remove personalInfo fields
+
+            const sectionArray = (optimized as any)[section];
+            if (!Array.isArray(sectionArray)) continue;
+
+            if (bulletId && entityId) {
+                // Remove a specific bullet from an entity's description
+                const entity = sectionArray.find((e: any) => e.id === entityId);
+                if (entity && Array.isArray(entity.description)) {
+                    entity.description = entity.description.filter((b: any) => b.id !== bulletId);
+                }
+            } else if (entityId && !bulletId) {
+                // Remove an entire entity (e.g., remove an old internship)
+                (optimized as any)[section] = sectionArray.filter((e: any) => e.id !== entityId);
+            }
+            continue;
+        }
+
+        // ── MODIFY / ADD (require 'after' text) ────────────────────────
+        if (change.type !== 'modify' && change.type !== 'add') continue;
         if (!change.after) continue;
 
         if (section === 'personalInfo') {
@@ -73,7 +94,7 @@ function applyCvChanges(cv: CvStructuredData, changes: CvChange[]): CvStructured
         const entity = sectionArray.find((e: any) => e.id === entityId);
         if (!entity) continue;
 
-        // Bullets in Experience/Education
+        // Bullets in Experience (description is Array<{id, text}>)
         if (field === 'description' && Array.isArray(entity.description)) {
             if (change.type === 'modify' && bulletId) {
                 const bullet = entity.description.find((b: any) => b.id === bulletId);
@@ -81,6 +102,10 @@ function applyCvChanges(cv: CvStructuredData, changes: CvChange[]): CvStructured
             } else if (change.type === 'add') {
                 entity.description.push({ id: crypto.randomUUID(), text: change.after });
             }
+        }
+        // Education description is a plain string, not an array
+        else if (field === 'description' && typeof entity.description === 'string') {
+            entity.description = change.after;
         }
         // Skills array replacement (LLM can reorder/change items using comma-separated string)
         else if (section === 'skills' && field === 'items') {
@@ -189,10 +214,11 @@ HARD RULE: The final CV MUST fit on exactly 2 printed A4 pages. NEVER generate c
 
 SELF-JUDGE VALIDATION (run this before returning):
 Before returning your output, mentally verify:
-1. Count total bullet points across all experience entries. If >15, cut the weakest.
-2. Count total skill items. If >24, remove least relevant.
-3. Count certificates. If >6, keep only the 6 most relevant.
-4. If total content is likely to overflow 2 pages, aggressively cut the oldest/weakest entries.
+1. Count total changes. If >12, keep only the 12 most impactful. Prioritize: modify on recent experience > add > remove > changes on old/minor entries.
+2. Count total bullet points across all experience entries. If >15, cut the weakest.
+3. Count total skill items. If >24, remove least relevant.
+4. Count certificates. If >6, keep only the 6 most relevant.
+5. If total content is likely to overflow 2 pages, aggressively cut the oldest/weakest entries.
 If any check fails, revise your output before returning.
 [END LAYOUT CONSTRAINTS]
 
@@ -285,20 +311,40 @@ Muss folgendem Zod Schema entsprechen:
         }
 
         // Sanitize changes before Zod — handle common AI output quirks
-        rawJson.changes = rawJson.changes.map((c: any, idx: number) => ({
-            id: c.id || `change-${idx + 1}`,
-            target: {
-                section: c.target?.section || 'experience',
-                entityId: c.target?.entityId ?? null,
-                field: c.target?.field ?? null,
-                bulletId: c.target?.bulletId ?? null,
-            },
-            type: c.type || 'modify',
-            before: Array.isArray(c.before) ? c.before.join(', ') : (c.before ?? undefined),
-            after: Array.isArray(c.after) ? c.after.join(', ') : (c.after ?? undefined),
-            reason: c.reason || 'KI-Optimierung',
-            requirementRef: c.requirementRef ?? null,
-        }));
+        rawJson.changes = rawJson.changes
+            .filter((c: any) => {
+                // Drop changes with no section — prevents silent misrouting
+                if (!c.target?.section) {
+                    log.warn('Dropping change with no target.section', { changeId: c.id });
+                    return false;
+                }
+                return true;
+            })
+            .map((c: any, idx: number) => ({
+                id: c.id || `change-${idx + 1}`,
+                target: {
+                    section: c.target.section,
+                    entityId: c.target?.entityId ?? null,
+                    field: c.target?.field ?? null,
+                    bulletId: c.target?.bulletId ?? null,
+                },
+                type: c.type || 'modify',
+                before: Array.isArray(c.before) ? c.before.join(', ') : (c.before ?? undefined),
+                after: Array.isArray(c.after) ? c.after.join(', ') : (c.after ?? undefined),
+                reason: c.reason || 'KI-Optimierung',
+                requirementRef: c.requirementRef ?? null,
+            }));
+
+        // Backend-cap: limit to 12 most relevant changes
+        // Prompt already asks for max 12, but enforce as safety net
+        const MAX_CHANGES = 12;
+        if (rawJson.changes.length > MAX_CHANGES) {
+            log.info(`Capping changes from ${rawJson.changes.length} to ${MAX_CHANGES}`);
+            // Priority: modify > add > remove (keeps the most impactful)
+            const priorityOrder: Record<string, number> = { modify: 0, add: 1, remove: 2 };
+            rawJson.changes.sort((a: any, b: any) => (priorityOrder[a.type] ?? 9) - (priorityOrder[b.type] ?? 9));
+            rawJson.changes = rawJson.changes.slice(0, MAX_CHANGES);
+        }
 
         // Apply changes programmatically to create the optimized CV
         const optimizedCv = applyCvChanges(cv_structured_data, rawJson.changes);

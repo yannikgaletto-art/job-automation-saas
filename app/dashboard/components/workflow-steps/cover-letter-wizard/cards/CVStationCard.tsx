@@ -10,7 +10,6 @@ interface CVStationCardProps {
     selectedIndex: number | null;  // 1-3 wenn ausgewählt, null wenn nicht
     isDisabled: boolean;
     onToggle: () => void;
-    recommendation?: { requirement: string; reasoning: string };
 }
 
 export function CVStationCard({
@@ -21,16 +20,8 @@ export function CVStationCard({
     selectedIndex,
     isDisabled,
     onToggle,
-    recommendation,
 }: CVStationCardProps) {
     const isSelected = selectedIndex !== null;
-
-    // Truncate requirement for the badge display (~60 chars)
-    const shortRequirement = recommendation?.requirement
-        ? recommendation.requirement.length > 60
-            ? recommendation.requirement.slice(0, 57) + '...'
-            : recommendation.requirement
-        : null;
 
     return (
         <motion.div
@@ -55,18 +46,6 @@ export function CVStationCard({
                     <p className="text-[11px] text-[#A8A29E] mt-0.5">{period}</p>
                     {bullets && bullets.length > 0 && bullets[0] && (
                         <p className="text-[12px] text-[#73726E] mt-2 line-clamp-2">· {bullets[0]}</p>
-                    )}
-
-                    {/* Match Badge — nur wenn Recommendation vorhanden */}
-                    {recommendation && shortRequirement && (
-                        <div className="mt-2.5 bg-[#EEF3FF] border border-[#D0DEFF] rounded-md px-3 py-2">
-                            <p className="text-[11px] font-semibold text-[#002e7a] leading-tight">
-                                🎯 Match: {shortRequirement}
-                            </p>
-                            <p className="text-[11px] text-[#73726E] leading-snug mt-0.5">
-                                {recommendation.reasoning}
-                            </p>
-                        </div>
                     )}
                 </div>
 

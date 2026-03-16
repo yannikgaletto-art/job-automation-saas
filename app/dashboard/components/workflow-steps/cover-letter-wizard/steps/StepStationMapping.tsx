@@ -192,7 +192,6 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                     const selected = cvStations.find(
                         (s) => s.company === station.company && s.role === station.role
                     );
-                    const rec = top3Set.has(idx) ? recs[idx]?.rec : null;
 
                     return (
                         <CVStationCard
@@ -204,7 +203,6 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                             selectedIndex={selected?.stationIndex ?? null}
                             isDisabled={!selected && cvStations.length >= 3}
                             onToggle={() => handleToggle(idx, station)}
-                            recommendation={rec ? { requirement: rec.requirement, reasoning: rec.reasoning } : undefined}
                         />
                     );
                 })}

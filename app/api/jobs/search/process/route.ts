@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import {
     deepScrapeJob,
+    fetchSerpApiFullDescription,
     harvestJobData,
     judgeJob,
     getDefaultUserValues,
@@ -48,11 +49,12 @@ export async function POST(request: NextRequest) {
 
         console.log(`✅ [Process] Starting pipeline for: ${serpApiJob.title} @ ${serpApiJob.company_name}`);
 
-        // ─── Max 5 active jobs per user ──────────────────────────────
+        // ─── Max 5 active jobs per user (§12.5: pending_review excluded) ─
         const { count: activeJobCount } = await supabaseAdmin
             .from('job_queue')
             .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id);
+            .eq('user_id', user.id)
+            .neq('status', 'pending_review');
 
         if ((activeJobCount ?? 0) >= 5) {
             return NextResponse.json(
@@ -80,16 +82,54 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // ─── Step 1: Firecrawl deep scrape ──────────────────────────
-        const firecrawlMarkdown = serpApiJob.apply_link
+        // ─── §12.5 Step 1: SerpAPI full description (PRIMARY SOURCE) ─
+        // Google's description is GUARANTEED to match the displayed job title.
+        const jobId = (serpApiJob.raw as any)?.job_id;
+        const serpApiFullDesc = await fetchSerpApiFullDescription(
+            jobId, process.env.SERPAPI_KEY
+        );
+
+        // ─── §12.5 Step 1b: Jina Reader (ENRICHMENT) ────────────────
+        // Only scrape if we have a direct apply link (not LinkedIn/Google redirect).
+        // Jina adds extra detail but is NOT the primary source.
+        const jinaMarkdown = serpApiJob.apply_link
             ? await deepScrapeJob(serpApiJob.apply_link)
             : null;
 
-        // ─── Step 2: GPT-4o-mini Harvester ──────────────────────────
+        // ─── §12.3 Verification Guard: Expired ──────────────────────
+        if (jinaMarkdown === '__EXPIRED__') {
+            console.warn(`⚠️ [Process] Job expired: ${serpApiJob.title} @ ${serpApiJob.company_name}`);
+            return NextResponse.json({
+                success: false,
+                reason: 'expired',
+                message: 'Diese Stelle ist leider nicht mehr verfügbar.',
+            });
+        }
+
+        // ─── §12.5 Step 2: GPT-4o-mini Harvester ────────────────────
+        // SerpAPI = Ground Truth, Jina = Enrichment
+        const primaryDescription = serpApiFullDesc || serpApiJob.description;
         const harvested = await harvestJobData(
-            firecrawlMarkdown || '',
-            serpApiJob.description,
+            jinaMarkdown || '',
+            primaryDescription,
         );
+
+        // ─── §12.3 Verification Guard: Company Mismatch ─────────────
+        // Simple substring check (no Levenshtein — "Reduce Complexity")
+        if (harvested?.company_name) {
+            const expected = serpApiJob.company_name.toLowerCase().trim();
+            const actual = harvested.company_name.toLowerCase().trim();
+            // Neither contains the other → completely different company
+            const isMatch = expected.includes(actual) || actual.includes(expected);
+            if (!isMatch) {
+                console.warn(`⚠️ [Process] Company mismatch: expected "${serpApiJob.company_name}", got "${harvested.company_name}"`);
+                return NextResponse.json({
+                    success: false,
+                    reason: 'mismatch',
+                    message: `Der Link führt zu einer Stelle bei "${harvested.company_name}" statt bei "${serpApiJob.company_name}". Der Job wurde nicht hinzugefügt.`,
+                });
+            }
+        }
 
         // ─── Step 3: Claude Judge ───────────────────────────────────
         // Fetch user values (or use defaults)
@@ -145,9 +185,9 @@ export async function POST(request: NextRequest) {
             source_url: serpApiJob.apply_link || null,
             apply_link: serpApiJob.apply_link || null,
             serpapi_raw: serpApiJob.raw || null,
-            firecrawl_markdown: firecrawlMarkdown,
+            firecrawl_markdown: jinaMarkdown,
             salary_range: harvested?.salary_range || serpApiJob.detected_extensions?.salary || null,
-            status: 'pending', // Uses existing status flow per feedback
+            status: 'pending_review', // §12.5: User must confirm Steckbrief before queue
             snapshot_at: new Date().toISOString(),
             // Harvester fields
             work_model: harvested?.work_model || (serpApiJob.detected_extensions?.work_from_home ? 'remote' : 'unknown'),
@@ -203,16 +243,23 @@ export async function POST(request: NextRequest) {
             success: true,
             job: {
                 ...insertedJob,
+                // §12.5 Preview data — sent to SteckbriefPreviewModal
+                tasks: harvested?.tasks || [],
+                hard_requirements: harvested?.hard_requirements || [],
+                soft_requirements: harvested?.soft_requirements || [],
+                benefits: harvested?.benefits_and_perks || [],
+                ats_keywords: harvested?.ats_keywords || [],
                 score_breakdown: judgeResult?.score_breakdown || null,
                 judge_reasoning: judgeResult?.judge_reasoning || null,
                 red_flags: judgeResult?.red_flags || [],
                 green_flags: judgeResult?.green_flags || [],
                 knockout_reason: judgeResult?.knockout_reason || null,
                 work_model: harvested?.work_model || 'unknown',
-                ats_keywords: harvested?.ats_keywords || [],
+                location: harvested?.location || serpApiJob.location || null,
             },
             pipeline: {
-                firecrawl: !!firecrawlMarkdown,
+                serpapi_full: !!serpApiFullDesc,
+                jina: !!jinaMarkdown,
                 harvester: !!harvested,
                 judge: !!judgeResult,
                 duration_ms: duration,

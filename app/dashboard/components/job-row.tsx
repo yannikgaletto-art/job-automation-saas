@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, FileText, Check, Sparkles, Mail, Info, Trash2, ChevronDown, GraduationCap } from 'lucide-react';
+import { ChevronRight, FileText, Check, Sparkles, Mail, Video, Info, Trash2, ChevronDown } from 'lucide-react';
 import { ProgressWorkflow } from './progress-workflow';
 import { Button } from '@/components/motion/button';
 
@@ -12,8 +12,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { CustomDialog } from "@/components/ui/custom-dialog";
 import { CVMatchTab } from './cv-match/cv-match-tab';
 import { OptimizerWizard } from '@/components/cv-optimizer/OptimizerWizard';
-import { CertificateKanbanBoard } from '@/components/certificates/certificate-kanban-board';
-import type { CertificateRecommendation } from '@/types/certificates';
+import { Step5Video } from './workflow-steps/step-5-video';
 
 export interface Job {
     id: string;
@@ -86,7 +85,7 @@ function getNextAction(
         case 'cover_letter_done':
         case 'ready_for_review':
         case 'ready_to_apply':
-            return { label: 'Weiterbildung ansehen', targetTab: 4, icon: <GraduationCap className="w-4 h-4" />, variant: 'primary', action: open(4) };
+            return { label: 'Bewerbung abschließen', targetTab: 3, icon: <Mail className="w-4 h-4" />, variant: 'primary', action: open(3) };
         default:
             return { label: 'Öffnen', targetTab: 0, icon: <FileText className="w-4 h-4" />, variant: 'outline', action: open(0) };
     }
@@ -220,12 +219,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [liveMatchResult, setLiveMatchResult] = useState<any | null>(null);
     const [optimisticStep, setOptimisticStep] = useState<number | null>(null);
-    // Persist certificates data across tab switches (Problem 3 fix)
-    const [cachedCertificates, setCachedCertificates] = useState<{
-        status: 'idle' | 'pending' | 'processing' | 'done' | 'failed';
-        recommendations: CertificateRecommendation[];
-        summaryText: string;
-    } | null>(null);
+
 
     const displayTab = activeTab ?? 0;
 
@@ -305,7 +299,8 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                 { index: 1, label: 'CV Match', icon: <Check className="w-3.5 h-3.5" /> },
                                 { index: 2, label: 'CV Opt.', icon: <Sparkles className="w-3.5 h-3.5" /> },
                                 { index: 3, label: 'Cover Letter', icon: <Mail className="w-3.5 h-3.5" /> },
-                                { index: 4, label: 'Weiterbildung', icon: <GraduationCap className="w-3.5 h-3.5" /> },
+                                { index: 4, label: 'Video Letter', icon: <Video className="w-3.5 h-3.5" /> },
+
                             ].map((tab) => (
                                 <button
                                     key={tab.index}
@@ -465,6 +460,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                 <OptimizerWizard
                                     jobId={job.id}
                                     liveMatchResult={liveMatchResult ?? job.metadata?.cv_match ?? null}
+                                    onGoToCoverLetter={() => setActiveTab(3)}
                                 />
                             </div>
                         )}
@@ -477,34 +473,18 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                 jobTitle={job.jobTitle}
                                 onComplete={() => {
                                     console.log('Cover letter flow complete');
-                                    setOptimisticStep(4);
                                 }}
                             />
                         )}
 
-                        {/* ===== TAB 4: WEITERBILDUNG & ZERTIFIZIERUNG ===== */}
+                        {/* ===== TAB 4: VIDEO ===== */}
                         {displayTab === 4 && (
-                            <CertificateKanbanBoard
-                                jobId={job.id}
-                                jobStatus={
-                                    // Use raw dbStatus as primary source — bypass UI mapping
-                                    job.dbStatus === 'cv_matched' || job.dbStatus === 'cv_match_done'
-                                        ? 'cv_match_done'
-                                        : (() => {
-                                            switch (job.status) {
-                                                case 'CV_CHECKED': return 'cv_match_done';
-                                                case 'CV_OPTIMIZED': return 'cv_optimized';
-                                                case 'CL_GENERATED': return 'cover_letter_done';
-                                                case 'READY': return 'ready_to_apply';
-                                                case 'JOB_REVIEWED': return 'steckbrief_confirmed';
-                                                default: return 'pending';
-                                            }
-                                        })()
-                                }
-                                initialData={cachedCertificates}
-                                onDataLoaded={setCachedCertificates}
-                            />
+                            <div className="p-6">
+                                <Step5Video jobId={job.id} />
+                            </div>
                         )}
+
+
                     </motion.div>
                 )}
             </AnimatePresence>

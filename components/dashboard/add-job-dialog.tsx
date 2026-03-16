@@ -25,7 +25,7 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
     const [errorRequestId, setErrorRequestId] = useState<string | null>(null);
 
     const isUrlValid = /^https?:\/\/.+\..+/.test(companyWebsite);
-    const isFormValid = company.length >= 2 && title.length >= 2 && description.length >= 500 && description.length <= 5000 && isUrlValid;
+    const isFormValid = company.length >= 2 && title.length >= 2 && description.length >= 500 && description.length <= 7000 && isUrlValid;
     const isSubmitting = isLoading;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -141,8 +141,8 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
                             <Label htmlFor="description">Stellenbeschreibung <span className="text-red-500">*</span></Label>
-                            <span className={`text-xs ${description.length < 500 ? 'text-[#a1a1aa]' : description.length > 5000 ? 'text-red-500' : 'text-green-600'}`}>
-                                {description.length} / 5.000 Zeichen
+                            <span className={`text-xs ${description.length < 500 ? 'text-[#a1a1aa]' : description.length > 7000 ? 'text-red-500' : 'text-green-600'}`}>
+                                {description.length} / 7.000 Zeichen
                             </span>
                         </div>
                         <Textarea
@@ -152,7 +152,7 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                             onChange={(e) => setDescription(e.target.value)}
                             required
                             minLength={500}
-                            maxLength={5000}
+                            maxLength={7000}
                             className="w-full min-h-[160px] rounded-md border border-[#EBEBEA] bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-[#a1a1aa] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#2383e2] disabled:cursor-not-allowed disabled:opacity-50"
                         />
                     </div>

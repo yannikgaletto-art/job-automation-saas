@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { suggestRelevantQuotes } from '@/lib/services/quote-matcher';
 
-// Allow up to 60s — pipeline runs 3x Claude + 3x Perplexity (can take 30–50s)
+// Allow up to 60s — Claude One-Shot typically completes in ~3–8s
 export const maxDuration = 60;
 
 // validateUrl removed for Batch 7 — Quotes use text-based sources (books, speeches), not live URLs.
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { jobId, companyName, companyValues, companyVision, jobTitle, jobField } = await req.json();
+        const { jobId, companyName, companyValues, companyVision, jobTitle, jobField, language } = await req.json();
         if (!jobId || !companyName) {
             return NextResponse.json({ error: 'Missing jobId or companyName' }, { status: 400 });
         }
@@ -33,14 +33,15 @@ export async function POST(req: NextRequest) {
 
         console.log(`🔍 [Quotes] Fetching quotes for ${companyName} with ${values.length} values`);
 
-        // Uses Perplexity for quote discovery + OpenAI fallback and embeddings for scoring
-        // jobTitle + jobField inject Stelle-Kontext per SICHERHEITSARCHITEKTUR.md Section 11
+        // Claude One-Shot: generates thinkers + quotes in a single call
+        // language flag ensures correct ä/ö/ü handling for German cover letters
         const quotes = await suggestRelevantQuotes(
             companyName,
             values,
             companyVision || '',
             jobTitle || '',
-            jobField || ''
+            jobField || '',
+            (language === 'en' ? 'en' : 'de') as 'de' | 'en'
         );
 
         // ✅ Map quotes to standard shape first

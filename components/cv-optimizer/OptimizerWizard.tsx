@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { motion } from "framer-motion"
 import { TemplateSelector } from "./TemplateSelector"
 import { DiffReview } from "./DiffReview"
@@ -11,10 +11,12 @@ import { applyCVOptSettings } from "@/lib/utils/cv-settings-filter"
 import { saveCvDecisions } from "@/app/actions/save-cv-decisions"
 import { createClient } from '@/lib/supabase/client'
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { Check, Settings, Sparkles, FileText, Layout, Pencil, CheckCheck, ToggleLeft, ToggleRight } from "lucide-react"
+import { CustomDialog } from "@/components/ui/custom-dialog"
+import { Check, Settings, Sparkles, FileText, Layout, Pencil, CheckCheck, ToggleLeft, ToggleRight, Video, Loader2 } from "lucide-react"
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
+import QRCode from 'qrcode';
 
 const DynamicPdfViewer = dynamic(
     () => import('@/components/cv-templates/PdfViewerWrapper'),
@@ -36,9 +38,31 @@ const DynamicDownloadButton = dynamic(
 export interface OptimizerWizardProps {
     jobId: string
     liveMatchResult?: any | null
+    onGoToCoverLetter?: () => void
 }
 
-export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps) {
+// --- Cancel Button for CV Optimizer (appears after 15s) ---
+function OptCancelButton({ onCancel }: { onCancel: () => void }) {
+    const [visible, setVisible] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => setVisible(true), 15000);
+        return () => clearTimeout(timer);
+    }, []);
+    if (!visible) return null;
+    return (
+        <motion.button
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={onCancel}
+            className="mt-4 text-xs text-gray-400 hover:text-red-500 transition-colors"
+        >
+            Abbrechen
+        </motion.button>
+    );
+}
+
+export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: OptimizerWizardProps) {
     const [step, setStep] = useState<1 | 2>(1);
 
     const [isLoading, setIsLoading] = useState(true);
@@ -90,6 +114,12 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
     const [userDecisions, setUserDecisions] = useState<UserDecisions | null>(null);
 
     const [userId, setUserId] = useState<string | null>(null);
+
+    // QR-Video toggle state
+    const [qrEnabled, setQrEnabled] = useState(false);
+    const [qrBase64, setQrBase64] = useState<string | undefined>(undefined);
+    const [qrLoading, setQrLoading] = useState(false);
+    const [showQrDialog, setShowQrDialog] = useState(false);
 
     useEffect(() => {
         let isMounted = true;
@@ -278,6 +308,46 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
         }
     };
 
+    // -- QR-Video: Button opens dialog or toggles off --
+    const handleQrToggle = () => {
+        if (qrEnabled) {
+            // Toggle off — no dialog needed
+            setQrEnabled(false);
+            setQrBase64(undefined);
+            return;
+        }
+        // Show consent dialog
+        setShowQrDialog(true);
+    };
+
+    // -- QR-Video: Actually generate after consent --
+    const generateQrCode = async () => {
+        setShowQrDialog(false);
+        setQrLoading(true);
+        try {
+            const res = await fetch('/api/video/create-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                console.error('[QR Toggle] Token creation failed:', data.error);
+                return;
+            }
+
+            // async→sync bridge: resolve QR Base64 here, not in template
+            const qrUrl = `${window.location.origin}/v/${data.accessToken}`;
+            const base64 = await QRCode.toDataURL(qrUrl, { width: 200, margin: 1 });
+            setQrBase64(base64);
+            setQrEnabled(true);
+        } catch (err) {
+            console.error('[QR Toggle] Error:', err);
+        } finally {
+            setQrLoading(false);
+        }
+    };
+
     // Compute clean PDF data from finalCv + decisions + CVOptSettings
     const pdfData = useMemo(() => {
         if (!finalCv) return null;
@@ -385,6 +455,9 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                                         );
                                     })}
                                 </div>
+
+                                {/* Cancel button — appears after 15s */}
+                                <OptCancelButton onCancel={() => setIsOptimizing(false)} />
                             </div>
                         ) : (
                             <>
@@ -537,12 +610,16 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                 )}
 
                 {step === 1 && proposal && (
-                    <DiffReview
-                        originalCv={cvData}
-                        proposal={proposal}
-                        onSave={handleSaveDiffs}
-                        onCancel={() => setProposal(null)}
-                    />
+                    <div className="flex items-center justify-center py-8">
+                        <div className="w-full">
+                            <DiffReview
+                                originalCv={cvData}
+                                proposal={proposal}
+                                onSave={handleSaveDiffs}
+                                onCancel={() => setProposal(null)}
+                            />
+                        </div>
+                    </div>
                 )}
 
                 {/* ===== STEP 2: PREVIEW ===== */}
@@ -578,12 +655,25 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                                     {isEditing ? <><CheckCheck size={15} /> Fertig</> : <><Pencil size={15} /> Bearbeiten</>}
                                 </button>
                             </div>
+                            {/* QR-Video Toggle */}
+                            <button
+                                onClick={handleQrToggle}
+                                disabled={qrLoading}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all
+                                    ${qrEnabled
+                                        ? 'bg-[#012e7a] text-white shadow-sm'
+                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                    } ${qrLoading ? 'opacity-50 cursor-wait' : ''}`}
+                            >
+                                {qrLoading ? <Loader2 size={15} className="animate-spin" /> : <Video size={15} />}
+                                QR-Video
+                            </button>
                         </div>
 
                         {/* PDF Preview + optional editor panel */}
                         {isEditing ? (
                             <div className="grid grid-cols-[1fr_480px] gap-4 items-start">
-                                <DynamicPdfViewer data={activePdfData} templateId={templateId} />
+                                <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} />
                                 <div className="sticky top-4 bg-white rounded-xl border border-slate-200 p-4 h-[800px]">
                                     <InlineCvEditor
                                         data={activePdfData}
@@ -593,7 +683,7 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                                 </div>
                             </div>
                         ) : (
-                            <DynamicPdfViewer data={activePdfData} templateId={templateId} />
+                            <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} />
                         )}
 
                         <div className="flex justify-between items-center py-4 border-t border-gray-100 mt-6">
@@ -604,11 +694,72 @@ export function OptimizerWizard({ jobId, liveMatchResult }: OptimizerWizardProps
                                 Zurueck zum Optimizer
                             </button>
 
-                            <DynamicDownloadButton data={activePdfData} templateId={templateId} />
+                        <div className="flex items-center gap-3">
+                                <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} />
+                                <button
+                                    onClick={() => onGoToCoverLetter?.()}
+                                    className="px-5 py-2.5 bg-white border border-[#012e7a] text-[#012e7a] hover:bg-[#012e7a]/5 font-medium rounded-lg flex items-center gap-2 transition-colors"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                    Cover Letter
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
             </motion.div>
+
+            {/* QR-Video Consent Dialog */}
+            <CustomDialog
+                isOpen={showQrDialog}
+                onClose={() => setShowQrDialog(false)}
+                title="QR-Code auf dem Lebenslauf"
+                maxWidth="max-w-lg"
+            >
+                <div className="p-6 space-y-4">
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                        Bevor wir deinen persönlichen QR-Code generieren, hier ein kurzer Überblick, warum sich dieser Schritt für dich lohnt:
+                    </p>
+
+                    <div className="space-y-2.5">
+                        <div className="border border-gray-100 rounded-lg p-3">
+                            <p className="text-sm font-semibold text-gray-900 mb-0.5">Der beste erste Eindruck</p>
+                            <p className="text-xs text-gray-500 leading-relaxed">Ein kurzes Video gibt Recruitern ein authentischeres Bild von dir als reiner Text. Du zeigst, wer du bist.</p>
+                        </div>
+
+                        <div className="border border-gray-100 rounded-lg p-3">
+                            <p className="text-sm font-semibold text-gray-900 mb-0.5">Deine Chancen steigen</p>
+                            <p className="text-xs text-gray-500 leading-relaxed">Du stichst sofort aus der Masse heraus. Erfahrungswerte zeigen, dass persönliche Videobotschaften die Chance auf ein Vorstellungsgespräch um bis zu 40&nbsp;% erhöhen können.</p>
+                        </div>
+
+                        <div className="border border-gray-100 rounded-lg p-3">
+                            <p className="text-sm font-semibold text-gray-900 mb-0.5">Volle Kontrolle (Kein Download)</p>
+                            <p className="text-xs text-gray-500 leading-relaxed">Dein Video wird sicher auf EU-Servern gehostet (AWS Frankfurt). Recruiter können das Video ausschließlich ansehen (Stream) – ein Herunterladen oder Speichern ist technisch blockiert.</p>
+                        </div>
+
+                        <div className="border border-gray-100 rounded-lg p-3">
+                            <p className="text-sm font-semibold text-gray-900 mb-0.5">Automatische Löschung</p>
+                            <p className="text-xs text-gray-500 leading-relaxed">Du musst dich um nichts kümmern. Nach genau 14 Tagen wird dein Video restlos und unwiderruflich gelöscht.</p>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
+                        <button
+                            onClick={() => setShowQrDialog(false)}
+                            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition"
+                        >
+                            Abbrechen
+                        </button>
+                        <button
+                            onClick={generateQrCode}
+                            className="px-5 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white text-sm font-medium rounded-lg transition flex items-center gap-2"
+                        >
+                            <Video size={15} />
+                            Einverstanden
+                        </button>
+                    </div>
+                </div>
+            </CustomDialog>
         </div>
     );
 }

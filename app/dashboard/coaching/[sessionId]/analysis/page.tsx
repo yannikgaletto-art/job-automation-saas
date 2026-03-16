@@ -10,6 +10,7 @@ import {
     Target,
     CheckCircle,
     XCircle,
+    AlertCircle,
     BookOpen,
     ExternalLink,
     Bookmark,
@@ -70,12 +71,44 @@ export default function CoachingAnalysisPage() {
 
     const [report, setReport] = useState<FeedbackReport | null>(null);
     const [loading, setLoading] = useState(true);
+    const [regenerating, setRegenerating] = useState(false);
     const [jobTitle, setJobTitle] = useState('');
     const [companyName, setCompanyName] = useState('');
     const [savedTopics, setSavedTopics] = useState<Record<number, boolean>>({});
     const [savingTopics, setSavingTopics] = useState<Record<number, boolean>>({});
     const [expandedQuotes, setExpandedQuotes] = useState<Record<number, boolean>>({});
+    const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
     const pollRef = useRef<NodeJS.Timeout | null>(null);
+    const pollStartTimeRef = useRef<number | null>(null);
+
+    // Step-by-step progress for analysis
+    const ANALYSIS_STEPS = [
+        'Interview-Daten werden geladen',
+        'Antworten werden bewertet',
+        'Stärken werden identifiziert',
+        'Verbesserungen werden formuliert',
+        'Feedback-Report wird finalisiert',
+    ];
+    const [analysisStep, setAnalysisStep] = useState(0);
+    const analysisStepTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Drive analysis step progress when waiting for report
+    useEffect(() => {
+        if (!loading && !report && !analysisTimedOut) {
+            setAnalysisStep(0);
+            let idx = 0;
+            analysisStepTimerRef.current = setInterval(() => {
+                idx = Math.min(idx + 1, ANALYSIS_STEPS.length - 1);
+                setAnalysisStep(idx);
+                if (idx >= ANALYSIS_STEPS.length - 1 && analysisStepTimerRef.current) clearInterval(analysisStepTimerRef.current);
+            }, 3000);
+            return () => { if (analysisStepTimerRef.current) clearInterval(analysisStepTimerRef.current); };
+        } else if (report || analysisTimedOut) {
+            if (analysisStepTimerRef.current) clearInterval(analysisStepTimerRef.current);
+            setAnalysisStep(0);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading, report, analysisTimedOut]);
 
     useEffect(() => {
         loadData();
@@ -87,13 +120,22 @@ export default function CoachingAnalysisPage() {
 
     const startPolling = useCallback(() => {
         if (pollRef.current) clearInterval(pollRef.current);
+        pollStartTimeRef.current = Date.now();
         pollRef.current = setInterval(async () => {
+            const elapsed = pollStartTimeRef.current ? Date.now() - pollStartTimeRef.current : 0;
+            if (elapsed > 120_000) {
+                if (pollRef.current) clearInterval(pollRef.current);
+                pollStartTimeRef.current = null;
+                setAnalysisTimedOut(true);
+                return;
+            }
             try {
                 const res = await fetch(`/api/coaching/session?sessionId=${sessionId}`);
                 if (res.ok) {
                     const { session } = await res.json();
                     if (session.feedback_report) {
                         if (pollRef.current) clearInterval(pollRef.current);
+                        pollStartTimeRef.current = null;
                         parseReport(session.feedback_report);
                     }
                 }
@@ -103,12 +145,34 @@ export default function CoachingAnalysisPage() {
 
     function parseReport(raw: string) {
         try {
-            let cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-            if (!cleaned.startsWith('{')) {
-                const match = cleaned.match(/\{[\s\S]*\}/);
-                if (match) cleaned = match[0];
+            // Robust extraction: strip markdown fences, find outermost { ... }
+            let cleaned = raw
+                .replace(/```(?:json|JSON)?\n?/g, '')
+                .replace(/```\s*/g, '')
+                .replace(/^\uFEFF/, '')
+                .trim();
+            const start = cleaned.indexOf('{');
+            const end = cleaned.lastIndexOf('}');
+            if (start !== -1 && end !== -1 && end > start) {
+                cleaned = cleaned.substring(start, end + 1);
             }
-            const parsed = JSON.parse(cleaned);
+            let parsed = JSON.parse(cleaned);
+
+            // Self-healing: detect fallback shape (populated summary, empty arrays)
+            // This happens when the pipeline's JSON.parse failed and stored raw text in summary.
+            if (
+                parsed.summary &&
+                typeof parsed.summary === 'string' &&
+                parsed.summary.trimStart().startsWith('{') &&
+                (!parsed.dimensions || parsed.dimensions.length === 0)
+            ) {
+                try {
+                    const recovered = JSON.parse(parsed.summary);
+                    if (recovered.overallScore !== undefined) {
+                        parsed = recovered;
+                    }
+                } catch { /* summary wasn't JSON, use as-is */ }
+            }
 
             // Backwards compatibility: normalize old improvements format (string[] → object[])
             if (parsed.improvements && parsed.improvements.length > 0 && typeof parsed.improvements[0] === 'string') {
@@ -161,6 +225,7 @@ export default function CoachingAnalysisPage() {
             });
         }
     }
+
 
     async function loadData() {
         try {
@@ -250,16 +315,173 @@ export default function CoachingAnalysisPage() {
     }
 
     if (!report) {
+        const handleCancel = () => {
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollStartTimeRef.current = null;
+            router.push('/dashboard/coaching');
+        };
+
         return (
             <div className="flex-1 flex items-center justify-center min-h-[60vh]">
                 <div className="text-center">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto" style={{ color: BLUE }} />
-                    <p className="text-sm mt-3" style={{ color: MUTED }}>
-                        Dein Feedback-Report wird erstellt...
+                    {analysisTimedOut ? (
+                        <>
+                            <AlertCircle className="h-6 w-6 mx-auto text-red-400" />
+                            <p className="text-sm mt-3 font-medium" style={{ color: TEXT }}>
+                                Die Analyse hat zu lange gedauert.
+                            </p>
+                            <p className="text-xs mt-1" style={{ color: MUTED }}>
+                                Bitte versuche es später erneut oder gehe zurück.
+                            </p>
+                        </>
+                    ) : (
+                        <div className="w-full max-w-md mx-auto text-left">
+                            {/* Header */}
+                            <div className="flex items-center gap-3 mb-6">
+                                <Loader2 className="w-6 h-6 animate-spin shrink-0" style={{ color: BLUE }} />
+                                <div>
+                                    <p className="text-sm font-semibold" style={{ color: BLUE }}>Analyse wird erstellt…</p>
+                                    <p className="text-xs mt-0.5" style={{ color: MUTED }}>Das dauert ca. 10–15 Sekunden</p>
+                                </div>
+                            </div>
+
+                            {/* Step list */}
+                            <div className="space-y-2.5">
+                                {ANALYSIS_STEPS.map((label, i) => {
+                                    const isDone = i < analysisStep;
+                                    const isActive = i === analysisStep;
+                                    return (
+                                        <motion.div
+                                            key={i}
+                                            initial={{ opacity: 0, x: -8 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: i * 0.08 }}
+                                            className={`flex items-center gap-3 py-2 px-3 rounded-lg transition-colors ${isDone ? 'bg-[#2B5EA7]/5' :
+                                                    isActive ? 'bg-[#2B5EA7]/10 border border-[#2B5EA7]/20' :
+                                                        'opacity-30'
+                                                }`}
+                                        >
+                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-all ${isDone ? 'bg-[#2B5EA7] text-white' :
+                                                    isActive ? 'border-2 border-[#2B5EA7] text-[#2B5EA7]' :
+                                                        'border border-gray-300 text-gray-400'
+                                                }`}>
+                                                {isDone ? '✓' : i + 1}
+                                            </div>
+                                            <span className={`text-sm ${isDone ? 'text-[#2B5EA7] line-through opacity-60' :
+                                                    isActive ? 'text-[#2B5EA7] font-medium' :
+                                                        'text-gray-400'
+                                                }`}>
+                                                {label}
+                                            </span>
+                                            {isActive && (
+                                                <motion.div
+                                                    className="ml-auto w-3 h-3 rounded-full"
+                                                    style={{ background: BLUE }}
+                                                    animate={{ scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }}
+                                                    transition={{ repeat: Infinity, duration: 1.2 }}
+                                                />
+                                            )}
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                    <button
+                        onClick={handleCancel}
+                        className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-xs font-medium rounded-lg transition-colors hover:bg-red-50"
+                        style={{
+                            color: analysisTimedOut ? '#2B5EA7' : '#DC2626',
+                            border: `1px solid ${analysisTimedOut ? '#2B5EA7' : '#FECACA'}`,
+                            background: 'transparent',
+                        }}
+                    >
+                        {analysisTimedOut ? (
+                            <><ArrowLeft className="w-3.5 h-3.5" /> Zurück zur Übersicht</>
+                        ) : (
+                            <><XCircle className="w-3.5 h-3.5" /> Abbrechen</>
+                        )}
+                    </button>
+                    {analysisTimedOut && (
+                        <button
+                            onClick={() => {
+                                setAnalysisTimedOut(false);
+                                setLoading(true);
+                                loadData();
+                            }}
+                            className="inline-flex items-center gap-1.5 mt-2 px-4 py-2 text-xs font-medium rounded-lg transition-colors hover:bg-blue-50"
+                            style={{
+                                color: BLUE,
+                                border: `1px solid ${BLUE}`,
+                                background: 'transparent',
+                            }}
+                        >
+                            Erneut versuchen
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    // Detect broken report (fallback: empty arrays, no real content)
+    const isBrokenReport = report && (
+        (!report.dimensions || report.dimensions.length === 0) &&
+        (!report.strengths || report.strengths.length === 0) &&
+        (!report.improvements || report.improvements.length === 0)
+    );
+
+    async function regenerateReport() {
+        setRegenerating(true);
+        try {
+            const res = await fetch(`/api/coaching/session/${sessionId}/complete?regenerate=true`, { method: 'POST' });
+            if (res.ok) {
+                setReport(null);
+                setAnalysisTimedOut(false);
+                startPolling();
+            }
+        } catch (err) {
+            console.error('[Analysis] Regenerate error:', err);
+        } finally {
+            setRegenerating(false);
+        }
+    }
+
+    // If report is broken, show a prominent re-generate prompt
+    if (isBrokenReport) {
+        return (
+            <div className="max-w-3xl pb-16">
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-6">
+                    <button onClick={() => router.push('/dashboard/coaching')} className="p-1 rounded transition-colors hover:bg-[#F0EFED]">
+                        <ArrowLeft className="h-5 w-5" style={{ color: MUTED }} />
+                    </button>
+                    <div>
+                        <h1 className="text-2xl font-bold" style={{ color: TEXT }}>Interview Analyse</h1>
+                        <p className="text-sm" style={{ color: MUTED }}>{jobTitle} · {companyName}</p>
+                    </div>
+                </div>
+
+                <div className="rounded-xl p-6 text-center" style={{ background: BLUE_LIGHT, border: `1px solid ${BLUE}22` }}>
+                    <AlertCircle className="h-8 w-8 mx-auto mb-3" style={{ color: BLUE }} />
+                    <p className="text-sm font-medium" style={{ color: TEXT }}>
+                        Die Analyse konnte nicht korrekt erstellt werden.
                     </p>
-                    <p className="text-xs mt-1" style={{ color: MUTED }}>
-                        Das dauert ca. 10-15 Sekunden.
+                    <p className="text-xs mt-1 mb-4" style={{ color: MUTED }}>
+                        Du musst das Interview nicht wiederholen — klicke einfach auf den Button.
                     </p>
+                    <button
+                        onClick={regenerateReport}
+                        disabled={regenerating}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-60"
+                        style={{ background: BLUE }}
+                    >
+                        {regenerating ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" /> Wird generiert...</>
+                        ) : (
+                            'Analyse neu generieren'
+                        )}
+                    </button>
                 </div>
             </div>
         );

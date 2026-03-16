@@ -6,7 +6,7 @@ import {
     Search, SlidersHorizontal, Loader2, X, Sparkles,
     ExternalLink, ArrowRight, CheckCircle2, AlertTriangle,
     ChevronDown, ChevronRight, Clock, Trash2, Plus, Star, RefreshCw,
-    Compass, List, Layers, BriefcaseBusiness, PenLine
+    Compass, List, Layers, BriefcaseBusiness, PenLine, Globe
 } from 'lucide-react';
 import type { SerpApiJob } from '@/lib/services/job-search-pipeline';
 import { useJobQueueCount } from '@/store/use-job-queue-count';
@@ -124,7 +124,8 @@ export default function JobSearchPage() {
     const [isSearching, setIsSearching] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [searchMode, setSearchMode] = useState<'keyword' | 'mission' | 'manual'>('keyword');
+    const [searchMode, setSearchMode] = useState<'keyword' | 'mission'>('keyword');
+    const [showManualModal, setShowManualModal] = useState(false);
 
     // Filter state
     const [selectedExperience, setSelectedExperience] = useState<string[]>([]);
@@ -302,7 +303,7 @@ export default function JobSearchPage() {
             <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`bg-white border border-[#E7E7E5] rounded-xl p-5 shadow-sm${searchMode === 'manual' ? ' max-w-3xl' : ''}`}
+                className="bg-white border border-[#E7E7E5] rounded-xl p-5 shadow-sm"
             >
                 {/* Mode Toggle */}
                 <div className="flex gap-1 mb-3">
@@ -323,204 +324,205 @@ export default function JobSearchPage() {
                         <span className="flex items-center gap-1.5"><Compass className="w-3 h-3" />Mission</span>
                     </motion.button>
                     <motion.button
-                        onClick={() => setSearchMode('manual')}
-                        animate={{ scale: searchMode === 'manual' ? 1 : 0.97, opacity: searchMode === 'manual' ? 1 : 0.7 }}
+                        onClick={() => setShowManualModal(true)}
+                        animate={{ scale: 0.97, opacity: 0.7 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchMode === 'manual' ? 'bg-[#f0f4ff] text-[#002e7a] border border-[#002e7a]/20' : 'text-[#73726E] border border-[#E7E7E5] hover:border-[#002e7a]/30'}`}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-[#73726E] border border-[#E7E7E5] hover:border-[#002e7a]/30`}
                     >
                         <span className="flex items-center gap-1.5"><PenLine className="w-3 h-3" />Add Job <span className="opacity-70">(Highest Quality)</span></span>
                     </motion.button>
                 </div>
 
-                {/* Manual Job Form */}
-                {searchMode === 'manual' ? (
-                    <ManualJobForm />
-                ) : (
-                    <>
-                        <div className="flex gap-3">
-                            <div className="flex-1 relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A8A29E]" />
-                                <input
-                                    type="text"
-                                    placeholder={searchMode === 'mission' ? 'Beschreibe deine nächste Mission...' : 'Jobtitel eingeben...'}
-                                    value={query}
-                                    onChange={e => setQuery(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
-                                />
-                            </div>
-                            <div className="w-48 relative">
-                                <input
-                                    type="text"
-                                    placeholder="Ort..."
-                                    value={location}
-                                    onChange={e => setLocation(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                                    className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
-                                />
-                            </div>
-                            <motion.button
-                                whileHover={{ scale: 1.02, y: -1 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={handleSearch}
-                                disabled={isSearching || !query.trim()}
-                                className="px-6 py-2.5 bg-[#002e7a] text-white text-sm font-medium rounded-lg hover:bg-[#001d4f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                            >
-                                {isSearching ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Search className="w-4 h-4" />
-                                )}
-                                Suchen
-                            </motion.button>
-                            <button
-                                onClick={() => setShowFilters(!showFilters)}
-                                className={`px-3 py-2.5 rounded-lg border text-sm transition-colors ${showFilters ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff]' : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a]'}`}
-                            >
-                                <SlidersHorizontal className="w-4 h-4" />
-                            </button>
-                        </div>
+                {/* Manual Job Popup Modal */}
+                <ManualJobForm isOpen={showManualModal} onClose={() => setShowManualModal(false)} />
 
-                        {/* Suggested Titles */}
-                        {suggestedTitles.length > 0 && !isSearching && !hasSearches && (
-                            <div className="mt-3 flex items-center gap-2 flex-wrap">
-                                <span className="text-xs text-[#A8A29E] flex items-center gap-1">
-                                    <Sparkles className="w-3 h-3" /> Vorschlaege:
-                                </span>
-                                {suggestedTitles.map(title => (
-                                    <motion.button
-                                        key={title}
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() => setQuery(title)}
-                                        className="px-3 py-1 rounded-full bg-[#f0f4ff] text-[#002e7a] text-xs font-medium border border-[#002e7a]/10 hover:border-[#002e7a]/30 transition-colors"
-                                    >
-                                        {title}
-                                    </motion.button>
-                                ))}
-                            </div>
+                {/* Search UI (always visible now) */}
+                <div className="flex gap-3">
+                    <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A8A29E]" />
+                        <input
+                            type="text"
+                            placeholder={searchMode === 'mission' ? 'Beschreibe deine nächste Mission...' : 'Jobtitel eingeben...'}
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
+                        />
+                    </div>
+                    <div className="w-48 relative">
+                        <input
+                            type="text"
+                            placeholder="Ort..."
+                            value={location}
+                            onChange={e => setLocation(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                            className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
+                        />
+                    </div>
+                    <motion.button
+                        whileHover={{ scale: 1.02, y: -1 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleSearch}
+                        disabled={isSearching || !query.trim()}
+                        className="px-6 py-2.5 bg-[#002e7a] text-white text-sm font-medium rounded-lg hover:bg-[#001d4f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                        {isSearching ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Search className="w-4 h-4" />
                         )}
+                        Suchen
+                    </motion.button>
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`px-3 py-2.5 rounded-lg border text-sm transition-colors ${showFilters ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff]' : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a]'}`}
+                    >
+                        <SlidersHorizontal className="w-4 h-4" />
+                    </button>
+                </div>
 
-                        {/* Extended Filters */}
-                        <AnimatePresence>
-                            {showFilters && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="overflow-hidden"
-                                >
-                                    <div className="mt-4 pt-4 border-t border-[#E7E7E5] space-y-4">
-                                        {/* Row 1: Experience + OrgType */}
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Erfahrungslevel</label>
-                                                <div className="flex gap-2">
-                                                    {EXPERIENCE_LEVELS.map(level => (
-                                                        <button
-                                                            key={level}
-                                                            onClick={() => toggleFilter(level, selectedExperience, setSelectedExperience)}
-                                                            className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedExperience.includes(level)
-                                                                ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
-                                                                : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
-                                                                }`}
-                                                        >
-                                                            {level}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Organisationsform</label>
-                                                <div className="flex gap-2">
-                                                    {ORG_TYPES.map(org => (
-                                                        <button
-                                                            key={org}
-                                                            onClick={() => toggleFilter(org, selectedOrgType, setSelectedOrgType)}
-                                                            className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedOrgType.includes(org)
-                                                                ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
-                                                                : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
-                                                                }`}
-                                                        >
-                                                            {org}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
+                {/* Suggested Titles */}
+                {suggestedTitles.length > 0 && !isSearching && !hasSearches && (
+                    <div className="mt-3 flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-[#A8A29E] flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" /> Vorschlaege:
+                        </span>
+                        {suggestedTitles.map(title => (
+                            <motion.button
+                                key={title}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setQuery(title)}
+                                className="px-3 py-1 rounded-full bg-[#f0f4ff] text-[#002e7a] text-xs font-medium border border-[#002e7a]/10 hover:border-[#002e7a]/30 transition-colors"
+                            >
+                                {title}
+                            </motion.button>
+                        ))}
+                    </div>
+                )}
 
-                                        {/* Row 2: Werte-Filter (NEW) — 2 rows */}
-                                        <div>
-                                            <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Ausrichtung</label>
-                                            <div className="flex gap-2 mb-2">
-                                                {WERTE_FILTERS.slice(0, 4).map(wf => (
-                                                    <button
-                                                        key={wf.key}
-                                                        onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
-                                                        className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
-                                                            ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
-                                                            : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
-                                                            }`}
-                                                    >
-                                                        {wf.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <div className="flex gap-2">
-                                                {WERTE_FILTERS.slice(4).map(wf => (
-                                                    <button
-                                                        key={wf.key}
-                                                        onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
-                                                        className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
-                                                            ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
-                                                            : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
-                                                            }`}
-                                                    >
-                                                        {wf.label}
-                                                    </button>
-                                                ))}
-                                            </div>
+                {/* Extended Filters */}
+                <AnimatePresence>
+                    {showFilters && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                        >
+                            <div className="mt-4 pt-4 border-t border-[#E7E7E5] space-y-4">
+                                {/* Row 1: Experience + OrgType */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Erfahrungslevel</label>
+                                        <div className="flex gap-2">
+                                            {EXPERIENCE_LEVELS.map(level => (
+                                                <button
+                                                    key={level}
+                                                    onClick={() => toggleFilter(level, selectedExperience, setSelectedExperience)}
+                                                    className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedExperience.includes(level)
+                                                        ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                        : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                        }`}
+                                                >
+                                                    {level}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </>
-                )}
+                                    <div>
+                                        <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Organisationsform</label>
+                                        <div className="flex gap-2">
+                                            {ORG_TYPES.map(org => (
+                                                <button
+                                                    key={org}
+                                                    onClick={() => toggleFilter(org, selectedOrgType, setSelectedOrgType)}
+                                                    className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedOrgType.includes(org)
+                                                        ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                        : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                        }`}
+                                                >
+                                                    {org}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Row 2: Werte-Filter (NEW) — 2 rows */}
+                                <div>
+                                    <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Ausrichtung</label>
+                                    <div className="flex gap-2 mb-2">
+                                        {WERTE_FILTERS.slice(0, 4).map(wf => (
+                                            <button
+                                                key={wf.key}
+                                                onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
+                                                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
+                                                    ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                    : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                    }`}
+                                            >
+                                                {wf.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {WERTE_FILTERS.slice(4).map(wf => (
+                                            <button
+                                                key={wf.key}
+                                                onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
+                                                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
+                                                    ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
+                                                    : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
+                                                    }`}
+                                            >
+                                                {wf.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </motion.div>
 
             {/* Error */}
-            {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                    <div>
-                        <p className="text-sm font-medium text-red-800">Fehler bei der Suche</p>
-                        <p className="text-xs text-red-600 mt-1">{error}</p>
+            {
+                error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-sm font-medium text-red-800">Fehler bei der Suche</p>
+                            <p className="text-xs text-red-600 mt-1">{error}</p>
+                        </div>
+                        <button onClick={() => setError(null)} className="ml-auto">
+                            <X className="w-4 h-4 text-red-400" />
+                        </button>
                     </div>
-                    <button onClick={() => setError(null)} className="ml-auto">
-                        <X className="w-4 h-4 text-red-400" />
-                    </button>
-                </div>
-            )}
+                )
+            }
 
             {/* Loading */}
-            {isSearching && (
-                <div className="flex flex-col items-center justify-center py-16 gap-4">
-                    <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                    >
-                        <Search className="w-8 h-8 text-[#002e7a]" />
-                    </motion.div>
-                    <p className="text-sm text-[#73726E]">
-                        {searchMode === 'mission' ? 'Mission wird analysiert...' : 'Durchsuche Google Jobs...'}
-                    </p>
-                </div>
-            )}
+            {
+                isSearching && (
+                    <div className="flex flex-col items-center justify-center py-16 gap-4">
+                        <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                        >
+                            <Search className="w-8 h-8 text-[#002e7a]" />
+                        </motion.div>
+                        <p className="text-sm text-[#73726E]">
+                            {searchMode === 'mission' ? 'Mission wird analysiert...' : 'Durchsuche Google Jobs...'}
+                        </p>
+                    </div>
+                )
+            }
 
-            {/* Saved Searches (Notion-style Table) — hidden in manual mode */}
-            {searchMode !== 'manual' && !isSearching && hasSearches && (
+            {/* Saved Searches (Notion-style Table) */}
+            {!isSearching && hasSearches && (
                 <div className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden shadow-sm">
                     {/* Table Header */}
                     <div className="grid grid-cols-[1fr_100px_160px_80px] items-center px-5 py-2 border-b border-[#E7E7E5] bg-[#FAFAF9]">
@@ -550,6 +552,14 @@ export default function JobSearchPage() {
                             onDelete={(e) => handleDeleteSearch(search.id, e)}
                             onRefresh={(e) => handleRefreshSearch(search, e)}
                             onDeleteJob={(jobApplyLink) => handleDeleteJob(search.id, jobApplyLink)}
+                            onJobAdded={(jobApplyLink) => {
+                                // §UI-CONTRACT: Mark job as already_in_queue so button stays green
+                                setSavedSearches(prev => prev.map(s =>
+                                    s.id === search.id
+                                        ? { ...s, results: s.results.map(j => j.apply_link === jobApplyLink ? { ...j, already_in_queue: true } : j) }
+                                        : s
+                                ));
+                            }}
                             starredUrls={starredUrls}
                             toggleStar={toggleStar}
                             viewMode={viewMode}
@@ -560,21 +570,23 @@ export default function JobSearchPage() {
             )}
 
             {/* Empty State */}
-            {showEmptyState && (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-[#f0f4ff] flex items-center justify-center mb-4">
-                        <Search className="w-8 h-8 text-[#002e7a]" />
+            {
+                showEmptyState && (
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <div className="w-16 h-16 rounded-2xl bg-[#f0f4ff] flex items-center justify-center mb-4">
+                            <Search className="w-8 h-8 text-[#002e7a]" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-[#37352F] mb-1">
+                            Starte deine Jobsuche
+                        </h3>
+                        <p className="text-xs text-[#73726E] max-w-sm">
+                            Gib einen Jobtitel und Ort ein. Pathly durchsucht Google Jobs
+                            und zeigt dir passende Stellen mit echten Bewerbungslinks.
+                        </p>
                     </div>
-                    <h3 className="text-sm font-semibold text-[#37352F] mb-1">
-                        Starte deine Jobsuche
-                    </h3>
-                    <p className="text-xs text-[#73726E] max-w-sm">
-                        Gib einen Jobtitel und Ort ein. Pathly durchsucht Google Jobs
-                        und zeigt dir passende Stellen mit echten Bewerbungslinks.
-                    </p>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
 
@@ -587,6 +599,7 @@ function SearchAccordion({
     onDelete,
     onRefresh,
     onDeleteJob,
+    onJobAdded,
     starredUrls,
     toggleStar,
     viewMode,
@@ -598,6 +611,7 @@ function SearchAccordion({
     onDelete: (e: React.MouseEvent) => void;
     onRefresh: (e: React.MouseEvent) => void;
     onDeleteJob: (jobApplyLink: string) => void;
+    onJobAdded: (jobApplyLink: string) => void;
     starredUrls: Set<string>;
     toggleStar: (url: string) => void;
     viewMode: 'list' | 'swipe';
@@ -678,7 +692,7 @@ function SearchAccordion({
                             ) : (
                                 <>
                                     {/* View Mode Toggle */}
-                                    <div className="flex items-center justify-end gap-1 pt-3 pb-2" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-start gap-1 pt-3 pb-2" onClick={(e) => e.stopPropagation()}>
                                         <button
                                             onClick={() => onViewModeChange('list')}
                                             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs transition-colors ${viewMode === 'list'
@@ -711,6 +725,7 @@ function SearchAccordion({
                                                     starredUrls={starredUrls}
                                                     toggleStar={toggleStar}
                                                     onDelete={() => onDeleteJob(job.apply_link)}
+                                                    onJobAdded={onJobAdded}
                                                 />
                                             ))}
                                         </div>
@@ -731,7 +746,7 @@ function SearchAccordion({
 
 // ─── Job Row Component ──────────────────────────────────────────────
 
-function JobRow({ job, starredUrls, toggleStar, onDelete }: { job: EnrichedJob; starredUrls: Set<string>; toggleStar: (url: string) => void; onDelete: () => void }) {
+function JobRow({ job, starredUrls, toggleStar, onDelete, onJobAdded }: { job: EnrichedJob; starredUrls: Set<string>; toggleStar: (url: string) => void; onDelete: () => void; onJobAdded: (jobApplyLink: string) => void }) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     return (
@@ -926,7 +941,7 @@ function JobRow({ job, starredUrls, toggleStar, onDelete }: { job: EnrichedJob; 
                                 )}
                                 {!job.already_in_queue ? (
                                     <div className="flex items-center gap-2">
-                                        <AddToQueueButton job={job} />
+                                        <AddToQueueButton job={job} onJobAdded={onJobAdded} />
                                         <button
                                             onClick={(e) => { e.stopPropagation(); toggleStar(job.apply_link); }}
                                             className={`p-1.5 rounded-lg border transition-colors ${starredUrls.has(job.apply_link)
@@ -953,9 +968,9 @@ function JobRow({ job, starredUrls, toggleStar, onDelete }: { job: EnrichedJob; 
     );
 }
 
-// ─── Manual Job Entry Form ───────────────────────────────────────
+// ─── Manual Job Entry Form (Popup Modal) ─────────────────────────
 
-function ManualJobForm() {
+function ManualJobForm({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
     const [jobTitle, setJobTitle] = useState('');
     const [company, setCompany] = useState('');
     const [websiteUrl, setWebsiteUrl] = useState('');
@@ -967,15 +982,15 @@ function ManualJobForm() {
     const [formError, setFormError] = useState<string | null>(null);
     const increment = useJobQueueCount(s => s.increment);
 
-    const wordCount = jobDescription.trim() === '' ? 0 : jobDescription.trim().split(/\s+/).length;
-    const MAX_WORDS = 6000;
-    const MIN_WORDS = 100;
+    const charCount = jobDescription.length;
+    const MAX_CHARS = 7000;
+    const MIN_CHARS = 400;
 
     const canSubmit = jobTitle.trim().length >= 2
         && company.trim().length >= 2
         && websiteUrl.trim().length > 0
-        && wordCount >= MIN_WORDS
-        && wordCount <= MAX_WORDS;
+        && charCount >= MIN_CHARS
+        && charCount <= MAX_CHARS;
 
     const handleSubmit = async () => {
         if (!canSubmit || submitting) return;
@@ -1033,191 +1048,203 @@ function ManualJobForm() {
         setFormError(null);
     };
 
-    if (submitted) {
-        return (
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center py-8 text-center"
-            >
-                <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
-                    <CheckCircle2 className="w-7 h-7 text-green-500" />
-                </div>
-                <h3 className="text-base font-bold text-[#37352F] mb-1">
-                    Job hinzugefügt
-                </h3>
-                <p className="text-sm text-[#73726E] mb-5">
-                    <strong>{jobTitle}</strong> bei <strong>{company}</strong> wird jetzt analysiert.
-                </p>
-                <div className="flex gap-3">
-                    <a
-                        href="/dashboard/job-queue"
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#002e7a] text-white text-sm font-medium hover:bg-[#001f5c] transition-colors"
-                    >
-                        <ArrowRight className="w-4 h-4" />
-                        Zur Job Queue
-                    </a>
-                    <button
-                        onClick={handleReset}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#E7E7E5] text-sm text-[#73726E] font-medium hover:bg-[#F7F7F5] transition-colors"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Weiteren Job hinzufügen
-                    </button>
-                </div>
-            </motion.div>
-        );
-    }
+    const handleClose = () => {
+        handleReset();
+        onClose();
+    };
+
+    if (!isOpen) return null;
 
     return (
-        <>
-            {showQueueFull && <QueueFullModal onClose={() => setShowQueueFull(false)} />}
-            <div className="max-w-3xl space-y-4 pt-1">
-                {/* Row 1: Job Title + Company */}
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Jobtitel *</label>
-                        <input
-                            type="text"
-                            placeholder="z.B. Senior Product Manager"
-                            value={jobTitle}
-                            onChange={e => setJobTitle(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Unternehmen *</label>
-                        <input
-                            type="text"
-                            placeholder="z.B. Siemens AG"
-                            value={company}
-                            onChange={e => setCompany(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
-                        />
-                    </div>
-                </div>
-
-                {/* Row 2: Website URL */}
-                <div>
-                    <label className="text-xs font-medium text-[#73726E] mb-1.5 block">
-                        Unternehmens-Website *
-                    </label>
-                    <input
-                        type="url"
-                        placeholder="https://www.bundesdruckerei.de/de"
-                        value={websiteUrl}
-                        onChange={e => setWebsiteUrl(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
-                    />
-                </div>
-
-                {/* Row 3: Job Description */}
-                <div>
-                    <label className="text-xs font-medium text-[#73726E] mb-1.5 block">
-                        Job-Beschreibung *
-                        <span className="text-[#A8A29E] ml-1">(Copy & Paste)</span>
-                    </label>
-                    <textarea
-                        placeholder="Füge hier die komplette Stellenbeschreibung ein — je mehr Details, desto besser die Analyse..."
-                        value={jobDescription}
-                        onChange={e => setJobDescription(e.target.value)}
-                        rows={9}
-                        className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all resize-none"
-                    />
-                    <div className="flex items-center justify-between mt-1">
-                        <span className={`text-[10px] font-medium ${wordCount === 0 ? 'text-[#A8A29E]'
-                            : wordCount < MIN_WORDS ? 'text-amber-500'
-                                : wordCount > MAX_WORDS ? 'text-red-500'
-                                    : 'text-green-600'
-                            }`}>
-                            {wordCount === 0
-                                ? `Min. ${MIN_WORDS} Wörter erforderlich`
-                                : wordCount > MAX_WORDS
-                                    ? `${wordCount} / ${MAX_WORDS} Wörter — zu lang`
-                                    : `${wordCount} / ${MAX_WORDS} Wörter${wordCount < MIN_WORDS ? ` — noch ${MIN_WORDS - wordCount} mehr` : ' ✓'}`
-                            }
-                        </span>
-                        <span className="text-[10px] text-[#A8A29E]">
-                            Höchste Qualität — du steuerst die Daten
-                        </span>
-                    </div>
-                </div>
-
-                {/* Error */}
-                {formError && (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                        {formError}
-                    </div>
-                )}
-
-                {/* Submit */}
-                <div className="relative w-1/2">
-                    <motion.button
-                        whileHover={canSubmit && !showPulse ? { scale: 1.01, y: -1 } : undefined}
-                        whileTap={canSubmit && !showPulse ? { scale: 0.98 } : undefined}
-                        onClick={handleSubmit}
-                        disabled={!canSubmit || submitting || showPulse}
-                        animate={{
-                            backgroundColor: showPulse ? '#16a34a' : '#002e7a',
-                        }}
-                        transition={{ duration: 0.3 }}
-                        className="w-full py-2.5 text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 relative overflow-hidden"
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                >
+                    <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                        className="relative w-[min(600px,calc(100vw-2rem))] max-h-[85vh] overflow-y-auto rounded-xl shadow-lg bg-white p-6"
                     >
-                        {/* Swipe-style progress bar fill */}
-                        {submitting && !showPulse && (
-                            <motion.div
-                                className="absolute inset-0 bg-[#0050d4]"
-                                initial={{ x: '-100%' }}
-                                animate={{ x: '0%' }}
-                                transition={{ duration: 3, ease: 'easeInOut' }}
-                            />
-                        )}
-                        <AnimatePresence mode="wait">
-                            {showPulse ? (
-                                <motion.span
-                                    key="check"
-                                    initial={{ scale: 0, rotate: -90 }}
-                                    animate={{ scale: 1, rotate: 0 }}
-                                    transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                                    className="relative z-10 flex items-center gap-2"
-                                >
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    Hinzugefügt!
-                                </motion.span>
-                            ) : submitting ? (
-                                <motion.span key="loading" className="relative z-10 flex items-center gap-2">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Job wird analysiert...
-                                </motion.span>
-                            ) : (
-                                <motion.span key="default" className="relative z-10">
-                                    Job hinzufügen & analysieren
-                                </motion.span>
-                            )}
-                        </AnimatePresence>
-                    </motion.button>
+                        <button onClick={handleClose} className="absolute top-4 right-4 text-[#73726E] hover:text-[#37352F] transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
 
-                    {/* Pulse Rings on success */}
-                    {showPulse && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        {submitted ? (
+                            /* ── Success Screen ── */
                             <motion.div
-                                className="absolute w-full h-full rounded-lg border-2 border-green-400"
-                                initial={{ scale: 1, opacity: 0.5 }}
-                                animate={{ scale: 2.5, opacity: 0 }}
-                                transition={{ duration: 0.7, ease: 'easeOut' }}
-                            />
-                            <motion.div
-                                className="absolute w-full h-full rounded-lg border-2 border-green-400"
-                                initial={{ scale: 1, opacity: 0.35 }}
-                                animate={{ scale: 2, opacity: 0 }}
-                                transition={{ duration: 0.55, ease: 'easeOut', delay: 0.1 }}
-                            />
-                        </div>
-                    )}
-                </div>
-            </div>
-        </>
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="flex flex-col items-center justify-center py-8 text-center"
+                            >
+                                <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
+                                    <CheckCircle2 className="w-7 h-7 text-green-500" />
+                                </div>
+                                <h3 className="text-base font-bold text-[#37352F] mb-1">
+                                    Job hinzugefügt
+                                </h3>
+                                <p className="text-sm text-[#73726E] mb-5">
+                                    <strong>{jobTitle}</strong> bei <strong>{company}</strong> wird jetzt analysiert.
+                                </p>
+                                <div className="flex gap-3">
+                                    <a
+                                        href="/dashboard/job-queue"
+                                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#002e7a] text-white text-sm font-medium hover:bg-[#001f5c] transition-colors"
+                                    >
+                                        <ArrowRight className="w-4 h-4" />
+                                        Zur Job Queue
+                                    </a>
+                                    <button
+                                        onClick={handleReset}
+                                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#E7E7E5] text-sm text-[#73726E] font-medium hover:bg-[#F7F7F5] transition-colors"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        Weiteren Job
+                                    </button>
+                                </div>
+                            </motion.div>
+                        ) : (
+                            /* ── Form ── */
+                            <>
+                                <div className="mb-5">
+                                    <h2 className="text-lg font-semibold text-[#37352F]">Job hinzufügen</h2>
+                                    <p className="text-sm text-[#73726E] mt-1">Kopiere die vollständige Stellenbeschreibung. Unsere KI extrahiert die Anforderungen automatisch.</p>
+                                    <p className="text-xs text-[#A8A29E] mt-1">Tipp: Inklusive Aufgaben, Anforderungen und Tech-Stack.</p>
+                                </div>
+
+                                {showQueueFull && <QueueFullModal onClose={() => setShowQueueFull(false)} />}
+
+                                <div className="space-y-4">
+                                    {/* Row 1: Unternehmen + Jobtitel */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Unternehmen <span className="text-red-500">*</span></label>
+                                            <input
+                                                type="text"
+                                                placeholder="z.B. Fraunhofer"
+                                                value={company}
+                                                onChange={e => setCompany(e.target.value)}
+                                                className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-medium text-[#73726E] mb-1.5 block">Jobtitel <span className="text-red-500">*</span></label>
+                                            <input
+                                                type="text"
+                                                placeholder="z.B. Software Engineer"
+                                                value={jobTitle}
+                                                onChange={e => setJobTitle(e.target.value)}
+                                                className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Row 2: Website URL */}
+                                    <div>
+                                        <div className="flex items-center gap-1.5 mb-1.5">
+                                            <Globe className="w-3.5 h-3.5 text-[#73726E]" />
+                                            <label className="text-xs font-medium text-[#73726E]">Unternehmens-Website <span className="text-red-500">*</span></label>
+                                        </div>
+                                        <input
+                                            type="url"
+                                            placeholder="https://www.beispiel.de"
+                                            value={websiteUrl}
+                                            onChange={e => setWebsiteUrl(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
+                                        />
+                                        <p className="text-xs text-[#a1a1aa] mt-1">Pflichtfeld — für präzise Unternehmensanalyse</p>
+                                    </div>
+
+                                    {/* Row 3: Job Description */}
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <label className="text-xs font-medium text-[#73726E]">Stellenbeschreibung <span className="text-red-500">*</span></label>
+                                            <span className={`text-xs ${charCount < MIN_CHARS ? 'text-[#a1a1aa]' : charCount > MAX_CHARS ? 'text-red-500' : 'text-green-600'}`}>
+                                                {charCount.toLocaleString('de-DE')} / {MAX_CHARS.toLocaleString('de-DE')} Zeichen
+                                            </span>
+                                        </div>
+                                        <textarea
+                                            placeholder="Vollständige Stellenbeschreibung hier einfügen..."
+                                            value={jobDescription}
+                                            onChange={e => setJobDescription(e.target.value)}
+                                            maxLength={MAX_CHARS}
+                                            rows={7}
+                                            className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all resize-y min-h-[120px]"
+                                        />
+                                    </div>
+
+                                    {/* Error */}
+                                    {formError && (
+                                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                            {formError}
+                                        </div>
+                                    )}
+
+                                    {/* Footer Buttons */}
+                                    <div className="flex justify-end gap-3 pt-2">
+                                        <button
+                                            onClick={handleClose}
+                                            className="px-4 py-2 rounded-lg border border-[#E7E7E5] text-sm text-[#73726E] font-medium hover:bg-[#F7F7F5] transition-colors"
+                                        >
+                                            Abbrechen
+                                        </button>
+                                        <div className="relative">
+                                            <motion.button
+                                                whileHover={canSubmit && !showPulse ? { scale: 1.01, y: -1 } : undefined}
+                                                whileTap={canSubmit && !showPulse ? { scale: 0.98 } : undefined}
+                                                onClick={handleSubmit}
+                                                disabled={!canSubmit || submitting || showPulse}
+                                                animate={{ backgroundColor: showPulse ? '#16a34a' : '#002e7a' }}
+                                                transition={{ duration: 0.3 }}
+                                                className="px-6 py-2 text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 relative overflow-hidden"
+                                            >
+                                                {submitting && !showPulse && (
+                                                    <motion.div
+                                                        className="absolute inset-0 bg-[#0050d4]"
+                                                        initial={{ x: '-100%' }}
+                                                        animate={{ x: '0%' }}
+                                                        transition={{ duration: 3, ease: 'easeInOut' }}
+                                                    />
+                                                )}
+                                                <AnimatePresence mode="wait">
+                                                    {showPulse ? (
+                                                        <motion.span
+                                                            key="check"
+                                                            initial={{ scale: 0, rotate: -90 }}
+                                                            animate={{ scale: 1, rotate: 0 }}
+                                                            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                                                            className="relative z-10 flex items-center gap-2"
+                                                        >
+                                                            <CheckCircle2 className="w-4 h-4" />
+                                                            Hinzugefügt!
+                                                        </motion.span>
+                                                    ) : submitting ? (
+                                                        <motion.span key="loading" className="relative z-10 flex items-center gap-2">
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                            Wird analysiert...
+                                                        </motion.span>
+                                                    ) : (
+                                                        <motion.span key="default" className="relative z-10">
+                                                            Zur Queue hinzufügen
+                                                        </motion.span>
+                                                    )}
+                                                </AnimatePresence>
+                                            </motion.button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
     );
 }
 
@@ -1288,11 +1315,13 @@ function QueueFullModal({ onClose }: { onClose: () => void }) {
 
 // ─── Add to Queue Button — Pulse Ring + Morph Animation ─────────────
 
-function AddToQueueButton({ job }: { job: EnrichedJob }) {
+function AddToQueueButton({ job, onJobAdded }: { job: EnrichedJob; onJobAdded: (jobApplyLink: string) => void }) {
     const [adding, setAdding] = useState(false);
-    const [added, setAdded] = useState(false);
+    const [added, setAdded] = useState(job.already_in_queue ?? false);
     const [showPulse, setShowPulse] = useState(false);
     const [showQueueFull, setShowQueueFull] = useState(false);
+    const [verificationWarning, setVerificationWarning] = useState<string | null>(null);
+    const [previewData, setPreviewData] = useState<any>(null);
     const increment = useJobQueueCount(s => s.increment);
 
     const handleAdd = async (e: React.MouseEvent) => {
@@ -1300,9 +1329,9 @@ function AddToQueueButton({ job }: { job: EnrichedJob }) {
         if (adding || added) return;
 
         setAdding(true);
+        setVerificationWarning(null);
         try {
-            // Use the full enrichment pipeline (Firecrawl/Jina → Harvester → Judge)
-            // instead of the basic ingest route
+            // §12.5: Pipeline → Steckbrief Preview (not direct queue)
             const res = await fetch('/api/jobs/search/process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1326,18 +1355,19 @@ function AddToQueueButton({ job }: { job: EnrichedJob }) {
             }
             if (res.ok) {
                 const data = await res.json();
-                if (!data.duplicate) {
-                    // Phase 1+2: Trigger pulse animation
-                    setShowPulse(true);
-                    increment(); // Sidebar badge hochzählen
-                    // Phase 3: Settle into final state after animation
-                    setTimeout(() => {
-                        setAdded(true);
-                        setShowPulse(false);
-                    }, 1000);
-                } else {
-                    // Already in queue (duplicate detected by backend)
+
+                // §12.3 Verification Guard: handle expired/mismatch
+                if (data.success === false && (data.reason === 'expired' || data.reason === 'mismatch')) {
+                    setVerificationWarning(data.message || 'Diese Stelle konnte nicht verifiziert werden.');
+                    return;
+                }
+
+                if (data.duplicate) {
                     setAdded(true);
+                    onJobAdded(job.apply_link);
+                } else {
+                    // §12.5: Show preview modal instead of direct add
+                    setPreviewData(data.job);
                 }
             } else {
                 console.error('[AddToQueue] Failed:', res.status);
@@ -1347,6 +1377,34 @@ function AddToQueueButton({ job }: { job: EnrichedJob }) {
         } finally {
             setAdding(false);
         }
+    };
+
+    // §12.5: User confirmed preview → job goes to queue
+    const handleConfirm = () => {
+        setPreviewData(null);
+        setShowPulse(true);
+        increment();
+        onJobAdded(job.apply_link);
+        setTimeout(() => {
+            setAdded(true);
+            setShowPulse(false);
+        }, 1000);
+    };
+
+    // §12.5: User cancelled preview → delete zombie job
+    const handleCancel = async () => {
+        if (previewData?.id) {
+            try {
+                await fetch('/api/jobs/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ jobId: previewData.id }),
+                });
+            } catch (err) {
+                console.warn('[AddToQueue] Failed to delete cancelled preview job:', err);
+            }
+        }
+        setPreviewData(null);
     };
 
     // Final settled state — green "In der Queue"
@@ -1359,9 +1417,35 @@ function AddToQueueButton({ job }: { job: EnrichedJob }) {
         );
     }
 
+    // §12.3 Verification Guard warning (expired / mismatch)
+    if (verificationWarning) {
+        return (
+            <div className="flex items-start gap-2 max-w-xs">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 text-xs font-medium border border-amber-200">
+                    <AlertTriangle className="w-3 h-3 shrink-0" />
+                    <span>{verificationWarning}</span>
+                </span>
+                <button
+                    onClick={(e) => { e.stopPropagation(); setVerificationWarning(null); }}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 shrink-0 mt-1"
+                >
+                    <X className="w-3 h-3" />
+                </button>
+            </div>
+        );
+    }
+
     return (
         <>
             {showQueueFull && <QueueFullModal onClose={() => setShowQueueFull(false)} />}
+            {previewData && (
+                <SteckbriefPreviewModal
+                    data={previewData}
+                    jobApplyLink={job.apply_link}
+                    onConfirm={handleConfirm}
+                    onCancel={handleCancel}
+                />
+            )}
             <div className="relative">
                 <motion.button
                     whileHover={!showPulse ? { scale: 1.02 } : undefined}
@@ -1389,7 +1473,7 @@ function AddToQueueButton({ job }: { job: EnrichedJob }) {
                         ) : adding ? (
                             <motion.span key="loading" className="flex items-center gap-1.5">
                                 <Loader2 className="w-3 h-3 animate-spin" />
-                                Hinzufügen
+                                Steckbrief wird erstellt…
                             </motion.span>
                         ) : (
                             <motion.span key="default" className="flex items-center gap-1.5">
@@ -1419,6 +1503,289 @@ function AddToQueueButton({ job }: { job: EnrichedJob }) {
                 )}
             </div>
         </>
+    );
+}
+
+// ─── §12.5 Steckbrief Preview Modal ──────────────────────────────
+// Shows the extracted Steckbrief data for user verification before
+// the job enters the queue. Focused on Aufgaben & Qualifikationen only.
+// ATS Keywords and Benefits are handled by AI later in Job Queue.
+
+interface SteckbriefPreviewData {
+    id: string;
+    job_title: string;
+    company_name: string;
+    tasks: string[];
+    hard_requirements: string[];
+    source_url?: string;
+    apply_link?: string;
+    location: string | null;
+}
+
+function SteckbriefPreviewModal({
+    data,
+    jobApplyLink,
+    onConfirm,
+    onCancel,
+}: {
+    data: SteckbriefPreviewData;
+    jobApplyLink?: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+}) {
+    const [tasks, setTasks] = useState<string[]>(data.tasks || []);
+    const [requirements, setRequirements] = useState<string[]>(data.hard_requirements || []);
+    const [confirming, setConfirming] = useState(false);
+    const [editingField, setEditingField] = useState<string | null>(null);
+    const [newItem, setNewItem] = useState('');
+    const [tasksOpen, setTasksOpen] = useState(true);
+    const [reqsOpen, setReqsOpen] = useState(true);
+
+    const stelleUrl = data.source_url || data.apply_link || jobApplyLink;
+
+    const handleConfirm = async () => {
+        setConfirming(true);
+        try {
+            const res = await fetch('/api/jobs/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jobId: data.id,
+                    edits: {
+                        tasks: tasks.length > 0 ? tasks : undefined,
+                        hard_requirements: requirements.length > 0 ? requirements : undefined,
+                    },
+                }),
+            });
+            if (res.ok) {
+                onConfirm();
+            }
+        } catch (err) {
+            console.error('[SteckbriefPreview] Confirm failed:', err);
+        } finally {
+            setConfirming(false);
+        }
+    };
+
+    const removeItem = (list: string[], setList: (v: string[]) => void, idx: number) => {
+        setList(list.filter((_, i) => i !== idx));
+    };
+
+    const addItem = (setList: (v: string[]) => void, list: string[]) => {
+        if (newItem.trim()) {
+            setList([...list, newItem.trim()]);
+            setNewItem('');
+            setEditingField(null);
+        }
+    };
+
+    return (
+        <AnimatePresence>
+            <motion.div
+                className="fixed inset-0 z-50 flex items-center justify-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onCancel}
+            >
+                {/* Backdrop */}
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+
+                {/* Modal */}
+                <motion.div
+                    className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] overflow-y-auto"
+                    initial={{ scale: 0.95, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.95, y: 20 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Header */}
+                    <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 rounded-t-2xl z-10">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                                <h3 className="text-lg font-semibold text-slate-900">{data.job_title}</h3>
+                                <p className="text-sm text-slate-500 mt-0.5">{data.company_name} · {data.location || 'Standort nicht angegeben'}</p>
+                                {stelleUrl && (
+                                    <a
+                                        href={stelleUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 mt-1.5 text-xs text-[#002e7a] hover:underline font-medium"
+                                    >
+                                        <ExternalLink className="w-3 h-3" />
+                                        Zur Stellenanzeige
+                                    </a>
+                                )}
+                            </div>
+                            <button onClick={onCancel} className="p-1 hover:bg-slate-100 rounded-lg transition-colors ml-3 shrink-0">
+                                <X className="w-5 h-5 text-slate-400" />
+                            </button>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-2">
+                            Prüfe den Steckbrief und ergänze fehlende Punkte per Copy & Paste von der Stellenanzeige.
+                        </p>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-6 space-y-4">
+                        {/* Aufgaben — Toggleable */}
+                        <div className="border border-slate-200 rounded-xl overflow-hidden">
+                            <button
+                                onClick={() => setTasksOpen(!tasksOpen)}
+                                className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-[#002e7a]" />
+                                    <span className="text-sm font-semibold text-[#002e7a] uppercase tracking-wider">Aufgaben</span>
+                                    <span className="text-xs text-slate-400">({tasks.length})</span>
+                                </span>
+                                <motion.div animate={{ rotate: tasksOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                                </motion.div>
+                            </button>
+                            <AnimatePresence initial={false}>
+                                {tasksOpen && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="px-4 py-3 space-y-2">
+                                            {tasks.map((item, i) => (
+                                                <div key={i} className="flex items-start gap-2 text-sm text-slate-700 group">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-[#002e7a] mt-1.5 shrink-0 opacity-40" />
+                                                    <span className="flex-1">{item}</span>
+                                                    <button
+                                                        onClick={() => removeItem(tasks, setTasks, i)}
+                                                        className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                                    >
+                                                        <X className="w-3 h-3 text-slate-400 hover:text-red-500" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {editingField === 'tasks' ? (
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <input
+                                                        autoFocus
+                                                        value={newItem}
+                                                        onChange={(e) => setNewItem(e.target.value)}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') addItem(setTasks, tasks); if (e.key === 'Escape') { setEditingField(null); setNewItem(''); } }}
+                                                        className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-1 focus:ring-[#002e7a]/30 focus:border-[#002e7a]"
+                                                        placeholder="Aufgabe ergänzen…"
+                                                    />
+                                                    <button onClick={() => addItem(setTasks, tasks)} className="p-1.5 bg-[#002e7a] text-white rounded-lg hover:bg-[#001e5a] transition-colors">
+                                                        <Plus className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setEditingField('tasks')}
+                                                    className="flex items-center gap-1 mt-1 text-xs text-[#002e7a]/60 hover:text-[#002e7a] transition-colors"
+                                                >
+                                                    <Plus className="w-3 h-3" />
+                                                    Ergänzen
+                                                </button>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* Qualifikationen — Toggleable */}
+                        <div className="border border-slate-200 rounded-xl overflow-hidden">
+                            <button
+                                onClick={() => setReqsOpen(!reqsOpen)}
+                                className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-[#002e7a]" />
+                                    <span className="text-sm font-semibold text-[#002e7a] uppercase tracking-wider">Qualifikationen</span>
+                                    <span className="text-xs text-slate-400">({requirements.length})</span>
+                                </span>
+                                <motion.div animate={{ rotate: reqsOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                                </motion.div>
+                            </button>
+                            <AnimatePresence initial={false}>
+                                {reqsOpen && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="px-4 py-3 space-y-2">
+                                            {requirements.map((item, i) => (
+                                                <div key={i} className="flex items-start gap-2 text-sm text-slate-700 group">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-[#002e7a] mt-1.5 shrink-0 opacity-40" />
+                                                    <span className="flex-1">{item}</span>
+                                                    <button
+                                                        onClick={() => removeItem(requirements, setRequirements, i)}
+                                                        className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                                    >
+                                                        <X className="w-3 h-3 text-slate-400 hover:text-red-500" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {editingField === 'requirements' ? (
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <input
+                                                        autoFocus
+                                                        value={newItem}
+                                                        onChange={(e) => setNewItem(e.target.value)}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') addItem(setRequirements, requirements); if (e.key === 'Escape') { setEditingField(null); setNewItem(''); } }}
+                                                        className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-1 focus:ring-[#002e7a]/30 focus:border-[#002e7a]"
+                                                        placeholder="Qualifikation ergänzen…"
+                                                    />
+                                                    <button onClick={() => addItem(setRequirements, requirements)} className="p-1.5 bg-[#002e7a] text-white rounded-lg hover:bg-[#001e5a] transition-colors">
+                                                        <Plus className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setEditingField('requirements')}
+                                                    className="flex items-center gap-1 mt-1 text-xs text-[#002e7a]/60 hover:text-[#002e7a] transition-colors"
+                                                >
+                                                    <Plus className="w-3 h-3" />
+                                                    Ergänzen
+                                                </button>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 rounded-b-2xl flex items-center justify-between">
+                        <button
+                            onClick={onCancel}
+                            className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                        >
+                            Abbrechen
+                        </button>
+                        <button
+                            onClick={handleConfirm}
+                            disabled={confirming}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-[#002e7a] text-white text-sm font-medium rounded-lg hover:bg-[#001e5a] disabled:opacity-50 transition-colors"
+                        >
+                            {confirming ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <CheckCircle2 className="w-4 h-4" />
+                            )}
+                            Steckbrief bestätigen
+                        </button>
+                    </div>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
     );
 }
 

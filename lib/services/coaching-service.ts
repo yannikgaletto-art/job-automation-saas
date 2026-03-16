@@ -117,10 +117,61 @@ export async function sendCoachingMessage(
         content: msg.content,
     }));
 
-    // 6b. HARD STOP: If this is the last answer, skip the AI call entirely.
-    // Prompt-engineering is NOT reliable for this — deterministic bypass only.
+    // 6b. HARD STOP: If this is the last answer, generate farewell via Haiku.
     if (currentTurn >= maxQuestions) {
-        // Save the final user message to history (no AI response entry)
+        // Generate situationally-aware farewell using HINT_MODEL (cheap, already initialized)
+        const userAnswers = conversationHistory
+            .filter(m => m.role === 'user')
+            .map(m => m.content)
+            .join('\n---\n');
+
+        const farewellExamples = `
+Orientierung für den Ton (je nach maxQuestions):
+1 Frage:  "Hey, schade, dass wir so wenig Zeit hatten! Ich hoffe, du konntest trotzdem eine Kleinigkeit für dich mitnehmen, und ich freue mich auf alle weiteren Gespräche mit dir."
+2 Fragen: "Hey, danke für den kurzen, aber spannenden Austausch! Auch wenn die Zeit etwas knapp war, fand ich deine ersten Einblicke super spannend. Ich hoffe, du nimmst auch etwas für dich mit."
+3 Fragen: "Hey, vielen Dank für das gute und aufschlussreiche Gespräch! Wir konnten ja doch einige interessante Punkte anschneiden, und es hat mir echt Spaß gemacht, deine Perspektive kennenzulernen."
+4 Fragen: "Hey, das war ein richtig intensives und inspirierendes Gespräch, vielen Dank dafür! Deine ausführlichen Antworten haben mir sehr geholfen, und ich habe einige wertvolle Impulse von dir mitgenommen."
+5 Fragen: "Hey, vielen Dank für das wirklich tolle und ausführliche Gespräch! Ich habe extrem viel von dir gelernt und richtig viel mitgenommen. Ich hoffe sehr, dass wir uns in Zukunft noch mal austauschen können, und wünsche dir bis dahin alles Gute."`;
+
+        let farewell = 'Hey, danke für das Gespräch! Ich hoffe, du konntest etwas für dich mitnehmen.';
+        try {
+            const client = getClient();
+            const farewellResponse = await client.messages.create({
+                model: HINT_MODEL,
+                max_tokens: 150,
+                temperature: 0.5,
+                system: `Du bist ein Recruiter, der gerade ein Vorstellungsgespräch beendet hat. Schreibe einen kurzen, authentischen Abschiedssatz (1-3 Sätze).
+
+WICHTIG:
+- Der Ton skaliert nach Anzahl der gestellten Fragen (${maxQuestions} von 5 möglichen).
+- Bewerte die tatsächliche Gesprächsqualität anhand der User-Antworten. War der Austausch substantiell oder eher dünn? Reagiere ehrlich und wohlwollend, aber NICHT überschwänglich bei dünnen Antworten.
+- Schreibe KEINEN Verweis auf eine Analyse oder einen Link. Kein Markdown, keine Emojis.
+- Natürliches Deutsch, duze den Kandidaten.
+
+${farewellExamples}`,
+                messages: [
+                    { role: 'user', content: `Das Interview hatte ${maxQuestions} Frage(n). Hier sind die Antworten des Kandidaten:\n\n${userAnswers}\n\nSchreibe jetzt den Abschiedssatz.` },
+                ],
+            });
+            const generated = farewellResponse.content
+                .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+                .map(block => block.text)
+                .join('\n')
+                .trim();
+            if (generated.length > 10) farewell = generated;
+        } catch {
+            console.warn('[Coaching] Farewell generation failed, using fallback');
+        }
+
+        // Persist farewell in conversation_history (reload-safe)
+        const farewellMsg: ChatMessage = {
+            role: 'coach',
+            content: farewell,
+            timestamp: new Date().toISOString(),
+            turnNumber: currentTurn,
+        };
+        conversationHistory.push(farewellMsg);
+
         await supabaseAdmin
             .from('coaching_sessions')
             .update({
@@ -132,7 +183,7 @@ export async function sendCoachingMessage(
             .eq('id', sessionId);
 
         return {
-            aiMessage: '',  // Frontend shows farewell UI, not an AI message
+            aiMessage: farewell,
             hint: '',
             turnNumber: currentTurn,
             isComplete: true,

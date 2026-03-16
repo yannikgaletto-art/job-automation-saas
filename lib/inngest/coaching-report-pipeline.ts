@@ -28,7 +28,7 @@ function getClient(): Anthropic {
     return reportClient;
 }
 
-const REPORT_MODEL = 'claude-sonnet-4-5-20250929';
+const REPORT_MODEL = 'claude-haiku-4-5-20251001';
 
 export const generateCoachingReport = inngest.createFunction(
     {
@@ -40,29 +40,26 @@ export const generateCoachingReport = inngest.createFunction(
     async ({ event, step }) => {
         const { sessionId, userId } = event.data;
 
-        // Step 1: Load session
-        const session = await step.run('load-session', async () => {
-            const { data, error } = await supabaseAdmin
+        // Step 1: Load session + job data (single step, 2 sequential queries)
+        const { session, job } = await step.run('load-data', async () => {
+            const { data: sessionData, error: sessionError } = await supabaseAdmin
                 .from('coaching_sessions')
                 .select('*')
                 .eq('id', sessionId)
                 .eq('user_id', userId)
                 .single();
 
-            if (error || !data) {
+            if (sessionError || !sessionData) {
                 throw new NonRetriableError(`Session not found: ${sessionId}`);
             }
-            return data;
-        });
 
-        // Step 2: Load job data
-        const job = await step.run('load-job', async () => {
-            const { data } = await supabaseAdmin
+            const { data: jobData } = await supabaseAdmin
                 .from('job_queue')
                 .select('job_title, company_name')
-                .eq('id', session.job_id)
+                .eq('id', sessionData.job_id)
                 .single();
-            return data;
+
+            return { session: sessionData, job: jobData };
         });
 
         // Step 3: Generate report via Claude (round-aware dimensions)
@@ -104,7 +101,7 @@ export const generateCoachingReport = inngest.createFunction(
             const client = getClient();
             const response = await client.messages.create({
                 model: REPORT_MODEL,
-                max_tokens: 3000,
+                max_tokens: 4096,
                 temperature: 0.3,
                 system: `Du bist ein empathischer Senior Recruiting Coach.
 
@@ -202,6 +199,36 @@ WICHTIG für topicSuggestions:
 - Die context-Stichpunkte sind KEINE generischen Tipps. Beziehe dich auf das tatsächliche Interview und was KONKRET gefehlt hat.
 - Schreibe wie ein Head of Recruiting, der ehrlich sagt: "Das brauchst du, um diese Stelle zu kriegen."
 
+KOMMUNIKATIONS-FRAMEWORKS (NUR bei unstrukturiertem Antwortverhalten als topicSuggestion empfehlen):
+
+Wenn der Kandidat erkennbar unstrukturiert, abschweifend oder vage antwortet, empfiehl genau die Frameworks, die zum identifizierten Problem passen. Empfiehl NICHT alle drei pauschal — nur was zum konkreten Verhalten passt!
+
+1. PREP-Framework (bei vagen Argumenten ohne klare Position):
+   - topic: "PREP-Framework: Souveräne Argumentation"
+   - searchQuery: "PREP Methode Interview souverän argumentieren deutsch"
+   - youtubeTitle: "PREP-Methode – So argumentierst du souverän im Interview"
+   - category: "interview"
+   - Logik: Point (klare Aussage) → Reason (Begründung) → Example (konkreter Beweis) → Point (Wiederholung als harter Abschluss)
+   - Wann empfehlen: Kandidat bezieht keine klare Position, bleibt unverbindlich, sagt "ich würde versuchen" statt "ich mache"
+
+2. 3-2-1-Framework (bei chaotischen Antworten unter Druck):
+   - topic: "3-2-1-Framework: Spontane Fragen meistern"
+   - searchQuery: "spontane Fragen Interview strukturiert beantworten"
+   - youtubeTitle: "Spontane Interview-Fragen meistern – Das 3-2-1-Framework"
+   - category: "interview"
+   - Logik: Sofort-Anker wählen — 3 Schritte ("Erstens... Zweitens... Drittens...") ODER 2 Arten ("analytisch und kreativ") ODER 1 Hauptsache ("Die eine entscheidende Sache ist...")
+   - Wann empfehlen: Kandidat beginnt mit Füllwörtern ("ähm", "also"), schweift ab, verliert den Faden
+
+3. CCC-Framework (bei unklaren Erklärungen komplexer Themen):
+   - topic: "CCC-Framework: Komplexes klar erklären"
+   - searchQuery: "komplexe Themen einfach erklären Interview Technik"
+   - youtubeTitle: "CCC-Framework – Komplexe Sachverhalte klar kommunizieren"
+   - category: "interview"
+   - Logik: Context (Warum/Rahmenbedingungen) → Core (Kernbotschaft in einem Satz) → Connect (Relevanz für den Zuhörer)
+   - Wann empfehlen: Kandidat verliert den roten Faden bei komplexen Sachverhalten, erklärt zu lang ohne Struktur
+
+REGEL: Wenn der Kandidat strukturiert und klar antwortet → KEIN Framework empfehlen. Die Frameworks sind Hilfestellungen, keine Pflicht.
+
 NOCHMAL: observation, reason, suggestion sind KURZE STICHPUNKTE (max 8-10 Wörter). KEINE Sätze, KEINE Absätze!`,
                 messages: [
                     {
@@ -224,7 +251,9 @@ Antworte als JSON.`,
                 .join('\n');
 
             const tokensUsed = response.usage.input_tokens + response.usage.output_tokens;
-            const costCents = Math.ceil((tokensUsed / 1_000_000) * 3.0 * 100);
+            const costCents = Math.ceil(
+                ((response.usage.input_tokens / 1_000_000) * 1.0 + (response.usage.output_tokens / 1_000_000) * 5.0) * 100
+            );
 
             return { text, tokensUsed, costCents };
         });
@@ -233,16 +262,42 @@ Antworte als JSON.`,
         await step.run('save-report', async () => {
             let reportJson;
             try {
-                // Robust JSON extraction: strip markdown code blocks, find first { ... }
-                let cleaned = report.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-                if (!cleaned.startsWith('{')) {
-                    const match = cleaned.match(/\{[\s\S]*\}/);
-                    if (match) cleaned = match[0];
+                // Multi-stage robust JSON extraction:
+                // 1. Strip markdown fences
+                // 2. Find outermost JSON by bracket counting
+                let raw = report.text;
+
+                // Strip markdown code fences (```json, ```JSON, ```, etc.)
+                raw = raw.replace(/```(?:json|JSON)?\s*\n?/g, '').replace(/```\s*/g, '').trim();
+
+                // Find outermost JSON object using bracket depth counting
+                let depth = 0;
+                let jsonStart = -1;
+                let jsonEnd = -1;
+                for (let i = 0; i < raw.length; i++) {
+                    if (raw[i] === '{') {
+                        if (depth === 0) jsonStart = i;
+                        depth++;
+                    } else if (raw[i] === '}') {
+                        depth--;
+                        if (depth === 0) { jsonEnd = i; break; }
+                    }
                 }
-                reportJson = JSON.parse(cleaned);
-            } catch {
-                console.error('❌ [Coaching Report] JSON parse failed, saving raw text');
-                reportJson = { overallScore: 5, summary: report.text.substring(0, 500), dimensions: [], strengths: [], improvements: [] };
+
+                if (jsonStart === -1 || jsonEnd === -1) {
+                    throw new Error(`No valid JSON object found. Raw output starts with: ${raw.substring(0, 100)}`);
+                }
+
+                const jsonStr = raw.substring(jsonStart, jsonEnd + 1);
+                reportJson = JSON.parse(jsonStr);
+
+                console.log(`✅ [Coaching Report] Parsed JSON OK. Score: ${reportJson.overallScore}, dims: ${reportJson.dimensions?.length || 0}`);
+            } catch (err) {
+                const errMsg = err instanceof Error ? err.message : String(err);
+                console.error('❌ [Coaching Report] JSON parse failed:', errMsg);
+                console.error('❌ [Coaching Report] Raw output (first 500):', report.text.substring(0, 500));
+                console.error('❌ [Coaching Report] Raw output (last 200):', report.text.substring(Math.max(0, report.text.length - 200)));
+                reportJson = { overallScore: 5, summary: 'Report konnte nicht geladen werden. Bitte starte eine neue Session.', dimensions: [], strengths: [], improvements: [], topicSuggestions: [] };
             }
 
             const score = Math.min(10, Math.max(1, reportJson.overallScore || 5));

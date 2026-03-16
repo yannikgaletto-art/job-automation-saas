@@ -133,6 +133,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     companyValues,
                     companyVision,
                     jobTitle: setupData.jobTitle ?? undefined,
+                    language: setupData.detectedJobLanguage || 'de',
                 })
             });
             if (!res.ok) throw new Error('Quote search failed');
@@ -268,11 +269,10 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
             {(() => {
                 const filteredHooks = setupData.hooks.filter(h => h.type !== 'quote');
                 const groups: { label: string; icon: string; types: string[] }[] = [
-                    { label: 'Vision', icon: '🎯', types: ['vision'] },
+                    { label: 'Vision', icon: '', types: ['vision'] },
                     { label: 'Werte', icon: '✦', types: ['value'] },
                     { label: 'Projekte', icon: '🚀', types: ['project'] },
                     { label: 'Wachstum & Funding', icon: '📈', types: ['funding'] },
-                    { label: 'Eigener Text', icon: '✏️', types: ['manual'] },
                 ];
 
                 return groups.map(group => {
@@ -302,7 +302,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                     </span>
                                     {hasSelection && (
                                         <span className="text-[10px] bg-[#002e7a] text-white px-1.5 py-0.5 rounded-full font-medium">
-                                            Gewaehlt
+                                            Gewählt
                                         </span>
                                     )}
                                 </div>
@@ -403,7 +403,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 <div className="border-t border-[#E7E7E5] pt-6 mt-4 flex flex-col items-center text-center">
                     <div className="w-8 h-8 border-2 border-[#002e7a]/20 border-t-[#002e7a] rounded-full animate-spin mb-4" />
                     <p className="text-sm text-[#37352F] font-medium">Passende Zitate werden gesucht…</p>
-                    <p className="text-xs text-[#73726E] mt-1">Perplexity analysiert relevante Quellen</p>
+                    <p className="text-xs text-[#73726E] mt-1">KI sucht passende Vordenker und Zitate…</p>
                 </div>
             )}
 
@@ -416,7 +416,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 >
                     <div className="flex justify-between items-center">
                         <h4 className="text-xs font-semibold text-[#37352F]">
-                            💬 Passende Zitate ({fetchedQuotes.length})
+                            Passende Zitate ({fetchedQuotes.length})
                         </h4>
                         <button
                             onClick={handleQuoteSearch}
@@ -563,7 +563,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                 <p className="text-xs text-[#73726E] leading-relaxed">
                                     {pingPongDisabled
                                         ? 'Ping-Pong ist nur verfügbar wenn das Zitat in der Einleitung erscheint. Wähle "Zitat in die Einleitung" um diese Option zu aktivieren.'
-                                        : <>Statt dem Zitat nur zuzustimmen, baut Claude eine <strong className="text-[#37352F]">kritische Gegenperspektive</strong> ein — Thesis, Antithese, Synthese. Beweist echtes Selbstbewusstsein.</>}
+                                        : <>Statt dem Zitat nur zuzustimmen, baut Claude eine <strong className="text-[#37352F]">kritische Gegenperspektive</strong> ein — Thesis, Antithese, Synthese.</>}
                                 </p>
                             </div>
                             <button

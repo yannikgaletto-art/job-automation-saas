@@ -176,7 +176,17 @@ VERBOTEN: Oberflächliche Name-Dropping von Philosophen ohne Bezug, Arroganz, ak
     const hasPreset = !!ctx?.tone?.preset;
 
     // Custom Style: analyzed cover letter is the FULL tone source (not rhythm-only)
-    const customStyleBlock = isCustomStyle && style ? `STIL: DEIN EIGENER SCHREIBSTIL (aus deinem hochgeladenen Anschreiben)
+    // Detect if style is a genuine analysis vs. default fallback
+    const isGenuineAnalysis = isCustomStyle && style && (
+        (style.rhetorical_devices?.length ?? 0) > 0 ||
+        (style.forbidden_constructs?.length ?? 0) > 0 ||
+        style.tone !== 'professional' // Default fallback always returns 'professional'
+    );
+
+    const customStyleBlock = isCustomStyle && style ? (
+        isGenuineAnalysis
+            // Full custom style from genuine analysis
+            ? `STIL: DEIN EIGENER SCHREIBSTIL (aus deinem hochgeladenen Anschreiben)
 Ton: ${style.tone}
 Satzlänge: ${style.sentence_length}
 Bevorzugte Konjunktionen: ${(style.conjunctions || []).join(', ') || 'Daher, Deshalb, Zudem'}
@@ -187,7 +197,14 @@ ${(style.forbidden_constructs || []).length > 0 ? `VERBOTEN (User nutzt diese NI
 Du MUSST den Ton, die Satzstruktur und die Konjunktionen aus DIESEM Schreibstil übernehmen.
 Der Output soll klingen, als hätte der Bewerber selbst geschrieben.
 Nutze die extrahierten Konjunktionen statt generischer Übergänge.
-Kalibriere deinen Output auf dieses Muster — übernimm den Stil, nicht den Inhalt.` : null;
+Kalibriere deinen Output auf dieses Muster — übernimm den Stil, nicht den Inhalt.`
+            // Partial style: use what we have (rhythm data) but note limited calibration
+            : `SCHREIBRHYTHMUS (aus Stilanalyse — nur teilweise verfügbar):
+Satzlänge: ${style.sentence_length || 'medium'}
+Bevorzugte Konjunktionen: ${(style.conjunctions || []).join(', ') || 'Daher, Deshalb, Zudem'}
+
+Nutze diese Rhythmus-Daten für den Satzbau. Volle Stil-Kalibrierung ist nicht möglich (unvollständige Analyse).`
+    ) : null;
 
     const styleSection = style && !isCustomStyle
         ? hasPreset

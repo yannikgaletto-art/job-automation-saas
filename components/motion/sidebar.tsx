@@ -8,6 +8,30 @@ import { LucideIcon, LogOut, Coins } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { DynamicIsland } from './dynamic-island';
+
+// 20 animals for the avatar picker — displayed in Pathly dark-blue style
+const ANIMALS: { id: string; emoji: string; name: string }[] = [
+  { id: 'wolf',     emoji: '🐺', name: 'Wolf' },
+  { id: 'fox',      emoji: '🦊', name: 'Fuchs' },
+  { id: 'bear',     emoji: '🐻', name: 'Bär' },
+  { id: 'lion',     emoji: '🦁', name: 'Löwe' },
+  { id: 'tiger',    emoji: '🐯', name: 'Tiger' },
+  { id: 'eagle',    emoji: '🦅', name: 'Adler' },
+  { id: 'owl',      emoji: '🦉', name: 'Eule' },
+  { id: 'dolphin',  emoji: '🐬', name: 'Delfin' },
+  { id: 'shark',    emoji: '🦈', name: 'Hai' },
+  { id: 'panther',  emoji: '🐆', name: 'Leopard' },
+  { id: 'horse',    emoji: '🐴', name: 'Pferd' },
+  { id: 'elephant', emoji: '🐘', name: 'Elefant' },
+  { id: 'penguin',  emoji: '🐧', name: 'Pinguin' },
+  { id: 'octopus',  emoji: '🐙', name: 'Oktopus' },
+  { id: 'deer',     emoji: '🦌', name: 'Hirsch' },
+  { id: 'crow',     emoji: '🦝', name: 'Waschbär' },
+  { id: 'snake',    emoji: '🐍', name: 'Schlange' },
+  { id: 'hawk',     emoji: '🦎', name: 'Eidechse' },
+  { id: 'dragon',   emoji: '🐉', name: 'Drache' },
+  { id: 'unicorn',  emoji: '🦄', name: 'Einhorn' },
+];
 import { Badge } from './badge';
 import { Progress } from './progress';
 import { CountUp } from './count-up';
@@ -244,18 +268,51 @@ export function CreditsCard({ remaining, className }: CreditsCardProps) {
 
 export function Sidebar({ children, className, collapsed = false }: SidebarProps) {
   const [user, setUser] = useState<{ email?: string; full_name?: string } | null>(null);
+  const [selectedAnimal, setSelectedAnimal] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) {
-        setUser({
-          email: data.user.email,
-          full_name: data.user.user_metadata?.full_name,
-        });
+    supabase.auth.getUser().then(async ({ data: authData }) => {
+      if (!authData?.user) return;
+
+      // Load avatar from localStorage
+      const saved = localStorage.getItem(`pathly_avatar_${authData.user.id}`);
+      if (saved) setSelectedAnimal(saved);
+
+      // Try to get full_name from profile API
+      try {
+        const res = await fetch('/api/settings/profile');
+        if (res.ok) {
+          const profile = await res.json();
+          setUser({
+            email: authData.user.email,
+            full_name: profile.full_name || profile.data?.full_name || authData.user.user_metadata?.full_name,
+          });
+        } else {
+          setUser({ email: authData.user.email, full_name: authData.user.user_metadata?.full_name });
+        }
+      } catch {
+        setUser({ email: authData.user.email, full_name: authData.user.user_metadata?.full_name });
       }
     });
   }, []);
+
+  const handleSelectAnimal = async (animalId: string) => {
+    setSelectedAnimal(animalId);
+    setShowPicker(false);
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    if (data?.user?.id) {
+      localStorage.setItem(`pathly_avatar_${data.user.id}`, animalId);
+    }
+    // Fire-and-forget persist
+    fetch('/api/settings/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avatar_animal: animalId }),
+    }).catch(() => {});
+  };
 
   return (
     <motion.aside
@@ -270,7 +327,7 @@ export function Sidebar({ children, className, collapsed = false }: SidebarProps
       }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
     >
-      {/* Dynamic Island Logo — morphs to show notifications */}
+      {/* Dynamic Island Logo */}
       <DynamicIsland />
 
       {/* Navigation Content */}
@@ -280,15 +337,66 @@ export function Sidebar({ children, className, collapsed = false }: SidebarProps
 
       {/* User Info */}
       <div className="pt-4 border-t border-[#E7E7E5]">
-        <div className="flex items-center gap-3 px-2 py-2">
-          <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
-            {getInitials(user?.full_name || user?.email || '?')}
-          </div>
+        <div className="flex items-center gap-3 px-2 py-2 relative">
+
+          {/* Avatar button — click to open animal picker */}
+          <motion.button
+            onClick={() => setShowPicker(v => !v)}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.92 }}
+            className="h-8 w-8 rounded-full bg-[#012e7a] flex items-center justify-center text-white text-sm shrink-0 cursor-pointer border-none outline-none ring-offset-0 focus:ring-2 focus:ring-[#012e7a]/40"
+            title="Avatar ändern"
+          >
+            {selectedAnimal ? (
+              <span role="img" aria-label={selectedAnimal} className="text-base leading-none select-none">
+                {ANIMALS.find(a => a.id === selectedAnimal)?.emoji ?? '🐾'}
+              </span>
+            ) : (
+              <span className="text-xs font-semibold">{getInitials(user?.full_name || user?.email || '?')}</span>
+            )}
+          </motion.button>
+
+          {/* Animal picker popover */}
+          <AnimatePresence>
+            {showPicker && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.88, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.88, y: 8 }}
+                transition={{ duration: 0.16, ease: 'easeOut' }}
+                className="absolute bottom-12 left-0 z-50 bg-white border border-[#E7E7E5] rounded-2xl shadow-2xl p-3 w-[200px]"
+              >
+                <p className="text-[10px] font-bold text-[#012e7a] uppercase tracking-widest mb-2 px-1">
+                  Wähle dein Tier
+                </p>
+                <div className="grid grid-cols-5 gap-1">
+                  {ANIMALS.map(animal => (
+                    <motion.button
+                      key={animal.id}
+                      onClick={() => handleSelectAnimal(animal.id)}
+                      whileHover={{ scale: 1.25 }}
+                      whileTap={{ scale: 0.88 }}
+                      className={cn(
+                        'h-8 w-8 rounded-lg flex items-center justify-center text-base border-none cursor-pointer',
+                        selectedAnimal === animal.id
+                          ? 'bg-[#012e7a]/15 ring-2 ring-[#012e7a]'
+                          : 'bg-[#F7F7F5] hover:bg-[#E8EDF8]'
+                      )}
+                      title={animal.name}
+                    >
+                      {animal.emoji}
+                    </motion.button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-900 truncate leading-tight">
-              {user?.full_name || 'Kein Name'}
+            <p className="text-sm font-medium text-[#37352F] truncate leading-tight">
+              {user?.full_name || user?.email?.split('@')[0] || 'Profil'}
             </p>
-            <p className="text-xs text-slate-500 truncate leading-tight">
+            <p className="text-xs text-[#73726E] truncate leading-tight">
               {user?.email || ''}
             </p>
           </div>

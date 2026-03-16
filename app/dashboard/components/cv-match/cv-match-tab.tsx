@@ -146,6 +146,29 @@ function ExpandableCell({ text, boldFn }: { text: string; boldFn: (s: string) =>
     );
 }
 
+// --- Cancel Button (appears after delay so user is never stuck) ---
+function CancelButton({ onCancel }: { onCancel: () => void }) {
+    const [visible, setVisible] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => setVisible(true), 15000);
+        return () => clearTimeout(timer);
+    }, []);
+
+    if (!visible) return null;
+
+    return (
+        <motion.button
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={onCancel}
+            className="text-xs text-slate-400 hover:text-red-500 transition-colors mt-1"
+        >
+            Abbrechen
+        </motion.button>
+    );
+}
+
 export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, onNextStep }: CVMatchTabProps) {
     const [state, setState] = useState<'idle' | 'loading' | 'complete' | 'error' | 'no-cv'>('idle');
     const router = useRouter();
@@ -484,6 +507,15 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 </div>
 
                 <p className="text-[11px] text-[#A8A29E]">Dauert ca. 45–90 Sekunden</p>
+
+                {/* Cancel button — appears after 15s so the user is never stuck */}
+                <CancelButton onCancel={() => {
+                    if (pollingRef.current) {
+                        clearInterval(pollingRef.current);
+                        pollingRef.current = null;
+                    }
+                    setState('idle');
+                }} />
             </div>
         );
     }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
 import { CvStructuredData } from '@/types/cv';
 import { ProficiencyDots } from './shared/ProficiencyDots';
@@ -194,7 +194,7 @@ const RenderBullet = ({ text }: { text: string }) => {
     return <Text style={s.bulletText}>{text}</Text>;
 };
 
-export function TechTemplate({ data }: { data: CvStructuredData }) {
+export function TechTemplate({ data, qrBase64 }: { data: CvStructuredData; qrBase64?: string }) {
     const pi = data.personalInfo;
 
     return (
@@ -206,11 +206,20 @@ export function TechTemplate({ data }: { data: CvStructuredData }) {
                         <Text style={s.name}>{pi.name || ''}</Text>
                         <Text style={s.roleTitle}>{pi.targetRole || (pi.summary ? 'Software Engineer / Tech Lead' : '')}</Text>
                     </View>
-                    <View style={s.headerRight}>
-                        {pi.email && <Text style={s.contactTag}>{pi.email}</Text>}
-                        {pi.phone && <Text style={s.contactTag}>{pi.phone}</Text>}
-                        {pi.linkedin && <Text style={s.contactTag}>{pi.linkedin}</Text>}
-                        {pi.location && <Text style={s.contactTag}>{pi.location}</Text>}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {/* QR Code — Video Approach (page 1 only, left of contact) */}
+                        {qrBase64 && (
+                            <View style={{ alignItems: 'center', marginRight: 10 }}>
+                                <Image src={qrBase64} style={{ width: 42, height: 42 }} />
+                                <Text style={{ fontSize: 5, color: GRAY, marginTop: 2, textAlign: 'center' }}>Video-Vorstellung{"\n"}14 Tage verfügbar</Text>
+                            </View>
+                        )}
+                        <View style={s.headerRight}>
+                            {pi.email && <Text style={s.contactTag}>{pi.email}</Text>}
+                            {pi.phone && <Text style={s.contactTag}>{pi.phone}</Text>}
+                            {pi.linkedin && <Text style={s.contactTag}>{pi.linkedin}</Text>}
+                            {pi.location && <Text style={s.contactTag}>{pi.location}</Text>}
+                        </View>
                     </View>
                 </View>
 
@@ -308,6 +317,8 @@ export function TechTemplate({ data }: { data: CvStructuredData }) {
                     </View>
 
                 </View>
+
+
             </Page>
         </Document>
     );

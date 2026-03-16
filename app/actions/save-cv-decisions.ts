@@ -11,6 +11,13 @@ export async function saveCvDecisions(
     try {
         const supabase = await createClient();
 
+        // §8: Auth Guard — verify session before any write
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        // §3: User-scoped write — defense-in-depth alongside RLS
         const { error } = await supabase
             .from('job_queue')
             .update({
@@ -18,7 +25,8 @@ export async function saveCvDecisions(
                 cv_optimization_proposal: proposal,
                 status: 'cv_optimized',
             })
-            .eq('id', jobId);
+            .eq('id', jobId)
+            .eq('user_id', user.id);
 
         if (error) {
             console.error('❌ Failed to save CV decisions:', error);

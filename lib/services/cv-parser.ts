@@ -60,6 +60,16 @@ export async function parseCvTextToJson(text: string): Promise<CvStructuredData>
 Du bist ein präziser Daten-Extraktor für Lebensläufe.
 Deine Aufgabe ist es, den folgenden rohen CV-Text in eine strikt strukturierte JSON-Repräsentation zu übersetzen.
 
+⚠️ **KRITISCHE WARNUNG — OCR-REIHENFOLGE:**
+Der Text wurde von einem OCR-System (Azure Document Intelligence) extrahiert.
+Die Reihenfolge der Textblöcke im Input entspricht NICHT zwingend der logischen Reihenfolge des Lebenslaufs!
+Insbesondere bei zweispaltigen CVs können Daten, Firmennamen und Beschreibungen DURCHEINANDER stehen.
+Du MUSST daher den gesamten Text lesen und die Zuordnung SEMANTISCH vornehmen.
+
+**2-PASS-STRATEGIE (PFLICHT):**
+PASS 1: Lies den GESAMTEN Text und sammle ALLE Datumsangaben, Firmennamen und Rollen.
+PASS 2: Ordne sie logisch zu — welche Firma gehört zu welchem Datumsbereich? Nutze inhaltliche Hinweise (z.B. Seniorität, Branche, Technologien) um korrekte Zuordnungen zu finden.
+
 **REGELN FÜR DIE EXTRAKTION:**
 1. Erfinde KEINE Fakten ("No Hallucinations"). Wenn ein Feld im Text nicht existiert, lass es weg oder setze es auf null/leer.
 2. Formuliere nichts um. Übernimm die Informationen so originalgetreu wie möglich.
@@ -68,6 +78,7 @@ Deine Aufgabe ist es, den folgenden rohen CV-Text in eine strikt strukturierte J
 5. Setze "version" auf "2.0".
 6. **CHRONOLOGICAL ORDER (CRITICAL):** Die \`experience\`-Einträge MÜSSEN nach Datum absteigend sortiert sein (neueste zuerst). "Heute"/"Present" = aktuellste Position = Array-Index 0. Achte auf korrekte Zuordnung: Jede Firma muss mit ihrem korrekten Datumsbereich verknüpft werden — NICHT einfach in der Reihenfolge des Textes übernehmen, sondern semantisch korrekt zuordnen.
 7. **DATE-COMPANY MATCHING**: Lies den gesamten CV-Text zuerst vollständig, bevor du die Zuordnung machst. Stelle sicher, dass jede Firma/Rolle mit dem korrekten Datumsbereich (Start - Ende) verknüpft wird. Bei OCR-extrahiertem Text kann die Textreihenfolge FALSCH sein — prüfe die logische Konsistenz.
+8. **SECTION MARKERS**: Der Text kann Markdown-artige Abschnittsmarkierungen enthalten (z.B. "## Berufserfahrung"). Nutze diese als Hilfe, um die CV-Sektionen zu unterscheiden.
 
 **ZUSÄTZLICHE HINWEISE ZUR DATENSTRUKTUR:**
 - \`dateRangeText\`: z.B. "01/2020 - 12/2022" oder "2018 - Heute"
@@ -131,15 +142,34 @@ ${text}
     const rawJson = JSON.parse(jsonMatch[0]);
     console.log('🔍 Parsed raw JSON from Claude successfully');
 
-    // Verify strictly with Zod
-    const validated = cvStructuredDataSchema.parse(rawJson);
-    console.log('✅ Zod validation passed for structured CV data');
+    // Use safeParse instead of parse so a partially invalid Claude response
+    // (e.g. wrong field type in one experience entry) does NOT kill the entire
+    // CV upload. We log a warning and return the raw data coerced to the type.
+    const parseResult = cvStructuredDataSchema.safeParse(rawJson);
+    let validated: any;
+    if (parseResult.success) {
+      console.log('✅ Zod validation passed for structured CV data');
+      validated = parseResult.data;
+    } else {
+      const issues = parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
+      console.warn(`⚠️ [cv-parser] Zod validation partially failed — using raw JSON as fallback. Issues: ${issues}`);
+      // Ensure the raw JSON at least has the minimum required top-level structure
+      validated = {
+        version: rawJson.version ?? '2.0',
+        personalInfo: rawJson.personalInfo ?? {},
+        experience: Array.isArray(rawJson.experience) ? rawJson.experience : [],
+        education: Array.isArray(rawJson.education) ? rawJson.education : [],
+        skills: Array.isArray(rawJson.skills) ? rawJson.skills : [],
+        languages: Array.isArray(rawJson.languages) ? rawJson.languages : [],
+        certifications: Array.isArray(rawJson.certifications) ? rawJson.certifications : [],
+      };
+    }
 
     // Post-processing: sort experience by end-date descending (newest first)
     // This is a safety net in case Claude returns entries in wrong order
     const sorted = {
       ...validated,
-      experience: sortExperienceByDate(validated.experience),
+      experience: sortExperienceByDate(validated.experience ?? []),
     };
 
     return sorted as CvStructuredData;
@@ -151,7 +181,18 @@ ${text}
 
 /**
  * Sort experience entries by end-date descending (newest first).
- * Handles: "09.2025 - Heute", "01/2023 - 12/2024", "2020 - 2022", "09.2025 - Present"
+ *
+ * Handles all common date range formats found in German and international CVs:
+ *   "09.2025 - Heute"          → current job
+ *   "01/2023 - 12/2024"        → MM/YYYY
+ *   "2020 - 2022"              → YYYY only
+ *   "09.2025 - Present"        → English present
+ *   "seit 01/2023"             → German "since" (open-ended = current)
+ *   "ab 2022"                  → German "from" (open-ended = current)
+ *   "bis Heute"                → German "until today"
+ *   "Q1 2024 - Q3 2025"        → quarterly notation
+ *   "2023–" or "2023 –"        → open-ended with em-dash (no end = current)
+ *
  * Falls back to original order if dates can't be parsed.
  */
 function sortExperienceByDate(
@@ -159,24 +200,46 @@ function sortExperienceByDate(
 ): typeof entries {
   const parseEndDate = (dateRange: string | null | undefined): number => {
     if (!dateRange) return 0;
-    const lower = dateRange.toLowerCase().trim();
+    const raw = dateRange.trim();
+    const lower = raw.toLowerCase();
 
-    // "Heute" / "Present" / "current" = far future
-    if (/heute|present|current|aktuell/i.test(lower)) return 99999999;
+    // Open-ended / current job indicators — always sort first
+    if (/heute|present|current|aktuell|laufend|\bnow\b/i.test(lower)) return 99999999;
 
-    // Find the end part (after " - " or " – " or "–")
-    const parts = dateRange.split(/\s*[-–]\s*/);
+    // German "seit" or "ab" prefix = job started at date and is current
+    if (/^(seit|ab)\s/i.test(lower)) return 99999999;
+
+    // Open-ended trailing dash: "2023 –" or "2023–" with nothing after
+    if (/\d{4}\s*[-–]\s*$/.test(raw)) return 99999999;
+
+    // Find the end part (after " - " or " – ")
+    // Handles: "01.2020 - 12.2022", "01/2020 – 12/2022"
+    const parts = raw.split(/\s*[-–]\s*/);
     const endPart = (parts.length > 1 ? parts[parts.length - 1] : parts[0]).trim();
 
-    if (/heute|present|current|aktuell/i.test(endPart)) return 99999999;
+    // Re-check the end part for current indicators
+    if (/heute|present|current|aktuell|laufend/i.test(endPart)) return 99999999;
 
-    // Try MM.YYYY or MM/YYYY format
+    // Quarterly format: "Q1 2024" → treat as Jan (Q1), Apr (Q2), Jul (Q3), Oct (Q4)
+    const quarterMatch = endPart.match(/Q([1-4])\s*(\d{4})/i);
+    if (quarterMatch) {
+      const quarter = parseInt(quarterMatch[1]);
+      const year = parseInt(quarterMatch[2]);
+      const month = [3, 6, 9, 12][quarter - 1]; // end-of-quarter month
+      return year * 100 + month;
+    }
+
+    // MM.YYYY or MM/YYYY (German or international format)
     const mmYyyy = endPart.match(/(\d{1,2})[./](\d{4})/);
     if (mmYyyy) return parseInt(mmYyyy[2]) * 100 + parseInt(mmYyyy[1]);
 
-    // Try just YYYY
+    // YYYY/MM (ISO-ish reverse format)
+    const yyyyMm = endPart.match(/(\d{4})\/(\d{1,2})/);
+    if (yyyyMm) return parseInt(yyyyMm[1]) * 100 + parseInt(yyyyMm[2]);
+
+    // Just YYYY (no month — use 12 as end-of-year conservative estimate)
     const yyyy = endPart.match(/(\d{4})/);
-    if (yyyy) return parseInt(yyyy[1]) * 100;
+    if (yyyy) return parseInt(yyyy[1]) * 100 + 12;
 
     return 0;
   };

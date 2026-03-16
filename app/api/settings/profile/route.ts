@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/settings/profile
- * Returns the user's profile fields (linkedin_url, target_role).
+ * Returns profile fields including full_name from user_profiles.
  * Auth-guarded per SICHERHEITSARCHITEKTUR §8.
  */
 export async function GET() {
@@ -17,22 +17,33 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { data, error } = await supabase
+        // Fetch user_settings (linkedin, target_role, avatar_animal)
+        const { data: settings } = await supabase
             .from('user_settings')
-            .select('linkedin_url, target_role')
+            .select('linkedin_url, target_role, avatar_animal')
             .eq('user_id', user.id)
             .maybeSingle();
 
-        if (error) {
-            console.error('[settings/profile] GET error:', error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
-        }
+        // Fetch full_name from user_profiles
+        const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        // Fallback: user_metadata from auth (e.g. Google OAuth)
+        const full_name = profile?.full_name
+            || user.user_metadata?.full_name
+            || user.user_metadata?.name
+            || null;
 
         return NextResponse.json({
             success: true,
+            full_name,
+            avatar_animal: settings?.avatar_animal ?? null,
             profile: {
-                linkedin_url: data?.linkedin_url ?? '',
-                target_role: data?.target_role ?? '',
+                linkedin_url: settings?.linkedin_url ?? '',
+                target_role: settings?.target_role ?? '',
             },
         });
     } catch (err: unknown) {
@@ -43,8 +54,7 @@ export async function GET() {
 
 /**
  * POST /api/settings/profile
- * Updates the user's profile fields.
- * Uses upsert + read-back (Double-Assurance per SICHERHEITSARCHITEKTUR §1).
+ * Updates linkedin_url and target_role in user_settings.
  */
 export async function POST(request: NextRequest) {
     try {
@@ -92,7 +102,6 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (!verify) {
-            console.error('[settings/profile] Read-back failed');
             return NextResponse.json({ error: 'Verifikation fehlgeschlagen', success: false }, { status: 500 });
         }
 
@@ -103,6 +112,51 @@ export async function POST(request: NextRequest) {
                 target_role: verify.target_role ?? '',
             },
         });
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return NextResponse.json({ error: msg }, { status: 500 });
+    }
+}
+
+/**
+ * PATCH /api/settings/profile
+ * Lightweight update — used e.g. to save avatar_animal from the sidebar.
+ */
+export async function PATCH(request: NextRequest) {
+    try {
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await request.json();
+
+        const allowed = ['avatar_animal', 'linkedin_url', 'target_role'] as const;
+        const updatePayload: Record<string, unknown> = {};
+
+        for (const key of allowed) {
+            if (key in body) {
+                updatePayload[key] = body[key] ?? null;
+            }
+        }
+
+        if (Object.keys(updatePayload).length === 0) {
+            return NextResponse.json({ error: 'Keine gültigen Felder' }, { status: 400 });
+        }
+
+        const { error } = await supabase
+            .from('user_settings')
+            .update(updatePayload)
+            .eq('user_id', user.id);
+
+        if (error) {
+            console.error('[settings/profile] PATCH error:', error);
+            return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true });
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         return NextResponse.json({ error: msg }, { status: 500 });

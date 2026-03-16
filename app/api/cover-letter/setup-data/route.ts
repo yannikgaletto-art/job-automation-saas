@@ -37,11 +37,13 @@ export async function GET(req: NextRequest) {
             // All cover letter docs for tone source selection (slim payload)
             // WHY: metadata->>'original_name' fetches ONLY the key we need from the JSONB column,
             // preventing the full metadata blob (incl. extracted_text) from being loaded.
+            // Filter: origin='upload' excludes AI-generated drafts from polluting the style picker
             supabase
                 .from('documents')
                 .select('id, created_at, metadata->>original_name, metadata->style_analysis')
                 .eq('user_id', user.id)
                 .eq('document_type', 'cover_letter')
+                .neq('origin', 'generated')
                 .order('created_at', { ascending: false })
                 .limit(15),
         ]);

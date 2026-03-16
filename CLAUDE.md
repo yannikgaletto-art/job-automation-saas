@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 3.1
-**Last Updated:** 2026-03-10
+**Version:** 3.2
+**Last Updated:** 2026-03-16
 
 ---
 
@@ -78,31 +78,20 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | Feature | Fix / Implementation |
 |---------|----------------------|
 | PDF Download | New API route `/api/documents/download` |
-| Stepper | Fixed status mapping for active-cv-card |
 | Company Research | URL validation in research route |
-| Quote Quality | Enhanced quote matching prompt logic |
 | CV Match | Null guards (Array.isArray) + safeResult normalization in pipeline |
 | Certificates | `company` → `company_name` DB column fix; Parallel Perplexity; Stale detection |
-| Coaching | Text-Chat Mock Interview mit Gap-Analyse, Consent, 3 Runden (Kennenlernen/Deep Dive/Case Study) |
-| Coaching | Deterministic session end (turnCount >= maxQuestions), farewell message |
-| Coaching | Analysis page: Recommendations per company toggle, bolded keywords |
-| Community | Skill-Share / Career / Entrepreneurship boards mit Posts, Comments, Upvotes |
-| Volunteering | Ehrenamt-Feature mit Opportunities, Bookmarks, Category Voting |
-| Analytics | Redesign mit Pomodoro Heatmap, Task Completion, Coaching Stats |
-| Pomodoro | Session tracking (25/50 min), energy level, heatmap view |
-| Task-Sync | Tasks mit Pulse/Coaching source, drag-and-drop, carry-over |
-| Settings | LinkedIn URL + Target Role fields, active CV tracking |
-| Job Search | AI-Suche, Delete Buttons, Saved Searches Unique Constraint Fix |
-| Colors | Global #0066FF → #012e7a replacement |
-| Documentation | schema.sql V4.0, ARCHITECTURE.md V5.0 (13 neue Tabellen, 60+ API Endpoints) |
-| **Azure Document Intelligence** | **PRIMARY CV/Cover Letter extractor (EU, DSGVO-konform). Claude Haiku = Fallback. Neue Datei: `lib/services/azure-document-extractor.ts`** |
-| **Steckbrief UI** | **Unternehmenswebsite Hyperlink, ATS/Benefits Schriftgröße, Umlaute (ä/ö/ü), Layout-Alignment** |
-| **CV Match Tab** | **Rename 'CV Check' → 'CV Match', Icon entfernt, Loading-UI (Cover-Letter-Style), Polling 60s→150s Bug-Fix, ATS-Keywords Erklärungstext** |
-| **Upload UI** | **Azure EU Fortschrittsanzeige: Badge + Status-Texte für CV & Cover Letter Upload** |
-| **CV Optimizer (2026-03-10)** | **Hydration-Fix: nested `<button>` in DiffReview.tsx → `<div role=button>`. Summary-Toggle für Valley-Template freigegeben. `showSummary` jetzt korrekt an API übermittelt + Prompt-Instruktion.** |
-| **CV Optimizer (2026-03-10)** | **Error-Handling: Alle `throw` ersetzt durch `NextResponse.json()` mit deutschen Fehlertexten. Sanitization-Layer vor Zod-Validation. Zod-Schema generisch (section=string, reason=optional).** |
-| **ValleyTemplate (2026-03-10)** | **Max 3 Bullet-Points hard-cap (`.slice(0,3)`). Zertifikate in rechte Spalte der Dual-Column-Layout (Seite 2, unter Sprachen). KI-Prompt: 2-Seiten HARD RULE + Self-Judge-Validation.** |
-| **CV Parser (2026-03-10)** | **Chrono-Sort: `sortExperienceByDate()` post-processing (Heute/MM.YYYY/MM/YYYY/YYYY). Prompt-Anweisung 6+7: korrektes Date-Company-Matching, kein OCR-Reihenfolgen-Bug mehr.** |
+| Coaching | Text-Chat Mock Interview, Gap-Analyse, 3 Runden, PREP/3-2-1/CCC frameworks |
+| Cover Letter Polish | Inngest `cover-letter/polish` pipeline: Audit Trail, Quote Injection, Critique |
+| Cover Letter | `generationWarnings` pipeline fix — correctly passed to API response + UI |
+| **Video Script Studio** | **`app/api/video/scripts/generate/route.ts` — Claude Haiku keyword categorization + block generation, `video_scripts` table** |
+| **Avatar Picker** | **Animal avatar in Sidebar — 20 choices, saved to `user_profiles.avatar_animal`, Pathly brand colors** |
+| **Morning Briefing** | **Popup removed (`morning-briefing.tsx` → returns null)** |
+| **QR Code** | **Consent dialog before generation, embedded in Valley/Tech PDF templates** |
+| **Azure Document Intelligence** | **PRIMARY CV/Cover Letter extractor (EU, DSGVO-konform). Claude Haiku = Fallback** |
+| **CV Optimizer (2026-03-10)** | **Hydration-Fix, Summary-Toggle, Error-Handling with German messages, Zod-Schema generisch** |
+| **ValleyTemplate (2026-03-10)** | **Max 3 Bullet-Points hard-cap. Zertifikate in rechte Spalte. KI-Prompt: 2-Seiten HARD RULE** |
+| **CV Parser (2026-03-10)** | **Chrono-Sort: `sortExperienceByDate()` post-processing (Heute/MM.YYYY/MM/YYYY/YYYY)** |
 
 ---
 
@@ -126,7 +115,8 @@ Claude Haiku 4.5 (Anthropic US)
 
 ### Routing-Logik (lib/ai/model-router.ts)
 ```
-parse_html, extract_job_fields, detect_ats_system       → GPT-4o-mini (cheap)
+parse_html, extract_job_fields                              → Claude Haiku 4.5 (structured, deutsch)
+detect_ats_system, classify_job_board, summarize             → GPT-4o-mini (cheap)
 write_cover_letter, personalize_intro, optimize_cv      → Claude Sonnet 4.5 (premium)
 cv_match, cv_parse, analyze_skill_gaps                  → Claude Haiku 4.5 (structured)
 document_extraction (PRIMARY)                           → Azure Document Intelligence (EU)

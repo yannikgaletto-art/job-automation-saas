@@ -140,7 +140,12 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 const s = get();
                 if (step === 1) return !!s.selectedHook;
                 if (step === 2) return s.cvStations.length >= 1;
-                if (step === 3) return !!s.tone?.preset;
+                if (step === 3) {
+                    if (!s.tone?.preset) return false;
+                    // Custom style requires a selected doc
+                    if (s.tone?.toneSource === 'custom-style' && !s.tone?.selectedStyleDocId) return false;
+                    return true;
+                }
                 return false;
             },
 

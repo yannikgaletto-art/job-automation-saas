@@ -188,7 +188,7 @@ if (!verify) throw new Error('CV_SAFETY: Upload verification failed — document
   - `tasks`, `pomodoro_sessions`, `mood_checkins`, `daily_energy`, `daily_briefings`
   - `coaching_sessions`, `job_certificates`, `validation_logs`
   - `community_posts`, `community_comments`, `community_upvotes` (user_id für Write)
-  - `volunteering_bookmarks`, `volunteering_votes` (user_id für Write)
+  - `volunteering_bookmarks`, `volunteering_votes` (user_id für Write)\n  - `video_approaches`, `video_scripts` (user_id für Write)\n  - `script_block_templates` (user_id für Write, NULL für system read)
 - RLS MUSS für alle diese Tabellen aktiviert sein (✅ geprüft am 2026-03-09)
 - Service Role Key: NUR serverseitig, nie im Frontend
 
@@ -392,22 +392,23 @@ const safeItems = validatedItems.filter(item => item.url_valid);
 
 ## 11. QUOTE QUALITY CONTRACT (Company Research)
 
-### Invariante: Quotes müssen zur Stelle UND zum Unternehmen passen
-Der Prompt für Quote-Matching MUSS folgende Kontext-Injection enthalten:
-```
-Du suchst Zitate, Werte oder offizielle Statements von {companyName},
-die DIREKT relevant sind für die Stelle "{jobTitle}".
+### Invariante: Quotes müssen zum Unternehmenskontext passen
+Zitate werden per **Claude One-Shot** (1 API-Call) generiert. Claude wählt Vordenker + Zitate
+basierend auf Unternehmenswerten, Vision und Branche. Kein Perplexity-Verify mehr nötig.
 
-Kriterien:
-- Das Zitat/der Wert muss zum Tätigkeitsbereich der Stelle passen
-- Quelle MUSS von der offiziellen Unternehmenswebsite oder verifizierten Quellen stammen
-- NICHT: Generische Unternehmens-Statements ("wir sind innovativ")
-- JA: Spezifische Aussagen über Kultur, Rolle, Team, Wachstumsstrategie die zur Stelle passen
+**Pipeline (2 Stages):**
+1. **Claude Sonnet 4.5** → 3 Vordenker + Zitat + Kontext-Brücke + Konfidenz-Score
+2. **Regelcheck** → min. 8 Wörter, max. 30 Wörter, kein Anonymous, kein Spam, confidence: 'high'
 
-Stelle: {jobTitle}
-Unternehmen: {companyName}
-Branche/Kontext: {jobField}
-```
+**Sprachsteuerung:** Frontend sendet `language: 'de' | 'en'`. Claude generiert Zitate in der
+passenden Sprache. Bei `'de'` werden ä/ö/ü korrekt verwendet.
+
+**Anti-Halluzination:**
+- Claude gibt `confidence: 'low'` zurück bei Unsicherheit → Zitat wird verworfen
+- Zitate < 5 Wörter innerhalb Anführungszeichen werden verworfen
+- Verbotene Autoren: Elon Musk, Jeff Bezos, Mark Zuckerberg (zu polarisierend)
+
+**Fehlerverhalten:** Bei Claude-API-Fehler → leere Liste → Frontend zeigt `quoteError`.
 
 ---
 
@@ -474,3 +475,55 @@ await supabase.from('job_queue').update({ status: 'cover_letter_done' })...; // 
 **Batch 2 (Check-in + Notifications + Upload-Speed)** kann erst nach vollständigem Abschluss und Verifikation von Batch 1 starten.
 
 **Batch 3 (PDF Download + Stepper + CV-Format + Links + Quotes)** kann erst nach Batch 2 starten.
+
+---
+
+## 12. JOB SEARCH — UI STATE CONTRACT
+
+### §12.1 Hinzufügen-Button Persistenz
+Wenn ein User einen Job über "Hinzufügen" zur Queue hinzufügt, MUSS der Button-Zustand **im Parent-State** (`already_in_queue: true`) persistiert werden — **nicht nur** im lokalen Component-State.
+
+**Warum:** Lokaler State geht bei Accordion-Collapse/Expand verloren. Der User könnte denselben Job erneut scrapen und unnötig API-Credits verbrauchen.
+
+**Implementierung:**
+- `AddToQueueButton` ruft `onJobAdded(apply_link)` nach erfolgreichem Add
+- Der Parent (`SearchAccordion` → Root-Level `setSavedSearches`) setzt `already_in_queue: true` im `EnrichedJob`
+- `AddToQueueButton` initialisiert `added` von `job.already_in_queue` (nicht `false`)
+
+### §12.2 View Mode Toggle Positionierung
+Der Liste/Swipe-Toggle wird **links-bündig** angezeigt (unter dem Suchbegriff), nicht rechts.
+
+### §12.3 Job Verification Guard
+Vor dem DB-Insert in `process/route.ts` MÜSSEN zwei Prüfungen bestehen:
+
+1. **Expired Detection:** `deepScrapeJob` prüft gescrapten Content auf Expired-Phrasen (z.B. "this job has expired", "stelle ist nicht mehr verfügbar") BEVOR der 200-Char-Threshold greift. Bei Fund → Sentinel `'__EXPIRED__'` zurückgeben.
+
+2. **Company Mismatch:** Nach dem Harvester: `serpApiJob.company_name` vs. `harvested.company_name` per einfachem `includes()` (kein Levenshtein). Wenn keiner den anderen enthält → Mismatch.
+
+**Response-Kontrakt:** HTTP 200 mit `{ success: false, reason: 'expired' | 'mismatch', message: string }`. Kein DB-Insert.
+
+**Frontend:** `AddToQueueButton` rendert amber Inline-Warning mit der `message` aus dem Backend.
+
+### §12.4 Filter-Enriched Search Query (MANDATORY)
+Wenn der User Werte-Filter auswählt (z.B. Nachhaltigkeit, Innovation, etc.), MUSS das aktive Filter-Keyword direkt in die SerpAPI-Query injiziert werden — **nicht nur als Post-Tagging**.
+
+**Regel:** Filter dürfen NIEMALS nur UI-Dekoration oder nachträgliches Tagging sein. Sie MÜSSEN die tatsächliche Suche beeinflussen.
+
+**Implementierung** (`query/route.ts`):
+1. Vor dem SerpAPI-Call: erstes aktives Werte-Keyword an `serpApiQuery` anhängen
+2. Duplikat-Check: Keyword nur anhängen wenn nicht bereits in der Query enthalten
+3. Nur das erste Filter-Keyword anhängen um Over-Constraining zu vermeiden
+4. Post-Tagging via `tagJobsWithFilters()` bleibt als zusätzliche Klassifizierung erhalten
+
+**Beispiel:** User sucht "AI Consultant" + Filter "Nachhaltigkeit" → SerpAPI-Query = `"AI Consultant Nachhaltigkeit"`
+
+### §12.5 Steckbrief-Preview-Pflicht (MANDATORY)
+Kein Job aus Job Search darf direkt in die Queue ohne User-Bestätigung.
+
+**Pipeline:** SerpAPI `google_jobs_listing` (Ground Truth) + Jina (Enrichment) → GPT-4o-mini Harvester → Claude Judge → `status: 'pending_review'` → Steckbrief-Preview-Modal → User bestätigt → `status: 'pending'`
+
+**Regeln:**
+1. SerpAPI-Description ist Ground Truth. Jina ist optional Enrichment.
+2. `pending_review` Jobs erscheinen NICHT in der Job Queue und zählen NICHT gegen das 5-Job-Limit.
+3. "Abbrechen" im Preview löscht den `pending_review`-Job (kein Zombie).
+4. `confirm/route.ts` akzeptiert nur whitelisted Edits: `tasks`, `hard_requirements`, `ats_keywords`, `benefits`. Keine beliebigen Felder.

@@ -110,7 +110,32 @@ export async function POST(request: NextRequest) {
             serpApiLocation = translated.location;
         }
 
+        // ─── §12.4 Filter-Enriched Query: inject Werte keywords ─────
+        // Append active Werte-filter labels to the SerpAPI query so
+        // Google Jobs returns relevant results directly (not just post-tagging).
+        if (filters?.werte && filters.werte.length > 0) {
+            const WERTE_KEYWORDS: Record<string, string> = {
+                nachhaltigkeit: 'Nachhaltigkeit',
+                innovation: 'Innovation',
+                social_impact: 'Social Impact',
+                deep_tech: 'AI',
+                dei: 'Diversity',
+                gemeinwohl: 'Gemeinwohl',
+                circular_economy: 'Kreislaufwirtschaft',
+                new_work: 'Remote',
+            };
+            // Append only the first filter keyword to avoid over-constraining
+            const firstKeyword = WERTE_KEYWORDS[filters.werte[0]];
+            if (firstKeyword && !serpApiQuery.toLowerCase().includes(firstKeyword.toLowerCase())) {
+                serpApiQuery = `${serpApiQuery} ${firstKeyword}`;
+                console.log(`✅ [Search] Filter-enriched query: "${serpApiQuery}"`);
+            }
+        }
+
         // ─── 1. Cache Check (uses original intent as key) ───────────
+        // Skip cache when Werte-Filters are active (§12.4) because the
+        // enriched query differs from the cached non-filtered query.
+        const hasWerteFilters = filters?.werte && filters.werte.length > 0;
         const { data: cached } = await supabase
             .from('saved_job_searches')
             .select('*')
@@ -119,7 +144,7 @@ export async function POST(request: NextRequest) {
             .eq('location', trimmedLocation)
             .single();
 
-        if (cached && !forceRefresh) {
+        if (cached && !forceRefresh && !hasWerteFilters) {
             const fetchedAt = new Date(cached.fetched_at).getTime();
             const now = Date.now();
             const hasResults = (cached.results || []).length > 0;

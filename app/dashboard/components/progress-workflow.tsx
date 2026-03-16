@@ -33,7 +33,7 @@ function getTabForStep(workflowStep: number): number {
     if (workflowStep < 30) return 1;  // CV Match
     if (workflowStep < 60) return 2;  // CV Opt.
     if (workflowStep < 100) return 3; // Cover Letter
-    return 4;                          // Weiterbildung
+    return 3;                          // Done — stay on Cover Letter
 }
 
 export function ProgressWorkflow({ current, className, onStepClick, activeTab: _activeTab, jobId: _jobId }: ProgressWorkflowProps) {

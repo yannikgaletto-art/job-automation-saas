@@ -60,10 +60,17 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const [toneSource, setToneSource] = useState<'preset' | 'custom-style'>(tone?.toneSource || 'preset');
     const [selectedDocId, setSelectedDocId] = useState<string | undefined>(tone?.selectedStyleDocId);
     const [showDocPicker, setShowDocPicker] = useState(false);
+    const [pendingDocId, setPendingDocId] = useState<string | undefined>(undefined);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
     const availableDocs = setupData.availableStyleDocs || [];
     const hasUploadedDocs = availableDocs.length > 0;
     const docsWithStyle = availableDocs.filter(d => d.hasStyleAnalysis);
+
+    const [analyzedDocIds, setAnalyzedDocIds] = useState<Set<string>>(
+        () => new Set(availableDocs.filter(d => d.hasStyleAnalysis).map(d => d.id))
+    );
 
     // ─── Orphaned Reference Guard (QA Blind Spot #3) ─────────────────
     // If the stored selectedDocId no longer exists (user deleted it in Settings),
@@ -117,20 +124,16 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
 
         if (source === 'custom-style') {
             // Fix: Ghost-Preset — reset hidden preset to data-driven
-            // so First90Days / Vulnerability toggles are not blocked
-            // by an invisible 'formal' preset when user is in custom-style mode.
             if (selectedPreset === 'formal') {
                 setSelectedPreset('data-driven');
             }
-
+            // Always open the picker so user can choose/confirm
+            setShowDocPicker(true);
+            // Auto-select only if exactly 1 doc AND already have style — picker confirms it
             if (docsWithStyle.length === 1) {
-                // Auto-select the only available doc
                 const doc = docsWithStyle[0];
                 setSelectedDocId(doc.id);
                 syncTone('custom-style', selectedPreset === 'formal' ? 'data-driven' : selectedPreset, doc.id);
-            } else if (docsWithStyle.length > 1) {
-                // Show selection popup
-                setShowDocPicker(true);
             }
         } else {
             setSelectedDocId(undefined);
@@ -141,7 +144,39 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const handleDocSelect = (docId: string) => {
         setSelectedDocId(docId);
         setShowDocPicker(false);
+        setPendingDocId(undefined);
+        setAnalyzeError(null);
         syncTone('custom-style', selectedPreset, docId);
+    };
+
+    const handleDocConfirm = async () => {
+        if (!pendingDocId) return;
+        const isAnalyzed = analyzedDocIds.has(pendingDocId);
+        if (isAnalyzed) {
+            handleDocSelect(pendingDocId);
+            return;
+        }
+        // Trigger style analysis
+        setIsAnalyzing(true);
+        setAnalyzeError(null);
+        try {
+            const res = await fetch('/api/cover-letter/analyze-style', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ documentId: pendingDocId }),
+            });
+            if (res.ok) {
+                setAnalyzedDocIds(prev => new Set([...prev, pendingDocId]));
+                handleDocSelect(pendingDocId);
+            } else {
+                const data = await res.json().catch(() => ({}));
+                setAnalyzeError(data.error || 'Analyse fehlgeschlagen');
+            }
+        } catch {
+            setAnalyzeError('Netzwerkfehler — bitte erneut versuchen');
+        } finally {
+            setIsAnalyzing(false);
+        }
     };
 
     const handlePresetSelect = (preset: TonePreset) => {
@@ -269,7 +304,9 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden"
                     >
-                        <div className="bg-[#EEF3FF] border border-[#002e7a]/20 rounded-lg p-3">
+                        <div className="bg-[#EEF3FF] border border-[#002e7a]/20 rounded-lg p-3 cursor-pointer hover:bg-[#E5EDFF] transition-colors"
+                            onClick={() => setShowDocPicker(true)}
+                        >
                             <div className="flex items-start gap-2">
                                 <FileText className="w-4 h-4 text-[#002e7a] shrink-0 mt-0.5" />
                                 <div className="flex-1 min-w-0">
@@ -277,21 +314,19 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                                         Tonvorlage: {selectedDocName || 'Bitte wählen'}
                                     </p>
                                     <p className="text-[10px] text-[#73726E] mt-0.5">
-                                        Die KI übernimmt Ton, Satzstruktur und Konjunktionen aus diesem Anschreiben.
+                                        Die KI kalibriert sich auf den Ton dieses Anschreibens — Satzlänge, Konjunktionen und rhetorische Mittel werden übernommen.
                                     </p>
                                 </div>
-                                {docsWithStyle.length > 1 && (
-                                    <button
-                                        onClick={() => setShowDocPicker(true)}
-                                        className="text-[10px] text-[#002e7a] hover:underline shrink-0"
-                                    >
-                                        Ändern
-                                    </button>
-                                )}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setShowDocPicker(true); }}
+                                    className="text-[10px] text-[#002e7a] hover:underline shrink-0 font-medium"
+                                >
+                                    {selectedDocName ? 'Ändern' : 'Wählen'}
+                                </button>
                             </div>
 
                             {/* Warning if selected doc has no style analysis */}
-                            {selectedDocId && !availableDocs.find(d => d.id === selectedDocId)?.hasStyleAnalysis && (
+                            {selectedDocId && !analyzedDocIds.has(selectedDocId) && (
                                 <div className="flex items-center gap-1.5 mt-2 text-[10px] text-amber-600">
                                     <AlertTriangle className="w-3 h-3 shrink-0" />
                                     Dieses Anschreiben wurde noch nicht analysiert. Die KI nutzt den Standardton.
@@ -376,31 +411,64 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                                 Welches Anschreiben als Tonvorlage?
                             </h4>
                             <div className="space-y-2 max-h-60 overflow-y-auto">
-                                {docsWithStyle.map((doc) => (
+                                {availableDocs.map((doc) => (
                                     <button
                                         key={doc.id}
-                                        onClick={() => handleDocSelect(doc.id)}
+                                        onClick={() => { setPendingDocId(doc.id); setAnalyzeError(null); }}
                                         className={[
                                             'w-full text-left px-3 py-2.5 rounded-lg border transition-all flex items-center gap-2',
-                                            selectedDocId === doc.id
+                                            pendingDocId === doc.id
                                                 ? 'border-2 border-[#002e7a] bg-[#f0f4ff]'
                                                 : 'border border-[#E7E7E5] bg-white hover:shadow-sm',
                                         ].join(' ')}
                                     >
                                         <FileText className="w-4 h-4 text-[#73726E] shrink-0" />
-                                        <div className="min-w-0">
+                                        <div className="min-w-0 flex-1">
                                             <p className="text-xs font-medium text-[#37352F] truncate">{doc.fileName}</p>
                                             <p className="text-[10px] text-[#73726E]">{formatDate(doc.createdAt)}</p>
                                         </div>
+                                        {analyzedDocIds.has(doc.id) && (
+                                            <span className="text-[9px] text-green-600 font-medium shrink-0">Analysiert</span>
+                                        )}
                                     </button>
                                 ))}
                             </div>
-                            <button
-                                onClick={() => setShowDocPicker(false)}
-                                className="mt-3 w-full text-xs text-[#73726E] hover:text-[#37352F] py-1.5"
-                            >
-                                Abbrechen
-                            </button>
+                            {analyzeError && (
+                                <div className="mt-2 flex items-center gap-1.5 text-[10px] text-amber-600">
+                                    <AlertTriangle className="w-3 h-3 shrink-0" />
+                                    {analyzeError}
+                                </div>
+                            )}
+                            <div className="mt-3 flex gap-2">
+                                <button
+                                    onClick={() => { setShowDocPicker(false); setPendingDocId(undefined); setAnalyzeError(null); }}
+                                    className="flex-1 text-xs text-[#73726E] hover:text-[#37352F] py-2"
+                                >
+                                    Abbrechen
+                                </button>
+                                {pendingDocId && (
+                                    <button
+                                        onClick={handleDocConfirm}
+                                        disabled={isAnalyzing}
+                                        className={[
+                                            'flex-1 text-xs font-semibold py-2 rounded-lg transition-all',
+                                            isAnalyzing
+                                                ? 'bg-[#E7E7E5] text-[#A8A29E] cursor-wait'
+                                                : 'bg-[#002e7a] text-white hover:bg-[#001e5a]',
+                                        ].join(' ')}
+                                    >
+                                        {isAnalyzing ? 'Analysiere…' : 'Bestätigen'}
+                                    </button>
+                                )}
+                                {analyzeError && pendingDocId && (
+                                    <button
+                                        onClick={() => handleDocSelect(pendingDocId)}
+                                        className="flex-1 text-xs text-amber-600 hover:text-amber-700 py-2 font-medium"
+                                    >
+                                        Trotzdem wählen
+                                    </button>
+                                )}
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}
@@ -443,19 +511,18 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                 </div>
             )}
 
-            {/* Streamlined Style Callout — no checkbox */}
+            {toneSource !== 'custom-style' && (
             <div className="bg-[#EEF3FF] border-l-4 border-[#002e7a] rounded-md p-3">
                 <div className="flex items-start gap-2">
                     <Info className="w-4 h-4 text-[#002e7a] shrink-0 mt-0.5" />
                     <p className="text-xs text-[#37352F] leading-relaxed">
-                        {toneSource === 'custom-style'
-                            ? 'Die KI kalibriert sich auf den Ton deines hochgeladenen Anschreibens — Satzlänge, Konjunktionen und rhetorische Mittel werden übernommen.'
-                            : setupData.hasStyleSample
-                                ? 'Dein persönlicher Schreibstil wurde analysiert. Die KI nutzt daraus Satzlänge und Konjunktionen, der Ton kommt vom gewählten Preset.'
-                                : 'Lade ein altes Anschreiben in den Settings hoch, damit die KI deinen Stil lernt. Bis dahin nutzen wir den gewählten Ton.'}
+                        {setupData.hasStyleSample
+                            ? 'Dein persönlicher Schreibstil wurde analysiert. Die KI nutzt daraus Satzlänge und Konjunktionen, der Ton kommt vom gewählten Preset.'
+                            : 'Lade ein altes Anschreiben in den Settings hoch, damit die KI deinen Stil lernt. Bis dahin nutzen wir den gewählten Ton.'}
                     </p>
                 </div>
             </div>
+            )}
 
             {/* First 90 Days Hypothesis Toggle */}
             <div className={`border border-[#E7E7E5] rounded-lg p-3 bg-white ${isFormal ? 'opacity-50' : ''}`}>

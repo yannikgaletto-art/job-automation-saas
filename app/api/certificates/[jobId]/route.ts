@@ -41,9 +41,22 @@ export async function GET(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
+        // Self-healing: status stuck at processing/pending but data already populated
+        // (Inngest completed but didn't update status column)
+        if ((data.status === 'processing' || data.status === 'pending') &&
+            data.recommendations && Array.isArray(data.recommendations) && data.recommendations.length > 0) {
+            console.log(`[Certificates] Auto-healing stuck status for job=${jobId}: ${data.status} → done`);
+            await supabase
+                .from('job_certificates')
+                .update({ status: 'done' })
+                .eq('job_id', jobId)
+                .eq('user_id', user.id);
+            data.status = 'done';
+        }
+
         // Stale processing detection — server restart may have killed the pipeline
         const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-        if (data.status === 'processing') {
+        if (data.status === 'processing' || data.status === 'pending') {
             const updatedAt = new Date(data.updated_at).getTime();
             const isStale = Date.now() - updatedAt > STALE_THRESHOLD_MS;
 

@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Clock, Loader2, Building2, BriefcaseBusiness, PlayCircle, ExternalLink, FileText, BookOpen } from 'lucide-react';
+import { ChevronRight, Clock, Loader2, Building2, BriefcaseBusiness, PlayCircle, ExternalLink, FileText, BookOpen, GraduationCap, Trash2 } from 'lucide-react';
 import { DocumentsRequiredDialog } from '@/components/shared/documents-required-dialog';
+import { CertificateCompactList } from '@/components/certificates/certificate-compact-list';
 
 const BLUE = '#2B5EA7';
 const BLUE_LIGHT = '#E8EFF8';
@@ -82,9 +83,32 @@ export default function CoachingPage() {
 
     // Expanded row for completed sessions
     const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+    const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>({});
 
-    // Steckbrief inline toggle
-    const [steckbriefExpandedId, setSteckbriefExpandedId] = useState<string | null>(null);
+    // Delete coaching sessions + job permanently (optimistic)
+    const handleDeleteJob = async (jobId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        // Optimistic: remove from both lists so the row disappears immediately
+        setJobs(prev => prev.filter(j => j.id !== jobId));
+        setPastSessions(prev => prev.filter(s => s.job_id !== jobId));
+        // If this was the active job, clear active session banner
+        if (activeJobId === jobId) {
+            setActiveSessionId(null);
+            setActiveJobId(null);
+        }
+        try {
+            // Run both deletes in parallel: coaching sessions + job_queue entry
+            await Promise.all([
+                fetch(`/api/coaching/sessions?jobId=${jobId}`, { method: 'DELETE' }),
+                fetch('/api/jobs/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ jobId }),
+                }),
+            ]);
+        } catch { /* silent — optimistic update already applied */ }
+    };
+
 
     useEffect(() => {
         loadData();
@@ -279,18 +303,31 @@ export default function CoachingPage() {
 
             {/* ─── Empty State ─────────────────────────────────────────── */}
             {jobs.length === 0 && (
-                <div className="py-12">
+                <div className="py-4">
                     <p style={{ color: TEXT }}>Keine Jobs vorhanden.</p>
                     <p className="text-sm mt-1" style={{ color: MUTED }}>
                         Füge zuerst Jobs zu deiner Queue hinzu.
                     </p>
-                    <button
+                    <motion.button
+                        whileTap={{ scale: 0.97 }}
                         onClick={() => router.push('/dashboard/job-search')}
-                        className="mt-4 text-sm underline underline-offset-2"
-                        style={{ color: BLUE }}
+                        className="mt-4 px-4 py-2 rounded-lg text-xs font-semibold transition-all border-2 hover:text-white"
+                        style={{
+                            borderColor: BLUE,
+                            color: BLUE,
+                            background: 'transparent',
+                        }}
+                        onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLButtonElement).style.background = BLUE;
+                            (e.currentTarget as HTMLButtonElement).style.color = 'white';
+                        }}
+                        onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                            (e.currentTarget as HTMLButtonElement).style.color = BLUE;
+                        }}
                     >
                         Jobsuche starten
-                    </button>
+                    </motion.button>
                 </div>
             )}
 
@@ -314,48 +351,56 @@ export default function CoachingPage() {
                         >
                             {/* ── Creating (Progress) ── */}
                             {modalStep === 'creating' && (
-                                <div>
-                                    <h3 className="text-lg font-semibold mb-1" style={{ color: TEXT }}>
-                                        Interview wird vorbereitet...
-                                    </h3>
-                                    <p className="text-sm mb-5" style={{ color: MUTED }}>
-                                        {selectedJob.job_title} bei {selectedJob.company_name}
-                                    </p>
-                                    <div className="w-full">
-                                        <div className="flex justify-between items-center mb-1.5">
-                                            <span className="text-xs font-semibold" style={{ color: '#002e7a' }}>
-                                                {PROGRESS_STEPS[currentProgressStep]?.label ?? 'Vorbereitung...'}
-                                            </span>
-                                            <span className="text-xs" style={{ color: '#A8A29E' }}>{progressPercent}%</span>
-                                        </div>
-                                        <div className="h-2 w-full bg-[#E7E7E5] rounded-full overflow-hidden">
-                                            <motion.div
-                                                className="h-full bg-gradient-to-r from-[#002e7a] to-[#3B82F6] rounded-full"
-                                                initial={{ width: '5%' }}
-                                                animate={{ width: `${Math.max(progressPercent, 5)}%` }}
-                                                transition={{ duration: 0.5 }}
-                                            />
+                                <div className="w-full max-w-md mx-auto">
+                                    {/* Header */}
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <Loader2 className="w-6 h-6 animate-spin shrink-0" style={{ color: BLUE }} />
+                                        <div>
+                                            <p className="text-sm font-semibold" style={{ color: BLUE }}>Interview wird vorbereitet…</p>
+                                            <p className="text-xs mt-0.5" style={{ color: MUTED }}>Das dauert ca. 15–20 Sekunden</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-1.5 w-full justify-center mt-3 mb-3">
-                                        {PROGRESS_STEPS.map((_, i) => (
-                                            <div key={i} className="flex items-center gap-1.5">
-                                                <div className={[
-                                                    'w-2 h-2 rounded-full transition-all duration-300',
-                                                    i < currentProgressStep ? 'bg-[#22C55E]' :
-                                                        i === currentProgressStep ? 'bg-[#002e7a] scale-125' :
-                                                            'bg-[#E7E7E5]',
-                                                ].join(' ')} />
-                                                {i < PROGRESS_STEPS.length - 1 && (
-                                                    <div className={[
-                                                        'h-px w-5 transition-colors duration-500',
-                                                        i < currentProgressStep ? 'bg-[#22C55E]' : 'bg-[#E7E7E5]',
-                                                    ].join(' ')} />
-                                                )}
-                                            </div>
-                                        ))}
+
+                                    {/* Step list */}
+                                    <div className="space-y-2.5">
+                                        {PROGRESS_STEPS.map((s, i) => {
+                                            const isDone = i < currentProgressStep;
+                                            const isActive = i === currentProgressStep;
+                                            return (
+                                                <motion.div
+                                                    key={i}
+                                                    initial={{ opacity: 0, x: -8 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: i * 0.08 }}
+                                                    className={`flex items-center gap-3 py-2 px-3 rounded-lg transition-colors ${isDone ? 'bg-[#2B5EA7]/5' :
+                                                            isActive ? 'bg-[#2B5EA7]/10 border border-[#2B5EA7]/20' :
+                                                                'opacity-30'
+                                                        }`}
+                                                >
+                                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-all ${isDone ? 'bg-[#2B5EA7] text-white' :
+                                                            isActive ? 'border-2 border-[#2B5EA7] text-[#2B5EA7]' :
+                                                                'border border-gray-300 text-gray-400'
+                                                        }`}>
+                                                        {isDone ? '✓' : i + 1}
+                                                    </div>
+                                                    <span className={`text-sm ${isDone ? 'text-[#2B5EA7] line-through opacity-60' :
+                                                            isActive ? 'text-[#2B5EA7] font-medium' :
+                                                                'text-gray-400'
+                                                        }`}>
+                                                        {s.label}
+                                                    </span>
+                                                    {isActive && (
+                                                        <motion.div
+                                                            className="ml-auto w-3 h-3 rounded-full"
+                                                            style={{ background: BLUE }}
+                                                            animate={{ scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }}
+                                                            transition={{ repeat: Infinity, duration: 1.2 }}
+                                                        />
+                                                    )}
+                                                </motion.div>
+                                            );
+                                        })}
                                     </div>
-                                    <p className="text-[11px] text-center mb-4" style={{ color: '#A8A29E' }}>Dauert ca. 15–20 Sekunden</p>
                                 </div>
                             )}
 
@@ -537,37 +582,24 @@ export default function CoachingPage() {
 
                         return (
                             <div key={job.id} className="border-b border-[#E7E7E5] last:border-b-0">
-                                {/* Main Row — clicking row only expands past sessions, never opens modal */}
                                 <div
-                                    className={`grid grid-cols-[1fr_1fr_150px_180px] items-center px-5 py-3 transition-colors group ${completedForJob.length > 0 ? 'cursor-pointer hover:bg-[#FAFAF9]' : ''
-                                        }`}
-                                    onClick={completedForJob.length > 0
-                                        ? () => setExpandedJobId(isExpanded ? null : job.id)
-                                        : undefined
-                                    }
+                                    className={`grid grid-cols-[1fr_1fr_150px_auto] items-center px-5 py-3 transition-colors group cursor-pointer hover:bg-[#FAFAF9]`}
+                                    onClick={() => setExpandedJobId(isExpanded ? null : job.id)}
                                 >
                                     {/* Col 1: Unternehmen — click opens Steckbrief */}
                                     <div className="flex items-center gap-2.5 min-w-0">
-                                        {completedForJob.length > 0 ? (
-                                            <motion.div
-                                                animate={{ rotate: isExpanded ? 90 : 0 }}
-                                                transition={{ duration: 0.15 }}
-                                                className="shrink-0"
-                                            >
-                                                <ChevronRight className="w-3.5 h-3.5 text-[#A8A29E]" />
-                                            </motion.div>
-                                        ) : (
-                                            <ChevronRight className="w-3.5 h-3.5 text-transparent" />
-                                        )}
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSteckbriefExpandedId(steckbriefExpandedId === job.id ? null : job.id);
-                                            }}
-                                            className="text-sm font-medium text-[#37352F] truncate hover:text-[#2B5EA7] hover:underline text-left transition-colors"
+                                        <motion.div
+                                            animate={{ rotate: isExpanded ? 90 : 0 }}
+                                            transition={{ duration: 0.15 }}
+                                            className="shrink-0"
+                                        >
+                                            <ChevronRight className="w-3.5 h-3.5 text-[#A8A29E]" />
+                                        </motion.div>
+                                        <span
+                                            className="text-sm font-medium text-[#37352F] truncate text-left"
                                         >
                                             {job.company_name}
-                                        </button>
+                                        </span>
                                     </div>
 
                                     {/* Col 2: Job */}
@@ -582,8 +614,14 @@ export default function CoachingPage() {
                                         </span>
                                     </div>
 
-                                    {/* Col 4: Action Button — ONLY this triggers the modal */}
-                                    <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                            onClick={(e) => handleDeleteJob(job.id, e)}
+                                            className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all text-[#A8A29E] hover:text-red-500 hover:bg-red-50"
+                                            title="Unternehmen entfernen"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
                                         <motion.button
                                             whileTap={{ scale: 0.97 }}
                                             onClick={() => openModal(job)}
@@ -607,90 +645,9 @@ export default function CoachingPage() {
                                     </div>
                                 </div>
 
-                                {/* Steckbrief Inline Expand */}
-                                <AnimatePresence>
-                                    {steckbriefExpandedId === job.id && (
-                                        <motion.div
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            transition={{ duration: 0.18 }}
-                                            className="overflow-hidden border-t border-[#E7E7E5]"
-                                        >
-                                            <div className="px-5 py-4 bg-[#FAFAF9]/50 space-y-3">
-                                                {/* Summary */}
-                                                {job.summary && (
-                                                    <p className="text-xs text-[#37352F] leading-relaxed">{job.summary}</p>
-                                                )}
-
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    {/* Aufgaben */}
-                                                    {job.responsibilities && job.responsibilities.length > 0 && (
-                                                        <div>
-                                                            <h5 className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Aufgaben</h5>
-                                                            <ul className="space-y-1">
-                                                                {job.responsibilities.slice(0, 4).map((item, i) => (
-                                                                    <li key={i} className="text-xs text-[#37352F] flex gap-1.5 items-start leading-snug">
-                                                                        <span className="text-slate-400 mt-px shrink-0 text-[10px]">•</span>
-                                                                        <span>{item}</span>
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Qualifikationen */}
-                                                    {job.qualifications && job.qualifications.length > 0 && (
-                                                        <div>
-                                                            <h5 className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Qualifikationen</h5>
-                                                            <ul className="space-y-1">
-                                                                {job.qualifications.slice(0, 4).map((item, i) => (
-                                                                    <li key={i} className="text-xs text-[#37352F] flex gap-1.5 items-start leading-snug">
-                                                                        <span className="text-slate-400 mt-px shrink-0 text-[10px]">•</span>
-                                                                        <span>{item}</span>
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* ATS Keywords */}
-                                                {job.buzzwords && job.buzzwords.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {job.buzzwords.slice(0, 8).map((kw, i) => (
-                                                            <span key={i} className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                                                                {kw}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-
-                                                {/* Source URL */}
-                                                {job.source_url && (
-                                                    <a
-                                                        href={job.source_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1 text-xs text-[#2B5EA7] hover:underline"
-                                                    >
-                                                        <ExternalLink className="w-3 h-3" />
-                                                        Originalanzeige
-                                                    </a>
-                                                )}
-
-                                                {/* Empty state */}
-                                                {!job.summary && !job.responsibilities?.length && !job.qualifications?.length && (
-                                                    <p className="text-xs text-slate-400">Kein Steckbrief vorhanden.</p>
-                                                )}
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-
                                 {/* Expanded: Past Sessions for this Job */}
                                 <AnimatePresence>
-                                    {isExpanded && completedForJob.length > 0 && (() => {
+                                    {isExpanded && (() => {
                                         // Extract topic suggestions from the latest completed session with a report
                                         const latestWithReport = completedForJob.find(s => s.feedback_report);
                                         let topics: { topic: string; searchQuery: string; youtubeTitle: string; context?: string[]; category?: string }[] = [];
@@ -714,6 +671,68 @@ export default function CoachingPage() {
                                                 className="overflow-hidden"
                                             >
                                                 <div className="px-6 pb-3 pt-1 border-t border-[#E7E7E5]">
+                                                    {/* ── Steckbrief ── */}
+                                                    <div className="pb-4 space-y-3">
+                                                        {job.summary && (
+                                                            <p className="text-xs text-[#37352F] leading-relaxed">{job.summary}</p>
+                                                        )}
+
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            {job.responsibilities && job.responsibilities.length > 0 && (
+                                                                <div>
+                                                                    <h5 className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Aufgaben</h5>
+                                                                    <ul className="space-y-1">
+                                                                        {job.responsibilities.slice(0, 4).map((item, i) => (
+                                                                            <li key={i} className="text-xs text-[#37352F] flex gap-1.5 items-start leading-snug">
+                                                                                <span className="text-slate-400 mt-px shrink-0 text-[10px]">•</span>
+                                                                                <span>{item}</span>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            )}
+
+                                                            {job.qualifications && job.qualifications.length > 0 && (
+                                                                <div>
+                                                                    <h5 className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Qualifikationen</h5>
+                                                                    <ul className="space-y-1">
+                                                                        {job.qualifications.slice(0, 4).map((item, i) => (
+                                                                            <li key={i} className="text-xs text-[#37352F] flex gap-1.5 items-start leading-snug">
+                                                                                <span className="text-slate-400 mt-px shrink-0 text-[10px]">•</span>
+                                                                                <span>{item}</span>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {job.buzzwords && job.buzzwords.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {job.buzzwords.slice(0, 8).map((kw, i) => (
+                                                                    <span key={i} className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                                                        {kw}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {job.source_url && (
+                                                            <a
+                                                                href={job.source_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-1 text-xs text-[#2B5EA7] hover:underline"
+                                                            >
+                                                                <ExternalLink className="w-3 h-3" />
+                                                                Originalanzeige
+                                                            </a>
+                                                        )}
+
+                                                        {!job.summary && !job.responsibilities?.length && !job.qualifications?.length && (
+                                                            <p className="text-xs text-slate-400">Kein Steckbrief vorhanden.</p>
+                                                        )}
+                                                    </div>
                                                     <div className="flex items-center gap-1.5 mb-3 pt-1.5">
                                                         <BookOpen className="h-3.5 w-3.5" style={{ color: BLUE }} />
                                                         <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: BLUE }}>
@@ -721,13 +740,22 @@ export default function CoachingPage() {
                                                         </p>
                                                     </div>
                                                     {topics.length > 0 ? (
-                                                        <div className="space-y-3">
+                                                        <div className="divide-y" style={{ borderColor: BORDER }}>
                                                             {topics.map((topic, ti) => {
                                                                 const youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(topic.searchQuery)}`;
+                                                                const isOpen = expandedTopics[`${job.id}-${ti}`] || false;
                                                                 return (
-                                                                    <div key={ti} className="rounded-lg p-3" style={{ background: '#F7F6F5', border: `1px solid ${BORDER}` }}>
-                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                            <p className="text-sm font-medium flex-1" style={{ color: TEXT }}>
+                                                                    <div key={ti}>
+                                                                        {/* Row header — always visible */}
+                                                                        <button
+                                                                            onClick={() => setExpandedTopics(prev => ({ ...prev, [`${job.id}-${ti}`]: !prev[`${job.id}-${ti}`] }))}
+                                                                            className="w-full flex items-center gap-2 py-2.5 text-left transition-colors hover:bg-slate-50/50"
+                                                                        >
+                                                                            <ChevronRight
+                                                                                className="h-3.5 w-3.5 shrink-0 transition-transform"
+                                                                                style={{ color: MUTED, transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                                                                            />
+                                                                            <p className="text-sm font-medium flex-1 min-w-0 truncate" style={{ color: TEXT }}>
                                                                                 {topic.topic}
                                                                             </p>
                                                                             {topic.category && (
@@ -745,21 +773,26 @@ export default function CoachingPage() {
                                                                                 href={youtubeUrl}
                                                                                 target="_blank"
                                                                                 rel="noopener noreferrer"
+                                                                                onClick={(e) => e.stopPropagation()}
                                                                                 className="text-[10px] font-medium px-2 py-0.5 rounded-md shrink-0 transition-colors hover:opacity-80"
                                                                                 style={{ background: '#FF000012', color: '#CC0000' }}
                                                                             >
                                                                                 YouTube
                                                                             </a>
-                                                                        </div>
-                                                                        {topic.context && topic.context.length > 0 && (
-                                                                            <ul className="space-y-1 mt-1.5">
-                                                                                {topic.context.map((line, ci) => (
-                                                                                    <li key={ci} className="text-xs leading-relaxed flex items-start gap-1.5" style={{ color: MUTED }}>
-                                                                                        <span className="shrink-0 mt-0.5" style={{ color: BLUE }}>•</span>
-                                                                                        <span>{line}</span>
-                                                                                    </li>
-                                                                                ))}
-                                                                            </ul>
+                                                                        </button>
+
+                                                                        {/* Expanded context — toggled */}
+                                                                        {isOpen && topic.context && topic.context.length > 0 && (
+                                                                            <div className="pb-3 pl-6">
+                                                                                <ul className="space-y-1">
+                                                                                    {topic.context.map((line, ci) => (
+                                                                                        <li key={ci} className="text-xs leading-relaxed flex items-start gap-1.5" style={{ color: MUTED }}>
+                                                                                            <span className="shrink-0 mt-0.5" style={{ color: BLUE }}>•</span>
+                                                                                            <span>{line}</span>
+                                                                                        </li>
+                                                                                    ))}
+                                                                                </ul>
+                                                                            </div>
                                                                         )}
                                                                     </div>
                                                                 );
@@ -770,6 +803,17 @@ export default function CoachingPage() {
                                                             Schließe ein Interview ab, um Empfehlungen zu erhalten.
                                                         </p>
                                                     )}
+
+                                                    {/* ── Weiterbildung & Zertifizierung ── */}
+                                                    <div className="mt-4 pt-3 border-t border-[#E7E7E5]">
+                                                        <div className="flex items-center gap-1.5 mb-3">
+                                                            <GraduationCap className="h-3.5 w-3.5" style={{ color: BLUE }} />
+                                                            <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: BLUE }}>
+                                                                Weiterbildung & Zertifizierung
+                                                            </p>
+                                                        </div>
+                                                        <CertificateCompactList jobId={job.id} jobStatus={job.status} hasCompletedSession={completedForJob.length > 0} />
+                                                    </div>
                                                 </div>
                                             </motion.div>
                                         );

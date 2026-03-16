@@ -42,7 +42,7 @@ export function CustomDialog({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm"
+                        className="fixed inset-0 bg-black/40 z-[200] backdrop-blur-sm"
                     />
 
                     {/* Dialog Panel */}
@@ -51,7 +51,7 @@ export function CustomDialog({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         className={cn(
-                            "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full bg-white rounded-xl shadow-2xl z-50 overflow-hidden border border-[#d6d6d6]",
+                            "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full bg-white rounded-xl shadow-2xl z-[201] flex flex-col max-h-[85vh] border border-[#d6d6d6]",
                             maxWidth,
                             className
                         )}
@@ -65,7 +65,7 @@ export function CustomDialog({
                         </div>
 
                         {/* Body */}
-                        <div className="p-0">
+                        <div className="overflow-y-auto flex-1">
                             {children}
                         </div>
                     </motion.div>

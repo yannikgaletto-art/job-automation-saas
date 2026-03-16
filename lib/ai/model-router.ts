@@ -62,8 +62,8 @@ export type TaskType =
 export function selectModel(taskType: TaskType) {
     const routingMap: Record<TaskType, keyof typeof MODELS> = {
         // Cheap tasks
-        parse_html: 'GPT_4O_MINI',
-        extract_job_fields: 'GPT_4O_MINI',
+        parse_html: 'CLAUDE_HAIKU',
+        extract_job_fields: 'CLAUDE_HAIKU',
         detect_ats_system: 'GPT_4O_MINI',
         classify_job_board: 'GPT_4O_MINI',
         summarize_job_description: 'GPT_4O_MINI',

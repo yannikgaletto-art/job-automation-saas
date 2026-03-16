@@ -10,21 +10,22 @@ import { Download, Loader2 } from 'lucide-react';
 interface PdfViewerWrapperProps {
     data: CvStructuredData;
     templateId: string;
+    qrBase64?: string;
 }
 
-function resolveTemplate(data: CvStructuredData, templateId: string) {
+function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64?: string) {
     switch (templateId) {
         case 'tech':
-            return <TechTemplate data={data} />;
+            return <TechTemplate data={data} qrBase64={qrBase64} />;
         case 'valley':
         case 'classic':  // deprecated — fallback to Valley
         case 'modern':   // deprecated — fallback to Valley
         default:
-            return <ValleyTemplate data={data} />;
+            return <ValleyTemplate data={data} qrBase64={qrBase64} />;
     }
 }
 
-export default function PdfViewerWrapper({ data, templateId }: PdfViewerWrapperProps) {
+export default function PdfViewerWrapper({ data, templateId, qrBase64 }: PdfViewerWrapperProps) {
     const [isMobile, setIsMobile] = useState(false);
     const [hasMounted, setHasMounted] = useState(false);
 
@@ -36,7 +37,7 @@ export default function PdfViewerWrapper({ data, templateId }: PdfViewerWrapperP
         return () => window.removeEventListener('resize', check);
     }, []);
 
-    const document = useMemo(() => resolveTemplate(data, templateId), [data, templateId]);
+    const document = useMemo(() => resolveTemplate(data, templateId, qrBase64), [data, templateId, qrBase64]);
 
     if (!hasMounted) {
         return (

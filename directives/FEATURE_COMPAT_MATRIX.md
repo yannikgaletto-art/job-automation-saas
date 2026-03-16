@@ -297,3 +297,40 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via Migration
 | 60s Recording Limit | Hard timeout im Frontend, auto-stop + auto-submit |
 | Halluzinations-Filter | Backend-seitig bekannte Whisper-Patterns gefiltert |
 | Safari Compat | `MediaRecorder.isTypeSupported()` für MIME-Auswahl |
+
+---
+
+## 7. Feature-Silo: Video Script Studio
+
+> **Added:** 2026-03-15 | **Owner:** `video-script-studio.tsx` + `scripts/generate/route.ts`
+
+### 7.1 Erlaubte Dateien (Scope)
+
+| Datei | Rolle |
+|---|---|
+| `app/dashboard/components/workflow-steps/video-script-studio.tsx` | Frontend — Parent Container |
+| `app/dashboard/components/workflow-steps/script-studio/*` | Frontend — ModeToggle, BlockEditor, KeywordSidebar, ScriptPreview |
+| `app/dashboard/components/workflow-steps/step-5-video.tsx` | Frontend — Integration (SHARED mit Video Upload) |
+| `app/api/video/scripts/*` | API — Generate, Save, Load |
+| `supabase/migrations/20260315_video_scripts.sql` | DB Schema |
+
+### 7.2 Verbotene Dateien (Sperrzone)
+
+| Datei | Grund |
+|---|---|
+| `lib/ai/model-router.ts` | SHARED — Video nutzt isolierten Anthropic Client |
+| `lib/inngest/cv-match-pipeline.ts` | Fremdes Feature |
+| `lib/inngest/cover-letter-*.ts` | Fremdes Feature |
+| `lib/inngest/certificates-pipeline.ts` | Fremdes Feature |
+| `middleware.ts` | System-Level |
+
+### 7.3 Bekannte Patterns
+
+| Pattern | Details |
+|---|---|
+| Isolierter AI Client | Eigener `Anthropic({ apiKey })` statt model-router.ts |
+| Keyword Reuse | `ats_keywords` + `buzzwords` aus `job_queue` — kein neuer Extract |
+| 60s Recording Limit | Shared mit `step-5-video.tsx` (Coaching-Pattern) |
+| Safari Compat | `MediaRecorder.isTypeSupported()` für MIME-Auswahl |
+| State Management | `useReducer` lokal im Parent, kein globaler Store |
+

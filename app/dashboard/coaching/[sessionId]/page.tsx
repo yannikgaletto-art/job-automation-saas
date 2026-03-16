@@ -11,6 +11,8 @@ import {
     Lightbulb,
     Mic,
     Square,
+    XCircle,
+    AlertCircle,
 } from 'lucide-react';
 import type { ChatMessage, CoachingDossier, AboutRole } from '@/types/coaching';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
@@ -50,6 +52,7 @@ export default function CoachingSessionPage() {
     const [openHints, setOpenHints] = useState<{ [key: number]: boolean }>({});
     const [showAnalysisPrompt, setShowAnalysisPrompt] = useState(false);
     const [requestingAnalysis, setRequestingAnalysis] = useState(false);
+    const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
     const [voiceError, setVoiceError] = useState<string | null>(null);
     const [roleData, setRoleData] = useState<AboutRole | null>(null);
     const [myStoryData, setMyStoryData] = useState<string[]>([]);
@@ -141,15 +144,27 @@ export default function CoachingSessionPage() {
         }
     }
 
+    const pollStartTimeRef = useRef<number | null>(null);
+
     const startPolling = useCallback(() => {
         if (pollRef.current) clearInterval(pollRef.current);
+        pollStartTimeRef.current = Date.now();
         pollRef.current = setInterval(async () => {
+            // 60s timeout
+            const elapsed = pollStartTimeRef.current ? Date.now() - pollStartTimeRef.current : 0;
+            if (elapsed > 120_000) {
+                if (pollRef.current) clearInterval(pollRef.current);
+                pollStartTimeRef.current = null;
+                setAnalysisTimedOut(true);
+                return;
+            }
             try {
                 const res = await fetch(`/api/coaching/session?sessionId=${sessionId}`);
                 if (res.ok) {
                     const { session } = await res.json();
                     if (session.feedback_report) {
                         if (pollRef.current) clearInterval(pollRef.current);
+                        pollStartTimeRef.current = null;
                         router.push(`/dashboard/coaching/${sessionId}/analysis`);
                     }
                 }
@@ -246,6 +261,14 @@ export default function CoachingSessionPage() {
     }
 
     if (requestingAnalysis) {
+        const handleCancelAnalysis = () => {
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollStartTimeRef.current = null;
+            setRequestingAnalysis(false);
+            setAnalysisTimedOut(false);
+            router.push('/dashboard/coaching');
+        };
+
         return (
             <div className="flex-1 flex flex-col" style={{ background: BG }}>
                 {/* Same header as during interview */}
@@ -280,13 +303,58 @@ export default function CoachingSessionPage() {
                 {/* Analysis indicator */}
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto" style={{ color: BLUE }} />
-                        <p className="text-sm mt-3 font-medium" style={{ color: TEXT }}>
-                            Dein Interview wird analysiert...
-                        </p>
-                        <p className="text-xs mt-1" style={{ color: MUTED }}>
-                            Das dauert ca. 10–15 Sekunden.
-                        </p>
+                        {analysisTimedOut ? (
+                            <>
+                                <AlertCircle className="h-6 w-6 mx-auto text-red-400" />
+                                <p className="text-sm mt-3 font-medium" style={{ color: TEXT }}>
+                                    Die Analyse hat zu lange gedauert.
+                                </p>
+                                <p className="text-xs mt-1" style={{ color: MUTED }}>
+                                    Bitte versuche es später erneut oder gehe zurück.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <Loader2 className="h-6 w-6 animate-spin mx-auto" style={{ color: BLUE }} />
+                                <p className="text-sm mt-3 font-medium" style={{ color: TEXT }}>
+                                    Dein Interview wird analysiert...
+                                </p>
+                                <p className="text-xs mt-1" style={{ color: MUTED }}>
+                                    Das dauert ca. 10–15 Sekunden.
+                                </p>
+                            </>
+                        )}
+                        <button
+                            onClick={handleCancelAnalysis}
+                            className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-xs font-medium rounded-lg transition-colors"
+                            style={{
+                                color: analysisTimedOut ? BLUE : '#DC2626',
+                                border: `1px solid ${analysisTimedOut ? BLUE : '#FECACA'}`,
+                                background: 'transparent',
+                            }}
+                        >
+                            {analysisTimedOut ? (
+                                <><ArrowLeft className="w-3.5 h-3.5" /> Zurück zur Übersicht</>
+                            ) : (
+                                <><XCircle className="w-3.5 h-3.5" /> Abbrechen</>
+                            )}
+                        </button>
+                        {analysisTimedOut && (
+                            <button
+                                onClick={() => {
+                                    setAnalysisTimedOut(false);
+                                    startPolling();
+                                }}
+                                className="inline-flex items-center gap-1.5 mt-2 px-4 py-2 text-xs font-medium rounded-lg transition-colors hover:bg-blue-50"
+                                style={{
+                                    color: BLUE,
+                                    border: `1px solid ${BLUE}`,
+                                    background: 'transparent',
+                                }}
+                            >
+                                Erneut versuchen
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -651,7 +719,6 @@ export default function CoachingSessionPage() {
                         >
                             <div className="rounded-xl p-5 text-center max-w-md" style={{ background: BLUE_LIGHT, border: `1px solid ${BLUE}22` }}>
                                 <p className="text-sm leading-relaxed" style={{ color: TEXT }}>
-                                    Yannik, vielen Dank für das Gespräch! Wenn du willst, kannst du{' '}
                                     <button
                                         onClick={requestAnalysis}
                                         className="font-semibold underline underline-offset-2 transition-colors hover:opacity-80"
@@ -659,7 +726,7 @@ export default function CoachingSessionPage() {
                                     >
                                         Hier
                                     </button>{' '}
-                                    klicken und dir deine Analyse anschauen.
+                                    geht&apos;s zu deiner Analyse.
                                 </p>
                             </div>
                         </motion.div>

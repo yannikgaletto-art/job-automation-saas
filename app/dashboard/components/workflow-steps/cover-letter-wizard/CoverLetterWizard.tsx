@@ -51,10 +51,19 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
         }
     };
 
+    const [contextError, setContextError] = useState<string | null>(null);
+
     const handleFinish = () => {
+        setContextError(null);
         const context = buildContext();
         if (!context) {
-            console.warn('⚠️ [WizardSetup] buildContext() returned null');
+            console.warn('⚠️ [WizardSetup] buildContext() returned null — navigating to incomplete step');
+            // Find first incomplete step and navigate there
+            const { isStepComplete } = useCoverLetterSetupStore.getState();
+            if (!isStepComplete(1)) { setStep(1); setContextError('Bitte wähle einen Aufhänger (Schritt 1).'); }
+            else if (!isStepComplete(2)) { setStep(2); setContextError('Bitte wähle mindestens eine Station (Schritt 2).'); }
+            else if (!isStepComplete(3)) { setStep(3); setContextError('Bitte konfiguriere Ton & Sprache (Schritt 3).'); }
+            else { setContextError('Bitte überprüfe alle Schritte.'); }
             return;
         }
         onComplete(context);
@@ -105,6 +114,14 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
                     onNavigate={handleNavigateToStep}
                 />
             </div>
+
+            {/* Context Error Banner (1C) */}
+            {contextError && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                    <span>⚠️</span>
+                    <span>{contextError}</span>
+                </div>
+            )}
 
             {/* Steps */}
             <AnimatePresence mode="wait">

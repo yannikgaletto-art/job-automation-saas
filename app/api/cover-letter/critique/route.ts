@@ -85,7 +85,7 @@ Antworte NUR als valides JSON:
         console.log('🎭 [Critique] Generating hiring manager critique via Haiku...');
 
         const message = await anthropic.messages.create({
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 300,
             temperature: 0.3,
             system: 'You are a hiring manager simulator. Respond only with valid JSON.',

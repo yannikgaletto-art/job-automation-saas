@@ -20,6 +20,10 @@ interface GenerationResult {
     iterations: number
     auditTrail?: AuditTrailCard[]
     iteration_log?: any[]
+    judgePassed?: boolean
+    judgeFailReasons?: string[]
+    warnings?: string[]
+    draftId?: string
     validation?: {
         isValid: boolean
         stats: { wordCount: number; companyMentions: number; paragraphCount: number; forbiddenPhraseCount: number }
@@ -33,7 +37,7 @@ const AI_STEPS = [
     { label: 'Firmendaten abrufen', detail: 'Perplexity durchsucht aktuelle Firmen-Infos', pct: 15 },
     { label: 'Profil analysieren', detail: 'Claude liest deinen Lebenslauf & die Stellenanzeige', pct: 35 },
     { label: 'Anschreiben verfassen', detail: 'Claude Sonnet schreibt den ersten Entwurf', pct: 70 },
-    { label: 'Qualitätsprüfung', detail: 'AI-Judge prüft Constraints & Stil', pct: 92 },
+    { label: 'Anschreiben fertigstellen', detail: 'Qualitätsprüfung & Anti-Fluff-Scan', pct: 92 },
 ];
 
 function GenerationProgressView() {
@@ -42,8 +46,8 @@ function GenerationProgressView() {
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
-        // Smooth progress fill over ~22 seconds
-        const TOTAL_MS = 22000;
+        // Smooth progress fill over ~16 seconds (adjusted for faster sync path)
+        const TOTAL_MS = 16000;
         const TICK_MS = 120;
         let elapsed = 0;
 
@@ -164,6 +168,35 @@ export function Step4CoverLetter({
         loadPersistedContext()
     }, [jobId])
 
+    // ─── Poll for Audit Trail (async Inngest result) ──────────────────────────
+    // WHY: Inngest polish job runs ~15-20s after generation and writes audit_trail
+    // to documents.metadata. We poll every 4s for up to 35s (8 attempts).
+    async function pollForAuditTrail(
+        draftId: string,
+        updateResult: React.Dispatch<React.SetStateAction<GenerationResult | null>>
+    ) {
+        const supabase = createClient()
+        const MAX_ATTEMPTS = 8
+        const INTERVAL_MS = 4000
+
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, INTERVAL_MS))
+            const { data: doc } = await supabase
+                .from('documents')
+                .select('metadata')
+                .eq('id', draftId)
+                .single()
+
+            const trail: AuditTrailCard[] | undefined = doc?.metadata?.audit_trail
+            if (trail && trail.length > 0) {
+                console.log(`✅ [AuditTrail] Found ${trail.length} cards after ${(attempt + 1) * 4}s`)
+                updateResult(prev => prev ? { ...prev, auditTrail: trail } : prev)
+                return
+            }
+        }
+        console.log('⚠️ [AuditTrail] Polling ended without data')
+    }
+
     const generateCoverLetter = async (context?: CoverLetterSetupContext) => {
         try {
             if (!result) setIsLoading(true)
@@ -227,8 +260,12 @@ export function Step4CoverLetter({
             const mappedResult: GenerationResult = {
                 coverLetter: coverLetterText,
                 iterations: data.iterations || 1,
-                auditTrail: data.audit_trail || [],
+                auditTrail: [],
+                draftId: data.draft_id ?? undefined,
                 iteration_log: data.iteration_log,
+                judgePassed: data.judge_passed ?? true,
+                judgeFailReasons: data.judge_fail_reasons || [],
+                warnings: data.warnings || [],
                 validation: {
                     isValid: rawValidation.isValid ?? true,
                     stats: rawValidation.stats ?? {
@@ -245,6 +282,10 @@ export function Step4CoverLetter({
             setResult(mappedResult)
             console.log('✅ Cover letter generated successfully')
 
+            if (data.draft_id) {
+                pollForAuditTrail(data.draft_id, setResult)
+            }
+
             if (onComplete) {
                 onComplete()
             }
@@ -252,7 +293,7 @@ export function Step4CoverLetter({
         } catch (err) {
             console.error('❌ Cover letter generation failed:', err)
             if (err instanceof DOMException && err.name === 'AbortError') {
-                setError('Zeitüberschreitung (60s) — bitte erneut versuchen.')
+                setError('Zeitüberschreitung — bitte erneut versuchen.')
             } else {
                 setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
             }
@@ -311,7 +352,35 @@ export function Step4CoverLetter({
     // Success state
     if (result && userId) {
         return (
-            <div className="space-y-6 p-6 bg-[#FAFAF9]">
+            <div className="space-y-4 p-6 bg-[#FAFAF9]">
+                {/* 1D: Judge Warning Banner — covers both generation and targeted fix */}
+                {result.judgePassed === false && (
+                    <details className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                        <summary className="text-xs font-medium text-amber-700 cursor-pointer">
+                            ⚠️ Qualitätsprüfung nicht bestanden — bitte manuell überprüfen
+                        </summary>
+                        {(result.judgeFailReasons?.length ?? 0) > 0 && (
+                            <ul className="mt-2 space-y-1">
+                                {result.judgeFailReasons!.map((reason, i) => (
+                                    <li key={i} className="text-xs text-amber-600">• {reason}</li>
+                                ))}
+                            </ul>
+                        )}
+                    </details>
+                )}
+
+                {/* API Warnings Banner */}
+                {(result.warnings?.length ?? 0) > 0 && (
+                    <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                        <span className="text-xs">ℹ️</span>
+                        <div className="space-y-1">
+                            {result.warnings!.map((w, i) => (
+                                <p key={i} className="text-xs text-blue-700">{w}</p>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <CoverLetterResultView
                     initialResult={result}
                     userId={userId}
