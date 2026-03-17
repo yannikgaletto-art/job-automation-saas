@@ -5,6 +5,7 @@ import { getCVText } from '@/lib/services/cv-text-retriever';
 import { inngest } from '@/lib/inngest/client';
 import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
 import { logger } from '@/lib/logging';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
 
 // Rate limit: 5 CV match requests per minute per user
 const cvMatchLimiter = createRateLimiter({ maxRequests: 5, windowMs: 60_000 });
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
                 jobId,
                 userId: user.id,
                 cvDocumentId: cvData.documentId,
+                locale: await getUserLocale(user.id),
             },
         });
         console.log('🚀 [CV Match] Inngest event fired successfully!', sendResult);

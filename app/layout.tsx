@@ -3,7 +3,7 @@ import './globals.css';
 import { ErrorBoundary } from '@/components/error-boundary';
 
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ['latin', 'latin-ext'] });
 
 export const metadata = {
   title: 'Pathly V2.0 - Intelligent Job Application SaaS',

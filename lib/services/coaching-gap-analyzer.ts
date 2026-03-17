@@ -65,6 +65,12 @@ Beispiele als Orientierung (NICHT 1:1 kopieren, sondern Stil und Tiefe als Maßs
 - "Erzähl mir von einem Projekt, das so richtig gegen die Wand gefahren ist. Was hast du daraus gelernt?"
 - "Wie gehst du vor, wenn du dich unter Zeitdruck in ein komplett neues Themengebiet einarbeiten musst?"
 
+DIVERSITÄT DER FRAGEN:
+- Wähle NICHT immer die aktuellste oder prominenteste CV-Station als Einstieg. Variiere gezielt:
+  - Mal eine frühe Karriere-Station, mal ein Nebenprojekt, mal eine besondere Qualifikation.
+  - Wenn der Kandidat z.B. ein eigenes Unternehmen gegründet hat, frag NICHT nur danach — auch andere Stationen sind spannend.
+  - Stelle Fragen, die der Kandidat so noch NICHT erwartet hat.
+
 WICHTIG:
 - Passe die Fragen an den KONTEXT des Kandidaten an (z.B. Lehrer, Change Manager, Entwickler, Sales).
 - BEZIEHE DICH immer auf konkrete CV-Stationen. Zeige echte Neugier an bisherigen Erfahrungen.

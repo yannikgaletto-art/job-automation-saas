@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronUp, Plus, Loader2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import type { VoteAggregation } from '@/types/volunteering';
 
 interface CategoryVoteProps {
@@ -11,6 +12,7 @@ interface CategoryVoteProps {
 }
 
 export function CategoryVote({ votes, onVoteSubmitted }: CategoryVoteProps) {
+    const t = useTranslations('volunteering');
     const [input, setInput] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
@@ -25,11 +27,7 @@ export function CategoryVote({ votes, onVoteSubmitted }: CategoryVoteProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ category_suggestion: trimmed }),
             });
-            const data = await res.json();
-
-            if (res.status === 409) {
-            } else if (!res.ok) {
-            } else {
+            if (res.ok) {
                 setInput('');
                 onVoteSubmitted();
             }
@@ -42,10 +40,10 @@ export function CategoryVote({ votes, onVoteSubmitted }: CategoryVoteProps) {
     return (
         <section>
             <h2 className="text-lg font-semibold text-[#37352F] mb-3">
-                Welchen Bereich vermisst du?
+                {t('vote_title')}
             </h2>
             <p className="text-sm text-[#73726E] mb-4">
-                Schlage neue Ehrenamt-Kategorien vor und stimme für bestehende Vorschläge.
+                {t('vote_desc')}
             </p>
 
             {/* Input */}
@@ -55,7 +53,7 @@ export function CategoryVote({ votes, onVoteSubmitted }: CategoryVoteProps) {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                    placeholder="z.B. Tierschutz, Digitale Bildung..."
+                    placeholder={t('vote_placeholder')}
                     maxLength={100}
                     className="flex-1 px-3.5 py-2.5 text-sm rounded-lg border border-[#E7E7E5] bg-white text-[#37352F] placeholder:text-[#A9A9A6] focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] transition-colors"
                 />
@@ -66,18 +64,14 @@ export function CategoryVote({ votes, onVoteSubmitted }: CategoryVoteProps) {
                     className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-white bg-[#012e7a] hover:bg-[#011f5e] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    Vorschlagen
+                    {t('vote_submit')}
                 </motion.button>
             </div>
 
             {/* Vote List */}
             <AnimatePresence mode="popLayout">
                 {votes.length > 0 && (
-                    <motion.div
-                        className="space-y-2"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                    >
+                    <motion.div className="space-y-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                         {votes.map((v) => (
                             <motion.div
                                 key={v.category_suggestion}
@@ -91,12 +85,12 @@ export function CategoryVote({ votes, onVoteSubmitted }: CategoryVoteProps) {
                                 </span>
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs text-[#A9A9A6]">
-                                        {v.vote_count} {v.vote_count === 1 ? 'Stimme' : 'Stimmen'}
+                                        {v.vote_count} {v.vote_count === 1 ? t('vote_count_singular') : t('vote_count_plural')}
                                     </span>
                                     {v.user_voted && (
                                         <span className="flex items-center gap-0.5 text-xs text-[#012e7a] font-medium">
                                             <ChevronUp className="w-3.5 h-3.5" />
-                                            Deine Stimme
+                                            {t('vote_yours')}
                                         </span>
                                     )}
                                 </div>

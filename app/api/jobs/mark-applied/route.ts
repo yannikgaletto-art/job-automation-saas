@@ -1,29 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
     try {
-        const { jobId, userId } = await request.json() as { jobId: string; userId: string };
+        // Auth: verify session — never trust userId from body
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-        if (!jobId || !userId) {
-            return NextResponse.json({ error: 'Missing jobId or userId' }, { status: 400 });
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const supabase = createClient(
+        const { jobId } = await request.json() as { jobId: string };
+
+        if (!jobId) {
+            return NextResponse.json({ error: 'Missing jobId' }, { status: 400 });
+        }
+
+        const admin = createAdminClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
-        // We assume job_queue has 'status' and 'applied_at'
-        const { error } = await supabase
+        const { error } = await admin
             .from('job_queue')
-            .update({ status: 'applied', applied_at: new Date().toISOString() })
+            .update({ status: 'submitted', applied_at: new Date().toISOString() })
             .eq('id', jobId)
-            .eq('user_id', userId);
+            .eq('user_id', user.id);
 
         if (error) {
             console.error('Failed to mark job as applied:', error.message);
-            return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
+            return NextResponse.json({ error: 'Database update failed', detail: error.message }, { status: 500 });
         }
 
         return NextResponse.json({ success: true });

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { inngest } from '@/lib/inngest/client';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
 
 /**
  * POST /api/jobs/extract — Smart Trigger
@@ -127,7 +128,7 @@ WICHTIG für Listen (responsibilities, qualifications, benefits):
             console.log('🚀 [Extract] PROD MODE — sending to Inngest');
             await inngest.send({
                 name: 'job/extract',
-                data: { jobId, userId: user.id },
+                data: { jobId, userId: user.id, locale: await getUserLocale(user.id) },
             });
             return NextResponse.json({ success: true, status: 'processing' });
         }

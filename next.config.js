@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const { withSentryConfig } = require('@sentry/nextjs');
+const createNextIntlPlugin = require('next-intl/plugin');
+
+const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig = {
   webpack: (config) => {
@@ -23,7 +26,7 @@ const nextConfig = {
   },
 };
 
-module.exports = withSentryConfig(nextConfig, {
+module.exports = withSentryConfig(withNextIntl(nextConfig), {
   org: 'pathly',               // ← Sentry Org Name (bitte prüfen)
   project: 'pathly-v2',        // ← Sentry Project Name (bitte prüfen)
   silent: true,                // Kein Sentry-Output im Build-Log

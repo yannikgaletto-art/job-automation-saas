@@ -1,13 +1,9 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation';
+import { routing } from '@/i18n/routing';
 
-export default async function Home() {
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (session) {
-        redirect('/dashboard')
-    } else {
-        redirect('/login')
-    }
+// Root page: redirect to the default locale
+// next-intl middleware handles locale detection, but if someone hits /
+// directly (e.g. from a bookmark), we redirect to the default locale.
+export default function RootPage() {
+  redirect(`/${routing.defaultLocale}`);
 }

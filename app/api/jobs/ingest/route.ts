@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { deepScrapeJob } from '@/lib/services/job-search-pipeline';
 import { inngest } from '@/lib/inngest/client';
 import { complete } from '@/lib/ai/model-router';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -259,7 +260,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
         try {
             await inngest.send({
                 name: 'job/extract',
-                data: { jobId: job.id, userId },
+                data: { jobId: job.id, userId, locale: await getUserLocale(userId) },
             });
             console.log(`[${requestId}] route=jobs/ingest step=trigger_extract job_id=${job.id}`);
         } catch (triggerErr) {

@@ -125,34 +125,33 @@ export async function sendCoachingMessage(
             .map(m => m.content)
             .join('\n---\n');
 
-        const farewellExamples = `
-Orientierung für den Ton (je nach maxQuestions):
-1 Frage:  "Hey, schade, dass wir so wenig Zeit hatten! Ich hoffe, du konntest trotzdem eine Kleinigkeit für dich mitnehmen, und ich freue mich auf alle weiteren Gespräche mit dir."
-2 Fragen: "Hey, danke für den kurzen, aber spannenden Austausch! Auch wenn die Zeit etwas knapp war, fand ich deine ersten Einblicke super spannend. Ich hoffe, du nimmst auch etwas für dich mit."
-3 Fragen: "Hey, vielen Dank für das gute und aufschlussreiche Gespräch! Wir konnten ja doch einige interessante Punkte anschneiden, und es hat mir echt Spaß gemacht, deine Perspektive kennenzulernen."
-4 Fragen: "Hey, das war ein richtig intensives und inspirierendes Gespräch, vielen Dank dafür! Deine ausführlichen Antworten haben mir sehr geholfen, und ich habe einige wertvolle Impulse von dir mitgenommen."
-5 Fragen: "Hey, vielen Dank für das wirklich tolle und ausführliche Gespräch! Ich habe extrem viel von dir gelernt und richtig viel mitgenommen. Ich hoffe sehr, dass wir uns in Zukunft noch mal austauschen können, und wünsche dir bis dahin alles Gute."`;
-
-        let farewell = 'Hey, danke für das Gespräch! Ich hoffe, du konntest etwas für dich mitnehmen.';
+        let farewell = 'Danke für das Gespräch.';
         try {
             const client = getClient();
             const farewellResponse = await client.messages.create({
                 model: HINT_MODEL,
-                max_tokens: 150,
+                max_tokens: 100,
                 temperature: 0.5,
-                system: `Du bist ein Recruiter, der gerade ein Vorstellungsgespräch beendet hat. Schreibe einen kurzen, authentischen Abschiedssatz (1-3 Sätze).
+                system: `Du bist ein Recruiter, der gerade ein Vorstellungsgespräch beendet hat. Schreibe einen kurzen, warmen Abschiedssatz (1-2 Sätze).
 
 WICHTIG:
-- Der Ton skaliert nach Anzahl der gestellten Fragen (${maxQuestions} von 5 möglichen).
-- Bewerte die tatsächliche Gesprächsqualität anhand der User-Antworten. War der Austausch substantiell oder eher dünn? Reagiere ehrlich und wohlwollend, aber NICHT überschwänglich bei dünnen Antworten.
+- Du bist ein Recruiter. Du gibst KEINE inhaltliche Bewertung, KEINE Tipps, KEINE Kritik. Das kommt später in der schriftlichen Analyse.
+- Verabschiede dich professionell und menschlich, wie ein echter Recruiter nach einem Gespräch: Danke sagen, ggf. auf nächste Schritte verweisen.
+- Tonalität: warm, freundlich, kurz. Wie ein Mensch, nicht wie eine Maschine.
+- Bei kurzem Gespräch (1 Frage): Kurzer, netter Abschluss.
+- Bei längerem Gespräch (3-5 Fragen): Etwas ausführlicher, "hat Spaß gemacht".
 - Schreibe KEINEN Verweis auf eine Analyse oder einen Link. Kein Markdown, keine Emojis.
 - Natürliches Deutsch, duze den Kandidaten.
 
-${farewellExamples}`,
+Beispiele:
+- "Hey, danke für das Gespräch! Wir schauen uns alles in Ruhe an und melden uns dann bei dir."
+- "Vielen Dank, dass du dir die Zeit genommen hast! Hat mich echt gefreut, und wir hören uns."
+- "Danke dir, das war ein guter Austausch! Wir melden uns zeitnah mit Feedback."`,
                 messages: [
-                    { role: 'user', content: `Das Interview hatte ${maxQuestions} Frage(n). Hier sind die Antworten des Kandidaten:\n\n${userAnswers}\n\nSchreibe jetzt den Abschiedssatz.` },
+                    { role: 'user', content: `Das Interview hatte ${maxQuestions} Frage(n). Schreibe jetzt den Abschiedssatz.` },
                 ],
             });
+
             const generated = farewellResponse.content
                 .filter((block): block is Anthropic.TextBlock => block.type === 'text')
                 .map(block => block.text)

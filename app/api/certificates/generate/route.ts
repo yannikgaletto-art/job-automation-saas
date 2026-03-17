@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { inngest } from '@/lib/inngest/client';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
 
 export async function POST(request: NextRequest) {
     try {
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
         // Send Inngest Event
         await inngest.send({
             name: 'certificates/generate',
-            data: { jobId, userId: user.id },
+            data: { jobId, userId: user.id, locale: await getUserLocale(user.id) },
         });
 
         console.log(`[Certificates] Triggered generation for job=${jobId} user=${user.id}`);

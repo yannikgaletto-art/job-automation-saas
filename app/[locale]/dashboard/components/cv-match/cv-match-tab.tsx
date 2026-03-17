@@ -1,0 +1,732 @@
+"use client";
+
+/**
+ * CVMatchTab — Iteration Redesign.
+ * - Match Score: Progress bar instead of circle, with top 3 bullets strictly under it.
+ * - Score Breakdown: Expandable disclosure instead of truncation.
+ * - Anforderungs-Check: 2fr_3fr_4fr columns with clear headers and full badge status.
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CVMatchResult } from '@/lib/services/cv-match-analyzer';
+import { Button } from '@/components/motion/button';
+import {
+    Loader2, CheckCircle2, AlertCircle, Sparkles, Zap, ChevronDown
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { CVSelectDialog, type CVOption } from '@/components/dashboard/cv-select-dialog';
+import { DocumentsRequiredDialog } from '@/components/shared/documents-required-dialog';
+import { useNotification } from '@/hooks/use-notification';
+
+interface CVMatchTabProps {
+    jobId: string;
+    cachedMatch?: any;
+    onMatchStart?: () => void;
+    onMatchComplete?: (result: any) => void;
+    onNextStep?: () => void;
+}
+
+// --- Status Badge ---
+function StatusBadge({ status }: { status: 'met' | 'partial' | 'missing' }) {
+    const config = {
+        met: { icon: CheckCircle2, bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-100', label: 'Erfüllt' },
+        partial: { icon: Zap, bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-100', label: 'Teilweise' },
+        missing: { icon: AlertCircle, bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-100', label: 'Fehlt' },
+    }[status];
+    const Icon = config.icon;
+    return (
+        <span className={cn("inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium border", config.bg, config.text, config.border)}>
+            <Icon size={12} />
+            {config.label}
+        </span>
+    );
+}
+
+// --- Expandable bullet list for reasons ---
+function ReasonsList({ reasons }: { reasons: string[] }) {
+    const [expanded, setExpanded] = useState(false);
+    if (reasons.length === 0) return null;
+
+    /** Bold the KEY TERM at start of each bullet */
+    const boldStart = (text: string): React.ReactNode => {
+        const match = text.match(/^([^:,\-–]+)[:\-–,]\s*(.*)/);
+        if (match) return <><strong className="font-semibold text-[#37352F]">{match[1]}:</strong> {match[2]}</>;
+        return text;
+    };
+
+    return (
+        <div className="pl-[140px] pr-8 mt-0.5">
+            <ul className="space-y-0.5">
+                <li className="text-xs text-slate-500 list-disc ml-4 leading-snug">{boldStart(reasons[0])}</li>
+            </ul>
+
+            <AnimatePresence>
+                {expanded && reasons.length > 1 && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25, ease: 'easeOut' }}
+                        className="overflow-hidden"
+                    >
+                        <ul className="space-y-0.5 mt-0.5">
+                            {reasons.slice(1).map((r, idx) => (
+                                <li key={idx} className="text-xs text-slate-500 list-disc ml-4 leading-snug">{boldStart(r)}</li>
+                            ))}
+                        </ul>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {reasons.length > 1 && (
+                <button
+                    onClick={() => setExpanded(!expanded)}
+                    className="mt-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
+                >
+                    <ChevronDown
+                        size={12}
+                        className={cn("transition-transform duration-200", expanded && "rotate-180")}
+                    />
+                    {expanded ? 'Weniger anzeigen' : 'Mehr Details'}
+                </button>
+            )}
+        </div>
+    );
+}
+
+/** Insights list for Match Score card — all items + toggle, text-xs to match Score Breakdown */
+function InsightsList({ items }: { items: string[] }) {
+    const [expanded, setExpanded] = useState(false);
+    if (items.length === 0) return <p className="text-xs text-slate-400 italic">–</p>;
+    const shown = expanded ? items : items.slice(0, 1);
+    return (
+        <div>
+            <ul className="list-disc list-inside space-y-0.5">
+                {shown.map((item, i) => (
+                    <li key={i} className="text-xs text-slate-700 leading-snug">{item}</li>
+                ))}
+            </ul>
+            {items.length > 1 && (
+                <button
+                    onClick={() => setExpanded(!expanded)}
+                    className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
+                >
+                    <ChevronDown size={12} className={cn("transition-transform duration-200", expanded && "rotate-180")} />
+                    {expanded ? 'Weniger anzeigen' : `+${items.length - 1} mehr`}
+                </button>
+            )}
+        </div>
+    );
+}
+
+/** Expandable table cell for Anforderungs-Check rows */
+function ExpandableCell({ text, boldFn }: { text: string; boldFn: (s: string) => React.ReactNode }) {
+    const [expanded, setExpanded] = useState(false);
+    const SHORT_LIMIT = 80;
+    const isLong = text.length > SHORT_LIMIT;
+    return (
+        <div>
+            {expanded ? (
+                <p className="text-xs text-slate-600 leading-snug">{text}</p>
+            ) : (
+                <p className="text-xs text-slate-600 leading-snug">{boldFn(text)}</p>
+            )}
+            {isLong && (
+                <button
+                    onClick={() => setExpanded(!expanded)}
+                    className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
+                >
+                    <ChevronDown size={12} className={cn("transition-transform duration-200", expanded && "rotate-180")} />
+                    {expanded ? 'Weniger anzeigen' : 'Mehr Details'}
+                </button>
+            )}
+        </div>
+    );
+}
+
+// --- Cancel Button (appears after delay so user is never stuck) ---
+function CancelButton({ onCancel }: { onCancel: () => void }) {
+    const [visible, setVisible] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => setVisible(true), 15000);
+        return () => clearTimeout(timer);
+    }, []);
+
+    if (!visible) return null;
+
+    return (
+        <motion.button
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={onCancel}
+            className="text-xs text-slate-400 hover:text-red-500 transition-colors mt-1"
+        >
+            Abbrechen
+        </motion.button>
+    );
+}
+
+export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, onNextStep }: CVMatchTabProps) {
+    const [state, setState] = useState<'idle' | 'loading' | 'complete' | 'error' | 'no-cv'>('idle');
+    const router = useRouter();
+    const notify = useNotification();
+    const [matchData, setMatchData] = useState<CVMatchResult | null>(null);
+    const [loadingStep, setLoadingStep] = useState(0);
+    const [progressText, setProgressText] = useState('Lebenslauf wird eingelesen...');
+
+    // Steps shown during loading — no AI model names, only user-friendly action descriptions
+    const CV_STEPS = [
+        'Lebenslauf & Match-Ergebnisse werden geladen',
+        'Schwachstellen werden analysiert',
+        'Optimierungspotenziale werden identifiziert',
+        'Empfehlungen werden zusammengestellt',
+        'Ergebnisse werden aufbereitet',
+    ];
+
+    useEffect(() => {
+        // No-op — progress is driven by the CV_STEPS array via loadingStep
+    }, [state, loadingStep]);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(`/api/cv/match/cached?jobId=${jobId}`);
+                const data = await res.json();
+                if (cancelled) return;
+                if (data.success && data.cached && data.cached.analyzed_at) {
+                    setMatchData(data.cached as CVMatchResult);
+                    setState('complete');
+                } else if (data.cvMatchStatus === 'processing' && data.cvMatchStartedAt) {
+                    const elapsed = Date.now() - new Date(data.cvMatchStartedAt).getTime();
+                    if (elapsed > 5 * 60 * 1000) {
+                        // Definitively stale — show error + retry
+                        console.warn(`⚠️ [CV Match] Stale processing on mount (${Math.round(elapsed / 1000)}s) — showing retry`);
+                        setState('error');
+                    } else {
+                        // Still within threshold — resume polling (Inngest may still be running)
+                        console.log(`🔄 [CV Match] Resuming poll for in-flight job (${Math.round(elapsed / 1000)}s elapsed)`);
+                        setState('loading');
+                        setLoadingStep(2);
+
+                        // Start polling immediately — same logic as after runAnalysis() fires
+                        let resumeAttempts = 0;
+                        const maxResumeAttempts = 120; // up to ~6 minutes of polling
+                        pollingRef.current = setInterval(async () => {
+                            resumeAttempts++;
+                            try {
+                                const pollRes = await fetch(`/api/cv/match/cached?jobId=${jobId}`);
+                                const pollData = await pollRes.json();
+                                if (pollData.success && pollData.cached?.analyzed_at) {
+                                    if (pollingRef.current) clearInterval(pollingRef.current);
+                                    pollingRef.current = null;
+                                    setLoadingStep(3);
+                                    setMatchData(pollData.cached as CVMatchResult);
+                                    setState('complete');
+                                } else if (resumeAttempts >= maxResumeAttempts) {
+                                    if (pollingRef.current) clearInterval(pollingRef.current);
+                                    pollingRef.current = null;
+                                    setState('error');
+                                }
+                            } catch {
+                                if (pollingRef.current) clearInterval(pollingRef.current);
+                                pollingRef.current = null;
+                                setState('error');
+                            }
+                        }, 3000);
+                    }
+                } else {
+                    setState('idle');
+                }
+            } catch {
+                if (!cancelled) setState('idle');
+            }
+        })();
+        return () => {
+            cancelled = true;
+            if (pollingRef.current) clearInterval(pollingRef.current);
+        };
+    }, [jobId]);
+
+    const [showCVSelect, setShowCVSelect] = useState(false);
+    const [cvOptions, setCvOptions] = useState<CVOption[]>([]);
+    const [selectedCvId, setSelectedCvId] = useState<string | undefined>(undefined);
+    const [showCvDialog, setShowCvDialog] = useState(false);
+
+    const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Cleanup polling on unmount
+    useEffect(() => {
+        return () => {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+        };
+    }, []);
+
+    const runAnalysis = useCallback(async (cvDocumentId?: string) => {
+        setState('loading');
+        setLoadingStep(1);
+        setShowCVSelect(false);
+        onMatchStart?.();
+
+        try {
+            await new Promise(r => setTimeout(r, 800));
+            setLoadingStep(2);
+
+            // POST triggers the Inngest pipeline — returns immediately
+            const res = await fetch('/api/cv/match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId, cvDocumentId })
+            });
+
+            let data;
+            const resText = await res.text();
+            try {
+                data = JSON.parse(resText);
+            } catch (err) {
+                console.error("❌ CV Match API returned non-JSON response:", resText.substring(0, 500));
+                throw new Error("Server antwortet nicht korrekt (HTML statt JSON). Bitte lade die Seite neu oder prüfe die Konsole.");
+            }
+
+            if (!res.ok || !data?.success) {
+                if (data?.code === 'CV_NOT_FOUND') {
+                    setState('no-cv');
+                    return;
+                }
+                throw new Error(data?.error || 'Fehler bei der Analyse');
+            }
+
+            // Poll for results (Inngest processes in background)
+            let attempts = 0;
+            const maxAttempts = 50; // 50 × 3s = 150s max — CV Match takes 60-80s
+
+            pollingRef.current = setInterval(async () => {
+                attempts++;
+                try {
+                    const pollRes = await fetch(`/api/cv/match/cached?jobId=${jobId}`);
+                    const pollText = await pollRes.text();
+                    let pollData;
+                    try {
+                        pollData = JSON.parse(pollText);
+                    } catch (e) {
+                        console.error("❌ Polling API non-JSON response:", pollText.substring(0, 200));
+                        throw new Error("Verbindungsabbruch während der Analyse (HTML statt JSON).");
+                    }
+
+                    if (pollData.success && pollData.cached?.analyzed_at) {
+                        // Result arrived!
+                        if (pollingRef.current) clearInterval(pollingRef.current);
+                        pollingRef.current = null;
+                        setLoadingStep(3);
+                        setMatchData(pollData.cached);
+                        setState('complete');
+                        notify('CV Match erstellt');
+                        onMatchComplete?.(pollData.cached);
+                    } else if (attempts >= maxAttempts) {
+                        if (pollingRef.current) clearInterval(pollingRef.current);
+                        pollingRef.current = null;
+                        throw new Error('Analyse-Timeout — bitte erneut versuchen');
+                    }
+                } catch (pollError) {
+                    if (pollingRef.current) clearInterval(pollingRef.current);
+                    pollingRef.current = null;
+                    const errMsg = pollError instanceof Error ? pollError.message : String(pollError);
+                    setState('error');
+                }
+            }, 3000);
+
+        } catch (error: unknown) {
+            const errMsg = error instanceof Error ? error.message : String(error);
+            console.error(error);
+            setState('error');
+        }
+    }, [jobId, onMatchStart, onMatchComplete]);
+
+    /** Pre-check: how many CVs does the user have? */
+    const handleStartAnalysis = useCallback(async () => {
+        try {
+            const res = await fetch('/api/documents/list-cvs');
+            const resText = await res.text();
+            let data;
+            try {
+                data = JSON.parse(resText);
+            } catch (e) {
+                console.error("❌ list-cvs API non-JSON response:", resText.substring(0, 500));
+                throw new Error("Konnte Lebensläufe nicht laden (Server sendet HTML).");
+            }
+            const cvs: CVOption[] = data.cvs || [];
+
+            if (cvs.length === 0) {
+                setShowCvDialog(true);
+                return;
+            }
+
+            if (cvs.length === 1) {
+                // Auto-select the only CV
+                runAnalysis(cvs[0].id);
+                return;
+            }
+
+            // 2+ CVs → show selection dialog
+            setCvOptions(cvs);
+            setShowCVSelect(true);
+        } catch {
+            // Fallback: run without specific ID (uses latest)
+            runAnalysis();
+        }
+    }, [runAnalysis]);
+
+    // ── NO CV — Blocking State ──────────────────────────────────
+    if (state === 'no-cv') {
+        return (
+            <>
+                <DocumentsRequiredDialog
+                    open={true}
+                    onClose={() => setState('idle')}
+                    type="cv"
+                />
+                <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
+                    <div className="bg-amber-50 p-4 rounded-full shadow-sm mb-4 border border-amber-200">
+                        <AlertCircle className="w-8 h-8 text-amber-500" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">Kein Lebenslauf gefunden</h3>
+                    <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
+                        Um den CV Match zu starten, musst du zuerst deinen Lebenslauf hochladen.
+                        Das dauert nur 30 Sekunden.
+                    </p>
+                    <Button
+                        variant="primary"
+                        onClick={() => router.push('/dashboard/settings')}
+                    >
+                        CV in Einstellungen hochladen →
+                    </Button>
+                </div>
+            </>
+        );
+    }
+
+    // ── IDLE / ERROR ────────────────────────────────────────────
+    if (state === 'idle' || state === 'error') {
+        return (
+            <>
+                <DocumentsRequiredDialog
+                    open={showCvDialog}
+                    onClose={() => setShowCvDialog(false)}
+                    type="cv"
+                />
+                <CVSelectDialog
+                    isOpen={showCVSelect}
+                    cvOptions={cvOptions}
+                    onSelect={(id) => {
+                        setSelectedCvId(id);
+                        runAnalysis(id);
+                    }}
+                    onClose={() => setShowCVSelect(false)}
+                />
+                <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
+
+                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">CV Match & Optimierung</h3>
+                    <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
+                        Wir <strong>vergleichen</strong> deinen <strong>Lebenslauf</strong> mit den <strong>Anforderungen</strong> dieser <strong>Stelle</strong>.
+                        Du erhältst eine <strong>Gegenüberstellung</strong>, auf deren Basis wir einen <strong>optimierten CV</strong> generieren können.
+                    </p>
+                    {state === 'error' && (
+                        <div className="mb-4 text-sm text-red-600 flex items-center gap-2 bg-red-50 px-3 py-2 rounded-md border border-red-100">
+                            <AlertCircle className="w-4 h-4" />
+                            <div>Ein Fehler ist aufgetreten. Bitte versuche es erneut.</div>
+                        </div>
+                    )}
+                    <Button variant="primary" onClick={handleStartAnalysis}>
+                        {state === 'error' ? 'Erneut versuchen' : 'Analyse starten'}
+                    </Button>
+                </div>
+            </>
+        );
+    }
+
+    // ── LOADING ────────────────────────────────────────────────
+    if (state === 'loading') {
+        // Map loadingStep → active step index: 1=step0, 2=step2, 3+=step4
+        const activeStep = loadingStep === 1 ? 0 : loadingStep === 2 ? 2 : 4;
+
+        return (
+            <div className="px-6 py-8 bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
+                {/* Spinner + title — left-aligned like the CV Optimizer design */}
+                <div className="flex items-center gap-2.5 mb-1">
+                    <Loader2 className="w-5 h-5 text-[#002e7a] animate-spin shrink-0" />
+                    <span className="text-sm font-semibold text-[#37352F]">
+                        CV Match wird analysiert…
+                    </span>
+                </div>
+                <p className="text-xs text-[#73726E] mb-5 pl-[29px]">Das dauert etwa 30–75 Sekunden</p>
+
+                {/* Step list — full width, matches the image layout */}
+                <div className="space-y-2">
+                    {CV_STEPS.map((label, i) => {
+                        const isDone = i < activeStep;
+                        const isActive = i === activeStep;
+                        return (
+                            <motion.div
+                                key={i}
+                                initial={{ opacity: 0, x: -6 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: i * 0.07, duration: 0.25 }}
+                                className={cn(
+                                    'flex items-center gap-3 px-4 py-2.5 rounded-lg border transition-all duration-300',
+                                    isDone
+                                        ? 'bg-[#EEF2FF] border-[#C7D6F7]'
+                                        : isActive
+                                            ? 'bg-white border-[#002e7a] shadow-sm'
+                                            : 'bg-white border-[#E7E7E5]'
+                                )}
+                            >
+                                {/* Step indicator badge */}
+                                <div className={cn(
+                                    'w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 transition-all duration-300',
+                                    isDone
+                                        ? 'bg-[#002e7a] text-white'
+                                        : isActive
+                                            ? 'border-2 border-[#002e7a] bg-white text-[#002e7a]'
+                                            : 'border border-[#D0CFC8] bg-white text-[#A8A29E]'
+                                )}>
+                                    {isDone ? (
+                                        <CheckCircle2 size={13} />
+                                    ) : (
+                                        <span>{i + 1}</span>
+                                    )}
+                                </div>
+
+                                {/* Label */}
+                                <span className={cn(
+                                    'text-xs flex-1 transition-all duration-300',
+                                    isDone
+                                        ? 'line-through text-[#002e7a] opacity-60'
+                                        : isActive
+                                            ? 'font-semibold text-[#37352F]'
+                                            : 'font-normal text-[#A8A29E]'
+                                )}>
+                                    {label}
+                                </span>
+
+                                {/* Right: spinner dot for active step */}
+                                {isActive && (
+                                    <div className="w-3.5 h-3.5 rounded-full bg-[#9CA3AF] shrink-0" />
+                                )}
+                            </motion.div>
+                        );
+                    })}
+                </div>
+
+                {/* Cancel button — appears after 15s so the user is never stuck */}
+                <div className="mt-5 pl-1">
+                    <CancelButton onCancel={() => {
+                        if (pollingRef.current) {
+                            clearInterval(pollingRef.current);
+                            pollingRef.current = null;
+                        }
+                        setState('idle');
+                    }} />
+                </div>
+            </div>
+        );
+    }
+
+    // ── COMPLETE ───────────────────────────────────────────────
+    if (state === 'complete' && matchData) {
+        // §7-compliant: Array.isArray() guards — AI may return null, string, or truncated objects
+        const rows = Array.isArray(matchData.requirementRows) ? matchData.requirementRows : [];
+        const strengths = Array.isArray(matchData.strengths) ? matchData.strengths : [];
+        const gaps = Array.isArray(matchData.gaps) ? matchData.gaps : [];
+        const potentialHighlights = Array.isArray(matchData.potentialHighlights) ? matchData.potentialHighlights : [];
+        const keywordsFound = Array.isArray(matchData.keywordsFound) ? matchData.keywordsFound : [];
+        const keywordsMissing = Array.isArray(matchData.keywordsMissing) ? matchData.keywordsMissing : [];
+
+        const metCount = rows.filter(r => r.status === 'met').length;
+        const totalCount = rows.length;
+        const metPercent = totalCount > 0 ? Math.round((metCount / totalCount) * 100) : 0;
+
+        const scoreColor = matchData.overallScore >= 70 ? '#22c55e' : matchData.overallScore >= 50 ? '#f59e0b' : '#ef4444';
+        const score = typeof matchData.overallScore === 'number' ? matchData.overallScore : parseInt(String(matchData.overallScore ?? 0), 10);
+
+        // Arrays sourced directly from matchData
+        /** Truncate to word boundary at ~60 chars */
+        const trunc = (s: string, n = 60) =>
+            s.length > n ? s.slice(0, s.lastIndexOf(' ', n)) + '…' : s;
+
+        /** Extract boldable first term (noun/verb before first , : - em-dash) */
+        const boldFirst = (text: string): React.ReactNode => {
+            const m = text.match(/^([^:,\-–]+)[:\-–,]\s*(.*)/);
+            if (m) return <><strong className="font-semibold text-slate-900">{m[1].trim()}</strong>{' — '}{trunc(m[2])}</>;
+            return trunc(text);
+        };
+
+        return (
+            <div className="p-5 bg-[#FAFAF9] rounded-b-xl border-t border-slate-200 space-y-4">
+
+                {/* ── Match Score & Score Breakdown — identical card shells, same height ── */}
+                <div className="grid grid-cols-2 gap-4 items-stretch">
+                    {/* Match Score Card */}
+                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col">
+                        <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">
+                            Match Score
+                        </h3>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-semibold text-slate-700">Übereinstimmung</span>
+                            <span className="text-sm font-bold text-slate-900">{score}%</span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-slate-100 mb-5">
+                            <div
+                                className="h-2 rounded-full transition-all duration-700 ease-out"
+                                style={{ width: `${score}%`, backgroundColor: scoreColor }}
+                            />
+                        </div>
+                        <div className="space-y-3 flex-1">
+                            {[
+                                { label: 'Stärken', items: strengths.length > 0 ? strengths : ['Keine spezifischen Stärken dokumentiert.'] },
+                                { label: 'Lücken', items: gaps.length > 0 ? gaps : ['Keine kritischen Lücken identifiziert.'] },
+                                { label: 'Versteckte Potenziale', items: potentialHighlights.length > 0 ? potentialHighlights : ['Keine ungenutzten Potenziale erkannt.'] },
+                            ].map(({ label, items }) => (
+                                <div key={label}>
+                                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
+                                    <InsightsList items={items} />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Score Breakdown */}
+                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col overflow-y-auto max-h-[400px] custom-scrollbar">
+                        <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">Score-Breakdown</h4>
+                        <div className="space-y-3 flex-1">
+                            {[
+                                { label: 'Technische Skills', value: matchData.scoreBreakdown.technicalSkills },
+                                { label: 'Soft Skills', value: matchData.scoreBreakdown.softSkills },
+                                { label: 'Erfahrungslevel', value: matchData.scoreBreakdown.experienceLevel },
+                                { label: 'Domain-Wissen', value: matchData.scoreBreakdown.domainKnowledge },
+                            ].map((item, i) => {
+                                const sc = typeof item.value === 'number' ? item.value : item.value?.score || 0;
+                                const reasons = typeof item.value === 'number' ? [] : item.value?.reasons || [];
+                                return (
+                                    <div key={i} className="mb-2 last:mb-0">
+                                        <div className="flex items-center text-sm mb-1">
+                                            <div className="w-32 text-slate-500 font-medium text-xs"><strong>{item.label}</strong></div>
+                                            <div className="flex-1 h-1.5 bg-[#E7E7E5] rounded-full overflow-hidden mx-2">
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: sc + '%' }}
+                                                    transition={{ duration: 1, delay: i * 0.1 }}
+                                                    className="h-full bg-gradient-to-r from-[#002e7a] to-[#3B82F6]"
+                                                />
+                                            </div>
+                                            <div className="w-8 text-right font-medium text-xs text-[#37352F]">{sc}%</div>
+                                        </div>
+                                        <ReasonsList reasons={reasons} />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Anforderungs-Check (Fix 3b) ── */}
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                        <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">Anforderungs-Check</h3>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-400">{metCount}/{totalCount}</span>
+                            <div className="w-20 h-1 bg-slate-100 rounded overflow-hidden">
+                                <div className="h-1 bg-green-500 rounded" style={{ width: `${metPercent}%` }} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <table className="w-full table-fixed">
+                        <colgroup>
+                            <col className="w-[22%]" />
+                            <col className="w-[36%]" />
+                            <col className="w-[42%]" />
+                        </colgroup>
+                        <thead>
+                            <tr className="bg-slate-50 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                                <th className="px-4 py-2 text-left font-semibold">Anforderung</th>
+                                <th className="px-4 py-2 text-left font-semibold">Ist-Zustand</th>
+                                <th className="px-4 py-2 text-left font-semibold">Empfehlung</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {rows.map((row, i) => (
+                                <motion.tr
+                                    key={i}
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.04 }}
+                                    className="group hover:bg-slate-50 transition-colors"
+                                >
+                                    {/* Anforderung */}
+                                    <td className="py-3 px-4 align-top">
+                                        <StatusBadge status={row.status} />
+                                        <p className="text-xs text-slate-700 mt-1.5 leading-snug">{row.requirement}</p>
+                                    </td>
+
+                                    {/* Ist-Zustand — expandable teaser */}
+                                    <td className="py-3 px-4 align-top border-l border-slate-100">
+                                        <ExpandableCell text={row.currentState} boldFn={boldFirst} />
+                                    </td>
+
+                                    {/* Empfehlung — expandable teaser */}
+                                    <td className="py-3 px-4 align-top border-l border-slate-100">
+                                        <ExpandableCell text={row.suggestion || ''} boldFn={boldFirst} />
+                                    </td>
+                                </motion.tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* ── ATS Keywords ── */}
+                <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+                    <h4 className="text-xs font-semibold text-[#37352F] mb-2">
+                        ATS Keywords <span className="text-[10px] text-slate-400 font-normal ml-1">(Applicant Tracking System)</span>
+                    </h4>
+                    <p className="text-xs text-slate-500 leading-relaxed mb-3">
+                        In der Regel ist die erste Instanz, die deinen Lebenslauf prüft, ein <strong className="font-semibold text-slate-700">Algorithmus</strong>. Die Applicant Tracking Systems (ATS) suchen gezielt nach <strong className="font-semibold text-slate-700">Keywords</strong>, die für die Stelle relevant sind. Fehlen diese Begriffe, wird deine Bewerbung oft automatisch aussortiert. Wir empfehlen dir daher, die Schlagworte aus der Stellenanzeige direkt in deinen Lebenslauf zu <strong className="font-semibold text-slate-700">integrieren</strong>.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                        {keywordsFound.map(kw => (
+                            <span key={kw} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
+                                <CheckCircle2 size={10} /> {kw}
+                            </span>
+                        ))}
+                        {keywordsMissing.map(kw => (
+                            <span key={kw} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-red-50 text-red-700 border border-red-100 opacity-75">
+                                <AlertCircle size={10} /> {kw}
+                            </span>
+                        ))}
+                        {keywordsFound.length === 0 && keywordsMissing.length === 0 && (
+                            <span className="text-xs text-slate-400 italic">Keine expliziten Keywords analysiert.</span>
+                        )}
+                    </div>
+                </div>
+
+                {/* ── Next Step ── */}
+                <div className="bg-blue-50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between border border-blue-100">
+                    <div>
+                        <h4 className="font-semibold text-[#002e7a] text-sm">Zur Erstellung deines Lebenslaufs</h4>
+                        <p className="text-xs text-[#002e7a]/70 mt-0.5">Gehe zum nächsten Schritt, um deinen Lebenslauf basierend auf dieser Analyse zu aktualisieren.</p>
+                    </div>
+                    <div className="flex gap-3 mt-3 sm:mt-0">
+                        <Button variant="primary" onClick={() => onNextStep?.()} className="shadow-sm text-sm">
+                            Weiter zur Erstellung
+                        </Button>
+                    </div>
+                </div>
+
+            </div>
+        );
+    }
+
+    return null;
+}

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logging';
 import { inngest } from '@/lib/inngest/client';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
             // Fire Inngest scheduled deletion
             await inngest.send({
                 name: 'video/schedule-deletion',
-                data: { userId, jobId },
+                data: { userId, jobId, locale: await getUserLocale(userId) },
             });
 
             log.info('Video upload confirmed, deletion scheduled', { expiresAt });

@@ -7,6 +7,7 @@ import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
 import { logger } from '@/lib/logging';
 import { inngest } from '@/lib/inngest/client';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
 
 export const maxDuration = 120; // Vercel timeout — frontend client waits 180s, server allows 120s
 
@@ -138,6 +139,7 @@ export async function POST(request: NextRequest) {
                     data: {
                         draftId,
                         userId,
+                        locale: await getUserLocale(userId),
                         coverLetter: result.coverLetter,
                         fluffFound: result.fluffWarning ?? false,
                         jobData: undefined, // Job data already in DB — polish job reads it

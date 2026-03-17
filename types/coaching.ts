@@ -109,6 +109,7 @@ export interface CreateSessionResponse {
     sessionId: string;
     dossier: CoachingDossier;
     firstQuestion: string;
+    maxQuestions: number;
 }
 
 export interface SendMessageRequest {

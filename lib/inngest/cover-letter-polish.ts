@@ -229,10 +229,17 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
 
         // ── Step 4: X-Ray Audit Trail ────────────────────────────────
         let auditTrail: AuditTrailCard[] = [];
-        if (setupContext && process.env.ANTHROPIC_API_KEY) {
+        if (process.env.ANTHROPIC_API_KEY) {
+            // Build a minimal context if none was provided — ensures audit trail is always attempted
+            const effectiveContext: CoverLetterSetupContext = setupContext ?? {
+                companyName: jobData?.company_name ?? 'Unbekannt',
+                tone: { preset: 'formal' },
+                optInModules: {},
+            } as CoverLetterSetupContext;
+
             auditTrail = await step.run('audit-trail', async () => {
                 try {
-                    const trail = await generateAuditTrail(currentText, setupContext);
+                    const trail = await generateAuditTrail(currentText, effectiveContext);
                     console.log(`[Polish:Audit] ✅ Generated ${trail.length} cards`);
                     return trail;
                 } catch (auditErr: unknown) {

@@ -1,5 +1,9 @@
 "use client"
 
+import { useTranslations } from 'next-intl'
+
+import { createPortal } from 'react-dom';
+
 import { useState, useEffect, useMemo, useRef } from "react"
 import { motion } from "framer-motion"
 import { TemplateSelector } from "./TemplateSelector"
@@ -16,6 +20,7 @@ import { Check, Settings, Sparkles, FileText, Layout, Pencil, CheckCheck, Toggle
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
+import { cn } from '@/lib/utils';
 import QRCode from 'qrcode';
 
 const DynamicPdfViewer = dynamic(
@@ -24,7 +29,7 @@ const DynamicPdfViewer = dynamic(
         ssr: false,
         loading: () => (
             <div className="animate-pulse h-[800px] w-full bg-gray-100 rounded-md flex items-center justify-center">
-                <span className="text-gray-400 text-sm">PDF wird geladen...</span>
+                <span className="text-gray-400 text-sm">Loading PDF...</span>
             </div>
         ),
     }
@@ -42,7 +47,7 @@ export interface OptimizerWizardProps {
 }
 
 // --- Cancel Button for CV Optimizer (appears after 15s) ---
-function OptCancelButton({ onCancel }: { onCancel: () => void }) {
+function OptCancelButton({ onCancel, label }: { onCancel: () => void; label: string }) {
     const [visible, setVisible] = useState(false);
     useEffect(() => {
         const timer = setTimeout(() => setVisible(true), 15000);
@@ -57,12 +62,13 @@ function OptCancelButton({ onCancel }: { onCancel: () => void }) {
             onClick={onCancel}
             className="mt-4 text-xs text-gray-400 hover:text-red-500 transition-colors"
         >
-            Abbrechen
+            {label}
         </motion.button>
     );
 }
 
 export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: OptimizerWizardProps) {
+    const t = useTranslations('cv_optimizer');
     const [step, setStep] = useState<1 | 2>(1);
 
     const [isLoading, setIsLoading] = useState(true);
@@ -76,14 +82,14 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
     // Station metrics — always initialized from CV experience, user can fill values before optimizing
     const [stationMetrics, setStationMetrics] = useState<StationMetrics[]>([]);
 
-    const OPT_STEPS = [
-        "Lebenslauf & Match-Ergebnisse werden geladen",
-        "Schwachstellen werden analysiert",
-        "Bullet-Points werden neu formuliert",
-        "Keywords aus der Stellenanzeige werden integriert",
-        "ATS-Kompatibilität wird geprüft",
-        "Vorschläge werden finalisiert",
-    ];
+    const OPT_STEPS = useMemo(() => [
+        t('opt_step_1'),
+        t('opt_step_2'),
+        t('opt_step_3'),
+        t('opt_step_4'),
+        t('opt_step_5'),
+        t('opt_step_6'),
+    ], [t]);
     const [optStep, setOptStep] = useState(0);
 
     useEffect(() => {
@@ -163,7 +169,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                             if (cvStructured.experience && cvStructured.experience.length > 0) {
                                 setStationMetrics(
                                     cvStructured.experience.slice(0, 5).map(exp => ({
-                                        company: exp.company || 'Unbekannt',
+                                        company: exp.company || '',
                                         role: exp.role || '',
                                         metrics: '',
                                     }))
@@ -190,7 +196,37 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
             }
         };
 
+        // QR code persistence: check if a token already exists for this job
+        const restoreQr = async () => {
+            try {
+                const supabase = createClient();
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user || !isMounted) return;
+
+                const { data: approach } = await supabase
+                    .from('video_approaches')
+                    .select('access_token')
+                    .eq('user_id', user.id)
+                    .eq('job_id', jobId)
+                    .single();
+
+                if (approach?.access_token && isMounted) {
+                    const qrUrl = `${window.location.origin}/v/${approach.access_token}`;
+                    const QRCode = (await import('qrcode')).default;
+                    const base64 = await QRCode.toDataURL(qrUrl, { width: 200, margin: 1 });
+                    if (isMounted) {
+                        setQrBase64(base64);
+                        setQrEnabled(true);
+                        console.log('✅ [QR] Restored from existing video_approaches token');
+                    }
+                }
+            } catch {
+                // Non-critical — QR just won't be pre-enabled
+            }
+        };
+
         fetchData();
+        restoreQr();
         return () => { isMounted = false; };
     }, [jobId]);
 
@@ -224,7 +260,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                 || jobData?.cv_match_result;
             if (!cvMatch) {
                 setIsOptimizing(false);
-                setOptimizerError('Kein CV-Match-Ergebnis gefunden. Bitte führe zuerst den CV-Match-Schritt durch.');
+                setOptimizerError(t('error_no_match'));
                 return;
             }
 
@@ -255,16 +291,16 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
 
             const data = await res.json();
             if (!res.ok || !data.success) {
-                throw new Error(data.error || data.details || 'Optimierung fehlgeschlagen');
+                throw new Error(data.error || data.details || t('error_failed'));
             }
 
             setProposal(data.proposal);
         } catch (error: unknown) {
             if (error instanceof DOMException && error.name === 'AbortError') {
                 console.error('[CV Optimize] Client timeout after 110s');
-                setOptimizerError('Die Optimierung hat zu lange gedauert (>110 Sek.). Bitte versuche es erneut — die KI ist manchmal langsamer bei großen Lebensläufen.');
+                setOptimizerError(t('error_timeout'));
             } else {
-                const msg = error instanceof Error ? error.message : 'Unbekannter Fehler';
+                const msg = error instanceof Error ? error.message : t('error_unknown');
                 console.error('[CV Optimize] Error:', msg);
                 setOptimizerError(msg);
             }
@@ -370,12 +406,12 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
     if (!cvData) {
         return (
             <div className="p-8 text-center bg-gray-50 border border-gray-200 rounded-lg space-y-4">
-                <p className="text-gray-800 text-lg font-medium">Kein Lebenslauf gefunden.</p>
+                <p className="text-gray-800 text-lg font-medium">{t('no_cv_title')}</p>
                 <p className="text-sm text-gray-500 max-w-sm mx-auto">
-                    Bitte lade deinen initialen Lebenslauf zuerst hoch und scanne ihn, bevor du ihn optimieren kannst.
+                    {t('no_cv_desc')}
                 </p>
                 <Link href="/dashboard/settings" className="inline-block mt-4 text-blue-600 hover:text-blue-800 font-medium underline">
-                    Zu den Einstellungen
+                    {t('no_cv_link')}
                 </Link>
             </div>
         );
@@ -392,12 +428,12 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
             <div className="flex gap-4 items-center mb-4 px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg">
                 <div className={`flex items-center gap-2 text-sm font-medium ${step >= 1 ? 'text-[#012e7a]' : 'text-gray-400'}`}>
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 1 ? 'bg-blue-100 text-[#012e7a]' : 'bg-gray-200'}`}>1</span>
-                    Optimize
+                    {t('step_optimize')}
                 </div>
                 <div className="w-8 h-[1px] bg-gray-300" />
                 <div className={`flex items-center gap-2 text-sm font-medium ${step === 2 ? 'text-[#012e7a]' : 'text-gray-400'}`}>
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step === 2 ? 'bg-blue-100 text-[#012e7a]' : 'bg-gray-200'}`}>2</span>
-                    Preview
+                    {t('step_preview')}
                 </div>
             </div>
 
@@ -412,44 +448,63 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                 {step === 1 && !proposal && (
                     <div className="flex flex-col items-center justify-center p-12 bg-white border border-gray-200 rounded-xl space-y-6">
                         {isOptimizing ? (
-                            <div className="w-full max-w-md">
-                                {/* Header */}
-                                <div className="flex items-center gap-3 mb-8">
-                                    <LoadingSpinner className="w-7 h-7 text-[#012e7a] shrink-0" />
-                                    <div>
-                                        <p className="text-sm font-semibold text-[#012e7a]">CV wird optimiert…</p>
-                                        <p className="text-xs text-gray-500 mt-0.5">Das dauert etwa 15–20 Sekunden</p>
-                                    </div>
+                            <div className="w-full px-6 py-8 bg-[#FAFAF9] rounded-xl border border-slate-200">
+                                {/* Spinner + title — left-aligned, identical to CV Match design */}
+                                <div className="flex items-center gap-2.5 mb-1">
+                                    <LoadingSpinner className="w-5 h-5 text-[#002e7a] shrink-0" />
+                                    <span className="text-sm font-semibold text-[#37352F]">
+                                        {t('optimizing_title')}
+                                    </span>
                                 </div>
+                                <p className="text-xs text-[#73726E] mb-5 pl-[29px]">{t('optimizing_duration')}</p>
 
-                                {/* Step list */}
-                                <div className="space-y-3">
+                                {/* Step list — full width, identical structure to CV Match */}
+                                <div className="space-y-2">
                                     {OPT_STEPS.map((label, i) => {
                                         const isDone = i < optStep;
                                         const isActive = i === optStep;
                                         return (
                                             <motion.div
                                                 key={i}
-                                                initial={{ opacity: 0, x: -8 }}
+                                                initial={{ opacity: 0, x: -6 }}
                                                 animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: i * 0.08 }}
-                                                className={`flex items-center gap-3 py-2 px-3 rounded-lg transition-colors ${isDone ? 'bg-[#012e7a]/5' : isActive ? 'bg-[#012e7a]/10 border border-[#012e7a]/20' : 'opacity-30'
-                                                    }`}
+                                                transition={{ delay: i * 0.07, duration: 0.25 }}
+                                                className={cn(
+                                                    'flex items-center gap-3 px-4 py-2.5 rounded-lg border transition-all duration-300',
+                                                    isDone
+                                                        ? 'bg-[#EEF2FF] border-[#C7D6F7]'
+                                                        : isActive
+                                                            ? 'bg-white border-[#002e7a] shadow-sm'
+                                                            : 'bg-white border-[#E7E7E5]'
+                                                )}
                                             >
-                                                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-all ${isDone ? 'bg-[#012e7a] text-white' : isActive ? 'border-2 border-[#012e7a] text-[#012e7a]' : 'border border-gray-300 text-gray-400'
-                                                    }`}>
-                                                    {isDone ? '✓' : i + 1}
+                                                {/* Step indicator badge */}
+                                                <div className={cn(
+                                                    'w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 transition-all duration-300',
+                                                    isDone
+                                                        ? 'bg-[#002e7a] text-white'
+                                                        : isActive
+                                                            ? 'border-2 border-[#002e7a] bg-white text-[#002e7a]'
+                                                            : 'border border-[#D0CFC8] bg-white text-[#A8A29E]'
+                                                )}>
+                                                    {isDone ? <Check size={12} /> : <span>{i + 1}</span>}
                                                 </div>
-                                                <span className={`text-sm ${isDone ? 'text-[#012e7a] line-through opacity-60' : isActive ? 'text-[#012e7a] font-medium' : 'text-gray-400'
-                                                    }`}>
+
+                                                {/* Label */}
+                                                <span className={cn(
+                                                    'text-xs flex-1 transition-all duration-300',
+                                                    isDone
+                                                        ? 'line-through text-[#002e7a] opacity-60'
+                                                        : isActive
+                                                            ? 'font-semibold text-[#37352F]'
+                                                            : 'font-normal text-[#A8A29E]'
+                                                )}>
                                                     {label}
                                                 </span>
+
+                                                {/* Right: grey dot for active step */}
                                                 {isActive && (
-                                                    <motion.div
-                                                        className="ml-auto w-3 h-3 rounded-full bg-[#012e7a]"
-                                                        animate={{ scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }}
-                                                        transition={{ repeat: Infinity, duration: 1.2 }}
-                                                    />
+                                                    <div className="w-3.5 h-3.5 rounded-full bg-[#9CA3AF] shrink-0" />
                                                 )}
                                             </motion.div>
                                         );
@@ -457,44 +512,51 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                 </div>
 
                                 {/* Cancel button — appears after 15s */}
-                                <OptCancelButton onCancel={() => setIsOptimizing(false)} />
+                                <div className="mt-5 pl-1">
+                                    <OptCancelButton onCancel={() => setIsOptimizing(false)} label={t('cancel')} />
+                                </div>
                             </div>
                         ) : (
                             <>
                                 {/* Error state: visible retry UI */}
                                 {optimizerError && (
                                     <div className="w-full max-w-md mb-4 bg-red-50 border border-red-200 rounded-lg p-4 text-left">
-                                        <p className="text-sm font-medium text-red-800 mb-1">Optimierung fehlgeschlagen</p>
+                                        <p className="text-sm font-medium text-red-800 mb-1">{t('error_failed')}</p>
                                         <p className="text-xs text-red-700 mb-3">{optimizerError}</p>
                                         <button
                                             onClick={() => { setOptimizerError(null); handleOptimizeClick(); }}
                                             className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md transition"
                                         >
-                                            Erneut versuchen
+                                            {t('error_retry')}
                                         </button>
                                     </div>
                                 )}
                                 <div className="text-center max-w-md w-full">
-                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">CV: Was können wir besser machen?</h3>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('main_title')}</h3>
                                     <p className="text-gray-500 mb-4">
-                                        Wir gleichen deinen <strong className="text-gray-700">Lebenslauf</strong> mit den <strong className="text-gray-700">Match-Ergebnissen</strong> ab und geben dir <strong className="text-gray-700">Vorschläge</strong>, mit welchen Formulierungen du <strong className="text-gray-700">mehr Erfolg</strong> haben wirst.
+                                        {t.rich('main_desc', {
+                                            cv: (chunks) => <strong className="text-gray-700">{t('main_desc_cv')}</strong>,
+                                            matchResults: (chunks) => <strong className="text-gray-700">{t('main_desc_match')}</strong>,
+                                            suggestions: (chunks) => <strong className="text-gray-700">{t('main_desc_suggestions')}</strong>,
+                                            moreSuccess: (chunks) => <strong className="text-gray-700">{t('main_desc_success')}</strong>,
+                                        })}
                                     </p>
 
                                     {/* Anzeigeoptionen Toggle Group */}
                                     <details className="w-full mb-4 text-left group">
                                         <summary className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-gray-600 hover:text-gray-900 transition list-none">
                                             <span className="text-gray-400 group-open:rotate-90 transition-transform duration-200 inline-block">▶</span>
-                                            Anzeigeoptionen
+                                            {t('display_options')}
                                         </summary>
                                         <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
 
                                             {/* Summary toggle */}
                                             <div className="flex items-center justify-between">
-                                                <span className="text-sm text-gray-700">Zusammenfassung anzeigen</span>
+                                                <span className="text-sm text-gray-700">{t('show_summary')}</span>
                                                 <button
                                                     onClick={() => setCvOptSettings(s => ({ ...s, showSummary: !s.showSummary }))}
                                                     className="text-gray-500 hover:text-[#012e7a] transition"
-                                                    aria-label="Zusammenfassung umschalten"
+                                                    aria-label={t('show_summary')}
                                                 >
                                                     {cvOptSettings.showSummary
                                                         ? <ToggleRight className="w-7 h-7 text-[#012e7a]" />
@@ -511,7 +573,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                                             onChange={() => setCvOptSettings(s => ({ ...s, summaryMode: 'full' }))}
                                                             className="accent-[#012e7a]"
                                                         />
-                                                        Vollständig
+                                                        {t('summary_full')}
                                                     </label>
                                                     <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
                                                         <input
@@ -521,18 +583,18 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                                             onChange={() => setCvOptSettings(s => ({ ...s, summaryMode: 'compact' }))}
                                                             className="accent-[#012e7a]"
                                                         />
-                                                        Kompakt (max. 2 Sätze)
+                                                        {t('summary_compact')}
                                                     </label>
                                                 </div>
                                             )}
 
                                             {/* Certificates toggle */}
                                             <div className="flex items-center justify-between">
-                                                <span className="text-sm text-gray-700">Zertifikate anzeigen</span>
+                                                <span className="text-sm text-gray-700">{t('show_certificates')}</span>
                                                 <button
                                                     onClick={() => setCvOptSettings(s => ({ ...s, showCertificates: !s.showCertificates }))}
                                                     className="text-gray-500 hover:text-[#012e7a] transition"
-                                                    aria-label="Zertifikate umschalten"
+                                                    aria-label={t('show_certificates')}
                                                 >
                                                     {cvOptSettings.showCertificates
                                                         ? <ToggleRight className="w-7 h-7 text-[#012e7a]" />
@@ -542,11 +604,11 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
 
                                             {/* Languages toggle */}
                                             <div className="flex items-center justify-between">
-                                                <span className="text-sm text-gray-700">Sprachen anzeigen</span>
+                                                <span className="text-sm text-gray-700">{t('show_languages')}</span>
                                                 <button
                                                     onClick={() => setCvOptSettings(s => ({ ...s, showLanguages: !s.showLanguages }))}
                                                     className="text-gray-500 hover:text-[#012e7a] transition"
-                                                    aria-label="Sprachen umschalten"
+                                                    aria-label={t('show_languages')}
                                                 >
                                                     {cvOptSettings.showLanguages
                                                         ? <ToggleRight className="w-7 h-7 text-[#012e7a]" />
@@ -561,11 +623,11 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                         <details className="w-full mb-6 text-left group">
                                             <summary className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-gray-600 hover:text-gray-900 transition list-none">
                                                 <span className="text-gray-400 group-open:rotate-90 transition-transform duration-200 inline-block">▶</span>
-                                                Hast du konkrete Zahlen?
+                                                {t('metrics_title')}
                                             </summary>
                                             <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
                                                 <p className="text-xs text-gray-500">
-                                                    CVs mit Metriken erzielen deutlich bessere ATS-Scores. Ordne Zahlen direkt deinen Stationen zu — die KI integriert sie gezielt in die passenden Bullet-Points.
+                                                    {t('metrics_desc')}
                                                 </p>
                                                 <div className="space-y-3">
                                                     {stationMetrics.map((station, idx) => (
@@ -584,7 +646,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                                                     updated[idx] = { ...updated[idx], metrics: e.target.value.slice(0, 150) };
                                                                     setStationMetrics(updated);
                                                                 }}
-                                                                placeholder="z.B. 30% Umsatzsteigerung, Team von 12..."
+                                                                placeholder={t('metrics_placeholder')}
                                                                 className="w-full border border-gray-200 rounded px-2.5 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#012e7a]/30"
                                                                 maxLength={150}
                                                             />
@@ -601,7 +663,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                         className="px-6 py-3 bg-[#012e7a] hover:bg-[#01246b] transition flex items-center gap-2 font-medium text-white rounded-lg shadow-sm w-full justify-center"
                                     >
                                         <Sparkles className="w-5 h-5" />
-                                        Optimierung starten
+                                        {t('start_button')}
                                     </button>
                                 </div>
                             </>
@@ -627,32 +689,32 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                     <div className="space-y-4">
                         {/* Template Switcher + Bearbeiten */}
                         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-3">
-                            <div className="text-sm font-medium text-gray-700">Template waehlen:</div>
+                            <div className="text-sm font-medium text-gray-700">{t('template_label')}</div>
                             <div className="flex gap-2">
-                                {TEMPLATES.map((t) => (
+                                {TEMPLATES.map((tmpl) => (
                                     <button
-                                        key={t.id}
-                                        onClick={() => handleTemplateSwitchInPreview(t.id)}
+                                        key={tmpl.id}
+                                        onClick={() => handleTemplateSwitchInPreview(tmpl.id)}
                                         className={`
                                             px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all
-                                            ${templateId === t.id
-                                                ? 'bg-blue-600 text-white shadow-sm'
+                                            ${templateId === tmpl.id
+                                                ? 'bg-[#012e7a] text-white shadow-sm'
                                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
                                         `}
                                     >
-                                        {t.icon}
-                                        {t.label}
+                                        {tmpl.icon}
+                                        {tmpl.label}
                                     </button>
                                 ))}
                                 <button
                                     onClick={() => setIsEditing(!isEditing)}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all
                                         ${isEditing
-                                            ? 'bg-green-600 text-white shadow-sm'
+                                            ? 'bg-[#012e7a] text-white shadow-sm'
                                             : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                                         }`}
                                 >
-                                    {isEditing ? <><CheckCheck size={15} /> Fertig</> : <><Pencil size={15} /> Bearbeiten</>}
+                                    {isEditing ? <><CheckCheck size={15} /> {t('edit_done')}</> : <><Pencil size={15} /> {t('edit_start')}</>}
                                 </button>
                             </div>
                             {/* QR-Video Toggle */}
@@ -666,7 +728,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                     } ${qrLoading ? 'opacity-50 cursor-wait' : ''}`}
                             >
                                 {qrLoading ? <Loader2 size={15} className="animate-spin" /> : <Video size={15} />}
-                                QR-Video
+                                {t('qr_video')}
                             </button>
                         </div>
 
@@ -691,7 +753,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                 onClick={() => { setStep(1); setIsEditing(false); }}
                                 className="px-5 py-2 text-gray-600 hover:text-gray-900 font-medium rounded-lg hover:bg-gray-50 flex items-center transition"
                             >
-                                Zurueck zum Optimizer
+                                {t('back_to_optimizer')}
                             </button>
 
                         <div className="flex items-center gap-3">
@@ -701,7 +763,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                     className="px-5 py-2.5 bg-white border border-[#012e7a] text-[#012e7a] hover:bg-[#012e7a]/5 font-medium rounded-lg flex items-center gap-2 transition-colors"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                                    Cover Letter
+                                    {t('cover_letter')}
                                 </button>
                             </div>
                         </div>
@@ -713,33 +775,33 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
             <CustomDialog
                 isOpen={showQrDialog}
                 onClose={() => setShowQrDialog(false)}
-                title="QR-Code auf dem Lebenslauf"
+                title={t('qr_dialog_title')}
                 maxWidth="max-w-lg"
             >
                 <div className="p-6 space-y-4">
                     <p className="text-sm text-gray-600 leading-relaxed">
-                        Bevor wir deinen persönlichen QR-Code generieren, hier ein kurzer Überblick, warum sich dieser Schritt für dich lohnt:
+                        {t('qr_intro')}
                     </p>
 
                     <div className="space-y-2.5">
                         <div className="border border-gray-100 rounded-lg p-3">
-                            <p className="text-sm font-semibold text-gray-900 mb-0.5">Der beste erste Eindruck</p>
-                            <p className="text-xs text-gray-500 leading-relaxed">Ein kurzes Video gibt Recruitern ein authentischeres Bild von dir als reiner Text. Du zeigst, wer du bist.</p>
+                            <p className="text-sm font-semibold text-gray-900 mb-0.5">{t('qr_benefit_1_title')}</p>
+                            <p className="text-xs text-gray-500 leading-relaxed">{t('qr_benefit_1_desc')}</p>
                         </div>
 
                         <div className="border border-gray-100 rounded-lg p-3">
-                            <p className="text-sm font-semibold text-gray-900 mb-0.5">Deine Chancen steigen</p>
-                            <p className="text-xs text-gray-500 leading-relaxed">Du stichst sofort aus der Masse heraus. Erfahrungswerte zeigen, dass persönliche Videobotschaften die Chance auf ein Vorstellungsgespräch um bis zu 40&nbsp;% erhöhen können.</p>
+                            <p className="text-sm font-semibold text-gray-900 mb-0.5">{t('qr_benefit_2_title')}</p>
+                            <p className="text-xs text-gray-500 leading-relaxed">{t('qr_benefit_2_desc')}</p>
                         </div>
 
                         <div className="border border-gray-100 rounded-lg p-3">
-                            <p className="text-sm font-semibold text-gray-900 mb-0.5">Volle Kontrolle (Kein Download)</p>
-                            <p className="text-xs text-gray-500 leading-relaxed">Dein Video wird sicher auf EU-Servern gehostet (AWS Frankfurt). Recruiter können das Video ausschließlich ansehen (Stream) – ein Herunterladen oder Speichern ist technisch blockiert.</p>
+                            <p className="text-sm font-semibold text-gray-900 mb-0.5">{t('qr_benefit_3_title')}</p>
+                            <p className="text-xs text-gray-500 leading-relaxed">{t('qr_benefit_3_desc')}</p>
                         </div>
 
                         <div className="border border-gray-100 rounded-lg p-3">
-                            <p className="text-sm font-semibold text-gray-900 mb-0.5">Automatische Löschung</p>
-                            <p className="text-xs text-gray-500 leading-relaxed">Du musst dich um nichts kümmern. Nach genau 14 Tagen wird dein Video restlos und unwiderruflich gelöscht.</p>
+                            <p className="text-sm font-semibold text-gray-900 mb-0.5">{t('qr_benefit_4_title')}</p>
+                            <p className="text-xs text-gray-500 leading-relaxed">{t('qr_benefit_4_desc')}</p>
                         </div>
                     </div>
 
@@ -748,14 +810,14 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                             onClick={() => setShowQrDialog(false)}
                             className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition"
                         >
-                            Abbrechen
+                            {t('qr_cancel')}
                         </button>
                         <button
                             onClick={generateQrCode}
                             className="px-5 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white text-sm font-medium rounded-lg transition flex items-center gap-2"
                         >
                             <Video size={15} />
-                            Einverstanden
+                            {t('qr_agree')}
                         </button>
                     </div>
                 </div>

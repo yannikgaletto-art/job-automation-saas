@@ -129,23 +129,52 @@ export async function POST(request: Request) {
         const maxQuestions = Math.min(Math.max(requestedMax || 5, 1), 5);
         const round = interviewRound || 'kennenlernen';
 
-        // Idempotency check: return existing active session for this job
+        // Idempotency check: return existing active session ONLY if params match.
+        // If round or maxQuestions differ → the user wants a fresh session → abandon the old one.
         const { data: existingSession } = await supabaseAdmin
             .from('coaching_sessions')
-            .select('id, coaching_dossier, conversation_history')
+            .select('id, coaching_dossier, conversation_history, max_questions, interview_round')
             .eq('user_id', user.id)
             .eq('job_id', jobId)
             .eq('session_status', 'active')
             .maybeSingle();
 
         if (existingSession) {
-            console.log(`✅ [Coaching] Returning existing active session: ${existingSession.id}`);
-            return NextResponse.json({
-                sessionId: existingSession.id,
-                dossier: existingSession.coaching_dossier,
-                firstQuestion: existingSession.conversation_history?.[0]?.content || '',
-                existing: true,
-            } satisfies CreateSessionResponse & { existing: boolean });
+            const paramsMatch =
+                existingSession.interview_round === round &&
+                existingSession.max_questions === maxQuestions;
+
+            if (!paramsMatch) {
+                // User changed round or question count → abandon old session, create fresh
+                console.log(`[Coaching] Params changed (round/questions), abandoning session ${existingSession.id}`);
+                await supabaseAdmin
+                    .from('coaching_sessions')
+                    .update({ session_status: 'abandoned' })
+                    .eq('id', existingSession.id);
+            } else {
+                // Params match — reuse existing session
+
+                // Fix 3: Fall-forward if initial message was never generated (empty history)
+                let firstQuestion = existingSession.conversation_history?.[0]?.content || '';
+                if (!firstQuestion) {
+                    console.log(`[Coaching] Session ${existingSession.id} has empty history — regenerating initial message.`);
+                    try {
+                        const { aiMessage } = await getInitialCoachingMessage(existingSession.id, user.id);
+                        firstQuestion = aiMessage;
+                    } catch (e) {
+                        console.error('[Coaching] Failed to regenerate initial message:', e);
+                    }
+                }
+
+                console.log(`✅ [Coaching] Returning existing active session: ${existingSession.id}`);
+                return NextResponse.json({
+                    sessionId: existingSession.id,
+                    dossier: existingSession.coaching_dossier,
+                    firstQuestion,
+                    maxQuestions: existingSession.max_questions, // Fix 2: always include maxQuestions
+                    existing: true,
+                } satisfies CreateSessionResponse & { existing: boolean });
+            }
         }
 
         // Load job data (Contract 3: user-scoped)

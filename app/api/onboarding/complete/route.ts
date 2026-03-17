@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { step } = await request.json();
+        const { step, language } = await request.json();
 
         const { error } = await supabaseAdmin
             .from('user_settings')
@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
                     user_id: user.id,
                     onboarding_completed: true,
                     onboarding_step: step || 5,
+                    // i18n: save user-selected language (default: 'de')
+                    ...(language && ['de', 'en', 'es'].includes(language) ? { language } : {}),
                     updated_at: new Date().toISOString(),
                 },
                 { onConflict: 'user_id' }

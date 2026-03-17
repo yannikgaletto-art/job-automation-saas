@@ -132,7 +132,8 @@ export function ValleyTemplate({ data, qrBase64 }: { data: CvStructuredData; qrB
                         {qrBase64 && (
                             <View style={{ alignItems: 'center', marginRight: 10 }}>
                                 <Image src={qrBase64} style={{ width: 46, height: 46 }} />
-                                <Text style={{ fontSize: 5, color: MUTED, marginTop: 2, textAlign: 'center' }}>Video-Vorstellung{"\n"}14 Tage verfügbar</Text>
+                                <Text style={{ fontSize: 6.5, fontWeight: 700, color: DARK, marginTop: 3, textAlign: 'center' }}>Video Pitch</Text>
+                                <Text style={{ fontSize: 5, color: MUTED, marginTop: 1, textAlign: 'center' }}>14 Tage verfügbar</Text>
                             </View>
                         )}
                         <View style={s.headerContact}>

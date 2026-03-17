@@ -3,6 +3,7 @@
 import type { ReactNode } from "react"
 
 import { useState, useMemo } from "react"
+import { useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from "framer-motion"
 import { Check, X, ArrowRight, ChevronRight } from "lucide-react"
 import { CvChange, CvOptimizationProposal, CvStructuredData } from "@/types/cv"
@@ -17,29 +18,22 @@ export interface DiffReviewProps {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const SECTION_LABELS: Record<string, string> = {
-    experience: "Erfahrung",
-    education: "Ausbildung",
-    skills: "Skills",
-    personalInfo: "Persönliche Info",
-    languages: "Sprachen",
-    certificates: "Zertifikate",
-    certifications: "Zertifikate",
-    summary: "Zusammenfassung",
+const SECTION_KEYS: Record<string, string> = {
+    experience: "section_experience",
+    education: "section_education",
+    skills: "section_skills",
+    personalInfo: "section_personalInfo",
+    languages: "section_languages",
+    certificates: "section_certificates",
+    certifications: "section_certifications",
+    summary: "section_summary",
 };
 
-const TYPE_LABELS: Record<string, string> = {
-    modify: "Modifizieren",
-    add: "Ergänzen",
-    remove: "Entfernen",
+const TYPE_KEYS: Record<string, string> = {
+    modify: "type_modify",
+    add: "type_add",
+    remove: "type_remove",
 };
-
-function sectionLabel(s: string) {
-    return SECTION_LABELS[s] ?? s.charAt(0).toUpperCase() + s.slice(1);
-}
-function typeLabel(t: string) {
-    return TYPE_LABELS[t] ?? t;
-}
 
 // Highlight keywords that differ between before and after (very simple word-diff)
 function highlightNew(before: string, after: string): ReactNode {
@@ -59,10 +53,12 @@ function ChangeRow({
     change,
     decision,
     onDecide,
+    t,
 }: {
     change: CvChange;
     decision: 'accepted' | 'rejected' | undefined;
     onDecide: (id: string, d: 'accepted' | 'rejected') => void;
+    t: ReturnType<typeof useTranslations>;
 }) {
     const [open, setOpen] = useState(false);
     const isRejected = decision === 'rejected';
@@ -98,7 +94,7 @@ function ChangeRow({
                 <div className="flex gap-1 ml-3 shrink-0" onClick={e => e.stopPropagation()}>
                     <button
                         onClick={() => onDecide(change.id, 'rejected')}
-                        title="Ablehnen"
+                        title={t('reject_tooltip')}
                         className={cn(
                             "w-7 h-7 flex items-center justify-center rounded-md transition-colors",
                             isRejected
@@ -110,7 +106,7 @@ function ChangeRow({
                     </button>
                     <button
                         onClick={() => onDecide(change.id, 'accepted')}
-                        title="Übernehmen"
+                        title={t('accept_tooltip')}
                         className={cn(
                             "w-7 h-7 flex items-center justify-center rounded-md transition-colors",
                             isAccepted
@@ -138,17 +134,17 @@ function ChangeRow({
                             <div className="mx-4 mb-4 border border-red-100 rounded-lg overflow-hidden text-sm bg-red-50/30">
                                 <div className="px-3 py-3">
                                     <p className="text-gray-400 line-through leading-relaxed">{change.before}</p>
-                                    <p className="text-xs text-red-600/70 mt-2 font-medium">Wird entfernt — {change.reason}</p>
+                                    <p className="text-xs text-red-600/70 mt-2 font-medium">{t('removed_reason', { reason: change.reason })}</p>
                                 </div>
                             </div>
                         ) : (
-                            /* Modify/Add layout: Vorher/Nachher table */
+                            /* Modify/Add layout: Before/After table */
                             <div className="mx-4 mb-4 border border-gray-100 rounded-lg overflow-hidden text-sm">
                                 <table className="w-full table-fixed">
                                     <thead>
                                         <tr className="bg-gray-50 border-b border-gray-100">
-                                            <th className="w-1/2 px-3 py-2 text-left text-xs font-semibold text-gray-500 tracking-wide">Vorher</th>
-                                            <th className="w-1/2 px-3 py-2 text-left text-xs font-semibold text-[#012e7a] tracking-wide border-l border-gray-100">Nachher</th>
+                                            <th className="w-1/2 px-3 py-2 text-left text-xs font-semibold text-gray-500 tracking-wide">{t('col_before')}</th>
+                                            <th className="w-1/2 px-3 py-2 text-left text-xs font-semibold text-[#012e7a] tracking-wide border-l border-gray-100">{t('col_after')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -179,16 +175,20 @@ function TypeGroup({
     decisions,
     onDecide,
     onBulkDecide,
+    t,
 }: {
     typeKey: string;
     changes: CvChange[];
     decisions: Record<string, 'accepted' | 'rejected'>;
     onDecide: (id: string, d: 'accepted' | 'rejected') => void;
     onBulkDecide: (ids: string[], d: 'accepted' | 'rejected') => void;
+    t: ReturnType<typeof useTranslations>;
 }) {
     const [open, setOpen] = useState(false);
     const ids = changes.map(c => c.id);
     const pending = changes.filter(c => !decisions[c.id]).length;
+
+    const typeLabel = TYPE_KEYS[typeKey] ? t(TYPE_KEYS[typeKey]) : typeKey;
 
     return (
         <div className="ml-5">
@@ -206,25 +206,25 @@ function TypeGroup({
                         "w-3.5 h-3.5 text-gray-400 transition-transform duration-200",
                         open && "rotate-90"
                     )} />
-                    <span className="text-sm font-medium">{typeLabel(typeKey)}</span>
+                    <span className="text-sm font-medium">{typeLabel}</span>
                     <span className="ml-1 text-xs text-gray-400">({changes.length})</span>
                 </div>
                 {/* Pending badge + bulk actions */}
                 <div className="flex items-center gap-2 shrink-0">
                     {pending > 0 && (
                         <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
-                            {pending} offen
+                            {t('pending_badge', { n: pending })}
                         </span>
                     )}
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                             onClick={() => onBulkDecide(ids, 'rejected')}
                             className="text-[10px] px-2 py-0.5 rounded text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                        >Alle ablehnen</button>
+                        >{t('reject_all')}</button>
                         <button
                             onClick={() => onBulkDecide(ids, 'accepted')}
                             className="text-[10px] px-2 py-0.5 rounded text-gray-400 hover:bg-[#012e7a]/10 hover:text-[#012e7a] transition-colors"
-                        >Alle übern.</button>
+                        >{t('accept_all_short')}</button>
                     </div>
                 </div>
             </div>
@@ -245,6 +245,7 @@ function TypeGroup({
                                     change={change}
                                     decision={decisions[change.id]}
                                     onDecide={onDecide}
+                                    t={t}
                                 />
                             ))}
                         </div>
@@ -261,16 +262,22 @@ function SectionGroup({
     decisions,
     onDecide,
     onBulkDecide,
+    t,
 }: {
     sectionKey: string;
     changesByType: Record<string, CvChange[]>;
     decisions: Record<string, 'accepted' | 'rejected'>;
     onDecide: (id: string, d: 'accepted' | 'rejected') => void;
     onBulkDecide: (ids: string[], d: 'accepted' | 'rejected') => void;
+    t: ReturnType<typeof useTranslations>;
 }) {
     const [open, setOpen] = useState(false);
     const total = Object.values(changesByType).flat().length;
     const pending = Object.values(changesByType).flat().filter(c => !decisions[c.id]).length;
+
+    const sectionLabel = SECTION_KEYS[sectionKey]
+        ? t(SECTION_KEYS[sectionKey])
+        : sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1);
 
     return (
         <div className="border-b border-gray-100 last:border-0 pb-3 last:pb-0">
@@ -282,12 +289,12 @@ function SectionGroup({
                     "w-4 h-4 text-gray-500 transition-transform duration-200",
                     open && "rotate-90"
                 )} />
-                <span className="text-base font-semibold text-gray-900">{sectionLabel(sectionKey)}</span>
+                <span className="text-base font-semibold text-gray-900">{sectionLabel}</span>
                 <span className="text-xs text-gray-400">({total})</span>
                 {pending > 0 && (
                     <div className="ml-auto flex flex-col items-end gap-0.5">
                         <span className="text-[10px] bg-[#012e7a]/10 text-[#012e7a] px-2 py-0.5 rounded-full font-semibold">
-                            {pending} ausstehend
+                            {t('outstanding_badge', { n: pending })}
                         </span>
                     </div>
                 )}
@@ -311,6 +318,7 @@ function SectionGroup({
                                     decisions={decisions}
                                     onDecide={onDecide}
                                     onBulkDecide={onBulkDecide}
+                                    t={t}
                                 />
                             ))}
                         </div>
@@ -324,6 +332,7 @@ function SectionGroup({
 // ── Main DiffReview ────────────────────────────────────────────────────────
 
 export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffReviewProps) {
+    const t = useTranslations('diff_review');
     const [decisions, setDecisions] = useState<Record<string, 'accepted' | 'rejected'>>({});
 
     const handleDecide = (id: string, d: 'accepted' | 'rejected') => {
@@ -378,11 +387,11 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Änderungen prüfen</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">{t('header_title')}</h2>
                     <p className="text-xs text-gray-500 mt-0.5">
                         {pendingCount > 0
-                            ? <><span className="text-amber-600 font-medium">{pendingCount} offen</span> · {acceptedCount} übernommen · {rejectedCount} abgelehnt</>
-                            : <span className="text-[#012e7a] font-medium">Alle {totalCount} Änderungen geprüft ✓</span>
+                            ? <><span className="text-amber-600 font-medium">{t('status_pending', { pending: pendingCount })}</span> · {t('status_accepted', { n: acceptedCount })} · {t('status_rejected', { n: rejectedCount })}</>
+                            : <span className="text-[#012e7a] font-medium">{t('all_checked', { n: totalCount })}</span>
                         }
                     </p>
                 </div>
@@ -391,13 +400,13 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
                         onClick={handleRejectAll}
                         className="text-xs px-3 py-1.5 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors border border-gray-200"
                     >
-                        Alle ablehnen
+                        {t('reject_all_header')}
                     </button>
                     <button
                         onClick={handleAcceptAll}
                         className="text-xs px-3 py-1.5 rounded-md text-[#012e7a] hover:bg-[#012e7a]/10 transition-colors border border-[#012e7a]/20 font-medium"
                     >
-                        Alle übernehmen
+                        {t('accept_all_header')}
                     </button>
                 </div>
             </div>
@@ -412,6 +421,7 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
                         decisions={decisions}
                         onDecide={handleDecide}
                         onBulkDecide={handleBulkDecide}
+                        t={t}
                     />
                 ))}
             </div>
@@ -422,13 +432,13 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
                     onClick={onCancel}
                     className="px-4 py-2 text-sm text-gray-500 hover:text-gray-800 font-medium transition-colors"
                 >
-                    Abbrechen
+                    {t('footer_cancel')}
                 </button>
                 <button
                     onClick={handleFinalize}
                     className="px-5 py-2.5 bg-[#012e7a] hover:bg-[#01246b] text-white text-sm font-medium rounded-lg shadow-sm transition-all flex items-center gap-2"
                 >
-                    Speichern und Preview <ArrowRight className="w-4 h-4" />
+                    {t('footer_save')} <ArrowRight className="w-4 h-4" />
                 </button>
             </div>
         </div>

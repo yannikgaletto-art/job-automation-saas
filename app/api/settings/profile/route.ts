@@ -20,7 +20,7 @@ export async function GET() {
         // Fetch user_settings (linkedin, target_role, avatar_animal)
         const { data: settings } = await supabase
             .from('user_settings')
-            .select('linkedin_url, target_role, avatar_animal')
+            .select('linkedin_url, target_role, avatar_animal, language')
             .eq('user_id', user.id)
             .maybeSingle();
 
@@ -41,6 +41,7 @@ export async function GET() {
             success: true,
             full_name,
             avatar_animal: settings?.avatar_animal ?? null,
+            language: settings?.language ?? 'de',
             profile: {
                 linkedin_url: settings?.linkedin_url ?? '',
                 target_role: settings?.target_role ?? '',
@@ -133,11 +134,15 @@ export async function PATCH(request: NextRequest) {
 
         const body = await request.json();
 
-        const allowed = ['avatar_animal', 'linkedin_url', 'target_role'] as const;
+        const allowed = ['avatar_animal', 'linkedin_url', 'target_role', 'language'] as const;
         const updatePayload: Record<string, unknown> = {};
 
         for (const key of allowed) {
             if (key in body) {
+                // i18n: validate language value
+                if (key === 'language' && !['de', 'en', 'es'].includes(body[key])) {
+                    return NextResponse.json({ error: 'settings.invalid_language' }, { status: 400 });
+                }
                 updatePayload[key] = body[key] ?? null;
             }
         }

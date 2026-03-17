@@ -1,9 +1,10 @@
 'use client';
 
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface CustomDialogProps {
     isOpen: boolean;
@@ -22,6 +23,9 @@ export function CustomDialog({
     className,
     maxWidth = "max-w-md"
 }: CustomDialogProps) {
+    // Track if we're mounted client-side (needed for portal)
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
 
     // Close on escape key
     useEffect(() => {
@@ -32,7 +36,9 @@ export function CustomDialog({
         return () => window.removeEventListener('keydown', handleEsc);
     }, [isOpen, onClose]);
 
-    return (
+    if (!mounted) return null;
+
+    const dialog = (
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -42,35 +48,44 @@ export function CustomDialog({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/40 z-[200] backdrop-blur-sm"
+                        className="fixed inset-0 bg-black/40 z-[9998] backdrop-blur-sm"
                     />
 
-                    {/* Dialog Panel */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className={cn(
-                            "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full bg-white rounded-xl shadow-2xl z-[201] flex flex-col max-h-[85vh] border border-[#d6d6d6]",
-                            maxWidth,
-                            className
-                        )}
+                    {/* Centering wrapper — uses flexbox, NOT transform, so Framer Motion can't break it */}
+                    <div
+                        className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none p-4"
                     >
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-[#d6d6d6] bg-[#FAFAF9]">
-                            <h2 className="text-lg font-semibold text-[#37352F]">{title || ' '}</h2>
-                            <button onClick={onClose} className="text-[#a1a1aa] hover:text-[#37352F] transition-colors ml-auto">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
+                            className={cn(
+                                "w-full bg-white rounded-xl shadow-2xl flex flex-col border border-[#d6d6d6] pointer-events-auto min-h-0 overflow-hidden",
+                                maxWidth,
+                                className
+                            )}
+                            style={{ maxHeight: 'min(85vh, 680px)' }}
+                        >
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-[#d6d6d6] bg-[#FAFAF9] shrink-0 rounded-t-xl">
+                                <h2 className="text-lg font-semibold text-[#37352F]">{title || ' '}</h2>
+                                <button onClick={onClose} className="text-[#a1a1aa] hover:text-[#37352F] transition-colors ml-auto">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
 
-                        {/* Body */}
-                        <div className="overflow-y-auto flex-1">
-                            {children}
-                        </div>
-                    </motion.div>
+                            {/* Body — scrollable so buttons are always reachable */}
+                            <div className="overflow-y-auto flex-1 overscroll-contain">
+                                {children}
+                            </div>
+                        </motion.div>
+                    </div>
                 </>
             )}
         </AnimatePresence>
     );
+
+    // Portal renders directly into body — bypasses any ancestor transform context
+    return createPortal(dialog, document.body);
 }

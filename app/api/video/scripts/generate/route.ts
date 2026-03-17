@@ -56,13 +56,23 @@ export async function POST(request: NextRequest) {
         if (rateLimited) return rateLimited;
 
         const log = logger.forRequest(requestId, user.id, '/api/video/scripts/generate');
-        const { jobId, force } = await request.json() as { jobId: string; force?: boolean };
+        const {
+            jobId,
+            force,
+            applicant_archetype,
+            tone_mode,
+        } = await request.json() as {
+            jobId: string;
+            force?: boolean;
+            applicant_archetype?: string;
+            tone_mode?: 'standard' | 'direct' | 'initiative';
+        };
         if (!jobId) {
             return NextResponse.json({ error: 'Missing jobId', requestId }, { status: 400 });
         }
 
         const userId = user.id;
-        log.info('Generating video script', { jobId, force: !!force });
+        log.info('Generating video script', { jobId, force: !!force, applicant_archetype, tone_mode });
 
         // Fix 1: Check for existing script before overwriting
         const { data: existingScript } = await supabaseAdmin
@@ -130,21 +140,93 @@ export async function POST(request: NextRequest) {
             ? (clDraft.metadata.generated_content as string).substring(0, 500)
             : '';
 
-        // Claude Haiku: categorize keywords + generate block content
-        const prompt = `Du bist ein Karriere-Coach. Erstelle ein strukturiertes Video-Skript für ein 1-minütiges Bewerbungsvideo.
+        // --- Human Voice Directive ---
+        const toneCalibration = {
+            standard: `TONE_MODE: standard
+- "Sie"-Anrede im Abschluss erlaubt
+- Eröffnung mit Namen + Position (aber KEIN "bewerbe mich"-Satz)
+- Geeignet für: Konzern, Kanzlei, klassische Industrie`,
+            direct: `TONE_MODE: direct
+- "du/ihr"-Anrede im Abschluss
+- Erfahrungs-Block mit einer konkreten Zahl oder einem Datum
+- Geeignet für: Tech, Startup, Scale-up`,
+            initiative: `TONE_MODE: initiative
+- Vorstellung beginnt mit einer Beobachtung über die Firma (mirror_phrases nutzen), NICHT mit dem Namen
+- Abschluss schlägt einen konkreten nächsten Schritt vor
+- Name kommt erst in Satz 2 der Vorstellung
+- Geeignet für: wenn Stellenanzeige "ownership", "proaktiv", "self-starter" enthält
+- WICHTIG: Wenn keine konkreten Firmen-Infos, formuliere Beobachtung über Branche/Rolle. Erfinde NICHTS.`,
+        }[tone_mode ?? 'direct'] || '';
+
+        const archetypeHint = applicant_archetype ? {
+            builder: 'ARCHETYPE: Builder — Ergebnisse, Zahlen, gebaute Dinge betonen.',
+            strategist: 'ARCHETYPE: Stratege — Analyse, Denkweise, Klarheit betonen.',
+            teamplayer: 'ARCHETYPE: Teamplayer — Zusammenarbeit, gemeinsame Erfolge betonen.',
+            specialist: 'ARCHETYPE: Spezialist — Fachtiefe, technisches Wissen betonen.',
+        }[applicant_archetype] || '' : '';
+
+        // Claude Haiku: categorize keywords + generate block content + extract mirror phrases
+        const prompt = `Du schreibst Stichpunkte für ein 60-Sekunden-Video-Pitch.
+Kein Essay. Keine Präsentation. Jemand schaut in eine Kamera und redet.
+
+KONTEXT:
+- Der User liest diese Stichpunkte als Teleprompter
+- Jeder Block wird laut gesprochen, nicht gelesen
+- 60 Sekunden = ca. 130 Wörter gesamt = Kürze ist Pflicht
+- Jeder Satz muss sich natürlich anhören wenn man ihn laut sagt
 
 Firma: ${job.company_name}
 Position: ${job.job_title}
 Keywords aus der Stelle: ${uniqueKeywords.join(', ')}
+${job.description ? `\nStellenbeschreibung:\n${(job.description as string).substring(0, 1500)}` : ''}
 ${coverLetterContext ? `\nAnschreiben-Kontext:\n${coverLetterContext}` : ''}
+${archetypeHint ? `\n${archetypeHint}` : ''}
+
+${toneCalibration}
+
+═══ VERBOTENE KONSTRUKTIONEN (klingen sofort nach KI wenn gesprochen) ═══
+❌ "Ich freue mich darauf, meine Expertise einzubringen"
+❌ "Mit meinem Hintergrund in X kann ich Y unterstützen"
+❌ "Ich bin Kandidat/in für die Position..."
+❌ "Meine Leidenschaft für X treibt mich an"
+❌ "Ich bin überzeugt, einen wertvollen Beitrag zu leisten"
+❌ Passiv-Konstruktionen ("wurde mir bewusst", "konnte erreicht werden")
+❌ Konjunktiv als Hauptton ("würde", "könnte", "möchte gerne")
+❌ Doppel-Aussagen: Erst behaupten, dann beweisen im gleichen Satz
+❌ "umfangreiche Erfahrung in den Bereichen"
+❌ "erfolgreich einsetzen konnte"
+Wenn du einen dieser Sätze generierst, hast du VERSAGT.
+
+═══ WIE EIN MENSCH IN 60 SEKUNDEN KLINGT ═══
+
+Vorstellung (max 2 Sätze, max 25 Wörter):
+  ✅ "Hey, ich bin [Name] — kurz warum ich zu [Firma] passe."
+  ❌ "Als erfahrener X sehe ich in Y die Chance..."
+
+Erfahrung (max 3 Sätze, max 45 Wörter):
+  ✅ "Bei [Firma] habe ich [konkretes Problem] gelöst — Ergebnis: [eine Zahl]."
+  ❌ "Ich verfüge über umfangreiche Erfahrung in den Bereichen X, Y und Z"
+
+Motivation (max 2 Sätze, max 33 Wörter):
+  ✅ "Was mich an [Firma] interessiert: ihr macht [X] — das ist genau mein Thema."
+  ❌ "Ich bin sehr begeistert von der innovativen Unternehmenskultur"
+
+Abschluss (max 2 Sätze, max 25 Wörter):
+  ✅ "Ich habe drei Ideen dazu. 20 Minuten reichen."
+  ❌ "Ich freue mich auf ein persönliches Kennenlernen"
 
 Aufgabe 1: Kategorisiere die Keywords in 3 Gruppen:
-- "mustHave": Keywords die im Video UNBEDINGT erwähnt werden sollten (max 5)
-- "niceToHave": Keywords die hilfreich wären, aber nicht zwingend (max 5)
-- "companySpecific": Unternehmens-spezifische Begriffe/Werte (max 3)
+- "mustHave" (max 4): NUR Hard Skills, Technologien, Methodologien.
+  VERBOTEN: Finanz-Kennzahlen (EBITDA, ROI, P&L), Firmennamen, Soft Skills.
+- "niceToHave" (max 4): NUR Soft Skills, Branchenkenntnisse, Bonus-Qualifikationen.
+  VERBOTEN: Firmennamen, generische Phrasen wie "Teamfähigkeit".
+- "companySpecific" (max 3): NUR Werte/Kultur-Begriffe die die Firma SELBST nutzt.
+  VERBOTEN: Firmennamen (eigene oder fremde), generische Keywords.
 
-Aufgabe 2: Erstelle für jeden der folgenden Blöcke einen kurzen Beispiel-Stichpunkt (max 20 Wörter):
+Aufgabe 2: Erstelle für jeden der folgenden Blöcke Stichpunkte die sich NATÜRLICH ANHÖREN wenn laut gesprochen:
 ${(templates || []).map(t => `- ${t.name} (${t.default_duration_seconds}s)`).join('\n')}
+
+Aufgabe 3: Extrahiere 2-3 Identitäts-Phrasen die die Firma über sich selbst sagt (keine Keywords, sondern Selbstbeschreibungen).
 
 Antworte NUR mit folgendem JSON (kein anderer Text):
 {
@@ -153,8 +235,9 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
     "niceToHave": ["..."],
     "companySpecific": ["..."]
   },
+  "mirror_phrases": ["...", "..."],
   "blocks": [
-    { "title": "Vorstellung", "content": "Beispiel-Stichpunkt hier" },
+    { "title": "Vorstellung", "content": "..." },
     { "title": "Motivation", "content": "..." },
     { "title": "Erfahrung", "content": "..." },
     { "title": "Abschluss", "content": "..." }
@@ -163,7 +246,7 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
 
         const aiResponse = await anthropic.messages.create({
             model: 'claude-3-haiku-20240307',
-            max_tokens: 600,
+            max_tokens: 950,
             messages: [{ role: 'user', content: prompt }],
         });
 
@@ -171,6 +254,7 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
 
         let categorizedKeywords: CategorizedKeywords = { mustHave: [], niceToHave: [], companySpecific: [] };
         let aiBlocks: { title: string; content: string }[] = [];
+        let mirrorPhrases: string[] = [];
 
         try {
             const jsonMatch = aiText.match(/\{[\s\S]*\}/);
@@ -178,6 +262,7 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
                 const parsed = JSON.parse(jsonMatch[0]);
                 categorizedKeywords = parsed.keywords || categorizedKeywords;
                 aiBlocks = parsed.blocks || [];
+                mirrorPhrases = parsed.mirror_phrases || [];
             }
         } catch {
             log.error('Failed to parse generate response', { raw: aiText });
@@ -208,7 +293,7 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
                     mode: 'bullets',
                     blocks,
                     keywords_covered: [],
-                    categorized_keywords: categorizedKeywords,
+                    categorized_keywords: { ...categorizedKeywords, mirrorPhrases },
                     updated_at: new Date().toISOString(),
                 },
                 { onConflict: 'user_id,job_id', ignoreDuplicates: false }
@@ -257,7 +342,7 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
                 keywordsCovered: [],
                 wpmSpeed: 130,
             },
-            categorizedKeywords,
+            categorizedKeywords: { ...categorizedKeywords, mirrorPhrases },
             templates: templates || [],
         });
 

@@ -1,12 +1,38 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import createIntlMiddleware from 'next-intl/middleware'
+import { routing } from '@/i18n/routing'
+
+// next-intl middleware for locale detection and routing
+const intlMiddleware = createIntlMiddleware(routing)
 
 export async function middleware(request: NextRequest) {
-    let response = NextResponse.next({
-        request: {
-            headers: request.headers,
-        },
-    })
+    const { pathname } = request.nextUrl
+
+    // ─── Skip locale handling for non-page routes ──────────────────────
+    // API routes, auth callbacks, static files — no locale prefix
+    if (
+        pathname.startsWith('/api') ||
+        pathname.startsWith('/auth') ||
+        pathname.startsWith('/v/') ||
+        pathname.startsWith('/_next') ||
+        pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico)$/)
+    ) {
+        return NextResponse.next()
+    }
+
+    // ─── Extract locale from pathname ──────────────────────────────────
+    // Matches /de, /en, /es with optional trailing content
+    const localeMatch = pathname.match(/^\/(de|en|es)(\/|$)/)
+    const locale = localeMatch ? localeMatch[1] : routing.defaultLocale
+
+    // Strip locale prefix for route matching
+    const pathnameWithoutLocale = localeMatch
+        ? pathname.slice(localeMatch[1].length + 1) // e.g. /de/dashboard → /dashboard
+        : pathname
+
+    // ─── Supabase Auth Client ──────────────────────────────────────────
+    let response = intlMiddleware(request)
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,11 +48,7 @@ export async function middleware(request: NextRequest) {
                         value,
                         ...options,
                     })
-                    response = NextResponse.next({
-                        request: {
-                            headers: request.headers,
-                        },
-                    })
+                    response = intlMiddleware(request)
                     response.cookies.set({
                         name,
                         value,
@@ -39,11 +61,7 @@ export async function middleware(request: NextRequest) {
                         value: '',
                         ...options,
                     })
-                    response = NextResponse.next({
-                        request: {
-                            headers: request.headers,
-                        },
-                    })
+                    response = intlMiddleware(request)
                     response.cookies.set({
                         name,
                         value: '',
@@ -54,35 +72,34 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { user } } = await supabase.auth.getUser()
 
-    // Public routes that don't require auth
-    const publicRoutes = ['/login', '/signup']
-    const isPublicRoute = publicRoutes.some(route =>
-        request.nextUrl.pathname.startsWith(route)
+    // ─── Public routes that don't require auth ─────────────────────────
+    const publicPathnames = ['/login', '/signup', '/legal']
+    const isPublicRoute = publicPathnames.some(route =>
+        pathnameWithoutLocale.startsWith(route) || pathnameWithoutLocale === ''
     )
 
-    // Protected routes that require auth: /dashboard and /onboarding
-    const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
-        request.nextUrl.pathname.startsWith('/onboarding')
+    // ─── Protected routes that require auth ────────────────────────────
+    const isProtectedRoute = pathnameWithoutLocale.startsWith('/dashboard') ||
+        pathnameWithoutLocale.startsWith('/onboarding')
 
-    // If not logged in and trying to access protected route
-    if (!session && !isPublicRoute && isProtectedRoute) {
-        const redirectUrl = new URL('/login', request.url)
+    // If not logged in and trying to access protected route → redirect to login
+    if (!user && !isPublicRoute && isProtectedRoute) {
+        const redirectUrl = new URL(`/${locale}/login`, request.url)
         console.log("⚠️ Unauthorized access, redirecting to login")
         return NextResponse.redirect(redirectUrl)
     }
 
-    // If logged in and trying to access login/signup
-    if (session && isPublicRoute) {
-        const redirectUrl = new URL('/dashboard', request.url)
+    // If logged in and trying to access login/signup → redirect to dashboard
+    if (user && (pathnameWithoutLocale === '/login' || pathnameWithoutLocale === '/signup')) {
+        const redirectUrl = new URL(`/${locale}/dashboard`, request.url)
         console.log("✅ Already logged in, redirecting to dashboard")
         return NextResponse.redirect(redirectUrl)
     }
 
-    // Onboarding gate: if logged in and accessing /dashboard, check onboarding status
-    // Uses a separate SSR client with SERVICE_ROLE_KEY to bypass RLS (Edge-compatible)
-    if (session && request.nextUrl.pathname.startsWith('/dashboard')) {
+    // ─── Onboarding gate: check if onboarding is completed ────────────
+    if (user && pathnameWithoutLocale.startsWith('/dashboard')) {
         try {
             const supabaseAdmin = createServerClient(
                 process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -99,12 +116,12 @@ export async function middleware(request: NextRequest) {
             const { data: settings } = await supabaseAdmin
                 .from('user_settings')
                 .select('onboarding_completed')
-                .eq('user_id', session.user.id)
+                .eq('user_id', user.id)
                 .maybeSingle()
 
             // If no settings row or onboarding not completed → redirect to onboarding
             if (!settings || settings.onboarding_completed !== true) {
-                const redirectUrl = new URL('/onboarding', request.url)
+                const redirectUrl = new URL(`/${locale}/onboarding`, request.url)
                 return NextResponse.redirect(redirectUrl)
             }
         } catch (err) {
@@ -124,8 +141,9 @@ export const config = {
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
          * - api (API routes)
+         * - auth (Supabase auth callbacks)
+         * - v/ (video sharing pages)
          */
-        '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/((?!_next/static|_next/image|favicon.ico|api|auth|v/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }
-

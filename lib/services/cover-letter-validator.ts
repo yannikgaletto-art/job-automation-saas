@@ -41,9 +41,19 @@ export function validateCoverLetter(
         warnings.push(`Word count outside ideal range: ${wordCount} words (ideal: 250-380)`);
     }
 
-    // 2. COMPANY NAME CHECK
-    const companyPattern = new RegExp(companyName, 'gi');
-    const companyMentions = (coverLetter.match(companyPattern) || []).length;
+    // 2. COMPANY NAME CHECK (fuzzy — strips legal suffixes like AG, GmbH, SE)
+    const LEGAL_SUFFIXES = /\s*(AG|GmbH|SE|e\.V\.|Inc\.?|Ltd\.?|Co\.?|KG|OHG|UG|mbH|S\.A\.|GbR|Corp\.?)\s*$/gi;
+    const baseName = companyName.replace(LEGAL_SUFFIXES, '').trim();
+    
+    // Try exact name first, then base name (without suffix)
+    const exactPattern = new RegExp(companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const basePattern = baseName.length > 2 
+        ? new RegExp(baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+        : null;
+    
+    const exactMentions = (coverLetter.match(exactPattern) || []).length;
+    const baseMentions = basePattern ? (coverLetter.match(basePattern) || []).length : 0;
+    const companyMentions = Math.max(exactMentions, baseMentions);
 
     if (companyMentions === 0) {
         errors.push(`Company name "${companyName}" not mentioned at all`);

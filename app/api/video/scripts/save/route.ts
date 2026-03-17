@@ -114,6 +114,14 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Speichern fehlgeschlagen' }, { status: 500 });
         }
 
+        // Update job status to reflect video letter completion
+        // This unlocks the Video Letter tile in the progress indicator
+        await supabaseAdmin
+            .from('job_queue')
+            .update({ status: 'video_letter_done' })
+            .eq('id', jobId)
+            .eq('user_id', userId);
+
         // Read-back for response
         const { data: saved } = await supabaseAdmin
             .from('video_scripts')

@@ -31,13 +31,16 @@ export async function GET() {
         const todayStart = `${today}T00:00:00.000Z`;
         const todayEnd = `${today}T23:59:59.999Z`;
 
-        // Fetch: inbox tasks + today's scheduled + carry-overs for today
+        // 8-day cutoff for inbox tasks (prevents zombie tasks, 8d = timezone buffer for UTC+2)
+        const inboxCutoff = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+
+        // Fetch: recent inbox tasks + today's scheduled + carry-overs for today
         const { data: tasks, error } = await supabaseAdmin
             .from('tasks')
             .select('*')
             .eq('user_id', user.id)
             .or(
-                `status.eq.inbox,` +
+                `and(status.eq.inbox,created_at.gte.${inboxCutoff}),` +
                 `and(scheduled_start.gte.${todayStart},scheduled_start.lte.${todayEnd}),` +
                 `and(status.eq.carry_over,carry_over_to.eq.${today})`
             )

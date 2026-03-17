@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 3.2
-**Last Updated:** 2026-03-16
+**Version:** 3.3
+**Last Updated:** 2026-03-17
 
 ---
 
@@ -54,6 +54,11 @@ Jede Änderung an der Datenbank oder den API-Routen erfordert zwingend Doku-Upda
 
 Kein PR/Commit ohne diese Updates. Diese Regel existiert, weil die Doku in den letzten Wochen vom Code abgedriftet ist und Agenten dann veraltete Informationen nutzen.
 
+## ⚠️ i18n PROTOCOL (ab 2026-03-17)
+→ directives/i18n_protocol.md
+Jede Komponente mit User-sichtbaren Strings MUSS `useTranslations()` verwenden.
+Kein hardcoded Text in JSX. Neuer key → de + en + es gleichzeitig.
+
 ## ⚠️ CV & COVER LETTER QUALITY
 → directives/QUALITY_CV_COVER_LETTER.md
 Diese Standards sind BINDEND für alle Dokument-Generationen.
@@ -92,6 +97,7 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **CV Optimizer (2026-03-10)** | **Hydration-Fix, Summary-Toggle, Error-Handling with German messages, Zod-Schema generisch** |
 | **ValleyTemplate (2026-03-10)** | **Max 3 Bullet-Points hard-cap. Zertifikate in rechte Spalte. KI-Prompt: 2-Seiten HARD RULE** |
 | **CV Parser (2026-03-10)** | **Chrono-Sort: `sortExperienceByDate()` post-processing (Heute/MM.YYYY/MM/YYYY/YYYY)** |
+| **i18n Tier 1 (2026-03-17)** | **`OptimizerWizard`, `DiffReview`, `command-palette` vollständig i18n. 3 neue Namespaces: `cv_optimizer`, `diff_review`, `command_palette`. ~55 Keys pro Locale (de/en/es).** |
 
 ---
 
@@ -563,6 +569,7 @@ npm run build
 4. **Track everything** - Manual + auto applications
 5. **Visual verification** - Trust the pixel, not the code
 6. **Cross-Feature-Shield** - Check FEATURE_COMPAT_MATRIX.md before touching shared files
+7. **No hardcoded strings** - Every UI text goes through `useTranslations()` → i18n_protocol.md
 
 ---
 

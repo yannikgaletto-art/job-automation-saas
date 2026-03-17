@@ -2,13 +2,17 @@
  * Coaching Session Complete API Route
  * Feature-Silo: coaching
  * 
- * POST: Mark session as ended and trigger report generation via Inngest
+ * POST: Mark session as ended and trigger report generation.
+ * PRIMARY: Direct synchronous generation (works in localhost without Inngest dev server)
+ * FALLBACK: Inngest async pipeline on direct generation failure
  */
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { inngest } from '@/lib/inngest/client';
+import { generateAndSaveReport } from '@/lib/services/coaching-report-generator';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,10 +46,7 @@ export async function POST(
             return NextResponse.json({ error: 'Session nicht gefunden' }, { status: 404 });
         }
 
-        // Race condition fix: sendCoachingMessage may auto-complete the session
-        // (setting status to 'completed') before the user clicks "Analyse anschauen".
-        // In that case, we still need to fire Inngest if no report exists yet.
-        // ?regenerate=true allows re-triggering for broken reports.
+        // Race condition fix: ?regenerate=true allows re-triggering for broken reports.
         const url = new URL(request.url);
         const regenerate = url.searchParams.get('regenerate') === 'true';
 
@@ -71,7 +72,7 @@ export async function POST(
             }, { status: 400 });
         }
 
-        // Calculate duration from the same query result
+        // Calculate duration
         const durationSeconds = Math.round(
             (Date.now() - new Date(session.created_at).getTime()) / 1000
         );
@@ -85,16 +86,22 @@ export async function POST(
             })
             .eq('id', sessionId);
 
-        // Trigger report generation via Inngest
-        await inngest.send({
-            name: 'coaching/generate-report',
-            data: {
-                sessionId,
-                userId: user.id,
-            },
-        });
+        console.log(`✅ [Coaching] Session ${sessionId} completed (${durationSeconds}s) — starting report generation`);
 
-        console.log(`✅ [Coaching] Session ${sessionId} completed (${durationSeconds}s) — report generation triggered`);
+        // PRIMARY PATH: Generate report directly (fire-and-forget).
+        // Works in localhost dev (no Inngest dev server) and production.
+        const userId = user.id;
+        const userLocale = await getUserLocale(userId);
+        generateAndSaveReport(sessionId, userId).catch((err) => {
+            console.error('❌ [Coaching] Direct report generation failed — falling back to Inngest:', err);
+            // FALLBACK: Inngest async pipeline
+            inngest.send({
+                name: 'coaching/generate-report',
+                data: { sessionId, userId, locale: userLocale },
+            }).catch((inngestErr) => {
+                console.error('❌ [Coaching] Inngest fallback also failed:', inngestErr);
+            });
+        });
 
         return NextResponse.json({
             success: true,
