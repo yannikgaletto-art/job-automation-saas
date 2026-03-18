@@ -1,15 +1,16 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { motion } from "framer-motion"
 import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { CoverLetterWizard } from "./cover-letter-wizard/CoverLetterWizard"
-import type { CoverLetterSetupContext, AuditTrailCard } from "@/types/cover-letter-setup"
+import type { CoverLetterSetupContext } from "@/types/cover-letter-setup"
 import { createClient } from "@/lib/supabase/client"
 import { CoverLetterResultView } from "./cover-letter-result/CoverLetterResultView"
 import { useCoverLetterSetupStore } from "@/store/useCoverLetterSetupStore"
+import { useTranslations } from 'next-intl'
 
 interface Step4CoverLetterProps {
     jobId: string
@@ -22,7 +23,6 @@ interface Step4CoverLetterProps {
 interface GenerationResult {
     coverLetter: string
     iterations: number
-    auditTrail?: AuditTrailCard[]
     iteration_log?: any[]
     judgePassed?: boolean
     judgeFailReasons?: string[]
@@ -36,17 +36,8 @@ interface GenerationResult {
     }
 }
 
-// ─── Steps for Cover Letter generation ───────────────────────────────────────
-const CL_STEPS = [
-    'Firmendaten werden abgerufen',
-    'Profil & Stellenanzeige werden analysiert',
-    'Anschreiben wird verfasst',
-    'Qualitätsprüfung & Anti-Fluff-Scan',
-    'Anschreiben wird fertiggestellt',
-];
-
 // Cancel button — appears after 15s
-function CLCancelButton({ onCancel }: { onCancel: () => void }) {
+function CLCancelButton({ onCancel, label }: { onCancel: () => void; label: string }) {
     const [visible, setVisible] = useState(false);
     useEffect(() => {
         const t = setTimeout(() => setVisible(true), 15000);
@@ -61,24 +52,30 @@ function CLCancelButton({ onCancel }: { onCancel: () => void }) {
             onClick={onCancel}
             className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-1"
         >
-            Abbrechen
+            {label}
         </motion.button>
     );
 }
 
-function GenerationProgressView({ onCancel }: { onCancel?: () => void }) {
+function GenerationProgressView({ onCancel, steps, title, duration, cancelLabel }: {
+    onCancel?: () => void;
+    steps: string[];
+    title: string;
+    duration: string;
+    cancelLabel: string;
+}) {
     const [activeStep, setActiveStep] = useState(0);
 
     useEffect(() => {
         setActiveStep(0);
         let idx = 0;
         const interval = setInterval(() => {
-            idx = Math.min(idx + 1, CL_STEPS.length - 1);
+            idx = Math.min(idx + 1, steps.length - 1);
             setActiveStep(idx);
-            if (idx >= CL_STEPS.length - 1) clearInterval(interval);
+            if (idx >= steps.length - 1) clearInterval(interval);
         }, 4000);
         return () => clearInterval(interval);
-    }, []);
+    }, [steps.length]);
 
     return (
         <div className="w-full px-6 py-8 bg-[#FAFAF9] rounded-xl border border-slate-200">
@@ -86,14 +83,14 @@ function GenerationProgressView({ onCancel }: { onCancel?: () => void }) {
             <div className="flex items-center gap-2.5 mb-1">
                 <LoadingSpinner className="w-5 h-5 text-[#002e7a] shrink-0" />
                 <span className="text-sm font-semibold text-[#37352F]">
-                    Anschreiben wird generiert…
+                    {title}
                 </span>
             </div>
-            <p className="text-xs text-[#73726E] mb-5 pl-[29px]">Das dauert etwa 20–40 Sekunden</p>
+            <p className="text-xs text-[#73726E] mb-5 pl-[29px]">{duration}</p>
 
             {/* Step list */}
             <div className="space-y-2">
-                {CL_STEPS.map((label, i) => {
+                {steps.map((label, i) => {
                     const isDone = i < activeStep;
                     const isActive = i === activeStep;
                     return (
@@ -145,7 +142,7 @@ function GenerationProgressView({ onCancel }: { onCancel?: () => void }) {
             </div>
 
             <div className="mt-5 pl-1">
-                {onCancel && <CLCancelButton onCancel={onCancel} />}
+                {onCancel && <CLCancelButton onCancel={onCancel} label={cancelLabel} />}
             </div>
         </div>
     );
@@ -158,6 +155,14 @@ export function Step4CoverLetter({
     onComplete,
     initialData
 }: Step4CoverLetterProps) {
+    const t = useTranslations('cover_letter');
+    const clSteps = useMemo(() => [
+        t('gen_step_1'),
+        t('gen_step_2'),
+        t('gen_step_3'),
+        t('gen_step_4'),
+        t('gen_step_5'),
+    ], [t]);
     const [result, setResult] = useState<GenerationResult | null>(initialData || null)
     const [isLoading, setIsLoading] = useState(false)
     const [isLoadingDraft, setIsLoadingDraft] = useState(!initialData) // true until DB check completes
@@ -214,7 +219,6 @@ export function Step4CoverLetter({
                     setResult({
                         coverLetter: letterText,
                         iterations: lastDraft.metadata.iterations ?? 1,
-                        auditTrail: lastDraft.metadata.audit_trail ?? [],
                         draftId: lastDraft.id,
                         judgePassed: lastDraft.metadata.judge_passed ?? true,
                         judgeFailReasons: lastDraft.metadata.judge_fail_reasons ?? [],
@@ -255,34 +259,7 @@ export function Step4CoverLetter({
         return () => { cancelled = true }
     }, [jobId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ─── Poll for Audit Trail (async Inngest result) ──────────────────────────
-    // WHY: Inngest polish job runs ~15-20s after generation and writes audit_trail
-    // to documents.metadata. We poll every 4s for up to 35s (8 attempts).
-    async function pollForAuditTrail(
-        draftId: string,
-        updateResult: React.Dispatch<React.SetStateAction<GenerationResult | null>>
-    ) {
-        const supabase = createClient()
-        const MAX_ATTEMPTS = 8
-        const INTERVAL_MS = 4000
 
-        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-            await new Promise(resolve => setTimeout(resolve, INTERVAL_MS))
-            const { data: doc } = await supabase
-                .from('documents')
-                .select('metadata')
-                .eq('id', draftId)
-                .single()
-
-            const trail: AuditTrailCard[] | undefined = doc?.metadata?.audit_trail
-            if (trail && trail.length > 0) {
-                console.log(`✅ [AuditTrail] Found ${trail.length} cards after ${(attempt + 1) * 4}s`)
-                updateResult(prev => prev ? { ...prev, auditTrail: trail } : prev)
-                return
-            }
-        }
-        console.log('⚠️ [AuditTrail] Polling ended without data')
-    }
 
     const generateCoverLetter = async (context?: CoverLetterSetupContext) => {
         try {
@@ -295,7 +272,7 @@ export function Step4CoverLetter({
             const currentUserId = user?.id
 
             if (!currentUserId) {
-                throw new Error('Nicht angemeldet. Bitte einloggen.')
+                throw new Error(t('error_not_logged_in'))
             }
             setUserId(currentUserId)
 
@@ -330,7 +307,7 @@ export function Step4CoverLetter({
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}))
-                throw new Error(errorData.error || 'Generierung fehlgeschlagen')
+                throw new Error(errorData.error || t('error_generation_failed'))
             }
 
             const data = await response.json()
@@ -347,7 +324,6 @@ export function Step4CoverLetter({
             const mappedResult: GenerationResult = {
                 coverLetter: coverLetterText,
                 iterations: data.iterations || 1,
-                auditTrail: [],
                 draftId: data.draft_id ?? undefined,
                 iteration_log: data.iteration_log,
                 judgePassed: data.judge_passed ?? true,
@@ -369,9 +345,6 @@ export function Step4CoverLetter({
             setResult(mappedResult)
             console.log('✅ Cover letter generated successfully')
 
-            if (data.draft_id) {
-                pollForAuditTrail(data.draft_id, setResult)
-            }
 
             if (onComplete) {
                 onComplete()
@@ -380,9 +353,9 @@ export function Step4CoverLetter({
         } catch (err) {
             console.error('❌ Cover letter generation failed:', err)
             if (err instanceof DOMException && err.name === 'AbortError') {
-                setError('Zeitüberschreitung — bitte erneut versuchen.')
+                setError(t('error_timeout'))
             } else {
-                setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+                setError(err instanceof Error ? err.message : t('error_unknown'))
             }
         } finally {
             setIsLoading(false)
@@ -426,20 +399,26 @@ export function Step4CoverLetter({
 
     // AI Progress loading view
     if (isLoading && !result) {
-        return <GenerationProgressView onCancel={() => { setIsLoading(false); setError(null); }} />;
+        return <GenerationProgressView
+            onCancel={() => { setIsLoading(false); setError(null); }}
+            steps={clSteps}
+            title={t('gen_title')}
+            duration={t('gen_duration')}
+            cancelLabel={t('btn_cancel')}
+        />;
     }
 
     // Error state
     if (error) {
         return (
             <div className="p-6 bg-red-50 rounded-lg border border-red-200 m-6">
-                <h3 className="text-sm font-semibold text-red-800 mb-2">Generierung fehlgeschlagen</h3>
+                <h3 className="text-sm font-semibold text-red-800 mb-2">{t('error_gen_title')}</h3>
                 <p className="text-xs text-red-600 mb-4">{error}</p>
                 <button
                     onClick={() => generateCoverLetter()}
                     className="text-xs bg-white border border-red-200 text-red-600 px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors"
                 >
-                    Erneut versuchen
+                    {t('btn_retry')}
                 </button>
             </div>
         )
@@ -453,7 +432,7 @@ export function Step4CoverLetter({
                 {result.judgePassed === false && (
                     <details className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                         <summary className="text-xs font-medium text-amber-700 cursor-pointer">
-                            ⚠️ Qualitätsprüfung nicht bestanden — bitte manuell überprüfen
+                            ⚠️ {t('judge_warning')}
                         </summary>
                         {(result.judgeFailReasons?.length ?? 0) > 0 && (
                             <ul className="mt-2 space-y-1">

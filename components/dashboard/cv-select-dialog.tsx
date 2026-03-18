@@ -5,13 +5,11 @@
  * Shown before CV Match / Cover Letter workflows to let the user
  * choose which CV to use for the analysis.
  *
- * Logic:
- *  - 0 CVs → Not rendered (parent shows blocking state)
- *  - 1 CV  → Not rendered (parent auto-selects)
- *  - 2+ CVs → This dialog is shown
+ * i18n: Uses useTranslations('cv_select') + useLocale() for date formatting.
  */
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Check } from "lucide-react";
 import {
@@ -36,16 +34,25 @@ interface CVSelectDialogProps {
     onClose: () => void;
 }
 
-function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString("de-DE", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-    });
-}
+/** Locale-aware date format map */
+const LOCALE_MAP: Record<string, string> = {
+    de: 'de-DE',
+    en: 'en-US',
+    es: 'es-ES',
+};
 
 export function CVSelectDialog({ isOpen, cvOptions, onSelect, onClose }: CVSelectDialogProps) {
     const [selected, setSelected] = useState<string | null>(null);
+    const locale = useLocale();
+    const t = useTranslations('cv_select');
+
+    const formatDate = (dateStr: string) => {
+        return new Date(dateStr).toLocaleDateString(LOCALE_MAP[locale] || 'de-DE', {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+        });
+    };
 
     const handleConfirm = () => {
         if (selected) {
@@ -58,10 +65,10 @@ export function CVSelectDialog({ isOpen, cvOptions, onSelect, onClose }: CVSelec
             <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(480px,calc(100vw-2rem))] rounded-xl shadow-lg bg-white p-6 focus:outline-none">
                 <DialogHeader className="mb-4">
                     <DialogTitle className="text-lg font-semibold text-[#37352F]">
-                        Lebenslauf auswählen
+                        {t('title')}
                     </DialogTitle>
                     <DialogDescription className="text-sm text-[#73726E] mt-1">
-                        Du hast mehrere Lebensläufe hochgeladen. Welchen möchtest du für diese Analyse verwenden?
+                        {t('desc')}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -91,7 +98,7 @@ export function CVSelectDialog({ isOpen, cvOptions, onSelect, onClose }: CVSelec
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-[#37352F] truncate">{cv.name}</p>
-                                    <p className="text-xs text-[#73726E]">Hochgeladen: {formatDate(cv.createdAt)}</p>
+                                    <p className="text-xs text-[#73726E]">{t('uploaded', { date: formatDate(cv.createdAt) })}</p>
                                 </div>
                             </motion.button>
                         ))}
@@ -100,14 +107,14 @@ export function CVSelectDialog({ isOpen, cvOptions, onSelect, onClose }: CVSelec
 
                 <div className="flex justify-end gap-2 mt-5">
                     <Button variant="secondary" onClick={onClose} className="text-sm">
-                        Abbrechen
+                        {t('cancel')}
                     </Button>
                     <Button
                         onClick={handleConfirm}
                         disabled={!selected}
                         className="text-sm"
                     >
-                        Auswählen
+                        {t('select')}
                     </Button>
                 </div>
             </DialogContent>

@@ -6,6 +6,8 @@ import { cvOptimizationProposalSchema, CvOptimizationProposal, CvStructuredData,
 import crypto from 'crypto';
 import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
 import { logger } from '@/lib/logging';
+import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
+import { translateCvIfNeeded } from '@/lib/services/cv-translator';
 
 // Rate limit: 3 CV optimize requests per minute per user
 const cvOptimizeLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
@@ -13,7 +15,7 @@ const cvOptimizeLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 }
 export const maxDuration = 120; // Vercel timeout protection — Claude Sonnet can take 40-75s on large payloads
 
 // Prompt version for tracking and rollback
-const PROMPT_VERSION = 'v2.1';
+const PROMPT_VERSION = 'v2.4';
 
 // Admin client for bypassing RLS (used after Auth Guard verification)
 const supabaseAdmin = createAdminClient(
@@ -137,20 +139,35 @@ export async function POST(req: NextRequest) {
         const log = logger.forRequest(undefined, user.id, '/api/cv/optimize');
 
         const body = await req.json();
-        const { cv_structured_data, cv_match_result, template_id, job_id, station_metrics, cv_opt_settings } = body;
+        const { cv_structured_data, cv_match_result, template_id, job_id, station_metrics, cv_opt_settings, locale: rawLocale } = body;
+        const locale: SupportedLocale = (['de', 'en', 'es'].includes(rawLocale) ? rawLocale : 'de') as SupportedLocale;
+        const lang = getLanguageName(locale);
 
         if (!cv_structured_data || !cv_match_result || !job_id) {
-            return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+            return NextResponse.json({ error: 'error_missing_params' }, { status: 400 });
         }
 
         // Guard: requirementRows must exist on the cv_match_result object
         const requirementRows = cv_match_result?.requirementRows ?? cv_match_result?.rows ?? cv_match_result;
         if (!requirementRows) {
             log.warn('cv/optimize called without requirementRows', { job_id, cv_match_result_keys: Object.keys(cv_match_result || {}) });
-            return NextResponse.json({ error: 'CV Match result is missing requirementRows. Bitte führe zuerst den CV Match Schritt durch.' }, { status: 400 });
+            return NextResponse.json({ error: 'error_no_match' }, { status: 400 });
         }
 
         log.info('CV Optimize requested', { job_id });
+
+        // ── Pass 1: Translate CV to target language if needed ───────────
+        // cv-parser stores content verbatim (e.g. German bullets from a German CV).
+        // Translation is ONLY needed for non-German locales — the cv-parser prompt
+        // is in German and preserves original text, so locale='de' CVs are always
+        // already in the correct language. Skipping for 'de' prevents false-positive
+        // triggers from company names (e.g. 'The Boston Consulting Group').
+        const { cv: translatedCv, wasTranslated } = locale !== 'de'
+            ? await translateCvIfNeeded(cv_structured_data, lang)
+            : { cv: cv_structured_data, wasTranslated: false };
+        if (wasTranslated) {
+            log.info('CV pre-translated to target language', { locale, lang });
+        }
 
         // §3: User-scoped — always use session user.id, never trust body
         const user_id = user.id;
@@ -159,42 +176,43 @@ export async function POST(req: NextRequest) {
         const showSummary = cv_opt_settings?.showSummary ?? true;
         let summaryInstruction = '';
         if (!showSummary) {
-            summaryInstruction = `\nSUMMARY-INSTRUKTION: Der Nutzer hat die Zusammenfassung DEAKTIVIERT. Generiere KEINE Summary-Änderungen. Lasse das summary-Feld im optimierten CV UNBERÜHRT.\n`;
+            summaryInstruction = `\nSUMMARY INSTRUCTION: The user has DISABLED the summary. Do NOT generate any summary changes. Leave the summary field UNTOUCHED.\n`;
         } else if (cv_opt_settings?.summaryMode === 'compact') {
-            summaryInstruction = `\nSUMMARY-INSTRUKTION: Schreibe die Zusammenfassung in MAXIMAL 2 Sätzen.
-Kein Fließtext. Format strikt: "[Rolle] mit [konkreter Erfahrung], fokussiert auf [Wert für Arbeitgeber]."
-Keine Adjektive ohne Beleg. Kein "motiviert", "leidenschaftlich", "engagiert".\n`;
+            summaryInstruction = `\nSUMMARY INSTRUCTION: Write the summary in MAX 2 sentences.
+No filler text. Strict format: "[Role] with [concrete experience], focused on [value for employer]."
+No adjectives without evidence. No "motivated", "passionate", "dedicated".\n`;
         }
 
         // Build structured metrics context from station_metrics
         const metricsContext = station_metrics
             ?.filter((s: { metrics: string }) => s.metrics?.trim()?.length > 0)
             ?.map((s: { company: string; role: string; metrics: string }) =>
-                `- Bei "${s.company}"${s.role ? ` (${s.role})` : ''}: ${s.metrics}`)
+                `- At "${s.company}"${s.role ? ` (${s.role})` : ''}: ${s.metrics}`)
             ?.join('\n');
 
         const metricsBlock = metricsContext
-            ? `\n4. NUTZER-METRIKEN (vom Nutzer bereitgestellt — nur einbauen, wenn sachlich passend zur jeweiligen Station):\n${metricsContext}\n`
+            ? `\n4. USER METRICS (provided by user — only integrate if factually relevant to the respective position):\n${metricsContext}\n`
             : '';
 
         const prompt = `
-Du bist ein erstklassiger Karriere-Berater und CV-Optimierer.
-Deine Aufgabe ist es, einen Lebenslauf-JSON (CV SSoT) und eine Analyse (CV Match Result) zu erhalten, und eine genaue Optimierungsliste sowie einen angepassten Voll-Lebenslauf zu generieren.
+You are a world-class career consultant and CV optimizer.
+Your task: receive a CV JSON (CV SSoT) and an analysis (CV Match Result), then produce a precise optimization diff-list and an adjusted full CV.
 
-**REGELN ZUR OPTIMIERUNG:**
-1. NO HALLUCINATIONS! Erfinde niemals Fakten oder Erfahrungen, die der Nutzer nicht hat. Wenn etwas wegen fehlender Fakten nicht passt, schlage als Änderung "TODO Frage an User: Hast du hier Erfahrung?" vor, statt etwas zu erfinden.
-2. Formuliere Bullet Points so um, dass sie die Anforderungen aus dem CV Match Result gezielter ansprechen (falls belegbar!).
-3. Du darfst die Reihenfolge der Arrays z.B. bei 'skills' ändern (wichtigste zuerst).
-4. Verändere nicht grundlos bestehende IDs. Behalte bei vorhandenen Einträgen die \`id\` bei. Nutze \`id\` zum stabilen Referenzieren in deinem \`changes\` Array.
-5. Du musst als Output eine exakte Diff-Liste (changes) mitliefern:
-   - "target.section": wo (z.B. experience)
-   - "target.entityId": id des eintrags
-   - "target.field": z.B. 'description'
-   - "target.bulletId": Wenn ein spezielles BulletPoint geändert/hinzugefügt/entfernt wird
+**OPTIMIZATION RULES:**
+1. NO HALLUCINATIONS! Never invent facts or experiences the user does not have. If a gap cannot be filled with real data, suggest "TODO: Ask user — do you have experience here?" instead of inventing.
+2. Reformulate bullet points so they address the requirements from the CV Match Result more precisely (only if verifiable!).
+3. You may reorder arrays, e.g. in 'skills' (most important first).
+4. Do not change existing IDs without reason. Keep the \`id\` of existing entries. Use \`id\` for stable referencing in your \`changes\` array.
+5. If an experience entry has 0 bullet points, ADD 1–2 relevant bullets based on the role title and company context.
+6. Your output MUST be an exact diff-list (changes):
+   - "target.section": where (e.g. experience, skills, summary)
+   - "target.entityId": id of the entry
+   - "target.field": e.g. 'description'
+   - "target.bulletId": if a specific bullet is changed/added/removed
    - "type": "add" | "modify" | "remove"
-   - "before" / "after": MUSS EIN EINFACHER STRING SEIN. GIB NIEMALS EIN ARRAY ZURÜCK! (Bei Bulletpoints nur den reinen Text)
-   - "reason": WARUM
-   - "requirementRef.requirement": Aus welchem "requirement" des CV Match abgeleitet.
+   - "before" / "after": MUST BE A PLAIN STRING. NEVER return an array! (For bullets: only the raw text)
+   - "reason": WHY — written in ${lang}
+   - "requirementRef.requirement": which requirement from the CV Match this derives from.
 ${summaryInstruction}
 
 [LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION}]
@@ -212,31 +230,36 @@ HARD RULE: The final CV MUST fit on exactly 2 printed A4 pages. NEVER generate c
   → Page 2: Skills, Languages, Certificates (right column)
 - LESS IS MORE. The user can always add more later.
 
+SECTION DISTRIBUTION (MANDATORY):
+- Your changes MUST cover at least 2 different sections. Do NOT spend all 12 changes on experience alone.
+- Reserve at least 2 changes for Skills (reorder, add missing keywords) or Summary.
+- Prioritize: 7–8 experience changes, 2–3 skills changes, 1–2 summary changes.
+
 SELF-JUDGE VALIDATION (run this before returning):
 Before returning your output, mentally verify:
-1. Count total changes. If >12, keep only the 12 most impactful. Prioritize: modify on recent experience > add > remove > changes on old/minor entries.
-2. Count total bullet points across all experience entries. If >15, cut the weakest.
-3. Count total skill items. If >24, remove least relevant.
-4. Count certificates. If >6, keep only the 6 most relevant.
-5. If total content is likely to overflow 2 pages, aggressively cut the oldest/weakest entries.
+1. Count total changes. If >12, keep only the 12 most impactful.
+2. Verify at least 2 sections are covered (experience + skills/summary). If not, add 1–2 skills/summary changes.
+3. Count total bullet points across all experience entries. If >15, cut the weakest.
+4. Count total skill items. If >24, remove least relevant.
+5. Count certificates. If >6, keep only the 6 most relevant.
+6. If total content is likely to overflow 2 pages, aggressively cut the oldest/weakest entries.
 If any check fails, revise your output before returning.
 [END LAYOUT CONSTRAINTS]
 
 SUMMARY FORMATTING:
 - In the summary text field, wrap the 3-5 most impactful phrases in **double asterisks** for bold rendering.
-- Bold: quantified achievements ("**3+ Jahre**"), key competencies ("**Stakeholder-Management**"), and the target role/industry.
-- Example: "**Innovation Manager** mit **3+ Jahren** Erfahrung in **strategischem Stakeholder-Management**."
+- Bold: quantified achievements, key competencies, and the target role/industry.
 - Do NOT bold entire sentences. Only 3-5 key phrases.
 
-**EINGABEDATEN:**
+**INPUT DATA:**
 
-1. CV SSoT (AKTUELLER LEBENSLAUF):
-${JSON.stringify(cv_structured_data, null, 2)}
+1. CV SSoT (CURRENT CV):
+${JSON.stringify(translatedCv, null, 2)}
 
-2. CV MATCH RESULTAT (ANALYSE & LÜCKEN):
+2. CV MATCH RESULT (ANALYSIS & GAPS):
 ${JSON.stringify(requirementRows, null, 2)}
 
-3. GEWÄHLTES TEMPLATE ID:
+3. SELECTED TEMPLATE ID:
 ${template_id}
 ${metricsBlock}
 
@@ -245,20 +268,23 @@ ${metricsBlock}
 - If a change affects multiple bullet points, create ONE CvChange per bullet.
 - Return ONLY valid JSON. No markdown. No code blocks. No comments.
 - Every string field must be a string, not null, not an array.
+- The CV input may be in a different language than the output language. ALWAYS write "after" and "reason" fields in ${lang}, regardless of the CV input language.
 
-**OUTPUT FORMAT (STRIKT JSON):**
+**OUTPUT LANGUAGE: ${lang}. Write ALL "after" and "reason" text fields in ${lang}.**
+
+**OUTPUT FORMAT (STRICT JSON):**
 Return ONLY JSON. No markdown framing (\`\`\`json), no comments.
-Muss folgendem Zod Schema entsprechen:
+Must conform to the following Zod schema:
 {
   "changes": [
     {
       "id": "change-1",
       "target": { "section": "experience", "entityId": "exp-1", "field": "description", "bulletId": "bullet-1-1" },
       "type": "modify",
-      "before": "Hat Software programmiert",
-      "after": "Entwickelte Backend-Services (Python) für Zahlungsabwicklungen",
-      "reason": "Die Anforderung verlangt Erfahrung in Python-Backends.",
-      "requirementRef": { "requirement": "Python Backend-Services" }
+      "before": "Wrote software",
+      "after": "Developed backend services (Python) for payment processing",
+      "reason": "The requirement demands experience with Python backends.",
+      "requirementRef": { "requirement": "Python Backend Services" }
     }
   ]
 }
@@ -276,7 +302,7 @@ Muss folgendem Zod Schema entsprechen:
             const aiMsg = aiErr?.message || String(aiErr);
             log.error('AI call failed', { error: aiMsg });
             return NextResponse.json(
-                { success: false, error: 'KI-Aufruf fehlgeschlagen. Bitte versuche es erneut.', details: aiMsg },
+                { success: false, error: 'error_ai_failed', details: aiMsg },
                 { status: 502 }
             );
         }
@@ -285,7 +311,7 @@ Muss folgendem Zod Schema entsprechen:
         if (!jsonMatch) {
             log.error('No JSON in AI response', { textLength: response.text.length });
             return NextResponse.json(
-                { success: false, error: 'Die KI hat kein gültiges JSON zurückgegeben. Bitte erneut versuchen.' },
+                { success: false, error: 'error_parse_failed' },
                 { status: 502 }
             );
         }
@@ -296,7 +322,7 @@ Muss folgendem Zod Schema entsprechen:
         } catch (parseErr: any) {
             log.error('JSON parse failed', { error: parseErr?.message });
             return NextResponse.json(
-                { success: false, error: 'KI-Antwort konnte nicht verarbeitet werden. Bitte erneut versuchen.', details: parseErr?.message },
+                { success: false, error: 'error_parse_failed', details: parseErr?.message },
                 { status: 502 }
             );
         }
@@ -305,7 +331,7 @@ Muss folgendem Zod Schema entsprechen:
         if (!Array.isArray(rawJson.changes)) {
             log.error('AI response missing changes array', { keys: Object.keys(rawJson) });
             return NextResponse.json(
-                { success: false, error: 'KI-Antwort enthält keine Änderungsliste. Bitte erneut versuchen.' },
+                { success: false, error: 'error_parse_failed' },
                 { status: 502 }
             );
         }
@@ -347,10 +373,15 @@ Muss folgendem Zod Schema entsprechen:
         }
 
         // Apply changes programmatically to create the optimized CV
-        const optimizedCv = applyCvChanges(cv_structured_data, rawJson.changes);
+        const optimizedCv = applyCvChanges(translatedCv, rawJson.changes);
 
-        // Construct the final proposal object
+        // Construct the final proposal object.
+        // `translated` is the base CV after Pass 1 (language translation) but before
+        // Pass 2 (ATS optimization). The frontend needs it as a stable base for
+        // re-applying selective user decisions after a page refresh — without it, the
+        // restore path would fall back to the original (possibly untranslated) CV.
         const proposalPayload = {
+            translated: translatedCv,
             optimized: optimizedCv,
             changes: rawJson.changes
         };
@@ -361,7 +392,7 @@ Muss folgendem Zod Schema entsprechen:
             const zodMsg = parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
             log.error('Zod validation failed', { error: zodMsg });
             return NextResponse.json(
-                { success: false, error: 'KI-Ausgabe hat das Validierungsschema nicht bestanden. Bitte erneut versuchen.', details: zodMsg },
+                { success: false, error: 'error_validation_failed', details: zodMsg },
                 { status: 502 }
             );
         }
@@ -380,7 +411,7 @@ Muss folgendem Zod Schema entsprechen:
         if (dbError) {
             log.error('DB write failed', { error: dbError.message });
             return NextResponse.json(
-                { success: false, error: 'Datenbankfehler beim Speichern. Bitte erneut versuchen.', details: dbError.message },
+                { success: false, error: 'error_db_failed', details: dbError.message },
                 { status: 500 }
             );
         }
@@ -396,7 +427,7 @@ Muss folgendem Zod Schema entsprechen:
         if (!readBack?.cv_optimization_proposal) {
             log.error('Read-back verification FAILED');
             return NextResponse.json(
-                { success: false, error: 'Speicher-Verifizierung fehlgeschlagen. Bitte erneut versuchen.' },
+                { success: false, error: 'error_db_failed' },
                 { status: 500 }
             );
         }
@@ -410,7 +441,7 @@ Muss folgendem Zod Schema entsprechen:
         const errDetail = error?.errors ? JSON.stringify(error.errors) : (error?.message || String(error));
         console.error('❌ [CV Optimize] Unexpected error:', errDetail);
         return NextResponse.json(
-            { success: false, error: 'Unerwarteter Serverfehler. Bitte erneut versuchen.', details: errDetail },
+            { success: false, error: 'error_unknown', details: errDetail },
             { status: 500 }
         );
     }

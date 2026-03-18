@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 3.3
-**Last Updated:** 2026-03-17
+**Version:** 3.4
+**Last Updated:** 2026-03-18
 
 ---
 
@@ -98,6 +98,11 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **ValleyTemplate (2026-03-10)** | **Max 3 Bullet-Points hard-cap. Zertifikate in rechte Spalte. KI-Prompt: 2-Seiten HARD RULE** |
 | **CV Parser (2026-03-10)** | **Chrono-Sort: `sortExperienceByDate()` post-processing (Heute/MM.YYYY/MM/YYYY/YYYY)** |
 | **i18n Tier 1 (2026-03-17)** | **`OptimizerWizard`, `DiffReview`, `command-palette` vollständig i18n. 3 neue Namespaces: `cv_optimizer`, `diff_review`, `command_palette`. ~55 Keys pro Locale (de/en/es).** |
+| **Cover Letter i18n (2026-03-18)** | **`HookCard`, `StepHookSelection`, `StepStationMapping`, `StepToneConfig` vollständig i18n. 23 neue Keys (de/en/es). Fixes: `as any` → Union-Type, `intent`-Feld locale-aware für AI-Prompt, `useMemo` Import** |
+| **Tone Config Key-Fix (2026-03-18)** | **`tone_data-driven` (Bindestrich) → `tone_data_driven` (Underscore) via `.replace(/-/g, '_')` in `toneOptionIds` useMemo. Root cause: dynamic key generation mit Hyphen statt Underscore** |
+| **Formality Toggle i18n (2026-03-18)** | **`language === 'de'` → `language !== 'en' && locale !== 'en'`. ES zeigt Usted/Tú. EN komplett ausgeblendet (kein formell/informell). EN-Locale-Keys von German auf English korrigiert** |
+| **Numbers Saved Button (2026-03-18)** | **Redesign: kleiner right-aligned button → full-width dark-navy matching "Start optimization". Label vereinfacht: "OK — numbers saved" → "Numbers Saved" / "Zahlen gespeichert"** |
+| **Hiring Manager Critique (2026-03-18)** | **Fix: API 400-Error bei leerem `companyName` → Fallback "the company". Locale-aware Prompts: DE/EN/ES. `locale` Prop in `CoverLetterResultView` via `useLocale()` → Critique antwortet in App-Locale** |
 
 ---
 

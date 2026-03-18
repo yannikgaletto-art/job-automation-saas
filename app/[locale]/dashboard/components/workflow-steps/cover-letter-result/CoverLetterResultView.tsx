@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { LetterEditor } from "./LetterEditor"
-import { XRayAuditTrail } from "./XRayAuditTrail"
 import { HiringManagerCritique } from "./HiringManagerCritique"
-import type { AuditTrailCard, HiringManagerCritique as CritiqueType, CoverLetterSetupContext } from "@/types/cover-letter-setup"
+import type { HiringManagerCritique as CritiqueType, CoverLetterSetupContext } from "@/types/cover-letter-setup"
+import { useTranslations, useLocale } from 'next-intl'
 
 interface GenerationResult {
     coverLetter: string
     iterations: number
-    auditTrail?: AuditTrailCard[]
     validation?: {
         isValid: boolean
         stats: { wordCount: number; companyMentions: number; paragraphCount: number; forbiddenPhraseCount: number }
@@ -29,6 +28,8 @@ interface CoverLetterResultViewProps {
 }
 
 export function CoverLetterResultView({ initialResult, userId, jobId, companyName, jobTitle, setupContext }: CoverLetterResultViewProps) {
+    const t = useTranslations('cover_letter');
+    const locale = useLocale();
     const [currentLetter, setCurrentLetter] = useState(initialResult.coverLetter)
     const [fixingParagraphIndex, setFixingParagraphIndex] = useState<number | null>(null)
     const [isFixing, setIsFixing] = useState(false)
@@ -50,8 +51,9 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         coverLetter: initialResult.coverLetter,
-                        jobTitle: setupContext?.selectedHook?.label || jobTitle || '',
+                        jobTitle: jobTitle || '',
                         companyName: setupContext?.companyName || companyName || '',
+                        locale,
                     })
                 })
                 if (!res.ok) throw new Error('Critique fetch failed')
@@ -90,7 +92,7 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
             }
         } catch (e) {
             console.error(e)
-            alert("Fix fehlgeschlagen — bitte manuell bearbeiten")
+            // Non-blocking — user can still edit manually
         } finally {
             setIsFixing(false)
             setFixingParagraphIndex(null)
@@ -128,8 +130,8 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
         const fileDownload = document.createElement("a");
         document.body.appendChild(fileDownload);
         fileDownload.href = source;
-        const safeCompanyName = setupContext?.companyName?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'Unternehmen';
-        fileDownload.download = `Anschreiben_${safeCompanyName}.doc`;
+        const safeCompanyName = setupContext?.companyName?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'company';
+        fileDownload.download = `${t('result_filename')}_${safeCompanyName}.doc`;
         fileDownload.click();
         document.body.removeChild(fileDownload);
     }
@@ -154,7 +156,7 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
                 })
             })
         } catch {
-            alert("Konnte den Status nicht aktualisieren.")
+            // Error handled gracefully
         }
     }
 
@@ -195,7 +197,7 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
                             onClick={handleCopy}
                             className="bg-white border border-[#E7E7E5] px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
                         >
-                            Kopieren
+                            {t('btn_copy')}
                         </button>
                         <button
                             onClick={handleDownloadPdf}
@@ -214,23 +216,21 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
 
                         {isApplied ? (
                             <div className="text-[#2e7d32] bg-[#e8f5e9] rounded px-3 py-2 text-sm font-medium flex items-center gap-2">
-                                Bewerbung gespeichert
+                                {t('result_applied')}
                             </div>
                         ) : (
                             <button
                                 onClick={handleMarkApplied}
                                 className="bg-[#002e7a] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#001f5c] transition-colors flex items-center gap-2"
                             >
-                                Als beworben markieren
+                                {t('btn_mark_applied')}
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* Right Column: X-Ray Audit Trail + Hiring Manager Critique */}
+                {/* Right Column: Hiring Manager Critique */}
                 <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:pr-1">
-                    <XRayAuditTrail cards={initialResult.auditTrail ?? []} />
-
                     <HiringManagerCritique
                         critique={critique}
                         isLoading={critiqueLoading}

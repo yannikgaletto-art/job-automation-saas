@@ -11,6 +11,7 @@
 import { inngest } from './client';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { complete } from '@/lib/ai/model-router';
+import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,7 +72,9 @@ export const extractJob = inngest.createFunction(
     },
     { event: 'job/extract' },
     async ({ event, step }) => {
-        const { jobId, userId } = event.data as { jobId: string; userId: string };
+        const { jobId, userId, locale: rawLocale } = event.data as { jobId: string; userId: string; locale?: string };
+        const locale = (rawLocale === 'en' || rawLocale === 'es' ? rawLocale : 'de') as SupportedLocale;
+        const languageName = getLanguageName(locale);
 
         // Step 1: Read job description (§3 — user-scoped)
         const job = await step.run('read-job', async () => {
@@ -92,16 +95,14 @@ export const extractJob = inngest.createFunction(
         const extracted = await step.run('claude-extract', async () => {
             const response = await complete({
                 taskType: 'parse_html',
-                systemPrompt: `Extrahiere aus der Stellenbeschreibung diese JSON-Struktur. NUR JSON zurückgeben, kein Markdown, keine Erklärungen.
+                systemPrompt: `Extract the following JSON structure from the job description. Return ONLY JSON, no markdown, no explanations. All text fields (summary, responsibilities, qualifications, benefits) MUST be written in ${languageName}.
 
-WICHTIG für Listen (responsibilities, qualifications, benefits):
-- Schreibe verdichtete, vollständige Sätze — ca. 20% kürzer als das Original.
-- Erhalte die Kernaussage jedes Punktes. Kein Abkürzen auf bloße Stichworte.
-- KEIN Copy-Paste des Originals, sondern eine informierte Verdichtung.
-- Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
-- Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
+IMPORTANT for lists (responsibilities, qualifications, benefits):
+- Write condensed, complete sentences — approximately 20% shorter than the original.
+- Preserve the core message of each point. No abbreviating to mere keywords.
+- NO copy-paste of the original, but an informed condensation.
 
-{"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben als verdichtete vollständige Sätze"],"qualifications":["max 8 Anforderungen als verdichtete vollständige Sätze"],"benefits":["max 5"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["max 12 ATS Keywords"]}`,
+{"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8 responsibilities as condensed complete sentences in ${languageName}"],"qualifications":["max 8 qualifications as condensed complete sentences in ${languageName}"],"benefits":["max 5"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["max 12 ATS Keywords"]}`,
                 prompt: job.description,
                 temperature: 0,
                 maxTokens: 2000,

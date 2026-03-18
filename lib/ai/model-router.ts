@@ -51,6 +51,7 @@ export type TaskType =
     | 'optimize_cv'
     | 'cv_match'
     | 'cv_parse'
+    | 'translate_cv'
     // Certificate pipeline
     | 'analyze_skill_gaps'
     | 'synthesize_certificates';
@@ -75,6 +76,7 @@ export function selectModel(taskType: TaskType) {
         // Structured analysis (Haiku: fast + cheap, no creative writing needed)
         cv_match: 'CLAUDE_HAIKU',
         cv_parse: 'CLAUDE_HAIKU',
+        translate_cv: 'CLAUDE_HAIKU',
         // Certificate pipeline
         analyze_skill_gaps: 'CLAUDE_HAIKU',
         synthesize_certificates: 'CLAUDE_HAIKU',

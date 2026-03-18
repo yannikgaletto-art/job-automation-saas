@@ -123,7 +123,9 @@ export function checkRateLimit(
 
         return new Response(
             JSON.stringify({
-                error: 'Zu viele Anfragen. Bitte warte kurz und versuche es erneut.',
+                // §i18n-FIX: No hardcoded German strings in API layer.
+                // Frontend reads 'code' and maps to the correct locale string.
+                error: 'rate_limit_exceeded',
                 code: 'RATE_LIMIT_EXCEEDED',
                 retryAfterSeconds,
             }),

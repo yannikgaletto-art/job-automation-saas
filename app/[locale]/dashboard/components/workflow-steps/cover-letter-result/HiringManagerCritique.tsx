@@ -4,6 +4,7 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Shield, CheckCircle2, AlertCircle, Loader2, Sparkles } from "lucide-react"
 import type { HiringManagerCritique as CritiqueType } from "@/types/cover-letter-setup"
+import { useTranslations } from 'next-intl'
 
 interface HiringManagerCritiqueProps {
     critique: CritiqueType | null
@@ -24,6 +25,7 @@ export function HiringManagerCritique({
     onCustomFix,
     isFixing,
 }: HiringManagerCritiqueProps) {
+    const t = useTranslations('cover_letter');
     const [customInstruction, setCustomInstruction] = useState("")
 
     const handleCustomSubmit = (e: React.FormEvent) => {
@@ -61,19 +63,21 @@ export function HiringManagerCritique({
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-start gap-3">
                     <AlertCircle className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
                     <div>
-                        <h4 className="text-sm font-semibold text-[#73726E]">Hiring Manager Simulation</h4>
+                        <h4 className="text-sm font-semibold text-[#73726E]">{t('critique_sim_title')}</h4>
                         <p className="text-xs text-[#9B9A97] mt-1">
-                            Simulation nicht verfügbar. Du kannst dein Anschreiben trotzdem manuell bearbeiten.
+                            {t('critique_unavailable')}
                         </p>
                     </div>
                 </div>
-                <CustomInputForm
-                    value={customInstruction}
-                    onChange={setCustomInstruction}
-                    onSubmit={handleCustomSubmit}
-                    disabled={isFixing}
-                    isFixing={isFixing}
-                />
+                    <CustomInputForm
+                        value={customInstruction}
+                        onChange={setCustomInstruction}
+                        onSubmit={handleCustomSubmit}
+                        disabled={isFixing}
+                        isFixing={isFixing}
+                        placeholder={t('critique_custom_placeholder')}
+                        btnLabel={t('critique_ai_fix')}
+                    />
             </div>
         )
     }
@@ -90,9 +94,9 @@ export function HiringManagerCritique({
                     <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-start gap-3">
                         <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                         <div>
-                            <h4 className="text-sm font-semibold text-emerald-900">Kritik behoben</h4>
+                            <h4 className="text-sm font-semibold text-emerald-900">{t('critique_resolved_title')}</h4>
                             <p className="text-xs text-emerald-700 mt-1">
-                                Die Kritik des Hiring Managers wurde erfolgreich eingearbeitet.
+                                {t('critique_resolved_desc')}
                             </p>
                         </div>
                     </div>
@@ -102,6 +106,8 @@ export function HiringManagerCritique({
                         onSubmit={handleCustomSubmit}
                         disabled={isFixing}
                         isFixing={isFixing}
+                        placeholder={t('critique_custom_placeholder')}
+                        btnLabel={t('critique_ai_fix')}
                     />
                 </motion.div>
             </AnimatePresence>
@@ -143,9 +149,9 @@ export function HiringManagerCritique({
                         className="w-full bg-[#002e7a] text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-[#001f5c] disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                     >
                         {isFixing ? (
-                            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Wird eingearbeitet...</>
+                            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {t('critique_fixing')}</>
                         ) : (
-                            <><Sparkles className="w-3.5 h-3.5" /> Kritik ins Anschreiben einarbeiten</>
+                            <><Sparkles className="w-3.5 h-3.5" /> {t('critique_apply_fix')}</>
                         )}
                     </button>
                 </div>
@@ -156,6 +162,8 @@ export function HiringManagerCritique({
                     onSubmit={handleCustomSubmit}
                     disabled={isFixing}
                     isFixing={isFixing}
+                    placeholder={t('critique_custom_placeholder')}
+                    btnLabel={t('critique_ai_fix')}
                 />
             </motion.div>
         </AnimatePresence>
@@ -169,12 +177,16 @@ function CustomInputForm({
     onSubmit,
     disabled,
     isFixing,
+    placeholder,
+    btnLabel,
 }: {
     value: string
     onChange: (v: string) => void
     onSubmit: (e: React.FormEvent) => void
     disabled: boolean
     isFixing: boolean
+    placeholder: string
+    btnLabel: string
 }) {
     return (
         <form onSubmit={onSubmit} className="flex gap-2">
@@ -182,7 +194,7 @@ function CustomInputForm({
                 type="text"
                 value={value}
                 onChange={e => onChange(e.target.value)}
-                placeholder="Eigene Anweisung (z.B. 'Absatz 2 kürzen')"
+                placeholder={placeholder}
                 className="flex-1 border border-gray-200 rounded-md px-3 py-1.5 text-xs bg-white focus:outline-none focus:border-[#002e7a] transition-colors"
                 disabled={disabled}
             />
@@ -192,7 +204,7 @@ function CustomInputForm({
                 className="bg-gray-100 text-[#37352F] px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-gray-200 disabled:opacity-50 transition-colors flex items-center gap-1 shrink-0"
             >
                 {isFixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                KI-Fix
+                {btnLabel}
             </button>
         </form>
     )

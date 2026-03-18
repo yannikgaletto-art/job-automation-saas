@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import { WizardProgressBar } from './WizardProgressBar';
 import { StepHookSelection } from './steps/StepHookSelection';
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
+    const t = useTranslations('cover_letter');
     const { currentStep, setStep, initForJob, buildContext } =
         useCoverLetterSetupStore();
 
@@ -32,13 +34,13 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
     const fetchSetupData = async () => {
         try {
             const res = await fetch(`/api/cover-letter/setup-data?jobId=${jobId}`);
-            if (!res.ok) throw new Error('Fehler beim Laden der Daten');
+            if (!res.ok) throw new Error(t('error_load_data'));
             const data: SetupDataResponse = await res.json();
             setSetupData(data);
             console.log(`✅ [WizardSetup] Setup data loaded for job ${jobId}`);
         } catch (err) {
             console.error('❌ [WizardSetup] Setup data fetch failed:', err);
-            setLoadError(err instanceof Error ? err.message : 'Unbekannter Fehler');
+            setLoadError(err instanceof Error ? err.message : t('error_unknown'));
         }
     };
 
@@ -60,10 +62,10 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
             console.warn('⚠️ [WizardSetup] buildContext() returned null — navigating to incomplete step');
             // Find first incomplete step and navigate there
             const { isStepComplete } = useCoverLetterSetupStore.getState();
-            if (!isStepComplete(1)) { setStep(1); setContextError('Bitte wähle einen Aufhänger (Schritt 1).'); }
-            else if (!isStepComplete(2)) { setStep(2); setContextError('Bitte wähle mindestens eine Station (Schritt 2).'); }
-            else if (!isStepComplete(3)) { setStep(3); setContextError('Bitte konfiguriere Ton & Sprache (Schritt 3).'); }
-            else { setContextError('Bitte überprüfe alle Schritte.'); }
+            if (!isStepComplete(1)) { setStep(1); setContextError(t('error_step1')); }
+            else if (!isStepComplete(2)) { setStep(2); setContextError(t('error_step2')); }
+            else if (!isStepComplete(3)) { setStep(3); setContextError(t('error_step3')); }
+            else { setContextError(t('error_check_all')); }
             return;
         }
         onComplete(context);
@@ -78,7 +80,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
                     <div className="h-20 bg-[#E7E7E5] rounded" />
                     <div className="h-20 bg-[#E7E7E5] rounded" />
                 </div>
-                <p className="text-xs text-[#73726E] text-center">Lade Wizard-Daten...</p>
+                <p className="text-xs text-[#73726E] text-center">{t('loading_wizard')}</p>
             </div>
         );
     }
@@ -87,12 +89,12 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
     if (loadError || !setupData) {
         return (
             <div className="px-5 py-8 text-center space-y-3">
-                <p className="text-xs text-red-600">⚠️ {loadError || 'Daten konnten nicht geladen werden.'}</p>
+                <p className="text-xs text-red-600">⚠️ {loadError || t('error_data_load')}</p>
                 <button
                     onClick={fetchSetupData}
                     className="text-xs text-[#002e7a] hover:underline"
                 >
-                    Erneut versuchen
+                    {t('btn_retry')}
                 </button>
             </div>
         );

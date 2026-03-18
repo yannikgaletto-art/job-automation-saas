@@ -5,10 +5,13 @@
  * - Match Score: Progress bar instead of circle, with top 3 bullets strictly under it.
  * - Score Breakdown: Expandable disclosure instead of truncation.
  * - Anforderungs-Check: 2fr_3fr_4fr columns with clear headers and full badge status.
+ *
+ * i18n: All UI strings use useTranslations('cv_match').
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CVMatchResult } from '@/lib/services/cv-match-analyzer';
 import { Button } from '@/components/motion/button';
@@ -29,11 +32,11 @@ interface CVMatchTabProps {
 }
 
 // --- Status Badge ---
-function StatusBadge({ status }: { status: 'met' | 'partial' | 'missing' }) {
+function StatusBadge({ status, t }: { status: 'met' | 'partial' | 'missing'; t: ReturnType<typeof useTranslations> }) {
     const config = {
-        met: { icon: CheckCircle2, bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-100', label: 'Erfüllt' },
-        partial: { icon: Zap, bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-100', label: 'Teilweise' },
-        missing: { icon: AlertCircle, bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-100', label: 'Fehlt' },
+        met: { icon: CheckCircle2, bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-100', label: t('status_met') },
+        partial: { icon: Zap, bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-100', label: t('status_partial') },
+        missing: { icon: AlertCircle, bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-100', label: t('status_missing') },
     }[status];
     const Icon = config.icon;
     return (
@@ -45,7 +48,7 @@ function StatusBadge({ status }: { status: 'met' | 'partial' | 'missing' }) {
 }
 
 // --- Expandable bullet list for reasons ---
-function ReasonsList({ reasons }: { reasons: string[] }) {
+function ReasonsList({ reasons, t }: { reasons: string[]; t: ReturnType<typeof useTranslations> }) {
     const [expanded, setExpanded] = useState(false);
     if (reasons.length === 0) return null;
 
@@ -89,7 +92,7 @@ function ReasonsList({ reasons }: { reasons: string[] }) {
                         size={12}
                         className={cn("transition-transform duration-200", expanded && "rotate-180")}
                     />
-                    {expanded ? 'Weniger anzeigen' : 'Mehr Details'}
+                    {expanded ? t('show_less') : t('show_more')}
                 </button>
             )}
         </div>
@@ -97,7 +100,7 @@ function ReasonsList({ reasons }: { reasons: string[] }) {
 }
 
 /** Insights list for Match Score card — all items + toggle, text-xs to match Score Breakdown */
-function InsightsList({ items }: { items: string[] }) {
+function InsightsList({ items, t }: { items: string[]; t: ReturnType<typeof useTranslations> }) {
     const [expanded, setExpanded] = useState(false);
     if (items.length === 0) return <p className="text-xs text-slate-400 italic">–</p>;
     const shown = expanded ? items : items.slice(0, 1);
@@ -114,7 +117,7 @@ function InsightsList({ items }: { items: string[] }) {
                     className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
                 >
                     <ChevronDown size={12} className={cn("transition-transform duration-200", expanded && "rotate-180")} />
-                    {expanded ? 'Weniger anzeigen' : `+${items.length - 1} mehr`}
+                    {expanded ? t('show_less') : t('show_more_count', { n: items.length - 1 })}
                 </button>
             )}
         </div>
@@ -122,7 +125,7 @@ function InsightsList({ items }: { items: string[] }) {
 }
 
 /** Expandable table cell for Anforderungs-Check rows */
-function ExpandableCell({ text, boldFn }: { text: string; boldFn: (s: string) => React.ReactNode }) {
+function ExpandableCell({ text, boldFn, t }: { text: string; boldFn: (s: string) => React.ReactNode; t: ReturnType<typeof useTranslations> }) {
     const [expanded, setExpanded] = useState(false);
     const SHORT_LIMIT = 80;
     const isLong = text.length > SHORT_LIMIT;
@@ -139,7 +142,7 @@ function ExpandableCell({ text, boldFn }: { text: string; boldFn: (s: string) =>
                     className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
                 >
                     <ChevronDown size={12} className={cn("transition-transform duration-200", expanded && "rotate-180")} />
-                    {expanded ? 'Weniger anzeigen' : 'Mehr Details'}
+                    {expanded ? t('show_less') : t('show_more')}
                 </button>
             )}
         </div>
@@ -147,7 +150,7 @@ function ExpandableCell({ text, boldFn }: { text: string; boldFn: (s: string) =>
 }
 
 // --- Cancel Button (appears after delay so user is never stuck) ---
-function CancelButton({ onCancel }: { onCancel: () => void }) {
+function CancelButton({ onCancel, t }: { onCancel: () => void; t: ReturnType<typeof useTranslations> }) {
     const [visible, setVisible] = useState(false);
     useEffect(() => {
         const timer = setTimeout(() => setVisible(true), 15000);
@@ -164,31 +167,30 @@ function CancelButton({ onCancel }: { onCancel: () => void }) {
             onClick={onCancel}
             className="text-xs text-slate-400 hover:text-red-500 transition-colors mt-1"
         >
-            Abbrechen
+            {t('btn_cancel')}
         </motion.button>
     );
 }
 
 export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, onNextStep }: CVMatchTabProps) {
+    const t = useTranslations('cv_match');
+    const locale = useLocale();
     const [state, setState] = useState<'idle' | 'loading' | 'complete' | 'error' | 'no-cv'>('idle');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const router = useRouter();
     const notify = useNotification();
     const [matchData, setMatchData] = useState<CVMatchResult | null>(null);
     const [loadingStep, setLoadingStep] = useState(0);
-    const [progressText, setProgressText] = useState('Lebenslauf wird eingelesen...');
 
-    // Steps shown during loading — no AI model names, only user-friendly action descriptions
-    const CV_STEPS = [
-        'Lebenslauf & Match-Ergebnisse werden geladen',
-        'Schwachstellen werden analysiert',
-        'Optimierungspotenziale werden identifiziert',
-        'Empfehlungen werden zusammengestellt',
-        'Ergebnisse werden aufbereitet',
-    ];
+    // Steps shown during loading — computed from translations
+    const CV_STEPS = useMemo(() => [
+        t('step_1'),
+        t('step_2'),
+        t('step_3'),
+        t('step_4'),
+        t('step_5'),
+    ], [t]);
 
-    useEffect(() => {
-        // No-op — progress is driven by the CV_STEPS array via loadingStep
-    }, [state, loadingStep]);
 
     useEffect(() => {
         let cancelled = false;
@@ -202,10 +204,14 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                     setState('complete');
                 } else if (data.cvMatchStatus === 'processing' && data.cvMatchStartedAt) {
                     const elapsed = Date.now() - new Date(data.cvMatchStartedAt).getTime();
-                    if (elapsed > 5 * 60 * 1000) {
-                        // Definitively stale — show error + retry
-                        console.warn(`⚠️ [CV Match] Stale processing on mount (${Math.round(elapsed / 1000)}s) — showing retry`);
-                        setState('error');
+                    if (elapsed > 4 * 60 * 1000) {
+                        // §BUG-FIX #2: Threshold aligned with API (4min). Previously 5min caused
+                        // a dead-zone where API blocked restarts but frontend kept polling.
+                        // Definitively stale — set idle so user can restart cleanly.
+                        console.warn(`⚠️ [CV Match] Stale processing on mount (${Math.round(elapsed / 1000)}s) — auto-retriggering silently`);
+                        // runAnalysis is not available here yet (defined below), so set idle and let
+                        // the user click — but clear the stale flag so they don't see an error.
+                        setState('idle');
                     } else {
                         // Still within threshold — resume polling (Inngest may still be running)
                         console.log(`🔄 [CV Match] Resuming poll for in-flight job (${Math.round(elapsed / 1000)}s elapsed)`);
@@ -265,8 +271,9 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
         };
     }, []);
 
-    const runAnalysis = useCallback(async (cvDocumentId?: string) => {
+    const runAnalysis = useCallback(async (cvDocumentId?: string, forceRestart?: boolean) => {
         setState('loading');
+        setErrorMessage(null);
         setLoadingStep(1);
         setShowCVSelect(false);
         onMatchStart?.();
@@ -279,7 +286,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
             const res = await fetch('/api/cv/match', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId, cvDocumentId })
+                body: JSON.stringify({ jobId, cvDocumentId, forceRestart: forceRestart || false })
             });
 
             let data;
@@ -288,7 +295,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 data = JSON.parse(resText);
             } catch (err) {
                 console.error("❌ CV Match API returned non-JSON response:", resText.substring(0, 500));
-                throw new Error("Server antwortet nicht korrekt (HTML statt JSON). Bitte lade die Seite neu oder prüfe die Konsole.");
+                throw new Error(t('error_parse'));
             }
 
             if (!res.ok || !data?.success) {
@@ -296,7 +303,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                     setState('no-cv');
                     return;
                 }
-                throw new Error(data?.error || 'Fehler bei der Analyse');
+                throw new Error(data?.error || t('error_analysis'));
             }
 
             // Poll for results (Inngest processes in background)
@@ -313,7 +320,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         pollData = JSON.parse(pollText);
                     } catch (e) {
                         console.error("❌ Polling API non-JSON response:", pollText.substring(0, 200));
-                        throw new Error("Verbindungsabbruch während der Analyse (HTML statt JSON).");
+                        throw new Error(t('error_poll'));
                     }
 
                     if (pollData.success && pollData.cached?.analyzed_at) {
@@ -323,30 +330,40 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         setLoadingStep(3);
                         setMatchData(pollData.cached);
                         setState('complete');
-                        notify('CV Match erstellt');
+                        notify(t('notify_match_done'));
                         onMatchComplete?.(pollData.cached);
+                    } else if (pollData.cvMatchStatus === 'error') {
+                        // Pipeline permanently failed (onFailure wrote error to DB)
+                        if (pollingRef.current) clearInterval(pollingRef.current);
+                        pollingRef.current = null;
+                        const pipelineError = (pollData.cached as any)?.cv_match_error || t('error_analysis');
+                        throw new Error(pipelineError);
                     } else if (attempts >= maxAttempts) {
                         if (pollingRef.current) clearInterval(pollingRef.current);
                         pollingRef.current = null;
-                        throw new Error('Analyse-Timeout — bitte erneut versuchen');
+                        throw new Error(t('error_timeout'));
                     }
                 } catch (pollError) {
                     if (pollingRef.current) clearInterval(pollingRef.current);
                     pollingRef.current = null;
                     const errMsg = pollError instanceof Error ? pollError.message : String(pollError);
+                    setErrorMessage(errMsg);
                     setState('error');
                 }
             }, 3000);
 
         } catch (error: unknown) {
             const errMsg = error instanceof Error ? error.message : String(error);
-            console.error(error);
+            console.error('[CV Match] Error:', errMsg);
+            setErrorMessage(errMsg);
             setState('error');
         }
-    }, [jobId, onMatchStart, onMatchComplete]);
+    }, [jobId, onMatchStart, onMatchComplete, t]);
 
     /** Pre-check: how many CVs does the user have? */
     const handleStartAnalysis = useCallback(async () => {
+        // If retrying after error/timeout, force-restart to bypass stale-check
+        const shouldForceRestart = state === 'error';
         try {
             const res = await fetch('/api/documents/list-cvs');
             const resText = await res.text();
@@ -355,7 +372,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 data = JSON.parse(resText);
             } catch (e) {
                 console.error("❌ list-cvs API non-JSON response:", resText.substring(0, 500));
-                throw new Error("Konnte Lebensläufe nicht laden (Server sendet HTML).");
+                throw new Error(t('error_cv_load'));
             }
             const cvs: CVOption[] = data.cvs || [];
 
@@ -366,7 +383,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
 
             if (cvs.length === 1) {
                 // Auto-select the only CV
-                runAnalysis(cvs[0].id);
+                runAnalysis(cvs[0].id, shouldForceRestart);
                 return;
             }
 
@@ -375,9 +392,9 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
             setShowCVSelect(true);
         } catch {
             // Fallback: run without specific ID (uses latest)
-            runAnalysis();
+            runAnalysis(undefined, shouldForceRestart);
         }
-    }, [runAnalysis]);
+    }, [runAnalysis, t, state]);
 
     // ── NO CV — Blocking State ──────────────────────────────────
     if (state === 'no-cv') {
@@ -392,16 +409,15 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                     <div className="bg-amber-50 p-4 rounded-full shadow-sm mb-4 border border-amber-200">
                         <AlertCircle className="w-8 h-8 text-amber-500" />
                     </div>
-                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">Kein Lebenslauf gefunden</h3>
+                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">{t('no_cv_title')}</h3>
                     <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
-                        Um den CV Match zu starten, musst du zuerst deinen Lebenslauf hochladen.
-                        Das dauert nur 30 Sekunden.
+                        {t('no_cv_desc')}
                     </p>
                     <Button
                         variant="primary"
-                        onClick={() => router.push('/dashboard/settings')}
+                        onClick={() => router.push(`/${locale}/dashboard/settings`)}
                     >
-                        CV in Einstellungen hochladen →
+                        {t('no_cv_cta')}
                     </Button>
                 </div>
             </>
@@ -428,19 +444,18 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 />
                 <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
 
-                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">CV Match & Optimierung</h3>
-                    <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
-                        Wir <strong>vergleichen</strong> deinen <strong>Lebenslauf</strong> mit den <strong>Anforderungen</strong> dieser <strong>Stelle</strong>.
-                        Du erhältst eine <strong>Gegenüberstellung</strong>, auf deren Basis wir einen <strong>optimierten CV</strong> generieren können.
-                    </p>
+                    <h3 className="text-xl font-semibold text-[#37352F] mb-2">{t('title')}</h3>
+                    <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed"
+                       dangerouslySetInnerHTML={{ __html: String(t.raw('subtitle')) }}
+                    />
                     {state === 'error' && (
-                        <div className="mb-4 text-sm text-red-600 flex items-center gap-2 bg-red-50 px-3 py-2 rounded-md border border-red-100">
-                            <AlertCircle className="w-4 h-4" />
-                            <div>Ein Fehler ist aufgetreten. Bitte versuche es erneut.</div>
+                        <div className="mb-4 text-sm text-red-600 flex items-start gap-2 bg-red-50 px-3 py-2 rounded-md border border-red-100">
+                            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                            <div>{errorMessage || t('error_generic')}</div>
                         </div>
                     )}
                     <Button variant="primary" onClick={handleStartAnalysis}>
-                        {state === 'error' ? 'Erneut versuchen' : 'Analyse starten'}
+                        {state === 'error' ? t('btn_retry') : t('btn_start')}
                     </Button>
                 </div>
             </>
@@ -458,10 +473,10 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 <div className="flex items-center gap-2.5 mb-1">
                     <Loader2 className="w-5 h-5 text-[#002e7a] animate-spin shrink-0" />
                     <span className="text-sm font-semibold text-[#37352F]">
-                        CV Match wird analysiert…
+                        {t('loading_title')}
                     </span>
                 </div>
-                <p className="text-xs text-[#73726E] mb-5 pl-[29px]">Das dauert etwa 30–75 Sekunden</p>
+                <p className="text-xs text-[#73726E] mb-5 pl-[29px]">{t('loading_duration')}</p>
 
                 {/* Step list — full width, matches the image layout */}
                 <div className="space-y-2">
@@ -522,7 +537,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
 
                 {/* Cancel button — appears after 15s so the user is never stuck */}
                 <div className="mt-5 pl-1">
-                    <CancelButton onCancel={() => {
+                    <CancelButton t={t} onCancel={() => {
                         if (pollingRef.current) {
                             clearInterval(pollingRef.current);
                             pollingRef.current = null;
@@ -571,10 +586,10 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                     {/* Match Score Card */}
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col">
                         <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">
-                            Match Score
+                            {t('score_title')}
                         </h3>
                         <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-semibold text-slate-700">Übereinstimmung</span>
+                            <span className="text-xs font-semibold text-slate-700">{t('score_match')}</span>
                             <span className="text-sm font-bold text-slate-900">{score}%</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-slate-100 mb-5">
@@ -585,13 +600,13 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         </div>
                         <div className="space-y-3 flex-1">
                             {[
-                                { label: 'Stärken', items: strengths.length > 0 ? strengths : ['Keine spezifischen Stärken dokumentiert.'] },
-                                { label: 'Lücken', items: gaps.length > 0 ? gaps : ['Keine kritischen Lücken identifiziert.'] },
-                                { label: 'Versteckte Potenziale', items: potentialHighlights.length > 0 ? potentialHighlights : ['Keine ungenutzten Potenziale erkannt.'] },
+                                { label: t('strengths'), items: strengths.length > 0 ? strengths : [t('no_strengths')] },
+                                { label: t('gaps'), items: gaps.length > 0 ? gaps : [t('no_gaps')] },
+                                { label: t('potential'), items: potentialHighlights.length > 0 ? potentialHighlights : [t('no_potential')] },
                             ].map(({ label, items }) => (
                                 <div key={label}>
                                     <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
-                                    <InsightsList items={items} />
+                                    <InsightsList items={items} t={t} />
                                 </div>
                             ))}
                         </div>
@@ -599,13 +614,13 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
 
                     {/* Score Breakdown */}
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col overflow-y-auto max-h-[400px] custom-scrollbar">
-                        <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">Score-Breakdown</h4>
+                        <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">{t('breakdown_title')}</h4>
                         <div className="space-y-3 flex-1">
                             {[
-                                { label: 'Technische Skills', value: matchData.scoreBreakdown.technicalSkills },
-                                { label: 'Soft Skills', value: matchData.scoreBreakdown.softSkills },
-                                { label: 'Erfahrungslevel', value: matchData.scoreBreakdown.experienceLevel },
-                                { label: 'Domain-Wissen', value: matchData.scoreBreakdown.domainKnowledge },
+                                { label: t('breakdown_technical'), value: matchData.scoreBreakdown.technicalSkills },
+                                { label: t('breakdown_soft'), value: matchData.scoreBreakdown.softSkills },
+                                { label: t('breakdown_experience'), value: matchData.scoreBreakdown.experienceLevel },
+                                { label: t('breakdown_domain'), value: matchData.scoreBreakdown.domainKnowledge },
                             ].map((item, i) => {
                                 const sc = typeof item.value === 'number' ? item.value : item.value?.score || 0;
                                 const reasons = typeof item.value === 'number' ? [] : item.value?.reasons || [];
@@ -623,7 +638,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                                             </div>
                                             <div className="w-8 text-right font-medium text-xs text-[#37352F]">{sc}%</div>
                                         </div>
-                                        <ReasonsList reasons={reasons} />
+                                        <ReasonsList reasons={reasons} t={t} />
                                     </div>
                                 );
                             })}
@@ -631,10 +646,10 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                     </div>
                 </div>
 
-                {/* ── Anforderungs-Check (Fix 3b) ── */}
+                {/* ── Requirements Check ── */}
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                     <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                        <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">Anforderungs-Check</h3>
+                        <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">{t('requirements_title')}</h3>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-400">{metCount}/{totalCount}</span>
                             <div className="w-20 h-1 bg-slate-100 rounded overflow-hidden">
@@ -651,9 +666,9 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         </colgroup>
                         <thead>
                             <tr className="bg-slate-50 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                                <th className="px-4 py-2 text-left font-semibold">Anforderung</th>
-                                <th className="px-4 py-2 text-left font-semibold">Ist-Zustand</th>
-                                <th className="px-4 py-2 text-left font-semibold">Empfehlung</th>
+                                <th className="px-4 py-2 text-left font-semibold">{t('req_col_requirement')}</th>
+                                <th className="px-4 py-2 text-left font-semibold">{t('req_col_current')}</th>
+                                <th className="px-4 py-2 text-left font-semibold">{t('req_col_suggestion')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -665,20 +680,20 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                                     transition={{ delay: i * 0.04 }}
                                     className="group hover:bg-slate-50 transition-colors"
                                 >
-                                    {/* Anforderung */}
+                                    {/* Requirement */}
                                     <td className="py-3 px-4 align-top">
-                                        <StatusBadge status={row.status} />
+                                        <StatusBadge status={row.status} t={t} />
                                         <p className="text-xs text-slate-700 mt-1.5 leading-snug">{row.requirement}</p>
                                     </td>
 
-                                    {/* Ist-Zustand — expandable teaser */}
+                                    {/* Current State — expandable teaser */}
                                     <td className="py-3 px-4 align-top border-l border-slate-100">
-                                        <ExpandableCell text={row.currentState} boldFn={boldFirst} />
+                                        <ExpandableCell text={row.currentState} boldFn={boldFirst} t={t} />
                                     </td>
 
-                                    {/* Empfehlung — expandable teaser */}
+                                    {/* Recommendation — expandable teaser */}
                                     <td className="py-3 px-4 align-top border-l border-slate-100">
-                                        <ExpandableCell text={row.suggestion || ''} boldFn={boldFirst} />
+                                        <ExpandableCell text={row.suggestion || ''} boldFn={boldFirst} t={t} />
                                     </td>
                                 </motion.tr>
                             ))}
@@ -689,11 +704,11 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 {/* ── ATS Keywords ── */}
                 <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
                     <h4 className="text-xs font-semibold text-[#37352F] mb-2">
-                        ATS Keywords <span className="text-[10px] text-slate-400 font-normal ml-1">(Applicant Tracking System)</span>
+                        {t('ats_title')} <span className="text-[10px] text-slate-400 font-normal ml-1">{t('ats_subtitle')}</span>
                     </h4>
-                    <p className="text-xs text-slate-500 leading-relaxed mb-3">
-                        In der Regel ist die erste Instanz, die deinen Lebenslauf prüft, ein <strong className="font-semibold text-slate-700">Algorithmus</strong>. Die Applicant Tracking Systems (ATS) suchen gezielt nach <strong className="font-semibold text-slate-700">Keywords</strong>, die für die Stelle relevant sind. Fehlen diese Begriffe, wird deine Bewerbung oft automatisch aussortiert. Wir empfehlen dir daher, die Schlagworte aus der Stellenanzeige direkt in deinen Lebenslauf zu <strong className="font-semibold text-slate-700">integrieren</strong>.
-                    </p>
+                    <p className="text-xs text-slate-500 leading-relaxed mb-3"
+                       dangerouslySetInnerHTML={{ __html: String(t.raw('ats_desc')) }}
+                    />
                     <div className="flex flex-wrap gap-1.5">
                         {keywordsFound.map(kw => (
                             <span key={kw} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
@@ -706,7 +721,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                             </span>
                         ))}
                         {keywordsFound.length === 0 && keywordsMissing.length === 0 && (
-                            <span className="text-xs text-slate-400 italic">Keine expliziten Keywords analysiert.</span>
+                            <span className="text-xs text-slate-400 italic">{t('ats_empty')}</span>
                         )}
                     </div>
                 </div>
@@ -714,12 +729,12 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 {/* ── Next Step ── */}
                 <div className="bg-blue-50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between border border-blue-100">
                     <div>
-                        <h4 className="font-semibold text-[#002e7a] text-sm">Zur Erstellung deines Lebenslaufs</h4>
-                        <p className="text-xs text-[#002e7a]/70 mt-0.5">Gehe zum nächsten Schritt, um deinen Lebenslauf basierend auf dieser Analyse zu aktualisieren.</p>
+                        <h4 className="font-semibold text-[#002e7a] text-sm">{t('next_step_title')}</h4>
+                        <p className="text-xs text-[#002e7a]/70 mt-0.5">{t('next_step_desc')}</p>
                     </div>
                     <div className="flex gap-3 mt-3 sm:mt-0">
                         <Button variant="primary" onClick={() => onNextStep?.()} className="shadow-sm text-sm">
-                            Weiter zur Erstellung
+                            {t('next_step_btn')}
                         </Button>
                     </div>
                 </div>

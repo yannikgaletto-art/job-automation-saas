@@ -1,5 +1,8 @@
 'use client';
 
+import { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
+
 interface WizardProgressBarProps {
     currentStep: 1 | 2 | 3;
     /** Highest step the user has reached — used to allow back-navigation */
@@ -7,21 +10,21 @@ interface WizardProgressBarProps {
     onNavigate?: (step: 1 | 2 | 3) => void;
 }
 
-const steps = [
-    { number: 1, title: 'Aufhänger', sub: 'Einstieg wählen' },
-    { number: 2, title: 'Erfahrung', sub: 'CV Stationen' },
-    { number: 3, title: 'Ton', sub: 'Schreibstil' },
-] as const;
-
 export function WizardProgressBar({ currentStep, maxReachedStep, onNavigate }: WizardProgressBarProps) {
+    const t = useTranslations('cover_letter');
     const maxStep = maxReachedStep ?? currentStep;
+
+    const steps = useMemo(() => [
+        { number: 1, title: t('step1_title'), sub: t('step1_sub') },
+        { number: 2, title: t('step2_title'), sub: t('step2_sub') },
+        { number: 3, title: t('step3_title'), sub: t('step3_sub') },
+    ] as const, [t]);
 
     return (
         <div className="flex items-center gap-2 mb-6">
             {steps.map((step, idx) => {
                 const isDone = step.number < currentStep;
                 const isActive = step.number === currentStep;
-                // A step is navigable if already visited (done) and we have an onNavigate handler
                 const isNavigable = isDone && !!onNavigate && step.number <= maxStep;
 
                 const circleContent = isDone ? '✓' : step.number;
@@ -41,10 +44,10 @@ export function WizardProgressBar({ currentStep, maxReachedStep, onNavigate }: W
                             {isNavigable ? (
                                 <button
                                     type="button"
-                                    title={`Zurück zu Schritt ${step.number}: ${step.title}`}
+                                    title={t('nav_back_to_step', { step: step.number, title: step.title })}
                                     onClick={() => onNavigate?.(step.number as 1 | 2 | 3)}
                                     className={circleClasses}
-                                    aria-label={`Zu Schritt ${step.number} navigieren`}
+                                    aria-label={t('nav_goto_step', { step: step.number })}
                                 >
                                     {circleContent}
                                 </button>
@@ -69,4 +72,3 @@ export function WizardProgressBar({ currentStep, maxReachedStep, onNavigate }: W
         </div>
     );
 }
-

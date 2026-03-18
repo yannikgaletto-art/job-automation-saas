@@ -71,15 +71,7 @@ export const DEFAULT_OPT_IN_MODULES: OptInModules = {
     stationsSelector: true,
 };
 
-// ─── X-Ray Audit Trail Card ──────────────────────────────────────
-export interface AuditTrailCard {
-    category: 'user_voice' | 'company_insight' | 'job_fit' | 'module_trace';
-    icon: '🟢' | '🔵' | '🟣' | '🟠';
-    title: string;
-    detail: string;
-    reference?: string;
-    moduleName?: string;
-}
+
 
 // ─── Hiring Manager Critique ──────────────────────────────────────
 export interface HiringManagerCritique {
@@ -101,7 +93,6 @@ export interface CoverLetterSetupContext {
     enablePingPong?: boolean;          // B1.3: Set via optInModules.pingPong
     selectedNews?: { title: string; date: string; source?: string }; // B2.5: News-Binding
     optInModules?: OptInModules;       // B2.2: Opt-In Feature-Module
-    xRayMode?: boolean;                // B3.1: Context X-Ray annotations
     selectedPersona?: HiringPersona;   // B3.2: Ausgewählte Hiring-Persona
     introFocus?: 'quote' | 'hook';     // Cross-Integration: Wer bekommt die Pole Position?
 }

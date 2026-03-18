@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
             coverLetter?: string;
             jobTitle?: string;
             companyName?: string;
+            locale?: string;
         };
 
         if (!body.coverLetter || body.coverLetter.trim().length === 0) {
@@ -40,12 +41,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!body.companyName || body.companyName.trim().length === 0) {
-            return NextResponse.json(
-                { success: false, error: 'Missing or empty companyName' },
-                { status: 400 }
-            );
-        }
+        // Use fallbacks for optional fields — never block critique on missing metadata
+        const companyName = body.companyName?.trim() || 'the company';
+        const jobTitle = body.jobTitle?.trim() || 'the role';
 
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) {
@@ -55,32 +53,77 @@ export async function POST(request: NextRequest) {
 
         const anthropic = new Anthropic({ apiKey });
 
-        const jobTitle = body.jobTitle || 'die ausgeschriebene Stelle';
-        const companyName = body.companyName;
 
-        const prompt = `Du bist ein skeptischer, erfahrener Hiring Manager bei ${companyName} für die Rolle "${jobTitle}".
+
+        const locale = body.locale || 'de';
+
+        const prompts: Record<string, string> = {
+            de: `Du bist ein skeptischer, erfahrener Hiring Manager bei ${companyName} für die Rolle "${jobTitle}".
 
 Lies dieses Anschreiben eines Kandidaten:
 ---
 ${body.coverLetter}
 ---
 
-DEINE AUFGABE:
-Formuliere GENAU EINE konstruktive, spezifische Kritik als Hiring Manager.
-
+AUFGABE: Formuliere GENAU EINE konstruktive, spezifische Kritik als Hiring Manager.
 REGELN:
-- Die Kritik muss sich auf eine KONKRETE LÜCKE beziehen (fehlende Zahlen, unklare Teamgröße, vage Ergebnisse, fehlende Zeiträume, etc.)
-- KEINE generischen Kommentare wie "könnte besser sein" oder "mehr Details"
-- Formuliere die Kritik als direkte Rede des Hiring Managers (Ich-Perspektive)
-- Gib einen konkreten Verbesserungsvorschlag
+- Beziehe dich auf eine KONKRETE LÜCKE (fehlende Zahlen, unklare Teamgröße, vage Ergebnisse)
+- Keine generischen Kommentare
+- Direkte Rede (Ich-Perspektive)
+- Einen konkreten Verbesserungsvorschlag
 
 Antworte NUR als valides JSON:
 {
   "persona": "Skeptischer HR-Chef",
   "role": "Head of People @ ${companyName}",
-  "critique": "Der Teil über [X] ist gut, aber als HR-Chef frage ich mich: [konkrete Frage]. Das fehlt mir, um [konkretes Ziel].",
-  "fixSuggestion": "Erwähne [konkretes Detail] bei der Station [X]"
-}`;
+  "critique": "Der Teil über [X] klingt gut, aber ich frage mich: [konkrete Frage].",
+  "fixSuggestion": "Erwähne [konkretes Detail] bei Station [X]"
+}`,
+            en: `You are a skeptical, experienced Hiring Manager at ${companyName} for the role "${jobTitle}".
+
+Read this cover letter from a candidate:
+---
+${body.coverLetter}
+---
+
+TASK: Formulate EXACTLY ONE constructive, specific critique as a Hiring Manager.
+RULES:
+- Focus on a CONCRETE GAP (missing numbers, unclear team size, vague results)
+- No generic comments like "could be better"
+- Write in first person (I-perspective as the hiring manager)
+- Provide a specific improvement suggestion
+
+Respond ONLY as valid JSON:
+{
+  "persona": "Skeptical HR Director",
+  "role": "Head of People @ ${companyName}",
+  "critique": "The part about [X] sounds good, but as a hiring manager I wonder: [specific question].",
+  "fixSuggestion": "Mention [specific detail] for the [X] role"
+}`,
+            es: `Eres un Director de Recursos Humanos escéptico y experimentado en ${companyName} para el puesto "${jobTitle}".
+
+Lee esta carta de presentación del candidato:
+---
+${body.coverLetter}
+---
+
+TAREA: Formula EXACTAMENTE UNA crítica constructiva y específica como Director de RRHH.
+REGLAS:
+- Céntrate en una BRECHA CONCRETA (números faltantes, tamaño de equipo poco claro, resultados vagos)
+- Sin comentarios genéricos
+- Primera persona (perspectiva del director)
+- Proporciona una sugerencia de mejora específica
+
+Responde SOLO como JSON válido:
+{
+  "persona": "Director de RRHH Escéptico",
+  "role": "Head of People @ ${companyName}",
+  "critique": "La parte sobre [X] suena bien, pero como director me pregunto: [pregunta concreta].",
+  "fixSuggestion": "Menciona [detalle concreto] para el puesto [X]"
+}`
+        };
+
+        const prompt = prompts[locale] ?? prompts['de'];
 
         console.log('🎭 [Critique] Generating hiring manager critique via Haiku...');
 

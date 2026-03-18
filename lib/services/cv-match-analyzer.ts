@@ -1,4 +1,5 @@
 import { complete } from '@/lib/ai/model-router';
+import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 
 // Admin client: works in both API routes AND Inngest background context (no cookie/session required)
@@ -43,6 +44,7 @@ export interface CVMatchRequest {
     requirements: string[];
     atsKeywords: string[];
     level: string;
+    locale?: SupportedLocale;
 }
 
 // 3-column Notion table row — one per requirement
@@ -73,159 +75,167 @@ export interface CVMatchResult {
     keywordsMissing: string[];
 }
 
-const CV_MATCH_PROMPT = (req: CVMatchRequest) => `
-Du bist ein erfahrener HR-Consultant und ATS-Experte mit hohem Anspruch
-an Realismus. Du bist bekannt dafür, ehrlich zu sein — weder zu hart noch
-zu wohlwollend.
-WICHTIGSTE REGEL: Sprich den Nutzer IMMER direkt mit "Du" an! (Niemals in der dritten Person reden).
+const CV_MATCH_PROMPT = (req: CVMatchRequest) => {
+    const lang = getLanguageName(req.locale || 'de');
+    const addressForm = req.locale === 'es' ? 'usted' : req.locale === 'en' ? 'you' : 'Du';
+    return `
+You are an experienced HR consultant and ATS expert with a high standard for realism.
+You are known for being honest — neither too harsh nor too lenient.
+CRITICAL RULE: Always address the user with "${addressForm}" (second person, never third person).
+CRITICAL RULE: ALL output text fields (currentState, suggestion, strengths, gaps, etc.) MUST be written in ${lang}. This is non-negotiable.
 
-**LEBENSLAUF DES KANDIDATEN:**
+**CANDIDATE CV:**
 ${req.cvText}
 
-**STELLENAUSSCHREIBUNG:**
-Unternehmen: ${req.company}
+**JOB POSTING:**
+Company: ${req.company}
 Position: ${req.jobTitle}
-Level: ${req.level || 'nicht angegeben'}
+Level: ${req.level || 'not specified'}
 
-Beschreibung:
+Description:
 ${req.jobDescription}
 
-Anforderungen (Original):
+Requirements (Original):
 ${req.requirements.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 
-ATS-Schlüsselwörter:
+ATS Keywords:
 ${req.atsKeywords.join(', ')}
 
 ***
 
-**SCHRITT 1 — KONSOLIDIERUNG (PFLICHT):**
-Fasse die Anforderungsliste auf 5–8 Kernkompetenzen zusammen.
-Merge semantisch gleiche Anforderungen zu einer Zeile.
-Jede Zeile = eine eigenständige Kompetenzdimension.
+**STEP 1 — CONSOLIDATION (MANDATORY):**
+Consolidate the requirements list to 5–8 core competencies.
+Merge semantically identical requirements into one row.
+Each row = one distinct competency dimension.
 
 ***
 
-**SCHRITT 2 — ANALYSE (für jede konsolidierte Anforderung):**
+**STEP 2 — ANALYSIS (for each consolidated requirement):**
 
-Für jede Anforderung erstelle eine 3-Spalten-Zeile:
+For each requirement, create a 3-column row:
 
-SPALTE 1 — Anforderung:
-Die konsolidierte Anforderungsformulierung.
+COLUMN 1 — Requirement:
+The consolidated requirement formulation.
 
-SPALTE 2 — CV Ist-Zustand (REALISTISCH, nicht wohlwollend):
-- Benenne KONKRET was vorhanden ist (z.B. "Du hast als Co-Founder und Product Owner von...").
-- Sprich den Kandidaten mit "Du" an!
-- Benenne EHRLICH was fehlt oder nur peripher vorhanden ist.
-- Kein Marketing. Kein Schönreden.
+COLUMN 2 — Current CV State (REALISTIC, not flattering):
+- Name CONCRETELY what is present (e.g., "${addressForm} worked as Co-Founder and Product Owner at...").
+- Address the candidate with "${addressForm}"!
+- Name HONESTLY what is missing or only peripherally present.
+- No marketing. No sugarcoating.
 
-SPALTE 3 — Veränderungsvorschlag (ethisch korrekt):
-- Nur auf Basis echter CV-Fakten.
-- Sprich den Kandidaten mit "Du" an (z.B. "Gehe auf diese Erfahrungen ein und bringe 1-2 Beispiele...").
-- Konkrete Formulierungsvorschläge für vorhandene, aber schwach beschriebene Erfahrungen.
-- Bei Lücken: ehrlicher Hinweis + was man tun kann.
-- KEINE Erfindungen.
+COLUMN 3 — Improvement Suggestion (ethically sound):
+- Based only on real CV facts.
+- Address the candidate with "${addressForm}" (e.g., "Highlight these experiences and provide 1-2 examples...").
+- Concrete reformulation suggestions for experiences that are present but weakly described.
+- For gaps: honest note + what can be done.
+- NO inventions.
 
-STATUS-VERGABE (streng):
-- "met": Direkte Erfahrung, nachweisbar, > 6 Monate oder klarer Erfolg
-- "partial": Verwandt, kurz, oder nur tangential relevant
-- "missing": Kein Beleg im CV
-
-***
-
-**SCHRITT 3 — SCORE:**
-Berechne einen realistischen Gesamtscore (0–100).
-Sei ehrlich: ein "partial" bei einer ZWINGEND erforderlichen Anforderung zieht den Score deutlich.
-Für jede der 5 Unterkategorien (technicalSkills, softSkills, experienceLevel, domainKnowledge, languageMatch) generierst du den Score UND 2-3 konkrete, kurze Stichpunkte als Begründung, warum dieser Score vergeben wurde (direkt an den Nutzer gerichtet, z.B. "Du bringst 3 Jahre Erfahrung mit").
+STATUS ASSIGNMENT (strict):
+- "met": Direct experience, verifiable, >6 months or clear demonstrated success
+- "partial": Related, brief, or only tangentially relevant
+- "missing": No evidence in CV
 
 ***
 
-**SCHRITT 4 — ATS KEYWORDS:**
-Reduziere die erkannten und fehlenden ATS-Keywords auf die absolut wichtigsten 5-6 Begriffe insgesamt.
+**STEP 3 — SCORE:**
+Calculate a realistic overall score (0–100).
+Be honest: a "partial" on a MANDATORY requirement significantly lowers the score.
+For each of the 5 sub-categories (technicalSkills, softSkills, experienceLevel, domainKnowledge, languageMatch), generate the score AND 2-3 concrete, brief bullet points explaining why that score was given (directed at the user with "${addressForm}", e.g., "${addressForm === 'Du' ? 'Du bringst' : addressForm === 'you' ? 'You bring' : 'Usted aporta'} 3 years of experience in...").
 
 ***
 
-**REGELN:**
-- Sprache: DEUTSCH
-- Immer im "Du" schreiben!
-- Keine vagen Formulierungen wie "hat Erfahrung in..." -> "Du hast Erfahrung in..."
-- Konkret: Was genau, wo, wie lange
-- Positiver Bias ist verboten. Ehrlichkeit ist Respekt.
-- Output: Strikt JSON, kein Markdown drumherum
-- **WICHTIG: requirementRows MAXIMAL 6 Einträge** — fasse ähnliche Anforderungen zusammen!
-- **WICHTIG: reasons-Arrays MAXIMAL 2 Einträge** — kurz und präzise!
-- **WICHTIG: Gib NUR vollständiges, gültiges JSON aus. Kürze Texte wenn nötig, aber beende immer das JSON korrekt.**
+**STEP 4 — ATS KEYWORDS:**
+Reduce recognized and missing ATS keywords to the most important 5-6 terms total.
+
+***
+
+**RULES:**
+- OUTPUT LANGUAGE: ${lang} — Write ALL output text in ${lang}. This is the highest priority rule.
+- Address form: always "${addressForm}"
+- No vague formulations
+- Be specific: what exactly, where, how long
+- Positive bias is forbidden. Honesty is respect.
+- Output: Strictly JSON, no surrounding markdown
+- **IMPORTANT: requirementRows MAXIMUM 6 entries** — merge similar requirements!
+- **IMPORTANT: reasons arrays MAXIMUM 2 entries** — short and precise!
+- **IMPORTANT: Output ONLY complete, valid JSON. Shorten texts if needed but always close the JSON correctly.**
 
 **OUTPUT FORMAT:**
 {
   "overallScore": <0-100>,
   "scoreBreakdown": {
-    "technicalSkills": { "score": <0-100>, "reasons": ["<Grund 1>", "<Grund 2>"] },
-    "softSkills": { "score": <0-100>, "reasons": ["<Grund 1>", "<Grund 2>"] },
-    "experienceLevel": { "score": <0-100>, "reasons": ["<Grund 1>", "<Grund 2>"] },
-    "domainKnowledge": { "score": <0-100>, "reasons": ["<Grund 1>", "<Grund 2>"] },
-    "languageMatch": { "score": <0-100>, "reasons": ["<Grund 1>", "<Grund 2>"] }
+    "technicalSkills": { "score": <0-100>, "reasons": ["<reason 1>", "<reason 2>"] },
+    "softSkills": { "score": <0-100>, "reasons": ["<reason 1>", "<reason 2>"] },
+    "experienceLevel": { "score": <0-100>, "reasons": ["<reason 1>", "<reason 2>"] },
+    "domainKnowledge": { "score": <0-100>, "reasons": ["<reason 1>", "<reason 2>"] },
+    "languageMatch": { "score": <0-100>, "reasons": ["<reason 1>", "<reason 2>"] }
   },
   "requirementRows": [
     {
-      "requirement": "<konsolidierte Anforderung>",
+      "requirement": "<consolidated requirement>",
       "status": "met|partial|missing",
-      "currentState": "<konkreter Ist-Zustand — ehrlich, du-Form, mit Belegen>",
-      "suggestion": "<ethisch korrekter Verbesserungsvorschlag, du-Form>"
+      "currentState": "<concrete current state — honest, ${addressForm}-form, with evidence>",
+      "suggestion": "<ethically sound improvement suggestion, ${addressForm}-form>"
     }
   ],
-  "strengths": ["<Deine Stärke 1>", "<Deine Stärke 2>"],
-  "gaps": ["<Deine Lücke 1>", "<Deine Lücke 2>"],
-  "potentialHighlights": ["<Dein Potenzial 1>"],
-  "overallRecommendation": "<1–2 ehrliche deutsche Sätze im Du>",
+  "strengths": ["<strength 1>", "<strength 2>"],
+  "gaps": ["<gap 1>", "<gap 2>"],
+  "potentialHighlights": ["<potential 1>"],
+  "overallRecommendation": "<1–2 honest sentences>",
   "keywordsFound": ["keyword1", "keyword2"],
   "keywordsMissing": ["keyword3"]
 }
 `;
+};
+
+
+
 
 export async function runRealismCheck(
     firstResult: CVMatchResult,
-    cvText: string
+    cvText: string,
+    locale: SupportedLocale = 'de'
 ): Promise<CVMatchResult & { realismTokens: number, realismCost: number, realismLatency: number }> {
 
+    const lang = getLanguageName(locale);
     const realismPrompt = `
-Du bist ein strenger, aber fairer HR-Prüfer.
-Dir wurde eine CV-Match-Analyse vorgelegt. Deine Aufgabe:
-Prüfe, ob die Bewertungen REALISTISCH sind — nicht zu positiv, nicht zu negativ.
+You are a strict but fair HR evaluator.
+You have been presented with a CV Match Analysis. Your task:
+Check whether the evaluations are REALISTIC — not too positive, not too negative.
 
 **ORIGINAL CV:**
 ${cvText}
 
-**VORLIEGENDE ANALYSE:**
+**CURRENT ANALYSIS:**
 ${JSON.stringify(firstResult.requirementRows, null, 2)}
 
 **OVERALL SCORE:** ${firstResult.overallScore}
 
-**DEINE PRÜF-AUFGABEN:**
+**YOUR REVIEW TASKS:**
 
-1. STATUS-CHECK: Ist jeder Status (met/partial/missing) korrekt?
-   Wende folgende strenge Kriterien an:
-   - "met" nur wenn: direkte Erfahrung, nachweisbar im CV, > 6 Monate oder
-     klarer Projekterfolg belegt
-   - "partial" wenn: verwandt aber nicht direkt, oder kurze Berührungspunkte
-   - "missing" wenn: kein Beleg im CV
+1. STATUS CHECK: Is each status (met/partial/missing) correct?
+   Apply these strict criteria:
+   - "met" ONLY when: direct experience, verifiable in CV, >6 months or clear project success documented
+   - "partial" when: related but not direct, or only brief touchpoints
+   - "missing" when: no evidence in CV
 
-2. IST-ZUSTAND-CHECK: Ist Spalte 2 konkret und ehrlich?
-   - Enthält sie Projektnamen, Arbeitgeber, Zeiträume?
-   - Sagt sie klar, was vorhanden UND was NICHT vorhanden ist?
-   - Keine vagen Formulierungen wie "hat Erfahrung in..."?
+2. CURRENT STATE CHECK: Is column 2 concrete and honest?
+   - Does it contain project names, employers, time periods?
+   - Does it clearly state what IS present AND what is NOT?
+   - No vague formulations like "has experience in..."?
 
-3. SCORE-CHECK: Ist der Gesamtscore realistisch?
-   Prüfe insbesondere auf "positive bias" — wird zu wohlwollend bewertet?
+3. SCORE CHECK: Is the overall score realistic?
+   Check especially for "positive bias" — is it rated too favorably?
 
-4. KONSOLIDIERUNGS-CHECK: Sind ähnliche Anforderungen zusammengefasst?
-   Max. 8 Zeilen. Wenn mehr: merge semantisch gleiche Anforderungen.
+4. CONSOLIDATION CHECK: Are similar requirements merged?
+   Max. 8 rows. If more: merge semantically identical requirements.
 
-**OUTPUT:** Korrigierte Version der Analyse im exakt gleichen JSON-Format.
-Ändere nur was wirklich korrigiert werden muss.
-Füge pro geänderter Zeile ein "corrected: true" Flag hinzu.
-Setze "realismScore" auf 0-100 (wie realistisch war die erste Analyse?).
+**OUTPUT:** Corrected version of the analysis in exactly the same JSON format.
+Only change what genuinely needs correction.
+Add a "corrected: true" flag to each changed row.
+Set "realismScore" to 0-100 (how realistic was the first analysis?).
 
-**SPRACHE:** Deutsch.
+**OUTPUT LANGUAGE:** ${lang}. Write ALL text fields in ${lang}.
   `;
 
     const checkResult = await complete({
@@ -294,27 +304,32 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
         const firstResult: CVMatchResult = safeParseJson(jsonMatch[0]);
 
         // Stage 2: Prüf-Agent (Realism Check)
-        const finalResult = await runRealismCheck(firstResult, req.cvText);
+        const finalResult = await runRealismCheck(firstResult, req.cvText, req.locale || 'de');
 
         const totalTokens = (result.tokensUsed || 0) + finalResult.realismTokens;
         const totalCost = (result.costCents || 0) + finalResult.realismCost;
 
-        // Ensure issues object exists to hold realism score without schema change
+        // §BUG-FIX #4: Align column names with actual generation_logs schema.
+        // Previously used non-existent columns (model_used, total_tokens, cost_usd, etc.)
+        // causing silent insert failures and zero audit-trail entries.
         const issuesPayload = finalResult.realismScore ? { realism_score: finalResult.realismScore } : null;
 
-        await supabaseAdmin.from('generation_logs').insert({
+        const { error: logError } = await supabaseAdmin.from('generation_logs').insert({
             user_id: req.userId,
             job_id: req.jobId,
-            generation_type: 'cv_match',
-            model_used: result.model,
-            prompt_tokens: 0,
-            completion_tokens: 0,
-            total_tokens: totalTokens,
-            cost_usd: totalCost / 100,
-            latency_ms: result.latencyMs + finalResult.realismLatency,
-            success: true,
-            issues: issuesPayload
+            model_name: result.model || 'claude-haiku',
+            model_version: null,
+            iteration: 1,                                          // CV match = single pass
+            prompt_tokens: result.tokensUsed || 0,
+            completion_tokens: 0,                                  // model-router returns total only
+            realism_score: finalResult.realismScore ?? null,
+            issues: issuesPayload,                                  // { realism_score } for audit
         });
+
+        if (logError) {
+            // Non-blocking — logging failure must never crash the analysis
+            console.error('⚠️ [CV Match] generation_logs insert failed (non-blocking):', logError.message);
+        }
 
         console.log('✅ CV Match complete (with Realism Check). Score:', finalResult.overallScore);
 
@@ -323,14 +338,20 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
         return cleanResult;
 
     } catch (error: any) {
-        await supabaseAdmin.from('generation_logs').insert({
+        // §BUG-FIX #4: Use correct schema columns for error log too
+        const { error: logErr } = await supabaseAdmin.from('generation_logs').insert({
             user_id: req.userId,
             job_id: req.jobId,
-            generation_type: 'cv_match',
-            success: false,
-            error_message: error.message,
-            latency_ms: Date.now() - startTime,
+            model_name: 'claude-haiku',
+            model_version: null,
+            iteration: 1,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            issues: { error: error.message, latency_ms: Date.now() - startTime },
         });
+        if (logErr) {
+            console.error('⚠️ [CV Match] generation_logs error-log insert failed (non-blocking):', logErr.message);
+        }
         throw error;
     }
 }

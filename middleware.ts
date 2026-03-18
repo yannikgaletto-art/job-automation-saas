@@ -16,7 +16,7 @@ export async function middleware(request: NextRequest) {
         pathname.startsWith('/auth') ||
         pathname.startsWith('/v/') ||
         pathname.startsWith('/_next') ||
-        pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico)$/)
+        pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico|ttf|woff|woff2|otf|eot)$/)
     ) {
         return NextResponse.next()
     }
@@ -144,6 +144,6 @@ export const config = {
          * - auth (Supabase auth callbacks)
          * - v/ (video sharing pages)
          */
-        '/((?!_next/static|_next/image|favicon.ico|api|auth|v/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/((?!_next/static|_next/image|favicon.ico|api|auth|v/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ttf|woff|woff2|otf|eot)$).*)',
     ],
 }

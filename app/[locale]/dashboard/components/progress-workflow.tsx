@@ -9,6 +9,8 @@
  * Contract 9 (SICHERHEITSARCHITEKTUR.md) canonical mapping preserved.
  */
 
+import { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 
 interface ProgressWorkflowProps {
@@ -19,17 +21,19 @@ interface ProgressWorkflowProps {
     jobId: string;
 }
 
-const WORKFLOW_TILES = [
-    { label: 'Steckbrief',    doneAt: 10,  tabIndex: 0 },
-    { label: 'CV Match',      doneAt: 30,  tabIndex: 1 },
-    { label: 'CV Optimizer',  doneAt: 60,  tabIndex: 2 },
-    { label: 'Cover Letter',  doneAt: 100, tabIndex: 3 },
-    { label: 'Video Letter',  doneAt: 110, tabIndex: 4 }, // currently never reached — future-proof
-];
-
 export function ProgressWorkflow({ current, className, onStepClick, activeTab: _activeTab, jobId: _jobId }: ProgressWorkflowProps) {
+    const t = useTranslations('job_queue');
+
+    const WORKFLOW_TILES = useMemo(() => [
+        { label: t('tab_profile'),      doneAt: 10,  tabIndex: 0 },
+        { label: t('tab_cv_match'),     doneAt: 30,  tabIndex: 1 },
+        { label: t('tab_cv_opt'),       doneAt: 60,  tabIndex: 2 },
+        { label: t('tab_cover_letter'), doneAt: 100, tabIndex: 3 },
+        { label: t('tab_video_letter'), doneAt: 110, tabIndex: 4 }, // currently never reached — future-proof
+    ], [t]);
+
     const fillPercent = Math.min(Math.max(current, 0), 110);
-    const doneTiles = WORKFLOW_TILES.filter(t => fillPercent >= t.doneAt);
+    const doneTiles = WORKFLOW_TILES.filter(tile => fillPercent >= tile.doneAt);
 
     if (doneTiles.length === 0) return null;
 

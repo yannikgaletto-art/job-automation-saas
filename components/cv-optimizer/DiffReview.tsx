@@ -334,6 +334,7 @@ function SectionGroup({
 export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffReviewProps) {
     const t = useTranslations('diff_review');
     const [decisions, setDecisions] = useState<Record<string, 'accepted' | 'rejected'>>({});
+    const [showConfirmPopup, setShowConfirmPopup] = useState(false);
 
     const handleDecide = (id: string, d: 'accepted' | 'rejected') => {
         setDecisions(prev => {
@@ -374,8 +375,21 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
     const pendingCount = totalCount - acceptedCount - rejectedCount;
 
     const handleFinalize = () => {
+        // If the user hasn't reviewed a single change, ask before proceeding
+        const noneReviewed = acceptedCount === 0 && rejectedCount === 0;
+        if (noneReviewed && totalCount > 0) {
+            setShowConfirmPopup(true);
+            return;
+        }
         // Undecided changes are accepted by default
         const accepted = proposal.changes.filter(c => decisions[c.id] !== 'rejected');
+        onSave(proposal.optimized, accepted);
+    };
+
+    const handleConfirmAcceptAll = () => {
+        setShowConfirmPopup(false);
+        handleAcceptAll();
+        const accepted = proposal.changes;
         onSave(proposal.optimized, accepted);
     };
 
@@ -425,6 +439,29 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
                     />
                 ))}
             </div>
+
+            {/* Confirm popup — shown when user clicks Preview without reviewing any change */}
+            {showConfirmPopup && (
+                <div className="mx-6 mb-2 border border-amber-200 bg-amber-50 rounded-lg p-4 flex flex-col gap-3">
+                    <p className="text-sm font-medium text-amber-900">{t('confirm_none_reviewed_title')}</p>
+                    <p className="text-xs text-amber-700 leading-relaxed">{t('confirm_none_reviewed_desc')}</p>
+                    <div className="flex gap-2 justify-end">
+                        <button
+                            onClick={() => setShowConfirmPopup(false)}
+                            className="px-3 py-1.5 text-xs font-medium text-amber-800 border border-amber-300 rounded-md hover:bg-amber-100 transition-colors"
+                        >
+                            {t('confirm_review_first')}
+                        </button>
+                        <button
+                            onClick={handleConfirmAcceptAll}
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-[#012e7a] hover:bg-[#01246b] rounded-md transition-colors flex items-center gap-1.5"
+                        >
+                            <Check className="w-3 h-3" />
+                            {t('confirm_accept_all_continue')}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">

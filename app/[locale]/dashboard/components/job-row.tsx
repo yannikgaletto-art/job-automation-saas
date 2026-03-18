@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, FileText, Check, Sparkles, Mail, Video, Info, Trash2, ChevronDown } from 'lucide-react';
 import { ProgressWorkflow } from './progress-workflow';
@@ -62,6 +63,7 @@ function getNextAction(
     dbStatus: string,
     onToggle: () => void,
     setActiveTab: (tab: number) => void,
+    t: ReturnType<typeof useTranslations>,
 ): {
     label: string;
     targetTab: number;
@@ -73,21 +75,21 @@ function getNextAction(
 
     switch (dbStatus?.toLowerCase()) {
         case 'pending':
-            return { label: 'Steckbrief prüfen', targetTab: 0, icon: <FileText className="w-4 h-4" />, variant: 'outline', action: open(0) };
+            return { label: t('cta_review_profile'), targetTab: 0, icon: <FileText className="w-4 h-4" />, variant: 'outline', action: open(0) };
         case 'processing':
         case 'steckbrief_confirmed':
-            return { label: 'CV Match starten', targetTab: 1, icon: <Check className="w-4 h-4" />, variant: 'outline', action: open(1) };
+            return { label: t('cta_start_cv_match'), targetTab: 1, icon: <Check className="w-4 h-4" />, variant: 'outline', action: open(1) };
         case 'cv_match_done':
         case 'cv_matched':
-            return { label: 'CV optimieren', targetTab: 2, icon: <Sparkles className="w-4 h-4" />, variant: 'primary', action: open(2) };
+            return { label: t('cta_optimize_cv'), targetTab: 2, icon: <Sparkles className="w-4 h-4" />, variant: 'primary', action: open(2) };
         case 'cv_optimized':
-            return { label: 'Cover Letter generieren', targetTab: 3, icon: <Mail className="w-4 h-4" />, variant: 'outline', action: open(3) };
+            return { label: t('cta_generate_cover_letter'), targetTab: 3, icon: <Mail className="w-4 h-4" />, variant: 'outline', action: open(3) };
         case 'cover_letter_done':
         case 'ready_for_review':
         case 'ready_to_apply':
-            return { label: 'Bewerbung abschließen', targetTab: 3, icon: <Mail className="w-4 h-4" />, variant: 'primary', action: open(3) };
+            return { label: t('cta_finalize_application'), targetTab: 3, icon: <Mail className="w-4 h-4" />, variant: 'primary', action: open(3) };
         default:
-            return { label: 'Öffnen', targetTab: 0, icon: <FileText className="w-4 h-4" />, variant: 'outline', action: open(0) };
+            return { label: t('cta_open'), targetTab: 0, icon: <FileText className="w-4 h-4" />, variant: 'outline', action: open(0) };
     }
 }
 
@@ -105,6 +107,7 @@ function boldFirstPhrase(text: string): React.ReactNode {
 
 /** Inline collapsible list — shows `limit` items, rest behind toggle */
 function CollapsibleList({ items, limit = 3 }: { items: string[]; limit?: number }) {
+    const t = useTranslations('job_queue');
     const [expanded, setExpanded] = useState(false);
     const shown = expanded ? items : items.slice(0, limit);
     const rest = items.length - limit;
@@ -123,7 +126,7 @@ function CollapsibleList({ items, limit = 3 }: { items: string[]; limit?: number
                     onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
                     className="mt-1.5 text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"
                 >
-                    <ChevronDown className="w-3 h-3" /> +{rest} mehr
+                    <ChevronDown className="w-3 h-3" /> {t('toggle_more_items', { n: rest })}
                 </button>
             )}
         </>
@@ -131,18 +134,24 @@ function CollapsibleList({ items, limit = 3 }: { items: string[]; limit?: number
 }
 
 function SummaryBlock({ summary }: { summary: string }) {
+    const t = useTranslations('job_queue');
     const [expanded, setExpanded] = useState(false);
     const showToggle = summary.split('\n').length > 2 || summary.length > 200;
 
     /** Bold critical nouns/verbs by keyword density heuristic */
     const boldKeywords = (text: string): React.ReactNode => {
         const keywords = [
+            // DE
             'Kaltakquise', 'Pipeline', 'Datenanalyse', 'Vertrieb', 'Akquise',
-            'Strategie', 'Umsatz', 'Revenue', 'Wachstum', 'Growth', 'KPIs',
-            'Führung', 'Leadership', 'Stakeholder', 'Digitalisierung', 'Transformation',
+            'Strategie', 'Umsatz', 'Wachstum', 'KPIs',
+            'Führung', 'Stakeholder', 'Digitalisierung', 'Transformation',
             'Agile', 'Scrum', 'Planung', 'Budget', 'Verantwortung', 'Team',
-            'Projektmanagement', 'Marketing', 'Sales', 'Product', 'Engineering',
-            'Consulting', 'Innovation', 'Optimierung', 'Analyse', 'CRM'
+            'Projektmanagement', 'Optimierung', 'Analyse',
+            // EN
+            'Strategy', 'Revenue', 'Growth', 'Leadership', 'Management',
+            'Marketing', 'Sales', 'Product', 'Engineering', 'Innovation',
+            'Consulting', 'CRM', 'Digital', 'Analytics', 'Governance',
+            'Operations', 'Development', 'Architecture', 'Compliance',
         ];
         const regex = new RegExp(`(${keywords.join('|')})`, 'gi');
         const parts = text.split(regex);
@@ -166,7 +175,7 @@ function SummaryBlock({ summary }: { summary: string }) {
                     onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
                     className="mt-1 text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"
                 >
-                    {expanded ? 'Weniger anzeigen' : 'Mehr anzeigen'}
+                    {expanded ? t('toggle_show_less') : t('toggle_show_more')}
                     {expanded ? <ChevronDown className="w-3 h-3 rotate-180" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
             )}
@@ -176,7 +185,14 @@ function SummaryBlock({ summary }: { summary: string }) {
 
 /** ATS Keywords — simple pill grid, no circle badge */
 function ATSKeywords({ buzzwords }: { buzzwords: string[] }) {
-    const LOW_SIGNAL = ['und', 'oder', 'bzw', 'etc', 'diverse', 'sonstige', 'allgemein', 'gut', 'gute'];
+    const LOW_SIGNAL = [
+        // DE
+        'und', 'oder', 'bzw', 'etc', 'diverse', 'sonstige', 'allgemein', 'gut', 'gute',
+        // EN
+        'and', 'or', 'various', 'general', 'good', 'other', 'misc', 'etc.',
+        // ES
+        'y', 'o', 'varios', 'general', 'bueno', 'otros',
+    ];
     const filtered = buzzwords
         .filter(bw => !LOW_SIGNAL.includes(bw.toLowerCase()))
         .slice(0, 10);
@@ -215,6 +231,7 @@ function BenefitsGrid({ benefits }: { benefits: string[] }) {
 // ---------------------------------------------------------------
 
 export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onConfirm, onDelete, isOptimizing }: JobRowProps) {
+    const t = useTranslations('job_queue');
     const [activeTab, setActiveTab] = useState<number | null>(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [liveMatchResult, setLiveMatchResult] = useState<any | null>(null);
@@ -230,7 +247,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
         }
     };
 
-    const nextAction = getNextAction(job.dbStatus, onToggle, setActiveTab);
+    const nextAction = getNextAction(job.dbStatus, onToggle, setActiveTab, t);
 
     return (
         <motion.div className="border-b border-[#d6d6d6] last:border-b-0">
@@ -295,11 +312,11 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                         {/* Tab bar — no Review tab, no emojis */}
                         <div className="flex items-center gap-1 px-6 pt-4 pb-0 border-b border-[#d6d6d6]">
                             {[
-                                { index: 0, label: 'Steckbrief', icon: <FileText className="w-3.5 h-3.5" /> },
-                                { index: 1, label: 'CV Match', icon: <Check className="w-3.5 h-3.5" /> },
-                                { index: 2, label: 'CV Opt.', icon: <Sparkles className="w-3.5 h-3.5" /> },
-                                { index: 3, label: 'Cover Letter', icon: <Mail className="w-3.5 h-3.5" /> },
-                                { index: 4, label: 'Video Letter', icon: <Video className="w-3.5 h-3.5" /> },
+                                { index: 0, label: t('tab_profile'), icon: <FileText className="w-3.5 h-3.5" /> },
+                                { index: 1, label: t('tab_cv_match'), icon: <Check className="w-3.5 h-3.5" /> },
+                                { index: 2, label: t('tab_cv_opt'), icon: <Sparkles className="w-3.5 h-3.5" /> },
+                                { index: 3, label: t('tab_cover_letter'), icon: <Mail className="w-3.5 h-3.5" /> },
+                                { index: 4, label: t('tab_video_letter'), icon: <Video className="w-3.5 h-3.5" /> },
 
                             ].map((tab) => (
                                 <button
@@ -347,7 +364,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                                 </svg>
-                                                {isManual ? 'Unternehmenswebsite' : 'Stellenanzeige'}
+                                                {isManual ? t('link_company_website') : t('link_job_posting')}
                                             </a>
                                         );
                                     })()}
@@ -361,7 +378,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                     {/* Row 1: Aufgaben (left) + ATS Keywords (right) — same start height */}
                                     {job.responsibilities && job.responsibilities.length > 0 && (
                                         <div className="rounded-lg border border-slate-200 p-4">
-                                            <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Aufgaben</h4>
+                                            <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">{t('section_responsibilities')}</h4>
                                             <CollapsibleList items={job.responsibilities} limit={3} />
                                         </div>
                                     )}
@@ -375,13 +392,13 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                     {/* Row 2: Qualifikationen (left) + Benefits (right) — same start height */}
                                     {job.qualifications && job.qualifications.length > 0 && (
                                         <div className="rounded-lg border border-slate-200 p-4">
-                                            <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Qualifikationen</h4>
+                                            <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">{t('section_qualifications')}</h4>
                                             <CollapsibleList items={job.qualifications} limit={3} />
                                         </div>
                                     )}
                                     {job.benefits && job.benefits.length > 0 && (
                                         <div className="rounded-lg border border-slate-200 p-4">
-                                            <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Benefits</h4>
+                                            <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">{t('section_benefits')}</h4>
                                             <BenefitsGrid benefits={job.benefits} />
                                         </div>
                                     )}
@@ -396,12 +413,12 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#002e7a] text-white text-xs font-medium rounded-md hover:bg-[#002e7a]/90 transition-colors"
                                             >
                                                 <Check className="w-3.5 h-3.5" />
-                                                Steckbrief bestätigen
+                                                {t('btn_confirm_profile')}
                                             </button>
                                         ) : (
                                             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-md border border-green-100">
                                                 <Check className="w-3.5 h-3.5" />
-                                                Steckbrief bestätigt
+                                                {t('badge_profile_confirmed')}
                                             </div>
                                         )}
                                         <button
@@ -418,7 +435,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                             )}
                                         >
                                             <Sparkles className="w-3.5 h-3.5" />
-                                            Zur CV Match Analyse
+                                            {t('btn_go_cv_match')}
                                         </button>
                                     </div>
                                 )}
@@ -427,13 +444,13 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                     (!job.qualifications || job.qualifications.length === 0) && (
                                         <div className="text-center py-6 space-y-3 bg-white/50 rounded-lg border border-dashed border-slate-300">
                                             <Info className="w-5 h-5 mx-auto text-slate-400" />
-                                            <p className="text-sm text-slate-500">Keine strukturierten Daten vorhanden.</p>
+                                            <p className="text-sm text-slate-500">{t('empty_no_data')}</p>
                                             {job.summary && <p className="text-sm text-[#37352F] max-w-lg mx-auto">{job.summary}</p>}
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onReanalyze?.(job.id); }}
                                                 className="px-4 py-2 bg-[#002e7a] text-white text-xs font-medium rounded-lg hover:bg-[#003d99] transition-colors shadow-sm"
                                             >
-                                                Jetzt analysieren
+                                                {t('btn_analyze_now')}
                                             </button>
                                         </div>
                                     )}
@@ -498,15 +515,19 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
             <CustomDialog
                 isOpen={showDeleteDialog}
                 onClose={() => setShowDeleteDialog(false)}
-                title="Bewerbung löschen"
+                title={t('delete_title')}
             >
                 <div className="p-6">
                     <p className="text-slate-500 mb-6 text-center">
-                        Bist du sicher, dass du die Bewerbung bei <strong>{job.company}</strong> für die Position <strong>{job.jobTitle}</strong> endgültig löschen möchtest?
+                        {t.rich('delete_confirm', {
+                            company: job.company,
+                            jobTitle: job.jobTitle,
+                            b: (chunks) => <strong>{chunks}</strong>,
+                        })}
                     </p>
                     <div className="flex justify-end gap-3 mt-6">
                         <Button variant="outline" onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(false); }}>
-                            Abbrechen
+                            {t('btn_cancel')}
                         </Button>
                         <Button
                             variant="primary"
@@ -518,7 +539,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                             }}
                         >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Löschen
+                            {t('btn_delete')}
                         </Button>
                     </div>
                 </div>

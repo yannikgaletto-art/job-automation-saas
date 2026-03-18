@@ -5,7 +5,8 @@ import { CvStructuredData } from '@/types/cv';
 import { ProficiencyDots } from './shared/ProficiencyDots';
 import { CertGrid } from './shared/CertGrid';
 import { RenderMarkdownText } from './shared/RenderMarkdownText';
-import { inferLanguageLevel } from '@/lib/utils/cv-template-helpers';
+import { inferLanguageLevel, normalizeDateRangeText } from '@/lib/utils/cv-template-helpers';
+import { CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 
 registerPdfFonts();
 
@@ -194,7 +195,7 @@ const RenderBullet = ({ text }: { text: string }) => {
     return <Text style={s.bulletText}>{text}</Text>;
 };
 
-export function TechTemplate({ data, qrBase64 }: { data: CvStructuredData; qrBase64?: string }) {
+export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels }) {
     const pi = data.personalInfo;
 
     return (
@@ -211,8 +212,8 @@ export function TechTemplate({ data, qrBase64 }: { data: CvStructuredData; qrBas
                         {qrBase64 && (
                             <View style={{ alignItems: 'center', marginRight: 10 }}>
                                 <Image src={qrBase64} style={{ width: 42, height: 42 }} />
-                                <Text style={{ fontSize: 6.5, fontWeight: 700, color: DARK, marginTop: 3, textAlign: 'center' }}>Video Pitch</Text>
-                                <Text style={{ fontSize: 5, color: GRAY, marginTop: 1, textAlign: 'center' }}>14 Tage verfügbar</Text>
+                                <Text style={{ fontSize: 6.5, fontWeight: 700, color: DARK, marginTop: 3, textAlign: 'center' }}>{labels.qrLabel}</Text>
+                                <Text style={{ fontSize: 5, color: GRAY, marginTop: 1, textAlign: 'center' }}>{labels.qrSubLabel}</Text>
                             </View>
                         )}
                         <View style={s.headerRight}>
@@ -231,19 +232,19 @@ export function TechTemplate({ data, qrBase64 }: { data: CvStructuredData; qrBas
                     <View style={s.mainCol}>
                         {pi.summary && (
                             <View style={{ marginBottom: 20 }}>
-                                <Text style={s.sectionTitle}>Summary</Text>
+                                <Text style={s.sectionTitle}>{labels.summary}</Text>
                                 <RenderMarkdownText text={pi.summary} style={{ fontSize: 9, color: GRAY, lineHeight: 1.5 }} />
                             </View>
                         )}
 
                         {data.experience.length > 0 && (
                             <View>
-                                <Text style={s.sectionTitle}>Experience</Text>
+                                <Text style={s.sectionTitle}>{labels.experience}</Text>
                                 {data.experience.map(exp => (
                                     <View key={exp.id} style={s.expBlock} wrap={false}>
                                         <View style={s.expHeader}>
                                             <Text style={s.expRole}>{exp.role || ''}</Text>
-                                            <Text style={s.expDateTag}>{exp.dateRangeText || ''}</Text>
+                                            <Text style={s.expDateTag}>{normalizeDateRangeText(exp.dateRangeText, labels.present)}</Text>
                                         </View>
                                         <Text style={s.expCompany}>{exp.company || ''} {exp.location ? `// ${exp.location}` : ''}</Text>
 
@@ -264,7 +265,7 @@ export function TechTemplate({ data, qrBase64 }: { data: CvStructuredData; qrBas
                         {/* Skills — keep tags for tech template style */}
                         {data.skills.length > 0 && (
                             <View style={{ marginBottom: 20 }}>
-                                <Text style={s.sectionTitle}>Tech Stack</Text>
+                                <Text style={s.sectionTitle}>{labels.techStack}</Text>
                                 {data.skills.map(group => (
                                     <View key={group.id} style={s.sideBlock}>
                                         <Text style={s.sideLabel}>{group.category || 'Core'}</Text>
@@ -281,12 +282,12 @@ export function TechTemplate({ data, qrBase64 }: { data: CvStructuredData; qrBas
                         {/* Education */}
                         {data.education.length > 0 && (
                             <View style={{ marginBottom: 20 }}>
-                                <Text style={s.sectionTitle}>Education</Text>
+                                <Text style={s.sectionTitle}>{labels.education}</Text>
                                 {data.education.map(edu => (
                                     <View key={edu.id} style={s.sideBlock} wrap={false}>
                                         <Text style={s.sideLabel}>{edu.degree || ''}</Text>
                                         <Text style={s.sideText}>{edu.institution || ''}</Text>
-                                        <Text style={[s.sideText, { color: ACCENT, marginTop: 2 }]}>{edu.dateRangeText || ''}</Text>
+                                        <Text style={[s.sideText, { color: ACCENT, marginTop: 2 }]}>{normalizeDateRangeText(edu.dateRangeText, labels.present)}</Text>
                                     </View>
                                 ))}
                             </View>
@@ -295,7 +296,7 @@ export function TechTemplate({ data, qrBase64 }: { data: CvStructuredData; qrBas
                         {/* Certifications — V2: CertGrid */}
                         {data.certifications && data.certifications.length > 0 && (
                             <View style={{ marginBottom: 20 }} wrap={false} minPresenceAhead={40}>
-                                <Text style={s.sectionTitle}>Certifications</Text>
+                                <Text style={s.sectionTitle}>{labels.certificates}</Text>
                                 <CertGrid certs={data.certifications} maxColumns={1} />
                             </View>
                         )}
@@ -303,7 +304,7 @@ export function TechTemplate({ data, qrBase64 }: { data: CvStructuredData; qrBas
                         {/* Languages — V2: with ProficiencyDots */}
                         {data.languages.length > 0 && (
                             <View>
-                                <Text style={s.sectionTitle}>Languages</Text>
+                                <Text style={s.sectionTitle}>{labels.languages}</Text>
                                 {data.languages.map(lang => (
                                     <View key={lang.id} style={s.langRow} wrap={false}>
                                         <View style={s.langLeft}>

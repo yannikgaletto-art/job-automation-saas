@@ -5,7 +5,8 @@ import { SkillTagGroup } from './shared/SkillTag';
 import { ProficiencyDots } from './shared/ProficiencyDots';
 import { CertGrid } from './shared/CertGrid';
 import { RenderMarkdownText } from './shared/RenderMarkdownText';
-import { truncateDescription, inferLanguageLevel } from '@/lib/utils/cv-template-helpers';
+import { truncateDescription, inferLanguageLevel, normalizeDateRangeText } from '@/lib/utils/cv-template-helpers';
+import { CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 
 /**
  * ValleyTemplate — FAANG-optimized, single-column, black & white CV.
@@ -87,9 +88,9 @@ const RenderBullet = ({ text }: { text: string }) => {
     return <Text style={s.bulletText}>{text}</Text>;
 };
 
-const SkillsSection = ({ skills }: { skills: CvStructuredData['skills'] }) => (
+const SkillsSection = ({ skills, label }: { skills: CvStructuredData['skills']; label: string }) => (
     <>
-        <Text style={s.sectionTitle}>Kenntnisse</Text>
+        <Text style={s.sectionTitle}>{label}</Text>
         {skills.map((g) => (
             <View key={g.id} style={s.skillGroupBlock}>
                 {g.category && <Text style={s.skillCategoryLabel}>{g.category}</Text>}
@@ -99,9 +100,9 @@ const SkillsSection = ({ skills }: { skills: CvStructuredData['skills'] }) => (
     </>
 );
 
-const LanguagesSection = ({ languages }: { languages: CvStructuredData['languages'] }) => (
+const LanguagesSection = ({ languages, label }: { languages: CvStructuredData['languages']; label: string }) => (
     <>
-        <Text style={s.sectionTitle}>Sprachen</Text>
+        <Text style={s.sectionTitle}>{label}</Text>
         {languages.map((l) => (
             <View key={l.id} style={s.langRow}>
                 <View style={s.langLeft}>
@@ -114,7 +115,7 @@ const LanguagesSection = ({ languages }: { languages: CvStructuredData['language
     </>
 );
 
-export function ValleyTemplate({ data, qrBase64 }: { data: CvStructuredData; qrBase64?: string }) {
+export function ValleyTemplate({ data, qrBase64, labels }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels }) {
     const pi = data.personalInfo;
     const hasSkills = data.skills.length > 0;
     const hasLanguages = data.languages.length > 0;
@@ -132,8 +133,8 @@ export function ValleyTemplate({ data, qrBase64 }: { data: CvStructuredData; qrB
                         {qrBase64 && (
                             <View style={{ alignItems: 'center', marginRight: 10 }}>
                                 <Image src={qrBase64} style={{ width: 46, height: 46 }} />
-                                <Text style={{ fontSize: 6.5, fontWeight: 700, color: DARK, marginTop: 3, textAlign: 'center' }}>Video Pitch</Text>
-                                <Text style={{ fontSize: 5, color: MUTED, marginTop: 1, textAlign: 'center' }}>14 Tage verfügbar</Text>
+                                <Text style={{ fontSize: 6.5, fontWeight: 700, color: DARK, marginTop: 3, textAlign: 'center' }}>{labels.qrLabel}</Text>
+                                <Text style={{ fontSize: 5, color: MUTED, marginTop: 1, textAlign: 'center' }}>{labels.qrSubLabel}</Text>
                             </View>
                         )}
                         <View style={s.headerContact}>
@@ -169,12 +170,12 @@ export function ValleyTemplate({ data, qrBase64 }: { data: CvStructuredData; qrB
                 {/* ===== EXPERIENCE ===== */}
                 {data.experience.length > 0 && (
                     <View style={s.sectionContainer}>
-                        <Text style={s.sectionTitle}>Berufserfahrung</Text>
+                        <Text style={s.sectionTitle}>{labels.experience}</Text>
                         {data.experience.map((exp) => (
                             <View key={exp.id} style={s.expBlock} wrap={false}>
                                 <View style={s.expTopRow}>
                                     <Text style={s.expRole}>{exp.role || ''}</Text>
-                                    <Text style={s.expDate}>{exp.dateRangeText || ''}</Text>
+                                    <Text style={s.expDate}>{normalizeDateRangeText(exp.dateRangeText, labels.present)}</Text>
                                 </View>
                                 {exp.company && (
                                     <Text style={s.expCompany}>
@@ -195,7 +196,7 @@ export function ValleyTemplate({ data, qrBase64 }: { data: CvStructuredData; qrB
                 {/* ===== EDUCATION ===== */}
                 {data.education.length > 0 && (
                     <View style={s.sectionContainer}>
-                        <Text style={s.sectionTitle}>Ausbildung</Text>
+                        <Text style={s.sectionTitle}>{labels.education}</Text>
                         {data.education.map((edu) => {
                             // Split description into sub-items (split on '. ' or ', ')
                             const rawDesc = edu.description || '';
@@ -207,13 +208,13 @@ export function ValleyTemplate({ data, qrBase64 }: { data: CvStructuredData; qrB
                                 <View key={edu.id} style={s.eduBlock} wrap={false}>
                                     <View style={s.eduTopRow}>
                                         <Text style={s.eduDegree}>{edu.degree || ''}</Text>
-                                        <Text style={s.eduDate}>{edu.dateRangeText || ''}</Text>
+                                        <Text style={s.eduDate}>{normalizeDateRangeText(edu.dateRangeText, labels.present)}</Text>
                                     </View>
                                     {edu.institution && <Text style={s.eduInstitution}>{edu.institution}</Text>}
                                     {/* Grade as bold label */}
                                     {edu.grade && (
                                         <View style={s.eduSubRow}>
-                                            <Text style={s.eduSubLabel}>Abschlussnote: </Text>
+                                            <Text style={s.eduSubLabel}>{labels.grade}: </Text>
                                             <Text style={s.eduSubText}>{edu.grade}</Text>
                                         </View>
                                     )}
@@ -233,14 +234,14 @@ export function ValleyTemplate({ data, qrBase64 }: { data: CvStructuredData; qrB
                     <View style={s.dualColumn} minPresenceAhead={40}>
                         {/* Left column: Skills */}
                         <View style={s.dualColumnLeft}>
-                            {hasSkills && <SkillsSection skills={data.skills} />}
+                            {hasSkills && <SkillsSection skills={data.skills} label={labels.skills} />}
                         </View>
                         {/* Right column: Languages + Certificates */}
                         <View style={s.dualColumnRight}>
-                            {hasLanguages && <LanguagesSection languages={data.languages} />}
+                            {hasLanguages && <LanguagesSection languages={data.languages} label={labels.languages} />}
                             {hasCerts && (
                                 <View style={{ marginTop: hasLanguages ? 12 : 0 }}>
-                                    <Text style={s.sectionTitle}>Zertifikate</Text>
+                                    <Text style={s.sectionTitle}>{labels.certificates}</Text>
                                     <CertGrid certs={data.certifications!} />
                                 </View>
                             )}

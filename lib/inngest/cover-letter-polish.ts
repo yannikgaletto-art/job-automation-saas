@@ -6,8 +6,7 @@
  *   1. Anti-Fluff Re-Gen (if fluff found during sync scan)
  *   2. GPT-4o Language Judge + Claim Extraction (if OPENAI_API_KEY available)
  *   3. Perplexity Fact Check on extracted claims (if PERPLEXITY_API_KEY available)
- *   4. X-Ray Audit Trail via Haiku
- *   5. JSONB Merge-Update on documents.metadata
+ *   4. JSONB Merge-Update on documents.metadata
  *
  * Reference: Implementation Plan Phase 2.2
  * Contract: §ARCHITECTURE 3.1 (Inngest Resilience)
@@ -19,7 +18,7 @@ import { createClient } from '@supabase/supabase-js';
 import { scanForFluff } from '@/lib/services/anti-fluff-blacklist';
 import { runMultiAgentPipeline } from '@/lib/services/multi-agent-pipeline';
 import Anthropic from '@anthropic-ai/sdk';
-import type { CoverLetterSetupContext, AuditTrailCard } from '@/types/cover-letter-setup';
+import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 
 // ─── Supabase Admin (per-call, not module-level — §QA Audit M4) ──────────
 function getSupabase() {
@@ -40,66 +39,7 @@ interface PolishEventData {
     setupContext?: CoverLetterSetupContext;
 }
 
-// ─── Audit Trail Generator (extracted from cover-letter-generator.ts) ────
-async function generateAuditTrail(
-    coverLetter: string,
-    setupContext: CoverLetterSetupContext
-): Promise<AuditTrailCard[]> {
-    if (!process.env.ANTHROPIC_API_KEY) return [];
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    const auditPrompt = `Analysiere dieses Anschreiben und erstelle 3-5 X-Ray Karten, die zeigen WARUM bestimmte Formulierungen so gewählt wurden.
-
-ANSCHREIBEN:
----
-${coverLetter}
----
-
-SETUP-KONTEXT:
-- Ton: ${setupContext.tone?.preset || 'formal'}
-- Firma: ${setupContext.companyName || 'Unbekannt'}
-- Gewählte Module: ${JSON.stringify(setupContext.optInModules || {})}
-
-Erstelle 3-5 Karten. Jede Karte MUSS exakt dieses JSON-Schema haben:
-{
-  "category": einer von: "user_voice" | "company_insight" | "job_fit" | "module_trace",
-  "icon": eines von: "🟢" (user_voice) | "🔵" (company_insight) | "🟣" (job_fit) | "🟠" (module_trace),
-  "title": "Kurzer prägnanter Titel (max 5 Wörter)",
-  "detail": "Erklärung warum diese Formulierung gewählt wurde (1-2 Sätze)",
-  "reference": "Optional: Quellbezug z.B. 'Zitat: Peter Drucker' oder 'CV-Station: Fraunhofer'"
-}
-
-Kategorie-Zuordnung:
-- user_voice: Formulierungen die auf den Schreibstil des Bewerbers eingehen
-- company_insight: Firmenwerte, Vision, Projekte die integriert wurden
-- job_fit: Direkte Bezüge zu den Job-Anforderungen
-- module_trace: Aktivierte Features wie Zitat, 90-Tage-Plan, Vulnerability-Injector
-
-Antworte NUR als valides JSON-Array (kein Markdown, keine Erklärung):
-[{ "category": "...", "icon": "...", "title": "...", "detail": "...", "reference": "..." }]`;
-
-    const message = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
-        temperature: 0.2,
-        system: 'You are an X-Ray annotation engine. Respond only with a valid JSON array, no markdown, no explanation.',
-        messages: [{ role: 'user', content: auditPrompt }]
-    });
-
-    const content = message.content[0].type === 'text' ? message.content[0].text : '[]';
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-        console.warn('[Audit] No JSON array found in Claude response:', content.slice(0, 200));
-        return [];
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]) as AuditTrailCard[];
-    // Validate: filter out cards missing required fields
-    const valid = parsed.filter(c => c.category && c.title && c.detail);
-    console.log(`[Audit] Parsed ${parsed.length} cards, ${valid.length} valid`);
-    return valid;
-}
 
 // ─── Main Pipeline ───────────────────────────────────────────────────────
 export const polishCoverLetter = inngest.createFunction(
@@ -227,29 +167,7 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
             });
         }
 
-        // ── Step 4: X-Ray Audit Trail ────────────────────────────────
-        let auditTrail: AuditTrailCard[] = [];
-        if (process.env.ANTHROPIC_API_KEY) {
-            // Build a minimal context if none was provided — ensures audit trail is always attempted
-            const effectiveContext: CoverLetterSetupContext = setupContext ?? {
-                companyName: jobData?.company_name ?? 'Unbekannt',
-                tone: { preset: 'formal' },
-                optInModules: {},
-            } as CoverLetterSetupContext;
 
-            auditTrail = await step.run('audit-trail', async () => {
-                try {
-                    const trail = await generateAuditTrail(currentText, effectiveContext);
-                    console.log(`[Polish:Audit] ✅ Generated ${trail.length} cards`);
-                    return trail;
-                } catch (auditErr: unknown) {
-                    const errMsg = auditErr instanceof Error ? auditErr.message : String(auditErr);
-                    console.warn('[Polish:Audit] Failed:', errMsg);
-                    polishWarnings.push(`Audit Trail fehlgeschlagen: ${errMsg}`);
-                    return [] as AuditTrailCard[];
-                }
-            });
-        }
 
         // ── Step 5: JSONB Merge-Update on documents.metadata ─────────
         await step.run('save-polished-draft', async () => {
@@ -276,7 +194,6 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
                 polish_warnings: polishWarnings.length > 0 ? polishWarnings : undefined,
                 pipeline_improved: polishImproved,
                 pipeline_warnings: polishWarnings.length > 0 ? polishWarnings : undefined,
-                ...(auditTrail.length > 0 ? { audit_trail: auditTrail, xray_annotations: auditTrail } : {}),
                 polished_at: new Date().toISOString(),
             };
 
@@ -298,7 +215,6 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
             draftId,
             polishImproved,
             polishWarnings,
-            auditTrailCards: auditTrail?.length ?? 0,
         };
     }
 );

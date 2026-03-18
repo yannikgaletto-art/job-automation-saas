@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { deepScrapeJob } from '@/lib/services/job-search-pipeline';
 import { inngest } from '@/lib/inngest/client';
 import { complete } from '@/lib/ai/model-router';
-import { getUserLocale } from '@/lib/i18n/get-user-locale';
+import { getUserLocale, getLanguageName } from '@/lib/i18n/get-user-locale';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -122,6 +122,13 @@ export async function POST(request: NextRequest) {
         }
 
         // ================================================================
+        // STEP 1.8: Fetch user locale (single call, reused for prompt + Inngest)
+        // ================================================================
+        const locale = await getUserLocale(userId);
+        const languageName = getLanguageName(locale);
+        console.log(`[${requestId}] route=jobs/ingest step=locale locale=${locale}`);
+
+        // ================================================================
         // STEP 2: Extract requirements with LLM (with timeout)
         // ================================================================
         let extractedData: any = {};
@@ -131,28 +138,26 @@ export async function POST(request: NextRequest) {
 
             if (process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY) {
                 const extractionSchema = {
-                    company: "string — Unternehmensname",
-                    jobTitle: "string — exakter Stellentitel",
-                    location: "string | null — Ort/Remote/Hybrid falls erkennbar",
-                    company_website: "string | null — URL der Unternehmenswebsite (z.B. https://firma.de), NICHT die Karriereseite oder Stellenanzeige",
-                    summary: "string — 2-3 Sätze Zusammenfassung der Rolle",
-                    responsibilities: "string[] — Aufgaben als Stichpunkte (max 8)",
-                    qualifications: "string[] — Anforderungen/Qualifikationen (max 8)",
-                    benefits: "string[] — Benefits (max 5, kann leer sein)",
+                    company: "string — company name",
+                    jobTitle: "string — exact job title",
+                    location: "string | null — location/Remote/Hybrid if identifiable",
+                    company_website: "string | null — URL of the company website (e.g. https://company.com), NOT the careers page or job posting",
+                    summary: `string — 2-3 sentence summary of the role in ${languageName}`,
+                    responsibilities: `string[] — responsibilities as bullet points (max 8), in ${languageName}`,
+                    qualifications: `string[] — qualifications (max 8), in ${languageName}`,
+                    benefits: `string[] — benefits (max 5, can be empty), in ${languageName}`,
                     seniority: "'junior' | 'mid' | 'senior' | 'lead' | 'unknown'",
-                    buzzwords: "string[] — ATS/Robot-Keywords: Tools, Methoden, Frameworks (max 12)"
+                    buzzwords: "string[] — ATS/Robot-Keywords: tools, methods, frameworks (max 12)"
                 };
 
                 const response = await complete({
                     taskType: 'extract_job_fields',
-                    systemPrompt: `Extrahiere aus der folgenden Stellenbeschreibung die Informationen als JSON. Alle Felder auf Deutsch. Wenn ein Feld nicht erkennbar ist, nutze null oder leeres Array. Gib NUR valides JSON zurück, kein Markdown.
+                    systemPrompt: `Extract the following information from the job description as JSON. All text fields (summary, responsibilities, qualifications, benefits) MUST be written in ${languageName}. If a field is not identifiable, use null or empty array. Return ONLY valid JSON, no markdown.
 
-WICHTIG für Listen (responsibilities, qualifications, benefits):
-- Schreibe verdichtete, vollständige Sätze — ca. 20% kürzer als das Original.
-- Erhalte die Kernaussage jedes Punktes. Kein Abkürzen auf bloße Stichworte.
-- KEIN Copy-Paste des Originals, sondern eine informierte Verdichtung.
-- Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
-- Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
+IMPORTANT for lists (responsibilities, qualifications, benefits):
+- Write condensed, complete sentences — approximately 20% shorter than the original.
+- Preserve the core message of each point. No abbreviating to mere keywords.
+- NO copy-paste of the original, but an informed condensation.
 
 Schema: ${JSON.stringify(extractionSchema)}`,
                     prompt: enrichedDescription,
@@ -260,7 +265,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
         try {
             await inngest.send({
                 name: 'job/extract',
-                data: { jobId: job.id, userId, locale: await getUserLocale(userId) },
+                data: { jobId: job.id, userId, locale },
             });
             console.log(`[${requestId}] route=jobs/ingest step=trigger_extract job_id=${job.id}`);
         } catch (triggerErr) {

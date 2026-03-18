@@ -30,13 +30,67 @@ export const analyzeCVMatch = inngest.createFunction(
             limit: 10,
             period: '1m',
         },
+        onFailure: async ({ event, error }) => {
+            // Dead-letter handler: write error status to DB so the frontend
+            // never gets stuck polling a 'processing' state that will never resolve.
+            //
+            // §BUG-FIX: Wrap in try-catch + use safe optional chaining.
+            // Previously: `event.data.event.data` could throw at runtime if the
+            // Inngest wrapper shape differed — silently crashing this handler
+            // and leaving cv_match_status='processing' forever in the DB.
+            const errMsg = error?.message || 'Unknown pipeline failure';
+
+            // Safe extraction — Inngest onFailure wraps the original event
+            const originalData = (event?.data as any)?.event?.data;
+            const jobId = originalData?.jobId as string | undefined;
+            const userId = originalData?.userId as string | undefined;
+
+            console.error(`❌ [CV Match] Pipeline permanently failed${jobId ? ` for job ${jobId}` : ''}: ${errMsg}`);
+
+            if (!jobId || !userId) {
+                console.error('❌ [CV Match] onFailure: Cannot write error status — jobId or userId missing from event payload', event?.data);
+                return;
+            }
+
+            try {
+                const { data: freshJob } = await supabaseAdmin
+                    .from('job_queue')
+                    .select('metadata')
+                    .eq('id', jobId)
+                    .eq('user_id', userId)
+                    .single();
+
+                const currentMetadata = (freshJob?.metadata as Record<string, unknown>) || {};
+
+                const { error: updateErr } = await supabaseAdmin
+                    .from('job_queue')
+                    .update({
+                        metadata: {
+                            ...currentMetadata,
+                            cv_match_status: 'error',
+                            cv_match_error: errMsg,
+                        },
+                    })
+                    .eq('id', jobId)
+                    .eq('user_id', userId);
+
+                if (updateErr) {
+                    console.error(`❌ [CV Match] DB update in onFailure failed:`, updateErr.message);
+                } else {
+                    console.log(`📝 [CV Match] Error status written to DB for job ${jobId}`);
+                }
+            } catch (dbErr) {
+                console.error(`❌ [CV Match] Failed to write error status to DB:`, dbErr);
+            }
+        },
     },
     { event: 'cv-match/analyze' },
     async ({ event, step }) => {
-        const { jobId, userId, cvDocumentId } = event.data as {
+        const { jobId, userId, cvDocumentId, locale } = event.data as {
             jobId: string;
             userId: string;
             cvDocumentId?: string;
+            locale?: string;
         };
 
         // Step 1: Read job data (§3 — user-scoped)
@@ -72,6 +126,7 @@ export const analyzeCVMatch = inngest.createFunction(
                     requirements: job.requirements || [],
                     atsKeywords: job.buzzwords || [],
                     level: job.seniority || '',
+                    locale: (locale as any) || 'de',
                 });
             } catch (err: any) {
                 if (err?.status === 400 || err?.status === 401 || err?.status === 404) {

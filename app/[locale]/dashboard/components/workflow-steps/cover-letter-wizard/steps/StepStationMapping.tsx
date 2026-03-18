@@ -5,6 +5,7 @@ import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse } from '@/types/cover-letter-setup';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 
 interface Props {
     setupData: SetupDataResponse;
@@ -20,7 +21,8 @@ function generateRecommendation(
     bullets: string[] | undefined,
     role: string,
     company: string,
-    requirements: string[]
+    requirements: string[],
+    matchFallbackText: string
 ): { requirement: string; reasoning: string; _score: number } | null {
     if (requirements.length === 0) return null;
 
@@ -28,7 +30,7 @@ function generateRecommendation(
     if (!bullets || bullets.length === 0) {
         return {
             requirement: requirements[0],
-            reasoning: `Match: Aufgrund der Jobbeschreibung und deinem Hintergrund passt diese Station sehr gut.`,
+            reasoning: matchFallbackText,
             _score: 0
         };
     }
@@ -55,7 +57,7 @@ function generateRecommendation(
         // Fallback: just use the first requirement
         return {
             requirement: requirements[0],
-            reasoning: `Match: Aufgrund der Jobbeschreibung und deinem Hintergrund passt diese Station sehr gut.`,
+            reasoning: matchFallbackText,
             _score: 0
         };
     }
@@ -71,6 +73,7 @@ function generateRecommendation(
 }
 
 export function StepStationMapping({ setupData, onBack, onNext }: Props) {
+    const t = useTranslations('cover_letter');
     const { cvStations, toggleStation, isStepComplete } = useCoverLetterSetupStore();
     const canProceed = isStepComplete(2);
     const autoSelectDone = useRef(false);
@@ -87,7 +90,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
             const safeBullets = station.bullets || [];
             return {
                 idx,
-                rec: generateRecommendation(safeBullets, station.role, station.company, setupData.jobRequirements)
+                rec: generateRecommendation(safeBullets, station.role, station.company, setupData.jobRequirements, t('recommendation_match'))
             };
         });
         const sortedIndices = [...computed].sort((a, b) => (b.rec?._score || 0) - (a.rec?._score || 0)).map(r => r.idx);
@@ -119,7 +122,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                 period: station.period,
                 keyBullet: safeBullets[0] || '',
                 matchedRequirement: rec?.requirement || setupData.jobRequirements[0] || '',
-                intent: `Beweis für: ${rec?.requirement || 'Berufserfahrung'}`,
+                intent: `${t('intent_prefix')}: ${rec?.requirement || t('intent_experience_fallback')}`,
                 bullets: safeBullets,
             });
         }
@@ -143,21 +146,21 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
         return (
             <div className="space-y-4">
                 <div>
-                    <h3 className="text-sm font-semibold text-[#37352F]">Relevante Erfahrungen</h3>
+                    <h3 className="text-sm font-semibold text-[#37352F]">{t('stations_empty_title')}</h3>
                     <p className="text-xs text-[#73726E] mt-0.5">
-                        Kein CV hochgeladen. Du kannst trotzdem fortfahren.
+                        {t('stations_empty_desc')}
                     </p>
                 </div>
-                <div className="text-xs text-[#A8A29E] italic">Lebenslaufdaten nicht verfügbar.</div>
+                <div className="text-xs text-[#A8A29E] italic">{t('stations_empty_cv')}</div>
                 <div className="flex justify-between pt-2">
                     <button onClick={onBack} className="flex items-center gap-1 text-xs text-[#73726E] hover:text-[#37352F]">
-                        <ChevronLeft className="w-3.5 h-3.5" /> Zurück
+                        <ChevronLeft className="w-3.5 h-3.5" /> {t('btn_back')}
                     </button>
                     <button
                         onClick={onNext}
                         className="flex items-center gap-1.5 px-4 py-2 bg-[#002e7a] text-white rounded-lg text-xs font-semibold hover:bg-[#001e5a] transition-colors"
                     >
-                        Weiter <ChevronRight className="w-3.5 h-3.5" />
+                        {t('btn_next')} <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                 </div>
             </div>
@@ -167,15 +170,15 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
     return (
         <div className="space-y-4">
             <div>
-                <h3 className="text-[15.5px] font-semibold text-[#37352F]">Wähle deine relevantesten Stationen</h3>
+                <h3 className="text-[15.5px] font-semibold text-[#37352F]">{t('stations_title')}</h3>
                 <p className="text-xs text-[#73726E] mt-0.5">
-                    Wähle max. 3 Stationen, die die Stelle am besten belegen.
+                    {t('stations_desc')}
                 </p>
 
                 {/* Job Requirements */}
                 {setupData.jobRequirements.length > 0 && (
                     <div className="mt-3 space-y-1">
-                        <p className="text-[11.5px] font-semibold text-[#A8A29E] uppercase tracking-wide">Top-Anforderungen</p>
+                        <p className="text-[11.5px] font-semibold text-[#A8A29E] uppercase tracking-wide">{t('top_requirements')}</p>
                         {setupData.jobRequirements.map((req, i) => (
                             <div key={i} className="flex items-start gap-1.5">
                                 <span className="text-[11.5px] text-[#002e7a] font-bold">{i + 1}.</span>
@@ -211,13 +214,13 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
             {/* Sticky Summary */}
             {cvStations.length > 0 && (
                 <div className="text-xs text-[#002e7a] font-medium">
-                    {cvStations.length}/3 Stationen gewählt
+                    {t('stations_count', { count: cvStations.length })}
                 </div>
             )}
 
             <div className="flex justify-between pt-2">
                 <button onClick={onBack} className="flex items-center gap-1 text-xs text-[#73726E] hover:text-[#37352F]">
-                    <ChevronLeft className="w-3.5 h-3.5" /> Zurück
+                    <ChevronLeft className="w-3.5 h-3.5" /> {t('btn_back')}
                 </button>
                 <button
                     onClick={onNext}
@@ -229,7 +232,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                             : 'bg-[#E7E7E5] text-[#A8A29E] cursor-not-allowed',
                     ].join(' ')}
                 >
-                    {!canProceed ? 'min. 1 Station wählen' : <>Weiter <ChevronRight className="w-3.5 h-3.5" /></>}
+                    {!canProceed ? t('btn_min_station') : <>{t('btn_next')} <ChevronRight className="w-3.5 h-3.5" /></>}
                 </button>
             </div>
         </div>

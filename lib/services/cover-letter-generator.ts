@@ -10,7 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { validateCoverLetter, logValidation } from './cover-letter-validator';
 import { enrichCompany, linkEnrichmentToJob } from './company-enrichment';
-import type { CoverLetterSetupContext, AuditTrailCard } from '@/types/cover-letter-setup';
+import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import type { StyleAnalysis } from './writing-style-analyzer';
 import { scanForFluff } from './anti-fluff-blacklist';
 import { buildSystemPrompt, type UserProfileData, type JobData, type CompanyResearchData } from './cover-letter-prompt-builder';

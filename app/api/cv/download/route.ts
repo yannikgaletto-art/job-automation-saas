@@ -7,6 +7,7 @@ import { CvStructuredData } from '@/types/cv';
 import { Font, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import React from 'react';
 import path from 'path';
+import { getCvTemplateLabels, CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 
 // Register fonts server-side using absolute filesystem paths
 // (Cannot use /fonts/... URLs on the server — browser-only)
@@ -45,13 +46,13 @@ function CoverLetterDoc({ text }: { text: string }) {
     );
 }
 
-function resolveTemplate(templateId: string, data: CvStructuredData) {
+function resolveTemplate(templateId: string, data: CvStructuredData, labels: CvTemplateLabels) {
     switch (templateId) {
-        case 'tech': return React.createElement(TechTemplate, { data });
+        case 'tech': return React.createElement(TechTemplate, { data, labels });
         case 'valley':
         case 'classic':  // deprecated → Valley
         case 'modern':   // deprecated → Valley
-        default: return React.createElement(ValleyTemplate, { data });
+        default: return React.createElement(ValleyTemplate, { data, labels });
     }
 }
 
@@ -71,6 +72,8 @@ export async function GET(req: NextRequest) {
 
         const type = req.nextUrl.searchParams.get('type') || 'cv';
         const templateId = req.nextUrl.searchParams.get('template') || 'valley';
+        const locale = req.nextUrl.searchParams.get('locale') || 'de';
+        const labels = getCvTemplateLabels(locale);
 
         // Fetch job (user-scoped — Contract 2)
         const { data: job, error: jobError } = await supabase
@@ -81,7 +84,7 @@ export async function GET(req: NextRequest) {
             .single();
 
         if (jobError || !job) {
-            return NextResponse.json({ error: 'Job nicht gefunden' }, { status: 404 });
+            return NextResponse.json({ error: 'error_not_found' }, { status: 404 });
         }
 
         // Register fonts before rendering
@@ -100,12 +103,12 @@ export async function GET(req: NextRequest) {
 
             if (!cvData) {
                 return NextResponse.json(
-                    { error: 'Optimiertes CV nicht gefunden — bitte zuerst CV-Optimizer abschliessen' },
+                    { error: 'error_cv_not_found' },
                     { status: 404 }
                 );
             }
 
-            const element = resolveTemplate(templateId, cvData as CvStructuredData);
+            const element = resolveTemplate(templateId, cvData as CvStructuredData, labels);
             buffer = await renderToBuffer(element as any);
             const rawCompany = (job.company_name || job.company || 'Pathly') as string;
             filename = `CV_${rawCompany.replace(/[^a-z0-9]/gi, '_')}.pdf`;
@@ -122,7 +125,7 @@ export async function GET(req: NextRequest) {
                 .single();
 
             if (docError || !docData?.metadata?.generated_content) {
-                return NextResponse.json({ error: 'Anschreiben nicht gefunden' }, { status: 404 });
+                return NextResponse.json({ error: 'error_cover_letter_not_found' }, { status: 404 });
             }
 
             buffer = await renderToBuffer(
@@ -149,7 +152,7 @@ export async function GET(req: NextRequest) {
         const errMsg = error instanceof Error ? error.stack || error.message : String(error);
         console.error('[cv/download] PDF Generation Error:', errMsg);
         return NextResponse.json(
-            { error: `PDF-Generierung fehlgeschlagen: ${errMsg}` },
+            { error: `error_pdf_generation_failed`, details: errMsg },
             { status: 500 }
         );
     }

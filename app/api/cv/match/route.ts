@@ -27,7 +27,7 @@ const supabaseAdmin = createAdminClient(
 
 export async function POST(req: NextRequest) {
     try {
-        const { jobId, cvDocumentId } = await req.json();
+        const { jobId, cvDocumentId, forceRestart } = await req.json();
         if (!jobId) {
             return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
         }
@@ -68,14 +68,18 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Stale-Recovery Check (Batch 2.1) ────────────────────────────
-        // If already processing, check if it's stale (> 5 min)
+        // If already processing, check if it's stale (> 2.5 min, synced with frontend polling timeout).
+        // If forceRestart is true (user clicked "Try again" after timeout), skip this check entirely.
         const currentMetadata = (job.metadata as Record<string, unknown>) || {};
         const existingStatus = currentMetadata.cv_match_status as string | undefined;
         const startedAt = currentMetadata.cv_match_started_at as string | undefined;
 
-        if (existingStatus === 'processing' && startedAt) {
+        if (!forceRestart && existingStatus === 'processing' && startedAt) {
             const elapsed = Date.now() - new Date(startedAt).getTime();
-            const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+            // §BUG-FIX #2: Aligned with frontend mount-check (4min) to close the dead-zone
+            // where the API blocked restarts but the frontend was still polling.
+            // API: 4min | Frontend mount: 4min | Frontend poll limit: 6min (last resort)
+            const STALE_THRESHOLD_MS = 240_000; // 4 min
 
             if (elapsed < STALE_THRESHOLD_MS) {
                 // Still within threshold — don't re-trigger
@@ -84,6 +88,8 @@ export async function POST(req: NextRequest) {
             }
             // Stale — reset and re-trigger below
             console.warn(`⚠️ [CV Match] Stale processing detected (${Math.round(elapsed / 1000)}s) — re-triggering`);
+        } else if (forceRestart) {
+            console.log(`🔄 [CV Match] Force restart requested — bypassing stale check`);
         }
 
         // Set processing status + timestamp in metadata (JSONB Merge!)

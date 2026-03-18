@@ -8,20 +8,11 @@ interface HookCardProps {
     hook: SelectedHook;
     isSelected: boolean;
     onSelect: () => void;
+    typeLabel: Record<HookType, string>;
+    manualPlaceholder: string;
 }
 
-const typeLabel: Record<HookType, string> = {
-    news: '📰 News',
-    value: '💡 Wert',
-    quote: '💬 Zitat',
-    linkedin: '💼 LinkedIn',
-    manual: '✏️ Eigener',
-    vision: '🎯 Vision',
-    project: '🚀 Projekt',
-    funding: '💰 Wachstum & Funding',
-};
-
-export function HookCard({ hook, isSelected, onSelect }: HookCardProps) {
+export function HookCard({ hook, isSelected, onSelect, typeLabel, manualPlaceholder }: HookCardProps) {
     const isManual = hook.type === 'manual';
 
     return (
@@ -48,7 +39,7 @@ export function HookCard({ hook, isSelected, onSelect }: HookCardProps) {
             {isManual ? (
                 <input
                     type="text"
-                    placeholder="Eigenen Aufhänger eingeben..."
+                    placeholder={manualPlaceholder}
                     className="w-full text-xs text-[#37352F] bg-transparent outline-none placeholder-[#A8A29E]"
                     onClick={(e) => e.stopPropagation()}
                 />

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { HookCard } from '../cards/HookCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse, SelectedHook, SelectedQuote } from '@/types/cover-letter-setup';
@@ -19,11 +20,13 @@ interface Props {
 }
 
 export function StepHookSelection({ jobId, companyName, setupData, onNext, onReloadData }: Props) {
+    const t = useTranslations('cover_letter');
     const { selectedHook, selectedQuote, fetchedQuotes, introFocus, optInModules, setHook, setQuote, setFetchedQuotes, setIntroFocus, setOptInModule, setStep } = useCoverLetterSetupStore();
     const [manualText, setManualText] = useState('');
     const [quoteError, setQuoteError] = useState<string | null>(null);
     const [openAccordion, setOpenAccordion] = useState<string | null>(null);
     const [websiteInput, setWebsiteInput] = useState(setupData.companyWebsite || '');
+    const [validationWarning, setValidationWarning] = useState<string | null>(null);
 
     // ─── State Machine: resume at correct phase ────────────────────
     const getInitialPhase = (): Phase => {
@@ -36,6 +39,18 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
 
     const [phase, setPhase] = useState<Phase>(getInitialPhase);
     const [analysisStep, setAnalysisStep] = useState(0);
+
+    // i18n-translated typeLabel for HookCard badges
+    const hookTypeLabel = useMemo(() => ({
+        news: `\uD83D\uDCF0 ${t('hook_type_news')}`,
+        value: `\uD83D\uDCA1 ${t('hook_type_value')}`,
+        quote: `\uD83D\uDCAC ${t('hook_type_quote')}`,
+        linkedin: `\uD83D\uDCBC ${t('hook_type_linkedin')}`,
+        manual: `\u270F\uFE0F ${t('hook_type_manual')}`,
+        vision: `\uD83C\uDFAF ${t('hook_type_vision')}`,
+        project: `\uD83D\uDE80 ${t('hook_type_project')}`,
+        funding: `\uD83D\uDCB0 ${t('hook_type_funding')}`,
+    }) as Record<import('@/types/cover-letter-setup').HookType, string>, [t]);
 
     // ─── Hook selection (no auto-advance) ──────────────────────────
     const handleSelect = (hook: SelectedHook) => {
@@ -58,9 +73,10 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     const handleAnalyze = async (websiteOverride?: string) => {
         const website = websiteOverride || websiteInput || setupData.companyWebsite;
         if (!website || website.trim().length < 4) {
-            alert('Bitte gib die Unternehmenswebsite ein.');
+            setValidationWarning(t('alert_no_website'));
             return;
         }
+        setValidationWarning(null);
 
         setPhase('analyzing');
         setAnalysisStep(1);
@@ -88,7 +104,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
         } catch (err) {
             console.error('❌ [StepHook] Analysis failed:', err);
             setPhase('idle');
-            alert('Analyse fehlgeschlagen. Bitte überprüfe die Website-URL und versuche es erneut.');
+            setValidationWarning(t('alert_analysis_failed'));
         }
     };
 
@@ -143,7 +159,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
             setPhase('quoteResults');
         } catch (err) {
             console.error('❌ [StepHook] Quote search failed:', err);
-            setQuoteError('Zitate konnten nicht geladen werden.');
+            setQuoteError(t('quote_error'));
             setPhase('quotePrompt');
         }
     };
@@ -163,27 +179,27 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     <Sparkles className="w-8 h-8 text-[#002e7a]" />
                 </div>
                 <h3 className="text-xl font-semibold text-[#37352F] mb-2">
-                    Unternehmensanalyse für <span className="text-[#002e7a]">{companyName}</span>
+                    {t('analysis_title', { company: companyName })}
                 </h3>
                 <p className="text-[#73726E] text-sm max-w-md mb-4 leading-relaxed">
-                    Um deinen Cover Letter so individuell wie möglich zu machen, analysieren wir Vision, Meilensteine, aktuelle Projekte und Wachstum von {companyName}.
+                    {t('analysis_desc', { company: companyName })}
                 </p>
 
                 {/* Website Input */}
                 <div className="w-full max-w-md mb-4">
                     <label className="text-xs font-medium text-[#37352F] mb-1.5 block text-left">
                         <Globe className="w-3.5 h-3.5 inline mr-1" />
-                        Unternehmenswebsite
+                        {t('website_label')}
                     </label>
                     <input
                         type="url"
                         value={websiteInput}
                         onChange={(e) => setWebsiteInput(e.target.value)}
-                        placeholder="z.B. https://www.replug.io"
+                        placeholder={t('website_placeholder')}
                         className="w-full text-sm text-[#37352F] border border-[#E7E7E5] rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#002e7a]/20 focus:border-[#002e7a] placeholder-[#A8A29E] transition-all"
                     />
                     <p className="text-[10px] text-[#A8A29E] mt-1 text-left">
-                        Die Website wird für die Analyse benötigt. Sie wird gespeichert für zukünftige Schritte.
+                        {t('website_hint')}
                     </p>
                 </div>
 
@@ -198,8 +214,14 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     ].join(' ')}
                 >
                     <Sparkles className="w-4 h-4" />
-                    {companyName} analysieren
+                    {t('analyze_btn', { company: companyName })}
                 </button>
+
+                {validationWarning && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 mt-3 max-w-md">
+                        <span>⚠️</span><span>{validationWarning}</span>
+                    </div>
+                )}
             </div>
         );
     }
@@ -207,10 +229,10 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     // ─── Phase A: ANALYZING ────────────────────────────────────────
     if (phase === 'analyzing') {
         const steps = [
-            'Unternehmenswebsite wird gelesen…',
-            'Vision & Projekte werden analysiert…',
-            'Werte & Wachstum werden geprüft…',
-            'Ergebnisse werden aufbereitet…',
+            t('step_reading_website'),
+            t('step_analyzing_vision'),
+            t('step_checking_values'),
+            t('step_preparing_results'),
         ];
         const progress = analysisStep === 1 ? '20%' : analysisStep === 2 ? '50%' : analysisStep === 3 ? '80%' : '95%';
 
@@ -250,10 +272,10 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
             <div className="flex justify-between items-start">
                 <div>
                     <h3 className="text-sm font-semibold text-[#37352F]">
-                        Ergebnisse für <span className="text-[#002e7a]">{companyName}</span>
+                        {t('results_title', { company: companyName })}
                     </h3>
                     <p className="text-xs text-[#73726E] mt-1 max-w-xl leading-relaxed">
-                        Damit wir aus der Masse herausstechen, empfehlen wir eine personalisierte Einleitung. Wähle einen Aspekt des Unternehmens, der dich anspricht.
+                        {t('results_desc')}
                     </p>
                 </div>
                 <button
@@ -261,7 +283,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium transition-colors border border-[#E7E7E5] text-[#73726E] hover:bg-gray-50 shrink-0"
                     title="Analyse wiederholen"
                 >
-                    <RefreshCw className="w-3 h-3" /> Aktualisieren
+                    <RefreshCw className="w-3 h-3" /> {t('btn_refresh')}
                 </button>
             </div>
 
@@ -269,10 +291,10 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
             {(() => {
                 const filteredHooks = setupData.hooks.filter(h => h.type !== 'quote');
                 const groups: { label: string; icon: string; types: string[] }[] = [
-                    { label: 'Vision', icon: '', types: ['vision'] },
-                    { label: 'Werte', icon: '✦', types: ['value'] },
-                    { label: 'Projekte', icon: '🚀', types: ['project'] },
-                    { label: 'Wachstum & Funding', icon: '📈', types: ['funding'] },
+                    { label: t('cat_vision'), icon: '', types: ['vision'] },
+                    { label: t('cat_values'), icon: '✦', types: ['value'] },
+                    { label: t('cat_projects'), icon: '🚀', types: ['project'] },
+                    { label: t('cat_funding'), icon: '📈', types: ['funding'] },
                 ];
 
                 return groups.map(group => {
@@ -302,14 +324,14 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                     </span>
                                     {hasSelection && (
                                         <span className="text-[10px] bg-[#002e7a] text-white px-1.5 py-0.5 rounded-full font-medium">
-                                            Gewählt
+                                            {t('badge_selected')}
                                         </span>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {bestScore > 0 && (
                                         <span className="text-[10px] text-[#73726E] font-medium">
-                                            bis {bestScore}% Match
+                                            {t('match_up_to', { score: bestScore })}
                                         </span>
                                     )}
                                     <ChevronDown className={[
@@ -336,6 +358,8 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                                     hook={hook}
                                                     isSelected={selectedHook?.id === hook.id}
                                                     onSelect={() => handleSelect(hook)}
+                                                    typeLabel={hookTypeLabel}
+                                                    manualPlaceholder={t('manual_hook_placeholder')}
                                                 />
                                             ))}
                                         </div>
@@ -352,7 +376,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 <textarea
                     value={manualText}
                     onChange={(e) => handleManualChange(e.target.value)}
-                    placeholder="Beschreibe dein persönliches Interesse an der Stelle oder einem spezifischen Aspekt des Unternehmens..."
+                    placeholder={t('manual_placeholder')}
                     rows={3}
                     className="w-full text-xs text-[#37352F] border border-[#002e7a] rounded-lg p-3 resize-none outline-none focus:ring-1 focus:ring-[#002e7a] placeholder-[#A8A29E]"
                 />
@@ -369,9 +393,9 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                         <div className="flex gap-2">
                             <Quote className="w-4 h-4 text-[#002e7a] shrink-0 mt-0.5" />
                             <div>
-                                <h4 className="text-xs font-semibold text-[#002e7a]">Passendes Zitat</h4>
+                                <h4 className="text-xs font-semibold text-[#002e7a]">{t('quote_title')}</h4>
                                 <p className="text-xs text-[#37352F] leading-relaxed mt-1">
-                                    Zudem empfehlen wir auch die Integration eines Zitats. Das kommt immer gut an :)
+                                    {t('quote_desc')}
                                 </p>
                             </div>
                         </div>
@@ -382,14 +406,14 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                             className="flex items-center gap-2 px-4 py-2 bg-[#002e7a] text-white text-xs font-semibold rounded-lg hover:bg-[#001e5a] transition-colors"
                         >
                             <Search className="w-3.5 h-3.5" />
-                            Zitate suchen
+                            {t('btn_search_quotes')}
                         </button>
                         <button
                             onClick={handleProceedToStep2}
                             className="flex items-center gap-2 px-4 py-2 text-[#73726E] text-xs font-medium rounded-lg border border-[#E7E7E5] hover:bg-gray-50 transition-colors"
                         >
                             <SkipForward className="w-3.5 h-3.5" />
-                            Überspringen
+                            {t('btn_skip')}
                         </button>
                     </div>
                     {quoteError && (
@@ -402,8 +426,8 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
             {phase === 'quoteSearching' && (
                 <div className="border-t border-[#E7E7E5] pt-6 mt-4 flex flex-col items-center text-center">
                     <div className="w-8 h-8 border-2 border-[#002e7a]/20 border-t-[#002e7a] rounded-full animate-spin mb-4" />
-                    <p className="text-sm text-[#37352F] font-medium">Passende Zitate werden gesucht…</p>
-                    <p className="text-xs text-[#73726E] mt-1">KI sucht passende Vordenker und Zitate…</p>
+                    <p className="text-sm text-[#37352F] font-medium">{t('quote_searching')}</p>
+                    <p className="text-xs text-[#73726E] mt-1">{t('quote_searching_desc')}</p>
                 </div>
             )}
 
@@ -416,13 +440,13 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 >
                     <div className="flex justify-between items-center">
                         <h4 className="text-xs font-semibold text-[#37352F]">
-                            Passende Zitate ({fetchedQuotes.length})
+                            {t('quote_results_title', { count: fetchedQuotes.length })}
                         </h4>
                         <button
                             onClick={handleQuoteSearch}
                             className="text-[10px] text-[#73726E] hover:text-[#002e7a] flex items-center gap-1"
                         >
-                            <RefreshCw className="w-3 h-3" /> 3 neue Zitate
+                            <RefreshCw className="w-3 h-3" /> {t('btn_new_quotes')}
                         </button>
                     </div>
 
@@ -430,15 +454,15 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
 
                         {/* Info-Box: So wirkt ein Zitat */}
                         <div className="bg-[#FFFBE6] border border-[#F5E6A3] rounded-lg p-3 mb-1">
-                            <p className="text-xs font-semibold text-[#8B7000] mb-1.5">💡 So wirkt ein Zitat im Anschreiben:</p>
+                            <p className="text-xs font-semibold text-[#8B7000] mb-1.5">{t('quote_example_title')}</p>
                             <p className="text-xs text-[#5C4A00] leading-relaxed mb-1">
-                                ich möchte gerne ein Zitat mit Euch teilen, da es mich an Eure Maxime des &ldquo;Challenging the Status Quo&rdquo; erinnert hat:
+                                {t('quote_example_intro')}
                             </p>
                             <p className="text-xs text-[#5C4A00] italic leading-relaxed mb-1">
-                                &ldquo;The most dangerous phrase is, &apos;We&apos;ve always done it this way.&apos;&rdquo;
+                                {t('quote_example_quote')}
                             </p>
                             <p className="text-xs text-[#5C4A00] leading-relaxed">
-                                Dieser Satz von Grace Hopper hat mich schon während meiner Zeit bei der Telekom geprägt. Er erinnert mich täglich daran, neugierig zu bleiben und Eure Maxime des &ldquo;Challenging the Status Quo&rdquo; zu leben.
+                                {t('quote_example_outro')}
                             </p>
                         </div>
                         {fetchedQuotes.map((q, i) => (
@@ -483,10 +507,10 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     className="border border-[#E7E7E5] rounded-lg p-4 bg-[#fafaf9] space-y-2"
                 >
                     <h4 className="text-sm font-semibold text-[#37352F]">
-                        Welcher Anker soll die Einleitung eröffnen?
+                        {t('intro_focus_title')}
                     </h4>
                     <p className="text-xs text-[#73726E] leading-relaxed">
-                        Damit das Anschreiben nicht überladen wirkt, bekommt nur EIN Element die Einleitung. <strong className="text-[#37352F]">Das andere wird elegant im Hauptteil verwoben.</strong>
+                        {t('intro_focus_desc')} <strong className="text-[#37352F]">{t('intro_focus_desc_bold')}</strong>
                     </p>
                     <div className="flex flex-col gap-1.5 mt-1">
                         <label
@@ -505,9 +529,9 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                 className="mt-0.5 accent-[#002e7a]"
                             />
                             <div>
-                                <span className="font-semibold text-[#37352F]">Zitat in die Einleitung</span>
-                                <span className="text-[#73726E]"> — News untermauert eine CV-Station im Hauptteil</span>
-                                <span className="block text-[10px] text-[#A8A29E] mt-0.5">Empfohlen</span>
+                                <span className="font-semibold text-[#37352F]">{t('focus_quote_label')}</span>
+                                <span className="text-[#73726E]"> {t('focus_quote_desc')}</span>
+                                <span className="block text-[10px] text-[#A8A29E] mt-0.5">{t('focus_quote_recommended')}</span>
                             </div>
                         </label>
                         <label
@@ -534,8 +558,8 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                 className="mt-0.5 accent-[#002e7a]"
                             />
                             <div>
-                                <span className="font-semibold text-[#37352F]">News in die Einleitung</span>
-                                <span className="text-[#73726E]"> — Zitat untermauert eine CV-Station im Hauptteil</span>
+                                <span className="font-semibold text-[#37352F]">{t('focus_hook_label')}</span>
+                                <span className="text-[#73726E]"> {t('focus_hook_desc')}</span>
                             </div>
                         </label>
                     </div>
@@ -558,12 +582,12 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 mb-0.5">
                                     <Sparkles className="w-3.5 h-3.5 text-[#002e7a] shrink-0" />
-                                    <span className="text-sm font-semibold text-[#37352F]">Eigene Meinung zeigen</span>
+                                    <span className="text-sm font-semibold text-[#37352F]">{t('pingpong_title')}</span>
                                 </div>
                                 <p className="text-xs text-[#73726E] leading-relaxed">
                                     {pingPongDisabled
-                                        ? 'Ping-Pong ist nur verfügbar wenn das Zitat in der Einleitung erscheint. Wähle "Zitat in die Einleitung" um diese Option zu aktivieren.'
-                                        : <>Statt dem Zitat nur zuzustimmen, baut Claude eine <strong className="text-[#37352F]">kritische Gegenperspektive</strong> ein — Thesis, Antithese, Synthese.</>}
+                                        ? t('pingpong_disabled_desc')
+                                        : <>{t('pingpong_desc').split(t('pingpong_desc_bold'))[0]}<strong className="text-[#37352F]">{t('pingpong_desc_bold')}</strong>{t('pingpong_desc').split(t('pingpong_desc_bold'))[1]}</>}
                                 </p>
                             </div>
                             <button
@@ -600,7 +624,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                         onClick={() => { setQuote(null); handleProceedToStep2(); }}
                         className="text-xs text-[#73726E] px-3 py-1.5 hover:underline"
                     >
-                        Ohne Zitat fortfahren
+                        {t('btn_skip_quote')}
                     </button>
                     <button
                         onClick={handleProceedToStep2}
@@ -612,7 +636,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                 : 'bg-[#E7E7E5] text-[#A8A29E] cursor-not-allowed',
                         ].join(' ')}
                     >
-                        Weiter <ChevronRight className="w-3.5 h-3.5" />
+                        {t('btn_next')} <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                 </div>
             )}
@@ -624,7 +648,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                         disabled
                         className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-[#E7E7E5] text-[#A8A29E] cursor-not-allowed"
                     >
-                        Weiter <ChevronRight className="w-3.5 h-3.5" />
+                        {t('btn_next')} <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                 </div>
             )}

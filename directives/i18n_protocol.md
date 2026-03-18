@@ -1,9 +1,9 @@
 # i18n Protocol — Pathly V2.0
 
-**Status:** AKTIV — Phase 1 implementiert. Tier 2 (JobSwipeView, CV-Templates) offen.  
-**Version:** 1.2 (Tier 1 Complete)  
-**Erstellt:** 2026-03-17  
-**Letzte Änderung:** 2026-03-17  
+**Status:** AKTIV — Tier 1 vollständig (inkl. Cover Letter Wizard). Tier 2 (JobSwipeView, CV-Templates) offen.
+**Version:** 1.3 (Cover Letter Wizard Complete)
+**Erstellt:** 2026-03-17
+**Letzte Änderung:** 2026-03-18
 **Sprachen:** Deutsch (de), Englisch (en), Spanisch (es)
 
 ---

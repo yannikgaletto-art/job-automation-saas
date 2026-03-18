@@ -1,6 +1,6 @@
 "use client"
 
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 
 import { createPortal } from 'react-dom';
 
@@ -69,6 +69,7 @@ function OptCancelButton({ onCancel, label }: { onCancel: () => void; label: str
 
 export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: OptimizerWizardProps) {
     const t = useTranslations('cv_optimizer');
+    const locale = useLocale();
     const [step, setStep] = useState<1 | 2>(1);
 
     const [isLoading, setIsLoading] = useState(true);
@@ -176,9 +177,14 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                 );
                             }
 
-                            // If we have restored decisions+proposal -> skip to Step 2 (Preview)
+                            // If we have restored decisions+proposal → skip to Step 2 (Preview)
                             if (jobRes?.cv_optimization_proposal && jobRes?.cv_optimization_user_decisions) {
-                                const restoredFinalData = applyOptimizations(cvStructured, jobRes.cv_optimization_user_decisions);
+                                // Prefer proposal.translated as the reconstitution base: it is the CV
+                                // AFTER language translation (Pass 1) but BEFORE ATS changes (Pass 2).
+                                // Falls back to the original cvStructured for proposals pre-v2.4.
+                                const baseForRestore =
+                                    jobRes.cv_optimization_proposal.translated ?? cvStructured;
+                                const restoredFinalData = applyOptimizations(baseForRestore, jobRes.cv_optimization_user_decisions);
                                 setFinalCv(restoredFinalData);
                                 setStep(2);
                             }
@@ -282,6 +288,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                     template_id: templateId,
                     job_id: jobId,
                     user_id: userId,
+                    locale,
                     ...(metricsToSend && metricsToSend.length > 0 ? { station_metrics: metricsToSend } : {}),
                     cv_opt_settings: { showSummary: cvOptSettings.showSummary, summaryMode: cvOptSettings.summaryMode },
                 }),
@@ -291,7 +298,10 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
 
             const data = await res.json();
             if (!res.ok || !data.success) {
-                throw new Error(data.error || data.details || t('error_failed'));
+                // API returns error codes (e.g. 'error_ai_failed') — translate via t()
+                const errorCode = data.error || 'error_failed';
+                const translated = t.has(errorCode) ? t(errorCode) : (data.details || t('error_failed'));
+                throw new Error(translated);
             }
 
             setProposal(data.proposal);
@@ -410,7 +420,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                 <p className="text-sm text-gray-500 max-w-sm mx-auto">
                     {t('no_cv_desc')}
                 </p>
-                <Link href="/dashboard/settings" className="inline-block mt-4 text-blue-600 hover:text-blue-800 font-medium underline">
+                <Link href={`/${locale}/dashboard/settings`} className="inline-block mt-4 text-blue-600 hover:text-blue-800 font-medium underline">
                     {t('no_cv_link')}
                 </Link>
             </div>
@@ -533,12 +543,12 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                 )}
                                 <div className="text-center max-w-md w-full">
                                     <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('main_title')}</h3>
-                                    <p className="text-gray-500 mb-4">
+                                    <p className="text-gray-500 mb-4 text-pretty leading-relaxed">
                                         {t.rich('main_desc', {
-                                            cv: (chunks) => <strong className="text-gray-700">{t('main_desc_cv')}</strong>,
-                                            matchResults: (chunks) => <strong className="text-gray-700">{t('main_desc_match')}</strong>,
-                                            suggestions: (chunks) => <strong className="text-gray-700">{t('main_desc_suggestions')}</strong>,
-                                            moreSuccess: (chunks) => <strong className="text-gray-700">{t('main_desc_success')}</strong>,
+                                            cv: (chunks) => <strong className="text-gray-700 font-medium">{chunks}</strong>,
+                                            matchResults: (chunks) => <strong className="text-gray-700 font-medium">{chunks}</strong>,
+                                            suggestions: (chunks) => <strong className="text-gray-700 font-medium">{chunks}</strong>,
+                                            moreSuccess: (chunks) => <strong className="text-gray-700 font-medium">{chunks}</strong>,
                                         })}
                                     </p>
 
@@ -620,7 +630,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
 
                                     {/* Metriken Toggle — station-based, always visible, same style as Anzeigeoptionen */}
                                     {stationMetrics.length > 0 && (
-                                        <details className="w-full mb-6 text-left group">
+                                        <details className="w-full mb-6 text-left group" id="metrics-accordion">
                                             <summary className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-gray-600 hover:text-gray-900 transition list-none">
                                                 <span className="text-gray-400 group-open:rotate-90 transition-transform duration-200 inline-block">▶</span>
                                                 {t('metrics_title')}
@@ -654,6 +664,20 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
                                                         </div>
                                                     ))}
                                                 </div>
+                                                {/* OK button — collapses accordion and confirms entries */}
+                                                {stationMetrics.some(s => s.metrics.trim().length > 0) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const el = document.getElementById('metrics-accordion') as HTMLDetailsElement | null;
+                                                            if (el) el.open = false;
+                                                        }}
+                                                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#012e7a] hover:bg-[#01246b] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                                                    >
+                                                        <Check className="w-4 h-4" />
+                                                        {t('metrics_ok')}
+                                                    </button>
+                                                )}
                                             </div>
                                         </details>
                                     )}

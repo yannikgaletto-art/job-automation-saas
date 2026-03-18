@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse, TonePreset, TargetLanguage } from '@/types/cover-letter-setup';
 import { Info, ChevronLeft, Sparkles, Zap, Shield, FileText, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations, useLocale } from 'next-intl';
 
 interface Props {
     setupData: SetupDataResponse;
@@ -12,35 +13,10 @@ interface Props {
     onGenerate: () => void;
 }
 
-const toneOptions: { id: TonePreset; label: string; desc: string; previewText: string }[] = [
-    {
-        id: 'data-driven',
-        label: 'Daten-getrieben',
-        desc: 'Zahlen, Fakten, konkrete Ergebnisse',
-        previewText: '„Ich konnte den Umsatz im B2B-Segment um 15% steigern — durch systematische Optimierung der Vertriebsprozesse."',
-    },
-    {
-        id: 'storytelling',
-        label: 'Storytelling',
-        desc: 'Narrative, persönliche Geschichte',
-        previewText: '„Als ich zum ersten Mal die Herausforderungen im B2B-Sales sah, wusste ich: Hier kann ich wirklich etwas bewegen."',
-    },
-    {
-        id: 'formal',
-        label: 'Formal',
-        desc: 'Klassisch, strukturiert, konservativ',
-        previewText: '„Meine bisherige Laufbahn ist geprägt durch erfolgreiche Abschlüsse im strategischen Vertrieb."',
-    },
-    {
-        id: 'philosophisch',
-        label: 'Philosophisch',
-        desc: 'Konzeptionell, reflektiert, intellektuell',
-        previewText: '„Wachstum entsteht dort, wo bewährte Prozesse hinterfragt und neu gedacht werden."',
-    },
-];
+const toneOptionIds: TonePreset[] = ['data-driven', 'storytelling', 'formal', 'philosophisch'];
 
-function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString('de-DE', {
+function formatDate(dateStr: string, locale: string) {
+    return new Date(dateStr).toLocaleDateString(locale, {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -48,7 +24,19 @@ function formatDate(dateStr: string) {
 }
 
 export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
+    const t = useTranslations('cover_letter');
+    const locale = useLocale();
     const { setTone, setOptInModule, isStepComplete, tone, optInModules } = useCoverLetterSetupStore();
+
+    const toneOptions = useMemo(() => toneOptionIds.map(id => {
+        const key = id.replace(/-/g, '_') as 'tone_data_driven' | 'tone_storytelling' | 'tone_formal' | 'tone_philosophisch';
+        return {
+            id,
+            label: t(`tone_${key}` as typeof key),
+            desc: t(`tone_${key}_desc` as `${typeof key}_desc`),
+            previewText: t(`tone_${key}_preview` as `${typeof key}_preview`),
+        };
+    }), [t]);
     const [selectedPreset, setSelectedPreset] = useState<TonePreset>(tone?.preset || 'data-driven');
     const [language, setLanguage] = useState<TargetLanguage>(tone?.targetLanguage || setupData.detectedJobLanguage);
     const [contactPerson, setContactPerson] = useState(tone?.contactPerson || '');
@@ -170,10 +158,10 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                 handleDocSelect(pendingDocId);
             } else {
                 const data = await res.json().catch(() => ({}));
-                setAnalyzeError(data.error || 'Analyse fehlgeschlagen');
+                setAnalyzeError(data.error || t('error_analyze'));
             }
         } catch {
-            setAnalyzeError('Netzwerkfehler — bitte erneut versuchen');
+            setAnalyzeError(t('error_network'));
         } finally {
             setIsAnalyzing(false);
         }
@@ -218,7 +206,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-sm font-semibold text-[#37352F]">Ton & Sprache</h3>
+                    <h3 className="text-sm font-semibold text-[#37352F]">{t('tone_title')}</h3>
                     <p className="text-xs text-[#73726E] mt-0.5">{setupData.styleAnalysisSummary}</p>
                 </div>
 
@@ -247,7 +235,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                     disabled={!hasUploadedDocs}
                     className={`flex items-center gap-2 transition-all ${!hasUploadedDocs ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                         }`}
-                    title={!hasUploadedDocs ? 'Lade ein Anschreiben in den Settings hoch' : undefined}
+                    title={!hasUploadedDocs ? t('doc_upload_hint') : undefined}
                 >
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${toneSource === 'custom-style' && hasUploadedDocs
                             ? 'border-[#002e7a] bg-[#002e7a]'
@@ -264,7 +252,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                     </div>
                     <span className={`text-xs font-semibold ${toneSource === 'custom-style' && hasUploadedDocs ? 'text-[#002e7a]' : 'text-[#73726E]'
                         }`}>
-                        Eigener Stil
+                        {t('source_custom')}
                     </span>
                 </button>
 
@@ -288,7 +276,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                     </div>
                     <span className={`text-xs font-semibold ${toneSource === 'preset' ? 'text-[#002e7a]' : 'text-[#73726E]'
                         }`}>
-                        Ton Wählen
+                        {t('source_preset')}
                     </span>
                 </button>
             </div>
@@ -311,17 +299,17 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                                 <FileText className="w-4 h-4 text-[#002e7a] shrink-0 mt-0.5" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-semibold text-[#37352F]">
-                                        Tonvorlage: {selectedDocName || 'Bitte wählen'}
+                                        {t('doc_template_label', { name: selectedDocName || t('doc_template_choose') })}
                                     </p>
                                     <p className="text-[10px] text-[#73726E] mt-0.5">
-                                        Die KI kalibriert sich auf den Ton dieses Anschreibens — Satzlänge, Konjunktionen und rhetorische Mittel werden übernommen.
+                                        {t('doc_desc')}
                                     </p>
                                 </div>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); setShowDocPicker(true); }}
                                     className="text-[10px] text-[#002e7a] hover:underline shrink-0 font-medium"
                                 >
-                                    {selectedDocName ? 'Ändern' : 'Wählen'}
+                                    {selectedDocName ? t('doc_change') : t('doc_choose')}
                                 </button>
                             </div>
 
@@ -329,7 +317,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                             {selectedDocId && !analyzedDocIds.has(selectedDocId) && (
                                 <div className="flex items-center gap-1.5 mt-2 text-[10px] text-amber-600">
                                     <AlertTriangle className="w-3 h-3 shrink-0" />
-                                    Dieses Anschreiben wurde noch nicht analysiert. Die KI nutzt den Standardton.
+                                    {t('doc_not_analyzed')}
                                 </div>
                             )}
                         </div>
@@ -408,7 +396,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                             onClick={(e) => e.stopPropagation()}
                         >
                             <h4 className="text-sm font-semibold text-[#37352F] mb-3">
-                                Welches Anschreiben als Tonvorlage?
+                                {t('doc_modal_title')}
                             </h4>
                             <div className="space-y-2 max-h-60 overflow-y-auto">
                                 {availableDocs.map((doc) => (
@@ -425,10 +413,10 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                                         <FileText className="w-4 h-4 text-[#73726E] shrink-0" />
                                         <div className="min-w-0 flex-1">
                                             <p className="text-xs font-medium text-[#37352F] truncate">{doc.fileName}</p>
-                                            <p className="text-[10px] text-[#73726E]">{formatDate(doc.createdAt)}</p>
+                                            <p className="text-[10px] text-[#73726E]">{formatDate(doc.createdAt, locale)}</p>
                                         </div>
                                         {analyzedDocIds.has(doc.id) && (
-                                            <span className="text-[9px] text-green-600 font-medium shrink-0">Analysiert</span>
+                                            <span className="text-[9px] text-green-600 font-medium shrink-0">{t('doc_analyzed')}</span>
                                         )}
                                     </button>
                                 ))}
@@ -444,7 +432,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                                     onClick={() => { setShowDocPicker(false); setPendingDocId(undefined); setAnalyzeError(null); }}
                                     className="flex-1 text-xs text-[#73726E] hover:text-[#37352F] py-2"
                                 >
-                                    Abbrechen
+                                    {t('doc_cancel')}
                                 </button>
                                 {pendingDocId && (
                                     <button
@@ -457,7 +445,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                                                 : 'bg-[#002e7a] text-white hover:bg-[#001e5a]',
                                         ].join(' ')}
                                     >
-                                        {isAnalyzing ? 'Analysiere…' : 'Bestätigen'}
+                                        {isAnalyzing ? t('doc_analyzing') : t('doc_confirm')}
                                     </button>
                                 )}
                                 {analyzeError && pendingDocId && (
@@ -465,7 +453,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                                         onClick={() => handleDocSelect(pendingDocId)}
                                         className="flex-1 text-xs text-amber-600 hover:text-amber-700 py-2 font-medium"
                                     >
-                                        Trotzdem wählen
+                                        {t('doc_select_anyway')}
                                     </button>
                                 )}
                             </div>
@@ -477,25 +465,25 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             {/* Contact Person Input */}
             <div className="pt-2">
                 <label className="block text-xs font-semibold text-[#37352F] mb-1">
-                    Ansprechpartner <span className="text-[#A8A29E] font-normal">(optional)</span>
+                    {t('contact_label')} <span className="text-[#A8A29E] font-normal">{t('contact_optional')}</span>
                 </label>
                 <input
                     type="text"
                     value={contactPerson}
                     onChange={handleContactPersonChange}
-                    placeholder="z.B. Herr Müller, HR Team"
+                    placeholder={t('contact_placeholder')}
                     className="w-full border border-[#E7E7E5] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[#002e7a]"
                 />
             </div>
 
-            {/* Du/Sie Toggle — YC Style */}
-            {language === 'de' && (
+            {/* Formality Toggle — DE: Sie/Du, ES: Usted/Tú, EN: always hidden */}
+            {language !== 'en' && locale !== 'en' && (
                 <div className="pt-2">
                     <label className="block text-xs font-semibold text-[#37352F] mb-1.5">
-                        Anrede im Unternehmen
+                        {t('formality_label')}
                     </label>
                     <div className="flex items-center gap-0.5 bg-[#E7E7E5] rounded-md p-0.5 w-fit">
-                        {([{ value: 'sie' as const, label: 'Sie-Form (Klassisch)' }, { value: 'du' as const, label: 'Du-Form (Startups/Tech)' }]).map((opt) => (
+                        {([{ value: 'sie' as const, label: t('formality_sie') }, { value: 'du' as const, label: t('formality_du') }]).map((opt) => (
                             <button
                                 key={opt.value}
                                 onClick={() => handleFormalityChange(opt.value)}
@@ -517,8 +505,8 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                     <Info className="w-4 h-4 text-[#002e7a] shrink-0 mt-0.5" />
                     <p className="text-xs text-[#37352F] leading-relaxed">
                         {setupData.hasStyleSample
-                            ? 'Dein persönlicher Schreibstil wurde analysiert. Die KI nutzt daraus Satzlänge und Konjunktionen, der Ton kommt vom gewählten Preset.'
-                            : 'Lade ein altes Anschreiben in den Settings hoch, damit die KI deinen Stil lernt. Bis dahin nutzen wir den gewählten Ton.'}
+                            ? t('style_analyzed_info')
+                            : t('style_missing_info')}
                     </p>
                 </div>
             </div>
@@ -530,11 +518,11 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                     <div className="flex items-start gap-2">
                         <Zap className="w-4 h-4 text-[#F59E0B] shrink-0 mt-0.5" />
                         <div>
-                            <p className="text-xs font-semibold text-[#37352F]">First 90 Days Plan</p>
+                            <p className="text-xs font-semibold text-[#37352F]">{t('first90_title')}</p>
                             <p className="text-[10px] text-[#73726E] mt-0.5 leading-relaxed">
                                 {isFormal
-                                    ? 'Beim formellen Stil wird auf zusätzliche Absätze verzichtet, um die klassische 4-Absatz-Struktur beizubehalten.'
-                                    : 'KI generiert einen konkreten 3-Punkte-Plan für deine ersten 90 Tage — basierend auf echten Firmenproblemen.'}
+                                    ? t('first90_formal_desc')
+                                    : t('first90_desc')}
                             </p>
                         </div>
                     </div>
@@ -574,11 +562,11 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                     <div className="flex items-start gap-2">
                         <Shield className="w-4 h-4 text-[#8B5CF6] shrink-0 mt-0.5" />
                         <div>
-                            <p className="text-xs font-semibold text-[#37352F]">Vulnerability Injector</p>
+                            <p className="text-xs font-semibold text-[#37352F]">{t('vul_title')}</p>
                             <p className="text-[10px] text-[#73726E] mt-0.5 leading-relaxed">
                                 {isFormal
-                                    ? 'Der formelle Stil erfordert einen durchgehend souveränen Ton ohne strategische Schwächen.'
-                                    : 'Baut 1-2 strategische, authentische Lernkurven ein — zeigt Selbstbewusstsein und Wachstum.'}
+                                    ? t('vul_formal_desc')
+                                    : t('vul_desc')}
                             </p>
                         </div>
                     </div>
@@ -614,7 +602,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
 
             <div className="flex justify-between pt-2">
                 <button onClick={onBack} className="flex items-center gap-1 text-xs text-[#73726E] hover:text-[#37352F]">
-                    <ChevronLeft className="w-3.5 h-3.5" /> Zurück
+                    <ChevronLeft className="w-3.5 h-3.5" /> {t('btn_back')}
                 </button>
                 <button
                     onClick={onGenerate}
@@ -627,7 +615,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                     ].join(' ')}
                 >
                     <Sparkles className="w-3.5 h-3.5" />
-                    Anschreiben generieren
+                    {t('btn_generate')}
                 </button>
             </div>
         </div>

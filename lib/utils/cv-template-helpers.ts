@@ -32,3 +32,28 @@ export function inferLanguageLevel(proficiency?: string): number {
     if (lower === 'a1') return 1;
     return 3; // safe default
 }
+
+/**
+ * Normalizes dateRangeText to replace language-specific "present" indicators
+ * with the locale-appropriate label.
+ *
+ * cv-parser stores dates verbatim from the uploaded CV (e.g. "Heute" from a German CV).
+ * This display-level normalization ensures consistency regardless of CV language.
+ *
+ * Examples:
+ *   "09.2025 - Heute"   + labelPresent="Present"  → "09.2025 - Present"
+ *   "2022 - heute"      + labelPresent="Heute"     → "2022 - Heute"  (de: same word)
+ *   "01/2023 - Present" + labelPresent="Hoy"       → "01/2023 - Hoy"  (es: replace)
+ */
+export function normalizeDateRangeText(
+    dateRangeText: string | undefined | null,
+    labelPresent: string,
+): string {
+    if (!dateRangeText) return '';
+    // Match any known "present" synonym, case-insensitive
+    return dateRangeText.replace(
+        /\b(Heute|heute|Present|present|Hoy|hoy|Aktuell|aktuell|current|laufend|Today|today)\b/g,
+        labelPresent,
+    );
+}
+
