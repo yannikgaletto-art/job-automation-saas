@@ -1,8 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * POST /api/mood/checkin
- * Stores a mood check-in and updates last_mood_checkin_at in user_settings.
+ * /api/mood/checkin
+ *
+ * GET  — Returns today's mood score (if any) and show_checkin status.
+ * POST — Stores a mood check-in, resets skip streak.
+ * PATCH — Handles skip increment and reactivation.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,6 +18,47 @@ const supabaseAdmin = createAdminClient(
     { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
+// ─── GET — Today's mood + visibility status ────────────────────────
+export async function GET() {
+    try {
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // 1. Check if user did a check-in today (UTC date)
+        const todayStart = new Date();
+        todayStart.setUTCHours(0, 0, 0, 0);
+
+        const { data: checkin } = await supabaseAdmin
+            .from('mood_checkins')
+            .select('mood')
+            .eq('user_id', user.id)
+            .gte('created_at', todayStart.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        // 2. Get show_checkin from user_profiles
+        const { data: profile } = await supabaseAdmin
+            .from('user_profiles')
+            .select('show_checkin')
+            .eq('user_id', user.id)
+            .single();
+
+        return NextResponse.json({
+            todayMood: checkin?.mood ?? null,
+            showCheckin: profile?.show_checkin ?? true,
+        });
+    } catch (error: unknown) {
+        console.error('[mood/checkin] GET error:', error);
+        // Fail-open: show overlay, no mood message
+        return NextResponse.json({ todayMood: null, showCheckin: true });
+    }
+}
+
+// ─── POST — Submit mood check-in ──────────────────────────────────
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createClient();
@@ -23,20 +67,20 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { mood, context, note } = await request.json();
+        const { mood, context } = await request.json();
 
         if (!mood || mood < 1 || mood > 5) {
             return NextResponse.json({ error: 'Invalid mood (1-5)' }, { status: 400 });
         }
 
-        // 1. Insert into mood_checkins
+        // 1. Insert into mood_checkins (note: null — textarea removed in V2)
         const { error: insertError } = await supabaseAdmin
             .from('mood_checkins')
             .insert({
                 user_id: user.id,
                 mood,
                 context: context || 'midday',
-                note: note || null,
+                note: null,
             });
 
         if (insertError) {
@@ -61,9 +105,64 @@ export async function POST(request: NextRequest) {
             // Non-critical — check-in was already saved
         }
 
-        return NextResponse.json({ success: true });
+        // 3. Reset skip streak after successful check-in
+        await supabaseAdmin
+            .from('user_profiles')
+            .update({ checkin_skip_streak: 0 })
+            .eq('user_id', user.id);
+
+        return NextResponse.json({ success: true, mood });
     } catch (error: unknown) {
-        console.error('[mood/checkin] Fatal:', error);
+        console.error('[mood/checkin] POST Fatal:', error);
+        return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    }
+}
+
+// ─── PATCH — Skip or reactivate ───────────────────────────────────
+export async function PATCH(request: NextRequest) {
+    try {
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { action } = await request.json();
+
+        if (action === 'skip') {
+            // Get current streak
+            const { data: profile } = await supabaseAdmin
+                .from('user_profiles')
+                .select('checkin_skip_streak')
+                .eq('user_id', user.id)
+                .single();
+
+            const newStreak = (profile?.checkin_skip_streak ?? 0) + 1;
+            const shouldHide = newStreak >= 5;
+
+            await supabaseAdmin
+                .from('user_profiles')
+                .update({
+                    checkin_skip_streak: newStreak,
+                    ...(shouldHide ? { show_checkin: false } : {}),
+                })
+                .eq('user_id', user.id);
+
+            return NextResponse.json({ hidden: shouldHide, streak: newStreak });
+        }
+
+        if (action === 'reactivate') {
+            await supabaseAdmin
+                .from('user_profiles')
+                .update({ show_checkin: true, checkin_skip_streak: 0 })
+                .eq('user_id', user.id);
+
+            return NextResponse.json({ reactivated: true });
+        }
+
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    } catch (error: unknown) {
+        console.error('[mood/checkin] PATCH Fatal:', error);
         return NextResponse.json({ error: 'Internal error' }, { status: 500 });
     }
 }

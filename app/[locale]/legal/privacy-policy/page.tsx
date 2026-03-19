@@ -9,21 +9,21 @@ export default async function PrivacyPolicyPage() {
 
             {/* TL;DR Section */}
             <div className="bg-[#F5F5F4] rounded-lg p-6 mb-10 border border-[#E7E7E5]">
-                <h2 className="text-lg font-semibold mb-3">Auf einen Blick</h2>
+                <h2 className="text-lg font-semibold mb-3">{t('tldr_title')}</h2>
                 <ul className="space-y-2 text-sm text-[#73726E]">
-                    <li>• Wir speichern nur Daten, die für die Bewerbungserstellung notwendig sind.</li>
-                    <li>• Deine Daten werden verschlüsselt in der EU (Frankfurt) gespeichert.</li>
-                    <li>• Wir verkaufen deine Daten nicht. Wir nutzen sie nicht zum KI-Training.</li>
-                    <li>• Du kannst jederzeit deine Daten exportieren oder löschen lassen.</li>
-                    <li>• KI-generierte Texte werden als solche gekennzeichnet — du prüfst vor dem Absenden.</li>
+                    <li>• {t('tldr_1')}</li>
+                    <li>• {t('tldr_2')}</li>
+                    <li>• {t('tldr_3')}</li>
+                    <li>• {t('tldr_4')}</li>
+                    <li>• {t('tldr_5')}</li>
                 </ul>
             </div>
 
             <div className="space-y-10">
-                {/* 1. Verantwortliche Stelle */}
+                {/* 1. Controller */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">1. Verantwortliche Stelle (Controller)</h2>
-                    <p className="mb-2">Verantwortlich für die Datenverarbeitung im Sinne der DSGVO:</p>
+                    <h2 className="text-xl font-semibold mb-3">{t('s1_title')}</h2>
+                    <p className="mb-2">{t('s1_intro')}</p>
                     <div className="bg-[#F5F5F4] rounded-lg p-4 text-sm">
                         <p className="font-medium">Pathly</p>
                         <p className="text-[#73726E]">Yannik Galetto</p>
@@ -31,213 +31,216 @@ export default async function PrivacyPolicyPage() {
                     </div>
                 </section>
 
-                {/* 2. Welche Daten wir erheben */}
+                {/* 2. Data Categories */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">2. Welche Daten wir erheben</h2>
-                    <p className="mb-3">Wir erheben ausschließlich Daten, die für den Betrieb von Pathly erforderlich sind:</p>
+                    <h2 className="text-xl font-semibold mb-3">{t('s2_title')}</h2>
+                    <p className="mb-3">{t('s2_intro')}</p>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm border border-[#E7E7E5] rounded-lg">
                             <thead>
                                 <tr className="bg-[#F5F5F4]">
-                                    <th className="text-left p-3 font-medium">Datenkategorie</th>
-                                    <th className="text-left p-3 font-medium">Beispiele</th>
-                                    <th className="text-left p-3 font-medium">Zweck</th>
+                                    <th className="text-left p-3 font-medium">{t('s2_col_category')}</th>
+                                    <th className="text-left p-3 font-medium">{t('s2_col_examples')}</th>
+                                    <th className="text-left p-3 font-medium">{t('s2_col_purpose')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#E7E7E5]">
                                 <tr>
-                                    <td className="p-3">Account-Daten</td>
-                                    <td className="p-3 text-[#73726E]">E-Mail-Adresse, Passwort (gehasht)</td>
-                                    <td className="p-3 text-[#73726E]">Authentifizierung</td>
+                                    <td className="p-3">{t('s2_r1_cat')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s2_r1_ex')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s2_r1_purpose')}</td>
                                 </tr>
                                 <tr>
-                                    <td className="p-3">Profil-Daten</td>
-                                    <td className="p-3 text-[#73726E]">Name, Präferenzen, Werte</td>
-                                    <td className="p-3 text-[#73726E]">Personalisierung der Bewerbungen</td>
+                                    <td className="p-3">{t('s2_r2_cat')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s2_r2_ex')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s2_r2_purpose')}</td>
                                 </tr>
                                 <tr>
-                                    <td className="p-3">Dokumente</td>
-                                    <td className="p-3 text-[#73726E]">Lebensläufe (CVs), Anschreiben</td>
-                                    <td className="p-3 text-[#73726E]">Dokumentgenerierung und -optimierung</td>
+                                    <td className="p-3">{t('s2_r3_cat')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s2_r3_ex')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s2_r3_purpose')}</td>
                                 </tr>
                                 <tr>
-                                    <td className="p-3">Nutzungsdaten</td>
-                                    <td className="p-3 text-[#73726E]">Einwilligungen (Consent), IP-Adresse, User Agent</td>
-                                    <td className="p-3 text-[#73726E]">DSGVO-Compliance, Sicherheit</td>
+                                    <td className="p-3">{t('s2_r4_cat')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s2_r4_ex')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s2_r4_purpose')}</td>
                                 </tr>
                                 <tr>
-                                    <td className="p-3">Job-Daten</td>
-                                    <td className="p-3 text-[#73726E]">Gesuchte Stellen, Bewerbungs-Historie</td>
-                                    <td className="p-3 text-[#73726E]">Job-Matching, Bewerbungsverfolgung</td>
+                                    <td className="p-3">{t('s2_r5_cat')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s2_r5_ex')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s2_r5_purpose')}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </section>
 
-                {/* 3. Rechtsgrundlage */}
+                {/* 3. Legal Basis */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">3. Rechtsgrundlage der Verarbeitung</h2>
+                    <h2 className="text-xl font-semibold mb-3">{t('s3_title')}</h2>
                     <ul className="space-y-2 text-sm">
-                        <li><strong>Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung):</strong> Verarbeitung deiner Daten zur Erbringung der Pathly-Dienste (Dokumentgenerierung, Job-Matching).</li>
-                        <li><strong>Art. 6 Abs. 1 lit. a DSGVO (Einwilligung):</strong> Für die KI-Verarbeitung deiner Daten holst du bei der Registrierung eine ausdrückliche Einwilligung.</li>
-                        <li><strong>Art. 6 Abs. 1 lit. f DSGVO (Berechtigtes Interesse):</strong> Für Sicherheitsmaßnahmen (Logging, Betrugsschutz).</li>
+                        <li><strong>{t('s3_b_label')}</strong> {t('s3_b_text')}</li>
+                        <li><strong>{t('s3_a_label')}</strong> {t('s3_a_text')}</li>
+                        <li><strong>{t('s3_f_label')}</strong> {t('s3_f_text')}</li>
                     </ul>
                 </section>
 
-                {/* 4. Weitergabe an Dritte / Sub-Processors */}
+                {/* 4. Sub-Processors */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">4. Weitergabe an Dritte & Auftragsverarbeiter</h2>
-                    <p className="mb-3">Wir übermitteln deine Daten ausschließlich an folgende Dienstleister, die vertraglich zur Einhaltung der DSGVO verpflichtet sind:</p>
+                    <h2 className="text-xl font-semibold mb-3">{t('s4_title')}</h2>
+                    <p className="mb-3">{t('s4_intro')}</p>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm border border-[#E7E7E5] rounded-lg">
                             <thead>
                                 <tr className="bg-[#F5F5F4]">
-                                    <th className="text-left p-3 font-medium">Anbieter</th>
-                                    <th className="text-left p-3 font-medium">Zweck</th>
-                                    <th className="text-left p-3 font-medium">Daten</th>
-                                    <th className="text-left p-3 font-medium">Standort</th>
+                                    <th className="text-left p-3 font-medium">{t('s4_col_provider')}</th>
+                                    <th className="text-left p-3 font-medium">{t('s4_col_purpose')}</th>
+                                    <th className="text-left p-3 font-medium">{t('s4_col_data')}</th>
+                                    <th className="text-left p-3 font-medium">{t('s4_col_location')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#E7E7E5]">
                                 <tr>
                                     <td className="p-3 font-medium">Supabase (AWS)</td>
-                                    <td className="p-3 text-[#73726E]">Datenbank & Authentifizierung</td>
-                                    <td className="p-3 text-[#73726E]">Alle User-Daten</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_supabase_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_supabase_data')}</td>
                                     <td className="p-3 text-[#73726E]">EU (Frankfurt)</td>
                                 </tr>
                                 <tr>
                                     <td className="p-3 font-medium">Anthropic (Claude)</td>
-                                    <td className="p-3 text-[#73726E]">KI-Textgenerierung (Anschreiben, CV-Analyse)</td>
-                                    <td className="p-3 text-[#73726E]">CV-Inhalte, Stellenbeschreibungen</td>
-                                    <td className="p-3 text-[#73726E]">USA (EU-SCC)</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_anthropic_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_anthropic_data')}</td>
+                                    <td className="p-3 text-[#73726E]">USA (EU-SCC, ZDR)</td>
                                 </tr>
                                 <tr>
                                     <td className="p-3 font-medium">OpenAI</td>
-                                    <td className="p-3 text-[#73726E]">Daten-Extraktion aus Stellenanzeigen</td>
-                                    <td className="p-3 text-[#73726E]">Stellenanzeigen-Texte</td>
-                                    <td className="p-3 text-[#73726E]">USA (EU-SCC)</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_openai_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_openai_data')}</td>
+                                    <td className="p-3 text-[#73726E]">USA (EU-SCC, ZDR)</td>
                                 </tr>
                                 <tr>
                                     <td className="p-3 font-medium">Perplexity</td>
-                                    <td className="p-3 text-[#73726E]">Unternehmensrecherche</td>
-                                    <td className="p-3 text-[#73726E]">Firmennamen (keine PII)</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_perplexity_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_perplexity_data')}</td>
                                     <td className="p-3 text-[#73726E]">USA (EU-SCC)</td>
                                 </tr>
                                 <tr>
                                     <td className="p-3 font-medium">SerpAPI</td>
-                                    <td className="p-3 text-[#73726E]">Job-Suche</td>
-                                    <td className="p-3 text-[#73726E]">Suchbegriffe (keine PII)</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_serpapi_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_serpapi_data')}</td>
                                     <td className="p-3 text-[#73726E]">USA (EU-SCC)</td>
                                 </tr>
                                 <tr>
                                     <td className="p-3 font-medium">Vercel</td>
-                                    <td className="p-3 text-[#73726E]">Hosting & CDN</td>
-                                    <td className="p-3 text-[#73726E]">HTTP-Requests, IP-Adressen</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_vercel_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_vercel_data')}</td>
                                     <td className="p-3 text-[#73726E]">EU (Frankfurt)</td>
+                                </tr>
+                                <tr>
+                                    <td className="p-3 font-medium">Azure Document Intelligence</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_azure_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_azure_data')}</td>
+                                    <td className="p-3 text-[#73726E]">EU (West Europe)</td>
+                                </tr>
+                                <tr>
+                                    <td className="p-3 font-medium">Firecrawl</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_firecrawl_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_firecrawl_data')}</td>
+                                    <td className="p-3 text-[#73726E]">USA</td>
+                                </tr>
+                                <tr>
+                                    <td className="p-3 font-medium">Jina AI (Reader)</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_jina_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_jina_data')}</td>
+                                    <td className="p-3 text-[#73726E]">EU/USA</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                     <p className="text-sm text-[#73726E] mt-3">
-                        Für US-basierte Anbieter bestehen EU-Standardvertragsklauseln (Standard Contractual Clauses / SCC) als Rechtsgrundlage für den Datentransfer.
+                        {t('s4_scc_note')}
                     </p>
                 </section>
 
-                {/* 5. KI-Transparenz */}
+                {/* 5. AI Transparency */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">5. KI-Verarbeitung & Transparenz (EU AI Act)</h2>
+                    <h2 className="text-xl font-semibold mb-3">{t('s5_title')}</h2>
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                        <p className="text-sm font-medium text-blue-800 mb-2">Transparenzhinweis gemäß EU AI Act</p>
-                        <p className="text-sm text-blue-700">
-                            Pathly nutzt Künstliche Intelligenz zur Generierung von Bewerbungsschreiben und zur Analyse von Lebensläufen.
-                            Alle KI-generierten Texte werden als solche gekennzeichnet.
-                        </p>
+                        <p className="text-sm font-medium text-blue-800 mb-2">{t('s5_notice_title')}</p>
+                        <p className="text-sm text-blue-700">{t('s5_notice_body')}</p>
                     </div>
                     <ul className="space-y-3 text-sm">
                         <li>
-                            <strong>Kein Training mit deinen Daten:</strong> Wir und unsere KI-Partner (Anthropic, OpenAI) verwenden deine persönlichen Daten und Lebensläufe <em>nicht</em> zum Training von KI-Modellen.
-                            Die API-Nutzung ist so konfiguriert, dass Training mit Nutzerdaten ausgeschlossen ist.
+                            <strong>{t('s5_no_training_label')}</strong> {t('s5_no_training_text')}
                         </li>
                         <li>
-                            <strong>Menschliche Aufsicht (Human Oversight):</strong> KI-generierte Inhalte können Fehler enthalten.
-                            Du bist verantwortlich, alle generierten Bewerbungen vor dem Absenden auf Richtigkeit zu prüfen.
-                            Pathly sendet keine Bewerbung automatisch ab — du behältst immer die Kontrolle.
+                            <strong>{t('s5_human_label')}</strong> {t('s5_human_text')}
                         </li>
                         <li>
-                            <strong>PII-Pseudonymisierung:</strong> Bevor dein Lebenslauf an KI-Modelle übermittelt wird,
-                            werden personenbezogene Daten (Name, Adresse, Kontaktdaten) vom Inhalt getrennt und pseudonymisiert.
+                            <strong>{t('s5_docs_label')}</strong> {t('s5_docs_text')}
+                        </li>
+                        <li>
+                            <strong>{t('s5_coaching_label')}</strong> {t('s5_coaching_text')}
                         </li>
                     </ul>
                 </section>
 
-                {/* 6. Speicherung & Löschung */}
+                {/* 6. Retention */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">6. Speicherdauer & Löschung</h2>
+                    <h2 className="text-xl font-semibold mb-3">{t('s6_title')}</h2>
                     <ul className="space-y-2 text-sm">
-                        <li><strong>Account-Daten:</strong> Solange dein Account existiert.</li>
-                        <li><strong>Dokumente (CVs, Anschreiben):</strong> Solange dein Account existiert. Bei Account-Löschung werden alle Dokumente innerhalb von 30 Tagen unwiderruflich gelöscht.</li>
-                        <li><strong>Job-Daten & Bewerbungs-Historie:</strong> Solange dein Account existiert.</li>
-                        <li><strong>KI-Verarbeitungsprotokolle:</strong> 90 Tage nach Erstellung (für Qualitätssicherung). Danach automatische Löschung.</li>
-                        <li><strong>Consent-Historie:</strong> Wird aus rechtlichen Gründen (DSGVO Art. 7) auch nach Account-Löschung für 3 Jahre aufbewahrt.</li>
+                        <li><strong>{t('s6_account_label')}</strong> {t('s6_account_text')}</li>
+                        <li><strong>{t('s6_docs_label')}</strong> {t('s6_docs_text')}</li>
+                        <li><strong>{t('s6_jobs_label')}</strong> {t('s6_jobs_text')}</li>
+                        <li><strong>{t('s6_ai_label')}</strong> {t('s6_ai_text')}</li>
+                        <li><strong>{t('s6_coaching_label')}</strong> {t('s6_coaching_text')}</li>
+                        <li><strong>{t('s6_consent_label')}</strong> {t('s6_consent_text')}</li>
                     </ul>
                 </section>
 
-                {/* 7. Datensicherheit */}
+                {/* 7. Security */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">7. Datensicherheit</h2>
+                    <h2 className="text-xl font-semibold mb-3">{t('s7_title')}</h2>
                     <ul className="space-y-2 text-sm">
-                        <li><strong>Verschlüsselung:</strong> Alle Daten werden im Ruhezustand mit AES-256 verschlüsselt. Die Übertragung erfolgt ausschließlich über TLS 1.3.</li>
-                        <li><strong>Zugriffskontrolle:</strong> Row Level Security (RLS) stellt sicher, dass jeder Nutzer nur seine eigenen Daten sehen kann.</li>
-                        <li><strong>Standort:</strong> Alle primären Daten werden in der EU (AWS Frankfurt, eu-central-1) gespeichert.</li>
+                        <li><strong>{t('s7_encryption_label')}</strong> {t('s7_encryption_text')}</li>
+                        <li><strong>{t('s7_rls_label')}</strong> {t('s7_rls_text')}</li>
+                        <li><strong>{t('s7_location_label')}</strong> {t('s7_location_text')}</li>
+                        <li><strong>{t('s7_pii_label')}</strong> {t('s7_pii_text')}</li>
                     </ul>
                 </section>
 
-                {/* 8. Deine Rechte */}
+                {/* 8. Your Rights */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">8. Deine Rechte (DSGVO Art. 12–22)</h2>
-                    <p className="mb-3 text-sm">Du hast folgende Rechte bezüglich deiner personenbezogenen Daten:</p>
+                    <h2 className="text-xl font-semibold mb-3">{t('s8_title')}</h2>
+                    <p className="mb-3 text-sm">{t('s8_intro')}</p>
                     <ul className="space-y-2 text-sm">
-                        <li><strong>Auskunftsrecht (Art. 15):</strong> Du kannst jederzeit Auskunft über deine gespeicherten Daten anfordern. Nutze dafür die Funktion &quot;Export My Data&quot; in den Sicherheitseinstellungen.</li>
-                        <li><strong>Recht auf Berichtigung (Art. 16):</strong> Du kannst fehlerhafte Daten in deinen Einstellungen selbst korrigieren.</li>
-                        <li><strong>Recht auf Löschung (Art. 17):</strong> Du kannst die Löschung deines Accounts und aller zugehörigen Daten beantragen.</li>
-                        <li><strong>Recht auf Einschränkung (Art. 18):</strong> Du kannst die Einschränkung der Verarbeitung deiner Daten verlangen.</li>
-                        <li><strong>Recht auf Datenübertragbarkeit (Art. 20):</strong> Du kannst deine Daten in einem maschinenlesbaren Format (JSON) exportieren.</li>
-                        <li><strong>Widerspruchsrecht (Art. 21):</strong> Du kannst der Verarbeitung deiner Daten jederzeit widersprechen.</li>
-                        <li><strong>Recht auf Widerruf der Einwilligung (Art. 7 Abs. 3):</strong> Du kannst deine Einwilligung zur KI-Verarbeitung jederzeit widerrufen.</li>
+                        <li><strong>{t('s8_r15_label')}</strong> {t('s8_r15_text')}</li>
+                        <li><strong>{t('s8_r16_label')}</strong> {t('s8_r16_text')}</li>
+                        <li><strong>{t('s8_r17_label')}</strong> {t('s8_r17_text')}</li>
+                        <li><strong>{t('s8_r18_label')}</strong> {t('s8_r18_text')}</li>
+                        <li><strong>{t('s8_r20_label')}</strong> {t('s8_r20_text')}</li>
+                        <li><strong>{t('s8_r21_label')}</strong> {t('s8_r21_text')}</li>
+                        <li><strong>{t('s8_r7_label')}</strong> {t('s8_r7_text')}</li>
                     </ul>
-                    <p className="text-sm text-[#73726E] mt-3">
-                        Zur Ausübung deiner Rechte kontaktiere uns unter: <strong>kontakt@pathly.app</strong>
-                    </p>
+                    <p className="text-sm text-[#73726E] mt-3">{t('s8_contact')}</p>
                 </section>
 
-                {/* 9. Beschwerderecht */}
+                {/* 9. Supervisory Authority */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">9. Beschwerderecht bei der Aufsichtsbehörde</h2>
-                    <p className="text-sm">
-                        Du hast das Recht, dich bei einer Datenschutzaufsichtsbehörde zu beschweren,
-                        wenn du der Meinung bist, dass die Verarbeitung deiner personenbezogenen Daten gegen die DSGVO verstößt.
-                        Die zuständige Aufsichtsbehörde richtet sich nach deinem Wohnort bzw. dem Sitz des Verantwortlichen.
-                    </p>
+                    <h2 className="text-xl font-semibold mb-3">{t('s9_title')}</h2>
+                    <p className="text-sm">{t('s9_body')}</p>
                 </section>
 
                 {/* 10. Cookies */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">10. Cookies</h2>
-                    <p className="text-sm">
-                        Pathly verwendet ausschließlich <strong>technisch notwendige Cookies</strong> für die Authentifizierung und Session-Verwaltung.
-                        Es werden keine Tracking-Cookies, Analyse-Cookies oder Werbe-Cookies eingesetzt. Ein Cookie-Banner ist daher nicht erforderlich.
-                    </p>
+                    <h2 className="text-xl font-semibold mb-3">{t('s10_title')}</h2>
+                    <p className="text-sm">{t('s10_body')}</p>
                 </section>
 
-                {/* 11. Änderungen */}
+                {/* 11. Changes */}
                 <section>
-                    <h2 className="text-xl font-semibold mb-3">11. Änderungen dieser Datenschutzerklärung</h2>
-                    <p className="text-sm">
-                        Bei wesentlichen Änderungen an dieser Datenschutzerklärung wirst du per E-Mail oder per In-App-Benachrichtigung informiert
-                        und ggf. um erneute Einwilligung gebeten. Die aktuelle Version ist immer unter{' '}
-                        <span className="font-medium">/legal/privacy-policy</span> einsehbar.
-                    </p>
+                    <h2 className="text-xl font-semibold mb-3">{t('s11_title')}</h2>
+                    <p className="text-sm">{t('s11_body')}</p>
                 </section>
             </div>
 

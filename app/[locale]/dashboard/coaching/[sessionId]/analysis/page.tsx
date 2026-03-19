@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { useTranslations } from 'next-intl';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft,
     Star,
@@ -35,17 +36,24 @@ const TAG_COLORS: Record<DimensionLevel, { bg: string; text: string }> = {
     red: { bg: '#F8D7DA', text: '#721C24' },
 };
 
-/** Key terms to auto-bold in text that lacks markdown bold markers */
+/** Key terms to auto-bold in text that lacks markdown bold markers.
+ * Only universal/cross-language terms are listed here — DE-specific terms only apply
+ * to legacy reports generated before the i18n prompt fix (2026-03-19).
+ * New reports from all locales use **bold** markdown and don't need auto-bolding.
+ */
 const BOLD_KEYWORDS = [
-    'STAR-Methode', 'Kundenmanagement', 'Erwartungsmanagement', 'Stakeholder',
+    // Universal technical terms (appear in all locales)
+    'STAR', 'B2B', 'Co-Founder', 'Storytelling', 'Account Management',
+    'Stakeholder', 'KPI', 'Hands-on', 'Entrepreneurship', 'Cultural Fit',
+    // German legacy report terms (for backward compatibility with pre-fix reports)
+    'STAR-Methode', 'Kundenmanagement', 'Erwartungsmanagement',
     'Transparenz', 'Lösungsorientierung', 'Kommunikation', 'Selbstreflexion',
-    'Authentizität', 'Cultural Fit', 'Problemlösung', 'Praxisbeispiele',
-    'konkrete Beispiele', 'strukturierte', 'Verhandlungsführung', 'Storytelling',
-    'Account Management', 'Führung', 'Strategie', 'Überzeugungskraft',
-    'Kundenzentrierung', 'B2B', 'Kundenbedürfnisse', 'Grundprinzipien',
-    'Hands-on', 'Entrepreneurship', 'Co-Founder', 'Fallstudien', 'Metriken',
-    'Füllwörter', 'STAR', 'Situation', 'Task', 'Action', 'Result',
-    'konzeptionell', 'improvisiert', 'Nachfragen', 'Grenzen', 'Learnings',
+    'Authentizität', 'Problemlösung', 'Praxisbeispiele',
+    'konkrete Beispiele', 'strukturierte', 'Verhandlungsführung',
+    'Führung', 'Strategie', 'Überzeugungskraft',
+    'Kundenzentrierung', 'Kundenbedürfnisse', 'Grundprinzipien',
+    'Fallstudien', 'Metriken', 'Füllwörter',
+    'konzeptionell', 'improvisiert', 'Nachfragen', 'Learnings',
     'souverän', 'selbstbewusst', 'vorsichtig', 'Reife', 'Lernfähigkeit',
 ];
 
@@ -68,6 +76,7 @@ export default function CoachingAnalysisPage() {
     const params = useParams();
     const router = useRouter();
     const sessionId = params.sessionId as string;
+    const t = useTranslations('dashboard.coaching.analysis');
 
     const [report, setReport] = useState<FeedbackReport | null>(null);
     const [loading, setLoading] = useState(true);
@@ -78,17 +87,18 @@ export default function CoachingAnalysisPage() {
     const [savingTopics, setSavingTopics] = useState<Record<number, boolean>>({});
     const [expandedQuotes, setExpandedQuotes] = useState<Record<number, boolean>>({});
     const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
+    const [openSections, setOpenSections] = useState<Record<number, boolean>>({ 1: true, 2: false, 3: false, 4: false });
     const pollRef = useRef<NodeJS.Timeout | null>(null);
     const pollStartTimeRef = useRef<number | null>(null);
 
     // Step-by-step progress for analysis
-    const ANALYSIS_STEPS = [
-        'Interview-Daten werden geladen',
-        'Antworten werden bewertet',
-        'Stärken werden identifiziert',
-        'Verbesserungen werden formuliert',
-        'Feedback-Report wird finalisiert',
-    ];
+    const ANALYSIS_STEPS = useMemo(() => [
+        t('analysis_step_1'),
+        t('analysis_step_2'),
+        t('analysis_step_3'),
+        t('analysis_step_4'),
+        t('analysis_step_5'),
+    ], [t]);
     const [analysisStep, setAnalysisStep] = useState(0);
     const analysisStepTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -217,7 +227,7 @@ export default function CoachingAnalysisPage() {
                 overallScore: 0,
                 topStrength: '',
                 recommendation: '',
-                summary: 'Der Report konnte nicht korrekt geladen werden. Bitte starte eine neue Session.',
+                summary: t('report_error'),
                 dimensions: [],
                 strengths: [],
                 improvements: [],
@@ -328,10 +338,10 @@ export default function CoachingAnalysisPage() {
                         <>
                             <AlertCircle className="h-6 w-6 mx-auto text-red-400" />
                             <p className="text-sm mt-3 font-medium" style={{ color: TEXT }}>
-                                Die Analyse hat zu lange gedauert.
+                                {t('analysis_timeout')}
                             </p>
                             <p className="text-xs mt-1" style={{ color: MUTED }}>
-                                Bitte versuche es später erneut oder gehe zurück.
+                                {t('analysis_timeout_desc')}
                             </p>
                         </>
                     ) : (
@@ -340,8 +350,8 @@ export default function CoachingAnalysisPage() {
                             <div className="flex items-center gap-3 mb-6">
                                 <Loader2 className="w-6 h-6 animate-spin shrink-0" style={{ color: BLUE }} />
                                 <div>
-                                    <p className="text-sm font-semibold" style={{ color: BLUE }}>Analyse wird erstellt…</p>
-                                    <p className="text-xs mt-0.5" style={{ color: MUTED }}>Das dauert ca. 10–15 Sekunden</p>
+                                    <p className="text-sm font-semibold" style={{ color: BLUE }}>{t('analysis_loading')}</p>
+                                    <p className="text-xs mt-0.5" style={{ color: MUTED }}>{t('analysis_time')}</p>
                                 </div>
                             </div>
 
@@ -397,9 +407,9 @@ export default function CoachingAnalysisPage() {
                         }}
                     >
                         {analysisTimedOut ? (
-                            <><ArrowLeft className="w-3.5 h-3.5" /> Zurück zur Übersicht</>
+                            <><ArrowLeft className="w-3.5 h-3.5" /> {t('back_overview')}</>
                         ) : (
-                            <><XCircle className="w-3.5 h-3.5" /> Abbrechen</>
+                            <><XCircle className="w-3.5 h-3.5" /> {t('cancel_btn')}</>
                         )}
                     </button>
                     {analysisTimedOut && (
@@ -416,7 +426,7 @@ export default function CoachingAnalysisPage() {
                                 background: 'transparent',
                             }}
                         >
-                            Erneut versuchen
+                            {t('retry')}
                         </button>
                     )}
                 </div>
@@ -457,7 +467,7 @@ export default function CoachingAnalysisPage() {
                         <ArrowLeft className="h-5 w-5" style={{ color: MUTED }} />
                     </button>
                     <div>
-                        <h1 className="text-2xl font-bold" style={{ color: TEXT }}>Interview Analyse</h1>
+                        <h1 className="text-2xl font-bold" style={{ color: TEXT }}>{t('title')}</h1>
                         <p className="text-sm" style={{ color: MUTED }}>{jobTitle} · {companyName}</p>
                     </div>
                 </div>
@@ -465,10 +475,10 @@ export default function CoachingAnalysisPage() {
                 <div className="rounded-xl p-6 text-center" style={{ background: BLUE_LIGHT, border: `1px solid ${BLUE}22` }}>
                     <AlertCircle className="h-8 w-8 mx-auto mb-3" style={{ color: BLUE }} />
                     <p className="text-sm font-medium" style={{ color: TEXT }}>
-                        Die Analyse konnte nicht korrekt erstellt werden.
+                        {t('broken_title')}
                     </p>
                     <p className="text-xs mt-1 mb-4" style={{ color: MUTED }}>
-                        Du musst das Interview nicht wiederholen — klicke einfach auf den Button.
+                        {t('broken_desc')}
                     </p>
                     <button
                         onClick={regenerateReport}
@@ -477,15 +487,17 @@ export default function CoachingAnalysisPage() {
                         style={{ background: BLUE }}
                     >
                         {regenerating ? (
-                            <><Loader2 className="h-4 w-4 animate-spin" /> Wird generiert...</>
+                            <><Loader2 className="h-4 w-4 animate-spin" /> {t('regenerating')}</>
                         ) : (
-                            'Analyse neu generieren'
+                            t('regenerate_btn')
                         )}
                     </button>
                 </div>
             </div>
         );
     }
+
+    const toggleSection = (id: number) => setOpenSections(prev => ({ ...prev, [id]: !prev[id] }));
 
     return (
         <div className="max-w-3xl pb-16">
@@ -499,7 +511,7 @@ export default function CoachingAnalysisPage() {
                 </button>
                 <div>
                     <h1 className="text-2xl font-bold" style={{ color: TEXT }}>
-                        Interview Analyse
+                        {t('title')}
                     </h1>
                     <p className="text-sm" style={{ color: MUTED }}>
                         {jobTitle} · {companyName}
@@ -507,374 +519,435 @@ export default function CoachingAnalysisPage() {
                 </div>
             </div>
 
-            {/* ─── Overall Score (Bullet Points) ──────────────────────── */}
-            <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-xl p-5 mb-6"
-                style={{ background: BLUE_LIGHT, border: `1px solid ${BLUE}22` }}
-            >
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <p className="text-xs font-medium uppercase tracking-wider" style={{ color: BLUE }}>
-                            Gesamtbewertung
-                        </p>
-                        <p className="text-4xl font-bold mt-1" style={{ color: BLUE }}>
-                            {report.overallScore}<span className="text-lg font-normal">/10</span>
-                        </p>
-                    </div>
-                    <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: `${BLUE}15` }}>
-                        <Star className="h-8 w-8" style={{ color: BLUE }} />
-                    </div>
+            {/* ─── Table-style toggle sections ─────────────────────────── */}
+            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
+
+                {/* ── Section 1: Overall Score ─────────────────────────── */}
+                <div style={{ borderBottom: `1px solid ${BORDER}` }}>
+                    <button
+                        onClick={() => toggleSection(1)}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors hover:bg-[#F7F6F5] group"
+                    >
+                        <motion.div
+                            animate={{ rotate: openSections[1] ? 90 : 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="shrink-0"
+                        >
+                            <ChevronRight className="w-3.5 h-3.5 text-[#A8A29E]" />
+                        </motion.div>
+                        <span className="text-sm font-medium" style={{ color: TEXT }}>
+                            {t('overall_score')}
+                        </span>
+                    </button>
+
+
+                    <AnimatePresence initial={false}>
+                        {openSections[1] && (
+                            <motion.div
+                                key="s1"
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.18 }}
+                                className="overflow-hidden"
+                            >
+                                <div className="px-6 pb-5 pt-1">
+                                    {(report.whatWorked || report.whatWasMissing || report.recruiterAdvice) ? (
+                                        <div className="space-y-3">
+                                            {report.whatWorked && (
+                                                <div className="rounded-lg px-4 py-3 border-l-4" style={{ borderLeftColor: '#16a34a', background: '#f0fdf4' }}>
+                                                    <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#15803d' }}>{t('what_worked')}</p>
+                                                    <p className="text-sm leading-relaxed" style={{ color: TEXT }}>{report.whatWorked}</p>
+                                                </div>
+                                            )}
+                                            {report.whatWasMissing && (
+                                                <div className="rounded-lg px-4 py-3 border-l-4" style={{ borderLeftColor: '#ea580c', background: '#fff7ed' }}>
+                                                    <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>{t('what_missing')}</p>
+                                                    <p className="text-sm leading-relaxed" style={{ color: TEXT }}>{report.whatWasMissing}</p>
+                                                </div>
+                                            )}
+                                            {report.recruiterAdvice && (
+                                                <div className="rounded-lg px-4 py-3 border-l-4" style={{ borderLeftColor: BLUE, background: `${BLUE}0D` }}>
+                                                    <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: BLUE }}>{t('recommendation')}</p>
+                                                    <p className="text-sm leading-relaxed" style={{ color: TEXT }}>{report.recruiterAdvice}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {report.topStrength && (
+                                                <div className="flex items-start gap-2">
+                                                    <TrendingUp className="h-4 w-4 mt-0.5 shrink-0" style={{ color: BLUE }} />
+                                                    <p className="text-sm leading-relaxed" style={{ color: TEXT }}
+                                                        dangerouslySetInnerHTML={{ __html: renderBold(report.topStrength) }} />
+                                                </div>
+                                            )}
+                                            {report.recommendation && (
+                                                <div className="flex items-start gap-2">
+                                                    <Target className="h-4 w-4 mt-0.5 shrink-0 text-orange-500" />
+                                                    <p className="text-sm leading-relaxed" style={{ color: TEXT }}
+                                                        dangerouslySetInnerHTML={{ __html: renderBold(report.recommendation) }} />
+                                                </div>
+                                            )}
+                                            {!report.topStrength && !report.recommendation && report.summary && (
+                                                <p className="text-sm" style={{ color: TEXT }}>{report.summary}</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
-                {/* Recruiter-style feedback (new fields) */}
-                {(report.whatWorked || report.whatWasMissing || report.recruiterAdvice) ? (
-                    <div className="space-y-3 mt-2">
-                        {report.whatWorked && (
-                            <div className="rounded-lg px-4 py-3 border-l-4" style={{ borderLeftColor: '#16a34a', background: '#f0fdf4' }}>
-                                <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#15803d' }}>Was gut lief</p>
-                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}>{report.whatWorked}</p>
-                            </div>
-                        )}
-                        {report.whatWasMissing && (
-                            <div className="rounded-lg px-4 py-3 border-l-4" style={{ borderLeftColor: '#ea580c', background: '#fff7ed' }}>
-                                <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>Was gefehlt hat</p>
-                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}>{report.whatWasMissing}</p>
-                            </div>
-                        )}
-                        {report.recruiterAdvice && (
-                            <div className="rounded-lg px-4 py-3 border-l-4" style={{ borderLeftColor: BLUE, background: `${BLUE}0D` }}>
-                                <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: BLUE }}>Empfehlung</p>
-                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}>{report.recruiterAdvice}</p>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    /* Fallback for older reports without new fields */
-                    <div className="space-y-2 mt-2">
-                        {report.topStrength && (
-                            <div className="flex items-start gap-2">
-                                <TrendingUp className="h-4 w-4 mt-0.5 shrink-0" style={{ color: BLUE }} />
-                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}
-                                    dangerouslySetInnerHTML={{ __html: renderBold(report.topStrength) }} />
-                            </div>
-                        )}
-                        {report.recommendation && (
-                            <div className="flex items-start gap-2">
-                                <Target className="h-4 w-4 mt-0.5 shrink-0 text-orange-500" />
-                                <p className="text-sm leading-relaxed" style={{ color: TEXT }}
-                                    dangerouslySetInnerHTML={{ __html: renderBold(report.recommendation) }} />
-                            </div>
-                        )}
-                        {!report.topStrength && !report.recommendation && report.summary && (
-                            <p className="text-sm" style={{ color: TEXT }}>{report.summary}</p>
-                        )}
+                {/* ── Section 2: In Detail ─────────────────────────────── */}
+                {report.dimensions && report.dimensions.length > 0 && (
+                    <div style={{ borderBottom: `1px solid ${BORDER}` }}>
+                        <button
+                            onClick={() => toggleSection(2)}
+                            className="w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors hover:bg-[#F7F6F5]"
+                        >
+                            <motion.div
+                                animate={{ rotate: openSections[2] ? 90 : 0 }}
+                                transition={{ duration: 0.15 }}
+                                className="shrink-0"
+                            >
+                                <ChevronRight className="w-3.5 h-3.5 text-[#A8A29E]" />
+                            </motion.div>
+                            <span className="text-sm font-medium" style={{ color: TEXT }}>
+                                {t('in_detail')}
+                            </span>
+                            <span className="ml-auto text-xs" style={{ color: MUTED }}>
+                                {report.dimensions.length}
+                            </span>
+                        </button>
+
+                        <AnimatePresence initial={false}>
+                            {openSections[2] && (
+                                <motion.div
+                                    key="s2"
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.18 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="px-4 pb-4 pt-1 space-y-3">
+                                        {report.dimensions.map((dim, i) => {
+                                            const tagColor = TAG_COLORS[dim.level as DimensionLevel] || TAG_COLORS.yellow;
+                                            const isQuoteOpen = expandedQuotes[i] || false;
+
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className="rounded-xl p-4"
+                                                    style={{ border: `1px solid ${BORDER}` }}
+                                                >
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <span className="text-sm font-semibold" style={{ color: TEXT }}>{dim.name}</span>
+                                                        <span
+                                                            className="text-xs font-medium px-3 py-1 rounded-full"
+                                                            style={{ background: tagColor.bg, color: tagColor.text }}
+                                                        >
+                                                            {dim.tag}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        {dim.observation && (
+                                                            <div className="flex items-start gap-2">
+                                                                <span className="text-xs font-semibold shrink-0 mt-0.5 w-24" style={{ color: BLUE }}>{t('we_see')}</span>
+                                                                <p className="text-sm" style={{ color: TEXT }} dangerouslySetInnerHTML={{ __html: renderBold(dim.observation) }} />
+                                                            </div>
+                                                        )}
+                                                        {dim.reason && (
+                                                            <div className="flex items-start gap-2">
+                                                                <span className="text-xs font-semibold shrink-0 mt-0.5 w-24" style={{ color: MUTED }}>{t('because')}</span>
+                                                                <p className="text-sm" style={{ color: TEXT }} dangerouslySetInnerHTML={{ __html: renderBold(dim.reason) }} />
+                                                            </div>
+                                                        )}
+                                                        {dim.suggestion && (
+                                                            <div className="flex items-start gap-2">
+                                                                <span className="text-xs font-semibold shrink-0 mt-0.5 w-24" style={{ color: '#2E7D32' }}>{t('we_recommend')}</span>
+                                                                <p className="text-sm" style={{ color: TEXT }} dangerouslySetInnerHTML={{ __html: renderBold(dim.suggestion) }} />
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {!dim.observation && !dim.reason && !dim.suggestion && dim.feedback && (
+                                                        <p className="text-sm" style={{ color: TEXT }} dangerouslySetInnerHTML={{ __html: renderBold(dim.feedback) }} />
+                                                    )}
+
+                                                    {dim.quote && (
+                                                        <div className="mt-3">
+                                                            <button
+                                                                onClick={() => toggleQuote(i)}
+                                                                className="flex items-center gap-1.5 text-xs transition-colors hover:opacity-80"
+                                                                style={{ color: MUTED }}
+                                                            >
+                                                                <MessageSquareQuote className="h-3.5 w-3.5" />
+                                                                <span>{t('show_quote')}</span>
+                                                                <ChevronDown
+                                                                    className="h-3 w-3 transition-transform"
+                                                                    style={{ transform: isQuoteOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                                                                />
+                                                            </button>
+                                                            {isQuoteOpen && (
+                                                                <motion.div
+                                                                    initial={{ opacity: 0, height: 0 }}
+                                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                                    exit={{ opacity: 0, height: 0 }}
+                                                                    className="mt-2 rounded-lg px-3 py-2.5 border-l-[3px]"
+                                                                    style={{ background: '#F7F6F5', borderLeftColor: BLUE }}
+                                                                >
+                                                                    <p className="text-sm italic" style={{ color: MUTED }}>
+                                                                        &ldquo;{dim.quote}&rdquo;
+                                                                    </p>
+                                                                </motion.div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 )}
-            </motion.div>
 
-            {/* ─── Im Detail (Colored Tags) ─────────────────────────── */}
-            {report.dimensions && report.dimensions.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="mb-8"
-                >
-                    <p className="text-xs font-semibold uppercase tracking-widest mb-5" style={{ color: MUTED }}>
-                        Im Detail
-                    </p>
-                    <div className="space-y-5">
-                        {report.dimensions.map((dim, i) => {
-                            const tagColor = TAG_COLORS[dim.level as DimensionLevel] || TAG_COLORS.yellow;
-                            const isQuoteOpen = expandedQuotes[i] || false;
+                {/* ── Section 3: In General (Strengths + Improvements) ─── */}
+                {((report.strengths && report.strengths.length > 0) || (report.improvements && report.improvements.length > 0)) && (
+                    <div style={{ borderBottom: `1px solid ${BORDER}` }}>
+                        <button
+                            onClick={() => toggleSection(3)}
+                            className="w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors hover:bg-[#F7F6F5]"
+                        >
+                            <motion.div
+                                animate={{ rotate: openSections[3] ? 90 : 0 }}
+                                transition={{ duration: 0.15 }}
+                                className="shrink-0"
+                            >
+                                <ChevronRight className="w-3.5 h-3.5 text-[#A8A29E]" />
+                            </motion.div>
+                            <span className="text-sm font-medium" style={{ color: TEXT }}>
+                                {t('in_general')}
+                            </span>
+                        </button>
 
-                            return (
+                        <AnimatePresence initial={false}>
+                            {openSections[3] && (
                                 <motion.div
-                                    key={i}
-                                    initial={{ opacity: 0, y: 8 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.05 * i }}
-                                    className="rounded-xl p-4"
-                                    style={{ border: `1px solid ${BORDER}` }}
+                                    key="s3"
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.18 }}
+                                    className="overflow-hidden"
                                 >
-                                    {/* Header: Name + Tag */}
-                                    <div className="flex items-center justify-between mb-3">
-                                        <span className="text-base font-semibold" style={{ color: TEXT }}>
-                                            {dim.name}
-                                        </span>
-                                        <span
-                                            className="text-xs font-medium px-3 py-1 rounded-full"
-                                            style={{ background: tagColor.bg, color: tagColor.text }}
-                                        >
-                                            {dim.tag}
-                                        </span>
-                                    </div>
-
-                                    {/* Structured Feedback: Wir sehen / Das liegt daran / Wir empfehlen */}
-                                    <div className="space-y-2">
-                                        {dim.observation && (
-                                            <div className="flex items-start gap-2">
-                                                <span className="text-xs font-semibold shrink-0 mt-0.5 w-24" style={{ color: BLUE }}>Wir sehen:</span>
-                                                <p
-                                                    className="text-sm"
-                                                    style={{ color: TEXT }}
-                                                    dangerouslySetInnerHTML={{ __html: renderBold(dim.observation) }}
-                                                />
-                                            </div>
-                                        )}
-                                        {dim.reason && (
-                                            <div className="flex items-start gap-2">
-                                                <span className="text-xs font-semibold shrink-0 mt-0.5 w-24" style={{ color: MUTED }}>Das liegt daran:</span>
-                                                <p
-                                                    className="text-sm"
-                                                    style={{ color: TEXT }}
-                                                    dangerouslySetInnerHTML={{ __html: renderBold(dim.reason) }}
-                                                />
-                                            </div>
-                                        )}
-                                        {dim.suggestion && (
-                                            <div className="flex items-start gap-2">
-                                                <span className="text-xs font-semibold shrink-0 mt-0.5 w-24" style={{ color: '#2E7D32' }}>Wir empfehlen:</span>
-                                                <p
-                                                    className="text-sm"
-                                                    style={{ color: TEXT }}
-                                                    dangerouslySetInnerHTML={{ __html: renderBold(dim.suggestion) }}
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Fallback: old-style feedback if no observation/reason/suggestion */}
-                                    {!dim.observation && !dim.reason && !dim.suggestion && dim.feedback && (
-                                        <p className="text-sm" style={{ color: TEXT }}
-                                            dangerouslySetInnerHTML={{ __html: renderBold(dim.feedback) }}
-                                        />
-                                    )}
-
-                                    {/* Collapsible Quote Evidence */}
-                                    {dim.quote && (
-                                        <div className="mt-3">
-                                            <button
-                                                onClick={() => toggleQuote(i)}
-                                                className="flex items-center gap-1.5 text-xs transition-colors hover:opacity-80"
-                                                style={{ color: MUTED }}
-                                            >
-                                                <MessageSquareQuote className="h-3.5 w-3.5" />
-                                                <span>Zitat anzeigen</span>
-                                                <ChevronDown
-                                                    className="h-3 w-3 transition-transform"
-                                                    style={{ transform: isQuoteOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                                                />
-                                            </button>
-                                            {isQuoteOpen && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, height: 0 }}
-                                                    animate={{ opacity: 1, height: 'auto' }}
-                                                    exit={{ opacity: 0, height: 0 }}
-                                                    className="mt-2 rounded-lg px-3 py-2.5 border-l-[3px]"
-                                                    style={{ background: '#F7F6F5', borderLeftColor: BLUE }}
-                                                >
-                                                    <p className="text-sm italic" style={{ color: MUTED }}>
-                                                        &ldquo;{dim.quote}&rdquo;
+                                    <div className="px-4 pb-4 pt-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {report.strengths && report.strengths.length > 0 && (
+                                            <div className="rounded-xl p-4" style={{ border: `1px solid ${BORDER}` }}>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <TrendingUp className="h-4 w-4" style={{ color: BLUE }} />
+                                                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: BLUE }}>
+                                                        {t('convincing')}
                                                     </p>
-                                                </motion.div>
-                                            )}
-                                        </div>
-                                    )}
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                </motion.div>
-            )}
-
-            {/* ─── Überzeugend + Verbesserungspotenzial (Side-by-Side) ── */}
-            {((report.strengths && report.strengths.length > 0) || (report.improvements && report.improvements.length > 0)) && (
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"
-                >
-                    {/* Left: Überzeugend */}
-                    {report.strengths && report.strengths.length > 0 && (
-                        <div className="rounded-xl p-4" style={{ border: `1px solid ${BORDER}` }}>
-                            <div className="flex items-center gap-2 mb-3">
-                                <TrendingUp className="h-4 w-4" style={{ color: BLUE }} />
-                                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: BLUE }}>
-                                    Überzeugend
-                                </p>
-                            </div>
-                            <ul className="space-y-2">
-                                {report.strengths.map((s, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-sm" style={{ color: TEXT }}>
-                                        <CheckCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BLUE }} />
-                                        <span dangerouslySetInnerHTML={{ __html: renderBold(s) }} />
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
-                    {/* Right: Verbesserungspotenzial */}
-                    {report.improvements && report.improvements.length > 0 && (
-                        <div className="rounded-xl p-4" style={{ border: `1px solid ${BORDER}` }}>
-                            <div className="flex items-center gap-2 mb-3">
-                                <Target className="h-4 w-4" style={{ color: BLUE }} />
-                                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: BLUE }}>
-                                    Verbesserungspotenzial
-                                </p>
-                            </div>
-                            <div className="space-y-3">
-                                {report.improvements.map((imp, i) => {
-                                    const item = typeof imp === 'string' ? { title: imp, bad: '', good: '' } : imp;
-                                    return (
-                                        <div key={i}>
-                                            {item.bad || item.good ? (
-                                                <div className="rounded-lg p-2.5" style={{ background: '#F7F6F5' }}>
-                                                    {item.bad && (
-                                                        <div className="flex items-start gap-2 mb-1">
-                                                            <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BLUE }} />
-                                                            <p className="text-xs" style={{ color: MUTED }}>
-                                                                <em>&ldquo;{item.bad}&rdquo;</em>
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                    {item.good && (
-                                                        <div className="flex items-start gap-2">
+                                                </div>
+                                                <ul className="space-y-2">
+                                                    {report.strengths.map((s, i) => (
+                                                        <li key={i} className="flex items-start gap-2 text-sm" style={{ color: TEXT }}>
                                                             <CheckCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BLUE }} />
-                                                            <p
-                                                                className="text-xs"
-                                                                style={{ color: TEXT }}
-                                                                dangerouslySetInnerHTML={{ __html: `&ldquo;${renderBold(item.good)}&rdquo;` }}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-start gap-2 text-sm" style={{ color: TEXT }}>
-                                                    <CheckCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BLUE }} />
-                                                    <span dangerouslySetInnerHTML={{ __html: renderBold(item.title) }} />
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </motion.div>
-            )}
-
-            {/* ─── Zusammenfassung: Themen zum Vertiefen ───────────────── */}
-            {report.topicSuggestions && report.topicSuggestions.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="rounded-xl p-4 mb-6"
-                    style={{ border: `1px solid ${BORDER}` }}
-                >
-                    <div className="flex items-center gap-2 mb-4">
-                        <BookOpen className="h-4 w-4" style={{ color: BLUE }} />
-                        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: BLUE }}>
-                            Zusammenfassung: Themen zum Vertiefen
-                        </p>
-                    </div>
-
-                    {/* Topics with context sub-bullets */}
-                    <div className="space-y-3">
-                        {report.topicSuggestions.map((raw, i) => {
-                            const topic = normalizeTopic(raw);
-                            const youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(topic.searchQuery)}`;
-                            const isSaved = savedTopics[i] || false;
-                            const isSaving = savingTopics[i] || false;
-
-                            return (
-                                <div
-                                    key={i}
-                                    className="rounded-lg p-4"
-                                    style={{ background: '#F7F6F5', border: `1px solid ${BORDER}` }}
-                                >
-                                    <div className="flex items-center gap-3 mb-2">
-                                        {/* Left: Empfehlung + Category badge */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-sm font-semibold" style={{ color: TEXT }}>
-                                                    {topic.topic}
-                                                </p>
-                                                {topic.category && (
-                                                    <span
-                                                        className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
-                                                        style={{
-                                                            background: topic.category === 'rolle' ? '#E8EFF8' : '#F0FDF4',
-                                                            color: topic.category === 'rolle' ? BLUE : '#15803d',
-                                                        }}
-                                                    >
-                                                        {topic.category === 'rolle' ? 'Für die Rolle' : 'Interview-Technik'}
-                                                    </span>
-                                                )}
+                                                            <span dangerouslySetInnerHTML={{ __html: renderBold(s) }} />
+                                                        </li>
+                                                    ))}
+                                                </ul>
                                             </div>
-                                        </div>
-                                    </div>
+                                        )}
 
-                                    {/* Context sub-bullets */}
-                                    {topic.context && topic.context.length > 0 && (
-                                        <ul className="space-y-1.5 mt-1 mb-3">
-                                            {topic.context.map((line, ci) => (
-                                                <li key={ci} className="text-xs leading-relaxed flex items-start gap-2" style={{ color: MUTED }}>
-                                                    <span className="mt-1 shrink-0" style={{ color: BLUE }}>•</span>
-                                                    <span>{line}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-
-                                    {/* Action buttons row */}
-                                    <div className="flex items-center gap-2">
-                                        <a
-                                            href={youtubeUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:opacity-80 shrink-0"
-                                            style={{ background: '#FF000015', color: '#CC0000' }}
-                                        >
-                                            <ExternalLink className="h-3.5 w-3.5" />
-                                            <span className="hidden sm:inline max-w-[200px] truncate">{topic.youtubeTitle}</span>
-                                            <span className="sm:hidden">YouTube</span>
-                                        </a>
-                                        <button
-                                            onClick={() => saveTopicToGoals(i, topic)}
-                                            disabled={isSaving || isSaved}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 shrink-0"
-                                            style={{
-                                                background: isSaved ? '#4CAF5020' : `${BLUE}15`,
-                                                color: isSaved ? '#4CAF50' : BLUE,
-                                            }}
-                                        >
-                                            {isSaving ? (
-                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                            ) : isSaved ? (
-                                                <>
-                                                    <CheckCircle className="h-3.5 w-3.5" />
-                                                    <span className="hidden sm:inline">Gespeichert</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Bookmark className="h-3.5 w-3.5" />
-                                                    <span className="hidden sm:inline">Todays Goals</span>
-                                                </>
-                                            )}
-                                        </button>
+                                        {report.improvements && report.improvements.length > 0 && (
+                                            <div className="rounded-xl p-4" style={{ border: `1px solid ${BORDER}` }}>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <Target className="h-4 w-4" style={{ color: BLUE }} />
+                                                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: BLUE }}>
+                                                        {t('improvement')}
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    {report.improvements.map((imp, i) => {
+                                                        const item = typeof imp === 'string' ? { title: imp, bad: '', good: '' } : imp;
+                                                        return (
+                                                            <div key={i}>
+                                                                {item.bad || item.good ? (
+                                                                    <div className="rounded-lg p-2.5" style={{ background: '#F7F6F5' }}>
+                                                                        {item.bad && (
+                                                                            <div className="flex items-start gap-2 mb-1">
+                                                                                <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BLUE }} />
+                                                                                <p className="text-xs" style={{ color: MUTED }}><em>&ldquo;{item.bad}&rdquo;</em></p>
+                                                                            </div>
+                                                                        )}
+                                                                        {item.good && (
+                                                                            <div className="flex items-start gap-2">
+                                                                                <CheckCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BLUE }} />
+                                                                                <p className="text-xs" style={{ color: TEXT }}
+                                                                                    dangerouslySetInnerHTML={{ __html: `&ldquo;${renderBold(item.good)}&rdquo;` }} />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-start gap-2 text-sm" style={{ color: TEXT }}>
+                                                                        <CheckCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BLUE }} />
+                                                                        <span dangerouslySetInnerHTML={{ __html: renderBold(item.title) }} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            );
-                        })}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
-                </motion.div>
-            )}
+                )}
+
+                {/* ── Section 4: Topics to Explore ─────────────────────── */}
+                {report.topicSuggestions && report.topicSuggestions.length > 0 && (
+                    <div>
+                        <button
+                            onClick={() => toggleSection(4)}
+                            className="w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors hover:bg-[#F7F6F5]"
+                        >
+                            <motion.div
+                                animate={{ rotate: openSections[4] ? 90 : 0 }}
+                                transition={{ duration: 0.15 }}
+                                className="shrink-0"
+                            >
+                                <ChevronRight className="w-3.5 h-3.5 text-[#A8A29E]" />
+                            </motion.div>
+                            <span className="text-sm font-medium" style={{ color: TEXT }}>
+                                {t('topics_title')}
+                            </span>
+                            <span className="ml-auto text-xs" style={{ color: MUTED }}>
+                                {report.topicSuggestions.length}
+                            </span>
+                        </button>
+
+                        <AnimatePresence initial={false}>
+                            {openSections[4] && (
+                                <motion.div
+                                    key="s4"
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.18 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="px-4 pb-4 pt-1 space-y-3">
+                                        {report.topicSuggestions.map((raw, i) => {
+                                            const topic = normalizeTopic(raw);
+                                            const youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(topic.searchQuery)}`;
+                                            const isSaved = savedTopics[i] || false;
+                                            const isSaving = savingTopics[i] || false;
+
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className="rounded-lg p-4"
+                                                    style={{ background: '#F7F6F5', border: `1px solid ${BORDER}` }}
+                                                >
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <p className="text-sm font-semibold" style={{ color: TEXT }}>{topic.topic}</p>
+                                                        {topic.category && (
+                                                            <span
+                                                                className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
+                                                                style={{
+                                                                    background: topic.category === 'rolle' ? '#E8EFF8' : '#F0FDF4',
+                                                                    color: topic.category === 'rolle' ? BLUE : '#15803d',
+                                                                }}
+                                                            >
+                                                                {topic.category === 'rolle' ? t('for_role') : t('interview_technique')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {topic.context && topic.context.length > 0 && (
+                                                        <ul className="space-y-1.5 mb-3">
+                                                            {topic.context.map((line, ci) => (
+                                                                <li key={ci} className="text-xs leading-relaxed flex items-start gap-2" style={{ color: MUTED }}>
+                                                                    <span className="mt-1 shrink-0" style={{ color: BLUE }}>•</span>
+                                                                    <span>{line}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+
+                                                    <div className="flex items-center gap-2">
+                                                        <a
+                                                            href={youtubeUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:opacity-80 shrink-0"
+                                                            style={{ background: '#FF000015', color: '#CC0000' }}
+                                                        >
+                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                            <span className="hidden sm:inline max-w-[200px] truncate">{topic.youtubeTitle}</span>
+                                                            <span className="sm:hidden">YouTube</span>
+                                                        </a>
+                                                        <button
+                                                            onClick={() => saveTopicToGoals(i, topic)}
+                                                            disabled={isSaving || isSaved}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 shrink-0"
+                                                            style={{
+                                                                background: isSaved ? '#4CAF5020' : `${BLUE}15`,
+                                                                color: isSaved ? '#4CAF50' : BLUE,
+                                                            }}
+                                                        >
+                                                            {isSaving ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : isSaved ? (
+                                                                <>
+                                                                    <CheckCircle className="h-3.5 w-3.5" />
+                                                                    <span className="hidden sm:inline">{t('saved_topic')}</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Bookmark className="h-3.5 w-3.5" />
+                                                                    <span className="hidden sm:inline">{t('save_topic')}</span>
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                )}
+
+            </div>
+
+            {/* Regenerate button (outside toggle container) */}
+            <div className="mt-4 flex justify-end">
+                <button
+                    onClick={regenerateReport}
+                    disabled={regenerating}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all disabled:opacity-60"
+                    style={{ color: MUTED, border: `1px solid ${BORDER}`, background: 'transparent' }}
+                >
+                    {regenerating ? (
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {t('regenerating')}</>
+                    ) : (
+                        t('regenerate_btn')
+                    )}
+                </button>
+            </div>
         </div>
     );
 }

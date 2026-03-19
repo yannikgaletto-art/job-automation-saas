@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Reorder, AnimatePresence, motion } from 'framer-motion';
 import { GripVertical, Plus, Trash2, AlertTriangle } from 'lucide-react';
 
@@ -21,13 +22,13 @@ interface BlockEditorProps {
 }
 
 export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
+    const t = useTranslations('video_letter');
     const [showNewForm, setShowNewForm] = useState(false);
     const [newBlockTitle, setNewBlockTitle] = useState('');
     const [newBlockDuration, setNewBlockDuration] = useState(15);
 
-    // Validation warnings
-    const hasVorstellung = blocks.some(b => b.title === 'Vorstellung');
-    const hasAbschluss = blocks.some(b => b.title === 'Abschluss');
+    // Validation: check that all required blocks are present
+    const missingRequired = blocks.some(b => b.isRequired) && blocks.filter(b => b.isRequired).length < 2;
     const totalDuration = blocks.reduce((sum, b) => sum + b.durationSeconds, 0);
 
     const handleReorder = (reordered: ScriptBlock[]) => {
@@ -70,7 +71,7 @@ export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
         <div className="space-y-3">
             {/* Validation Warnings */}
             <AnimatePresence>
-                {(!hasVorstellung || !hasAbschluss) && (
+                {missingRequired && (
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
@@ -79,8 +80,7 @@ export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
                     >
                         <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                         <div className="text-sm text-amber-700">
-                            {!hasVorstellung && <p>Pflicht-Block „Vorstellung" fehlt.</p>}
-                            {!hasAbschluss && <p>Pflicht-Block „Abschluss" fehlt.</p>}
+                            <p>{t('editor_missing_required')}</p>
                         </div>
                     </motion.div>
                 )}
@@ -109,7 +109,7 @@ export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
                                         <h4 className="font-medium text-gray-900 text-sm">{block.title}</h4>
                                         {block.isRequired && (
                                             <span className="text-[10px] bg-blue-100 text-[#012e7a] px-1.5 py-0.5 rounded font-medium">
-                                                Pflicht
+                                                {t('editor_required_badge')}
                                             </span>
                                         )}
                                     </div>
@@ -131,8 +131,8 @@ export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
                                     value={block.content}
                                     onChange={(e) => handleBlockChange(block.id, 'content', e.target.value)}
                                     placeholder={mode === 'teleprompter'
-                                        ? 'Vollständigen Text hier schreiben…'
-                                        : 'Stichpunkte hier notieren…'}
+                                        ? t('editor_placeholder_teleprompter')
+                                        : t('editor_placeholder_bullets')}
                                     rows={mode === 'teleprompter' ? 3 : 2}
                                     className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] placeholder:text-gray-400"
                                 />
@@ -155,7 +155,7 @@ export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
                             type="text"
                             value={newBlockTitle}
                             onChange={(e) => setNewBlockTitle(e.target.value)}
-                            placeholder="Blockname (z.B. Icebreaker, Fun Fact)"
+                            placeholder={t('editor_add_block_placeholder')}
                             className="w-full text-sm bg-white border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20"
                             autoFocus
                             onKeyDown={(e) => e.key === 'Enter' && handleAddBlock()}
@@ -166,13 +166,13 @@ export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
                                 disabled={!newBlockTitle.trim()}
                                 className="px-3 py-1.5 bg-[#012e7a] text-white text-sm rounded-md hover:bg-[#012e7a]/90 disabled:opacity-40 transition"
                             >
-                                Hinzufügen
+                                {t('editor_add_btn')}
                             </button>
                             <button
                                 onClick={() => { setShowNewForm(false); setNewBlockTitle(''); }}
                                 className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300 transition"
                             >
-                                Abbrechen
+                                {t('editor_cancel_btn')}
                             </button>
                         </div>
                     </motion.div>
@@ -183,7 +183,7 @@ export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
                         onClick={() => setShowNewForm(true)}
                         className="w-full py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-[#012e7a] hover:text-[#012e7a] transition flex items-center justify-center gap-1.5"
                     >
-                        <Plus className="w-4 h-4" /> Eigenen Block erstellen
+                        <Plus className="w-4 h-4" /> {t('editor_add_block')}
                     </motion.button>
                 )}
             </AnimatePresence>

@@ -12,6 +12,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { analyzeGap } from '@/lib/services/coaching-gap-analyzer';
 import { getInitialCoachingMessage } from '@/lib/services/coaching-service';
 import { COACHING_PROMPT_VERSION } from '@/lib/prompts/coaching-system-prompt';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
 import type { CreateSessionResponse } from '@/types/coaching';
 
 const supabaseAdmin = createAdminClient(
@@ -189,13 +190,16 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Job nicht gefunden' }, { status: 404 });
         }
 
+        // Read user locale (frozen for entire session — i18n_protocol.md §4)
+        const userLocale = await getUserLocale(user.id);
+
         // Run gap analysis (5-15s)
         const { dossier, tokensUsed, costCents } = await analyzeGap(user.id, {
             jobTitle: job.job_title || 'Unbekannt',
             companyName: job.company_name || 'Unbekannt',
             description: job.description || '',
             requirements: job.requirements as Record<string, unknown> | null,
-        }, round);
+        }, round, userLocale);
 
         // Create session
         const { data: session, error: insertError } = await supabaseAdmin
@@ -209,6 +213,7 @@ export async function POST(request: Request) {
                 cost_cents: costCents,
                 max_questions: maxQuestions,
                 interview_round: round,
+                language: userLocale,
                 prompt_version: COACHING_PROMPT_VERSION,
             })
             .select('id')

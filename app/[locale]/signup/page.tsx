@@ -1,12 +1,19 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "@/i18n/navigation"
-import { useTranslations } from "next-intl"
+import { useState, useEffect, useCallback } from "react"
+import { useRouter, usePathname } from "@/i18n/navigation"
+import { useTranslations, useLocale } from "next-intl"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/motion/button"
 import { Input } from "@/components/ui/input"
 import { Link } from "@/i18n/navigation"
+import { ChevronDown } from "lucide-react"
+
+const LANGUAGES = [
+    { code: "de", label: "Deutsch" },
+    { code: "en", label: "English" },
+    { code: "es", label: "Español" },
+] as const
 
 export default function SignupPage() {
     const [firstName, setFirstName] = useState("")
@@ -16,10 +23,48 @@ export default function SignupPage() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [signupSuccess, setSignupSuccess] = useState(false)
+    const [langOpen, setLangOpen] = useState(false)
 
     const router = useRouter()
+    const pathname = usePathname()
     const supabase = createClient()
     const t = useTranslations('auth.signup')
+    const currentLocale = useLocale()
+
+    // ── Poll for email confirmation (cross-device) ──────────────
+    // When the user confirms on their phone, this desktop tab detects the
+    // new session and auto-redirects to onboarding.
+    useEffect(() => {
+        if (!signupSuccess) return
+
+        const interval = setInterval(async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (session) {
+                clearInterval(interval)
+                console.log("✅ Email confirmed (detected via polling) — redirecting to onboarding")
+                router.push("/onboarding")
+            }
+        }, 3000) // check every 3 seconds
+
+        // Also listen for realtime auth state changes (same-device)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === "SIGNED_IN" && session) {
+                clearInterval(interval)
+                console.log("✅ Email confirmed (auth state change) — redirecting to onboarding")
+                router.push("/onboarding")
+            }
+        })
+
+        return () => {
+            clearInterval(interval)
+            subscription.unsubscribe()
+        }
+    }, [signupSuccess, supabase, router])
+
+    function handleLanguageChange(code: string) {
+        setLangOpen(false)
+        router.replace(pathname, { locale: code })
+    }
 
     async function handleSignup(e: React.FormEvent) {
         e.preventDefault()
@@ -63,18 +108,53 @@ export default function SignupPage() {
         }
     }
 
+    const currentLang = LANGUAGES.find(l => l.code === currentLocale) ?? LANGUAGES[1]
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
             <div className="max-w-md w-full bg-white p-8 rounded-xl border border-[#E7E7E5] shadow-sm">
                 <div className="mb-8">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#012e7a] to-[#1a4a9a] flex items-center justify-center">
-                            <span className="text-white font-bold text-xl">P</span>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#012e7a] to-[#1a4a9a] flex items-center justify-center">
+                                <span className="text-white font-bold text-xl">P</span>
+                            </div>
+                            <h1 className="text-3xl font-bold text-[#37352F]">Pathly</h1>
                         </div>
-                        <h1 className="text-3xl font-bold text-[#37352F]">Pathly</h1>
+                        {/* Language selector */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setLangOpen(!langOpen)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-[#37352F] bg-[#F5F5F4] border border-[#E7E7E5] rounded-lg hover:bg-[#EBEBEA] transition-colors"
+                            >
+                                {currentLang.label}
+                                <ChevronDown className={`w-3.5 h-3.5 text-[#73726E] transition-transform ${langOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            {langOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setLangOpen(false)} />
+                                    <div className="absolute right-0 mt-1 w-36 bg-white border border-[#E7E7E5] rounded-lg shadow-lg z-20 py-1">
+                                        {LANGUAGES.map((lang) => (
+                                            <button
+                                                key={lang.code}
+                                                type="button"
+                                                onClick={() => handleLanguageChange(lang.code)}
+                                                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                                                    lang.code === currentLocale
+                                                        ? 'text-[#012e7a] font-medium bg-[#F5F5F4]'
+                                                        : 'text-[#37352F] hover:bg-[#F5F5F4]'
+                                                }`}
+                                            >
+                                                {lang.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                     <h2 className="text-2xl font-semibold text-[#37352F]">{t('title')}</h2>
-                    <p className="text-[#73726E] mt-2">{t('subtitle')}</p>
                 </div>
 
                 {signupSuccess ? (
@@ -85,9 +165,10 @@ export default function SignupPage() {
                             </svg>
                         </div>
                         <h3 className="text-lg font-semibold text-[#37352F]">{t('success_title')}</h3>
-                        <p className="text-sm text-[#73726E] leading-relaxed"
-                           dangerouslySetInnerHTML={{ __html: t('success_message', { email }) }}
-                        />
+                        <div className="flex items-center justify-center gap-2">
+                            <div className="w-2 h-2 bg-[#012e7a] rounded-full animate-pulse" />
+                            <p className="text-sm text-[#73726E]">{t('waiting_confirmation')}</p>
+                        </div>
                         <p className="text-xs text-[#9B9A97] mt-4">
                             {t('success_no_email')}{" "}
                             <button

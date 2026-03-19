@@ -17,6 +17,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
 import { getCVText } from '@/lib/services/cv-text-retriever';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
+import { getLanguageInstruction } from '@/lib/prompts/coaching-prompt-i18n';
 import type { AboutRole } from '@/types/coaching';
 
 // Vercel timeout protection
@@ -142,6 +144,8 @@ export async function POST(request: Request) {
         }
 
         const client = getClient();
+        const userLocale = await getUserLocale(user.id);
+        const langInstruction = getLanguageInstruction(userLocale);
         const jobDesc = job.description?.substring(0, 3000) || 'Nicht verfügbar';
         const reqText = job.requirements
             ? JSON.stringify(job.requirements, null, 2).substring(0, 2000)
@@ -156,7 +160,7 @@ export async function POST(request: Request) {
                     model: MODEL,
                     max_tokens: 1200,
                     temperature: 0.3,
-                    system: `Du bist ein Karriereberater, der Jobsuchende auf Bewerbungsgespräche vorbereitet. Analysiere Stellenbeschreibungen prägnant und klar. Antworte ausschließlich als valides JSON (kein Markdown, keine Code-Blöcke).`,
+                    system: `${langInstruction}\nDu bist ein Karriereberater, der Jobsuchende auf Bewerbungsgespräche vorbereitet. Analysiere Stellenbeschreibungen prägnant und klar. Antworte ausschließlich als valides JSON (kein Markdown, keine Code-Blöcke).`,
                     messages: [{
                         role: 'user',
                         content: `Analysiere diese Stellenbeschreibung und beschreibe die Rolle "${job.job_title}" bei "${job.company_name}" in drei Kategorien.
@@ -190,7 +194,7 @@ Generiere 3-4 Punkte pro Kategorie.`,
                     model: MODEL,
                     max_tokens: 1200,
                     temperature: 0.4,
-                    system: `Du bist ein Storytelling-Coach. Formuliere die berufliche Geschichte als kraftvolle Stichpunkte. Jeder Stichpunkt beginnt mit einer **fettgedruckten Überschrift** (Markdown), gefolgt von maximal 1-2 Sätzen. Kein Fülltext, kein Blabla. Antworte ausschließlich als valides JSON (kein Markdown, keine Code-Blöcke).`,
+                    system: `${langInstruction}\nDu bist ein Storytelling-Coach. Formuliere die berufliche Geschichte als kraftvolle Stichpunkte. Jeder Stichpunkt beginnt mit einer **fettgedruckten Überschrift** (Markdown), gefolgt von maximal 1-2 Sätzen. Kein Fülltext, kein Blabla. Antworte ausschließlich als valides JSON (kein Markdown, keine Code-Blöcke).`,
                     messages: [{
                         role: 'user',
                         content: `Analysiere diesen Lebenslauf${coverLetterText ? ' und das Anschreiben' : ''} und formuliere die berufliche Geschichte als Stichpunkte.

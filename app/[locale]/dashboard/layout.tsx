@@ -10,7 +10,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { MorningBriefing } from '@/components/dashboard/morning-briefing';
 import { CommandPalette } from '@/components/dashboard/command-palette';
 import { MoodCheckInOverlay } from '@/components/MoodCheckInOverlay';
-import { useMoodCheckIn } from './hooks/useMoodCheckIn';
+import { useMoodCheckIn, MoodCheckinProvider } from './hooks/useMoodCheckIn';
 import { useJobQueueCount } from '@/store/use-job-queue-count';
 import { useCalendarStore } from '@/store/use-calendar-store';
 import { createClient } from '@/lib/supabase/client';
@@ -40,11 +40,23 @@ export default function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
+    return (
+        <MoodCheckinProvider>
+            <DashboardLayoutInner>{children}</DashboardLayoutInner>
+        </MoodCheckinProvider>
+    );
+}
+
+function DashboardLayoutInner({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
     const pathname = usePathname();
     const locale = useLocale();
     const t = useTranslations('dashboard');
-    const { showOverlay: showMoodOverlay, dismiss: dismissMoodOverlay } = useMoodCheckIn();
-    const { count: queueCount, setCount } = useJobQueueCount();
+    const { showOverlay: showMoodOverlay, dismiss: dismissMoodOverlay, handleSkip, handleSubmit } = useMoodCheckIn();
+    const { setCount } = useJobQueueCount();
     const timerTick = useCalendarStore((s) => s.timerTick);
 
     // ─── Global Pomodoro timer tick — runs on ALL pages ───────────
@@ -109,8 +121,13 @@ export default function DashboardLayout({
             {/* Morning Briefing overlay (once per day) */}
             <MorningBriefing />
 
-            {/* Midday Mood Check-in overlay (every 3 hours) */}
-            <MoodCheckInOverlay visible={showMoodOverlay} onDismiss={dismissMoodOverlay} />
+            {/* Midday Mood Check-in overlay */}
+            <MoodCheckInOverlay
+                visible={showMoodOverlay}
+                onDismiss={dismissMoodOverlay}
+                onSkip={handleSkip}
+                onSubmit={handleSubmit}
+            />
 
             {/* Command Palette (Cmd+K) */}
             <CommandPalette />

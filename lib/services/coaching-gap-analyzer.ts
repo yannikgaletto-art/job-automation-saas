@@ -11,6 +11,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { getCVText } from '@/lib/services/cv-text-retriever';
+import { getLanguageInstruction, type CoachingLocale } from '@/lib/prompts/coaching-prompt-i18n';
 import type { CoachingDossier, KennenlernenDossier, DeepDiveDossier, CaseStudyDossier } from '@/types/coaching';
 import type { InterviewRound } from '@/lib/prompts/coaching-system-prompt';
 
@@ -218,7 +219,8 @@ function getFallbackDossier(round: InterviewRound, jobData: JobData): CoachingDo
 export async function analyzeGap(
     userId: string,
     jobData: JobData,
-    interviewRound: InterviewRound = 'kennenlernen'
+    interviewRound: InterviewRound = 'kennenlernen',
+    locale: CoachingLocale = 'de'
 ): Promise<{ dossier: CoachingDossier; tokensUsed: number; costCents: number }> {
     // 1. Get CV text via existing service (QA: reuse, don't reinvent)
     const cvResult = await getCVText(userId);
@@ -238,7 +240,9 @@ export async function analyzeGap(
         model: COACHING_MODEL,
         max_tokens: 1500,
         temperature: 0.3,
-        system: `Du bist ein Recruiting-Analyst. Analysiere den Lebenslauf gegen die Stellenanforderungen.
+        system: `${getLanguageInstruction(locale)}
+
+Du bist ein Recruiting-Analyst. Analysiere den Lebenslauf gegen die Stellenanforderungen.
 BEZIEHE DICH IMMER auf konkrete Inhalte aus dem Lebenslauf des Kandidaten.
 Fasse dich kurz: jede Stärke und jeder Gap ist maximal 1 prägnanter Satz.
 Starte jeden Punkt mit einem **fettgedruckten Schlüsselwort** (Markdown **...**), gefolgt von einem Doppelpunkt.

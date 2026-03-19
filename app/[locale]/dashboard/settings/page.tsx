@@ -1,6 +1,7 @@
 import { ActiveCVCard } from "./active-cv-card"
 import { ProfileCard } from "./profile-card"
 import { LanguageToggleCard } from "./language-toggle-card"
+import { CheckinSettingsCard } from "./checkin-settings-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileText, User, Sparkles, Globe } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
@@ -66,6 +67,11 @@ export default async function SettingsPage() {
                     <LanguageToggleCard />
                 </CardContent>
             </Card>
+
+            {/* Mood Check-in Reactivation — only visible when auto-hidden */}
+            <div className="mb-6">
+                <CheckinSettingsCard />
+            </div>
 
             {/* Document Management Section */}
             <Card className="bg-white border-[#E7E7E5] shadow-sm">

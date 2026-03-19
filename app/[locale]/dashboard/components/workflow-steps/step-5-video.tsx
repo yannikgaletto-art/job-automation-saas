@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { motion } from 'framer-motion';
 import { Video, Mic, Square, Upload, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -17,6 +19,8 @@ type VideoState = 'loading' | 'consent' | 'script-studio' | 'record' | 'preview'
 
 
 export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
+    const t = useTranslations('video_letter');
+    const locale = useLocale();
     const [state, setState] = useState<VideoState>('loading');
     const [expiresAt, setExpiresAt] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -101,7 +105,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
         try {
             // Check browser support
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                setError('Dein Browser unterstützt keine Videoaufnahme. Bitte verwende Chrome oder Firefox.');
+                setError(t('record_camera_unsupported'));
                 return;
             }
 
@@ -158,12 +162,12 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
 
         } catch (err) {
             if (err instanceof DOMException && err.name === 'NotAllowedError') {
-                setError('Kamera-Zugriff wurde verweigert. Bitte erlaube den Zugriff in deinen Browser-Einstellungen.');
+                setError(t('record_camera_denied'));
             } else {
-                setError('Kamera konnte nicht gestartet werden.');
+                setError(t('record_camera_failed'));
             }
         }
-    }, []);
+    }, [t]);
 
     // Stop recording
     const stopRecording = useCallback(() => {
@@ -197,7 +201,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
             });
             const urlData = await urlRes.json();
             if (!urlRes.ok || !urlData.success) {
-                throw new Error(urlData.error || 'Signed URL konnte nicht erstellt werden');
+                throw new Error(urlData.error || t('error_generic'));
             }
 
             // Step 2: Upload blob directly to Supabase Storage via signed URL
@@ -212,7 +216,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
             });
 
             if (!uploadRes.ok) {
-                throw new Error('Upload an Supabase Storage fehlgeschlagen');
+                throw new Error(t('error_generic'));
             }
 
             setUploadProgress(80);
@@ -225,7 +229,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
             });
             const confirmData = await confirmRes.json();
             if (!confirmRes.ok || !confirmData.success) {
-                throw new Error(confirmData.error || 'Upload-Bestätigung fehlgeschlagen');
+                throw new Error(confirmData.error || t('error_generic'));
             }
 
             setUploadProgress(100);
@@ -233,7 +237,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
             setState('done');
 
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Upload fehlgeschlagen');
+            setError(err instanceof Error ? err.message : t('error_generic'));
             setState('preview'); // Go back to preview so user can retry
         }
     };
@@ -272,16 +276,17 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                 animate={{ opacity: 1, y: 0 }}
                 className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200"
             >
-                <h3 className="text-xl font-semibold text-[#37352F] mb-2">Video-Vorstellung</h3>
+                <h3 className="text-xl font-semibold text-[#37352F] mb-2">{t('consent_title')}</h3>
                 <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
-                    Wir erstellen die <strong>Talking Points</strong>, damit du weißt was du in deinem <strong>1-Minuten-Video</strong> sagen sollst.
-                    Das Video ist <strong>14 Tage</strong> verfügbar und wird danach automatisch gelöscht.
+                    {t.rich('consent_description', {
+                        strong: (chunks) => <strong>{chunks}</strong>,
+                    })}
                 </p>
                 <button
                     onClick={handleConsent}
                     className="px-6 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white text-sm font-medium rounded-lg transition"
                 >
-                    Los geht&apos;s
+                    {t('consent_cta')}
                 </button>
             </motion.div>
         );
@@ -347,14 +352,14 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                             onClick={startRecording}
                             className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition flex items-center gap-2"
                         >
-                            <Mic className="w-5 h-5" /> Aufnahme starten
+                            <Mic className="w-5 h-5" /> {t('record_start')}
                         </button>
                     ) : (
                         <button
                             onClick={stopRecording}
                             className="px-6 py-3 bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg transition flex items-center gap-2"
                         >
-                            <Square className="w-5 h-5" /> Aufnahme stoppen
+                            <Square className="w-5 h-5" /> {t('record_stop')}
                         </button>
                     )}
                 </div>
@@ -376,7 +381,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                 animate={{ opacity: 1, y: 0 }}
                 className="p-6 bg-white border border-gray-200 rounded-xl max-w-2xl mx-auto space-y-5"
             >
-                <h3 className="text-lg font-semibold text-gray-900 text-center">Vorschau</h3>
+                <h3 className="text-lg font-semibold text-gray-900 text-center">{t('preview_title')}</h3>
 
                 <div className="bg-black rounded-xl overflow-hidden aspect-video">
                     <video
@@ -393,13 +398,13 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                         onClick={handleReRecord}
                         className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition flex items-center gap-2"
                     >
-                        <RefreshCw className="w-4 h-4" /> Erneut aufnehmen
+                        <RefreshCw className="w-4 h-4" /> {t('preview_re_record')}
                     </button>
                     <button
                         onClick={handleUpload}
                         className="px-5 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white font-medium rounded-lg transition flex items-center gap-2"
                     >
-                        <Upload className="w-4 h-4" /> Hochladen
+                        <Upload className="w-4 h-4" /> {t('preview_upload')}
                     </button>
                 </div>
             </motion.div>
@@ -415,7 +420,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
             >
                 <LoadingSpinner className="w-10 h-10 text-[#012e7a] mx-auto" />
                 <div>
-                    <p className="text-sm font-medium text-gray-900 mb-1">Video wird hochgeladen…</p>
+                    <p className="text-sm font-medium text-gray-900 mb-1">{t('upload_title')}</p>
                     <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
                         <motion.div
                             className="bg-[#012e7a] h-2 rounded-full"
@@ -432,7 +437,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
 
     if (state === 'done') {
         const expiryFormatted = expiresAt
-            ? new Date(expiresAt).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
+            ? new Date(expiresAt).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
             : null;
 
         return (
@@ -445,13 +450,13 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                     <CheckCircle2 className="w-7 h-7 text-green-600" />
                 </div>
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Video hochgeladen!</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('done_title')}</h3>
                     <p className="text-sm text-gray-500">
-                        Dein Video ist über den QR-Code auf deinem Lebenslauf abrufbar.
+                        {t('done_description')}
                     </p>
                     {expiryFormatted && (
                         <p className="text-xs text-gray-400 mt-2">
-                            Verfügbar bis {expiryFormatted}
+                            {t('done_expiry', { date: expiryFormatted })}
                         </p>
                     )}
                 </div>
@@ -459,7 +464,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                     onClick={handleReRecord}
                     className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition flex items-center gap-2 mx-auto"
                 >
-                    <RefreshCw className="w-4 h-4" /> Neues Video aufnehmen
+                    <RefreshCw className="w-4 h-4" /> {t('done_new_recording')}
                 </button>
             </motion.div>
         );
@@ -469,12 +474,12 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
     return (
         <div className="p-8 bg-red-50 border border-red-200 rounded-xl max-w-sm mx-auto text-center space-y-4">
             <AlertTriangle className="w-8 h-8 text-red-500 mx-auto" />
-            <p className="text-sm text-red-700">{error || 'Ein unbekannter Fehler ist aufgetreten.'}</p>
+            <p className="text-sm text-red-700">{error || t('error_unknown')}</p>
             <button
                 onClick={() => setState('consent')}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg text-sm"
             >
-                Erneut versuchen
+                {t('error_retry')}
             </button>
         </div>
     );

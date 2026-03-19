@@ -14,6 +14,7 @@
 import type {
     CoachingDossier, KennenlernenDossier, DeepDiveDossier, CaseStudyDossier
 } from '@/types/coaching';
+import { getLanguageInstruction, getFormatInstruction, type CoachingLocale } from '@/lib/prompts/coaching-prompt-i18n';
 
 export const COACHING_PROMPT_VERSION = 'v3';
 
@@ -33,11 +34,16 @@ interface PromptContext {
     dossier: CoachingDossier;
     round?: InterviewRound;
     maxQuestions?: number;
+    locale?: CoachingLocale;
 }
 
 // ─── Shared preamble for all rounds ─────────────────────────────────────
 function buildPreamble(ctx: PromptContext): string {
-    return `Du bist ein echter Recruiter bei ${ctx.companyName} und führst ein Vorstellungsgespräch für die Stelle "${ctx.jobTitle}".
+    const locale = ctx.locale || 'de';
+    const langInstruction = getLanguageInstruction(locale);
+    return `${langInstruction}
+
+Du bist ein echter Recruiter bei ${ctx.companyName} und führst ein Vorstellungsgespräch für die Stelle "${ctx.jobTitle}".
 
 WICHTIG — DEINE ROLLE:
 Du sprichst ALS Mitarbeiter:in des Unternehmens. NIEMALS in der dritten Person über das Unternehmen.
@@ -57,7 +63,7 @@ ${ctx.dossier.gaps.map(g => `  - ${g}`).join('\n')}`;
 }
 
 // ─── Shared rules for all rounds ────────────────────────────────────────
-function buildSharedRules(): string {
+function buildSharedRules(locale: CoachingLocale = 'de'): string {
     return `VERBOTEN:
 - Keine rechtlichen oder Gehaltsberatungen.
 - Keine Markdown (kein **, kein #). Natürlicher Fließtext.
@@ -65,7 +71,7 @@ function buildSharedRules(): string {
 - NIEMALS in der dritten Person über das Unternehmen sprechen.
 
 FORMAT:
-- Natürliches Deutsch, kurze Absätze.
+- ${getFormatInstruction(locale)}
 - Feedback und nächste Frage/Interaktion durch Absatz getrennt.`;
 }
 
@@ -103,7 +109,7 @@ WICHTIG — PHASEN-ABGRENZUNG:
 Du bist in Phase 1 (Kennenlernen). Stelle KEINE fachlichen Tiefenfragen, keine STAR-Methodik, keine Case-Study-Szenarien.
 Hier geht es um den MENSCHEN, nicht um die Methodik.
 
-${buildSharedRules()}
+${buildSharedRules(ctx.locale)}
 
 STARTE: Begrüße den Kandidaten natürlich (als Recruiter der Firma), erwähne eine interessante Station aus dem CV und stelle Frage 1.`;
 }
@@ -151,7 +157,7 @@ WICHTIG — PHASEN-ABGRENZUNG:
 Du bist in Phase 2 (Deep Dive). Stelle KEINE lockeren Kennenlernen-Fragen wie "Was reizt dich an der Rolle?".
 Hier geht es um FACHLICHE TIEFE, METHODIK und PROBLEMLÖSUNG.
 
-${buildSharedRules()}
+${buildSharedRules(ctx.locale)}
 
 STARTE: Begrüße den Kandidaten kurz (als Recruiter), erwähne ein konkretes CV-Projekt und erkläre, dass ihr heute fachlich tiefer einsteigt. Stelle dann die Hauptfrage von Bereich 1.`;
 }
@@ -192,7 +198,7 @@ WICHTIG — PHASEN-ABGRENZUNG:
 Du bist in Phase 3 (Case Study). Stelle KEINE Kennenlernen-Fragen und KEINE STAR-Methodik-Fragen.
 Hier löst der Kandidat ein konkretes Business-Problem unter Druck.
 
-${buildSharedRules()}
+${buildSharedRules(ctx.locale)}
 
 STARTE: Begrüße den Kandidaten kurz und präsentiere dann sofort das vollständige Szenario. Frage am Ende: "Wie würden Sie dieses Problem angehen?"`;
 }

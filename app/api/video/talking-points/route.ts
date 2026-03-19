@@ -114,7 +114,7 @@ Regeln:
             iteration: 1,
             prompt_tokens: inputTokens,
             completion_tokens: outputTokens,
-            generated_text: aiText,
+            generated_text: null,
         });
 
         log.info('Talking points generated', { count: talkingPoints.length });

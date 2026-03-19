@@ -13,6 +13,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { COACHING_PROMPT_VERSION } from '@/lib/prompts/coaching-system-prompt';
+import { getDimensionNames, getScoringTags, getConversationLabels, getReportSystemPrompt, getReportUserMessage, type CoachingLocale } from '@/lib/prompts/coaching-prompt-i18n';
+import { buildContentHash } from '@/lib/services/pii-sanitizer';
 import type { ChatMessage } from '@/types/coaching';
 
 const supabaseAdmin = createAdminClient(
@@ -30,13 +32,6 @@ function getClient(): Anthropic {
 }
 
 const REPORT_MODEL = 'claude-haiku-4-5-20251001';
-
-// Round-specific dimension names (shared constant)
-const DIMENSION_NAMES_BY_ROUND: Record<string, string[]> = {
-    kennenlernen: ['Fachliche Kompetenz', 'Kommunikation & Struktur', 'Motivation & Cultural Fit', 'Selbstreflexion', 'Auftreten & Authentizität'],
-    deep_dive: ['Technische / Fachliche Tiefe', 'STAR-Methodik', 'Problemlösungskompetenz', 'Konkretheit & Belastbarkeit', 'Reflexionsfähigkeit'],
-    case_study: ['Strukturiertes Denken', 'Datenanalyse & Informationsbeschaffung', 'Kreativität & Lösungsansätze', 'Synthese & Empfehlung', 'Kommunikation unter Druck'],
-};
 
 
 
@@ -73,140 +68,32 @@ export async function generateAndSaveReport(sessionId: string, userId: string): 
         .eq('id', session.job_id)
         .single();
 
-    // 2. Build conversation text
+    // 2. Build conversation text with locale-aware role labels (BUG#3 FIX)
     const conversation = (session.conversation_history as ChatMessage[]) || [];
+    const round = session.interview_round || 'kennenlernen';
+    const locale: CoachingLocale = session.language || 'de';
+    const roleLabels = getConversationLabels(locale);
     const conversationText = conversation
-        .map((msg) => `${msg.role === 'coach' ? 'Coach' : 'Kandidat'}: ${msg.content}`)
+        .map((msg: ChatMessage) => `${msg.role === 'coach' ? roleLabels.coach : roleLabels.candidate}: ${msg.content}`)
         .join('\n\n');
 
-    const round = session.interview_round || 'kennenlernen';
-    const dimNames = DIMENSION_NAMES_BY_ROUND[round] || DIMENSION_NAMES_BY_ROUND['kennenlernen'];
+    const dimNames = getDimensionNames(locale, round);
+    const tags = getScoringTags(locale);
 
     // 3. Generate report via Claude Haiku
     const client = getClient();
+    const jobTitle = job?.job_title || (locale === 'en' ? 'Unknown' : locale === 'es' ? 'Desconocido' : 'Unbekannt');
+    const companyName = job?.company_name || (locale === 'en' ? 'Unknown' : locale === 'es' ? 'Desconocida' : 'Unbekannt');
+
     const response = await client.messages.create({
         model: REPORT_MODEL,
         max_tokens: 3500,
         temperature: 0.3,
-        system: `Du bist ein empathischer Senior Recruiting Coach.
-
-ABSOLUT WICHTIG — KÜRZE für Dimensions-Felder:
-- observation, reason, suggestion: KEINE GANZEN SÄTZE. Nur kurze Stichpunkte (max 8-10 Wörter).
-- Markiere 1-2 entscheidende Wörter mit **fett**.
-- Sprich den Kandidaten mit "du" an.
-
-FÜR DIE GESAMTBEWERTUNG (whatWorked, whatWasMissing, recruiterAdvice):
-- Schreibe je 1-2 ehrliche, direkte Sätze — wie ein Recruiter nach dem Interview.
-- Kein Corporate Speak, kein Lobhudeln. Nenn konkrete Dinge aus dem tatsächlichen Gespräch.
-- whatWorked: Was hat wirklich gut funktioniert? Was hat positiv überrascht?
-- whatWasMissing: Was hat gefehlt? Was war zu wenig oder zu vage?
-- recruiterAdvice: Eine klare, handlungsrelevante Empfehlung für das nächste Interview.
-
-SCORING-SYSTEM (score ist 1-10):
-- score 1-3 (unter 40%) → level: "red", tag: "Das vermissen wir"
-- score 4-6 (40-69%) → level: "yellow", tag: "Da fehlt nicht viel"
-- score 7-10 (70-100%) → level: "green", tag: "Das machst du gut"
-
-WICHTIG — DIFFERENZIERUNG:
-- Nutze die VOLLE Skala von 1 bis 10. NICHT alles auf 5-7 setzen!
-- Ein Kandidat hat IMMER Stärken (grün) UND Schwächen (gelb/rot). Mixed Tags sind Pflicht!
-- Mindestens 1 Dimension muss "green" sein und mindestens 1 muss "yellow" oder "red" sein.
-
-JEDE Dimension braucht ein echtes ZITAT aus dem Interview-Protokoll.
-Auch bei kurzen Gesprächen (1-2 Fragen): Arbeite mit dem vorhandenen Material. Eine einzelne Antwort enthält Signal zu Kommunikationsstil, Struktur, Motivation und Authentizität. Bewerte ehrlich was du siehst — nicht halluzinieren, aber auch nicht kapitulieren.
-
-Antworte als valides JSON (kein Markdown, keine Code-Blöcke). Exakte Struktur:
-{
-  "overallScore": 6,
-  "topStrength": "Solide **Grundkenntnisse** im Kundenmanagement",
-  "recommendation": "Mehr **konkrete Beispiele** und **STAR-Struktur** nutzen",
-  "whatWorked": "Du bist offen mit Wissenslücken umgegangen und hast nicht versucht, etwas zu verbergen – das wirkt authentisch und kommt gut an.",
-  "whatWasMissing": "Konkrete Zahlen und messbare Erfolge haben gefehlt. Bei beiden Fragen blieb es bei allgemeinen Aussagen statt echter Beispiele.",
-  "recruiterAdvice": "Bereite 2-3 STAR-Geschichten aus deiner Praxis vor, die du flexibel einsetzen kannst – das gibt deinen Antworten die Substanz, die den Unterschied macht.",
-  "dimensions": [
-    {
-      "name": "${dimNames[0]}",
-      "score": 6,
-      "level": "yellow",
-      "tag": "Da fehlt nicht viel",
-      "observation": "Kennt **Theorie**, wenig **Praxisbeispiele**",
-      "reason": "Bleibt bei **Nachfragen** konzeptionell",
-      "suggestion": "Mit **realen Fallstudien** und Zahlen belegen",
-      "quote": "Also ich würde versuchen, transparent zu sein...",
-      "feedback": ""
-    },
-    ... (für ALLE 5 Dimensionen: ${dimNames.join(', ')})
-  ],
-  "summary": "1-2 kurze Sätze Gesamteinschätzung",
-  "strengths": ["**Kundenverständnis** und Lösungsorientierung", "**Offenheit** für neue Ansätze", "**Gründungserfahrung** zeigt Eigeninitiative"],
-  "improvements": [
-    {
-      "title": "**STAR-Methode** für strukturierte Antworten",
-      "bad": "Ich versuche immer transparent zu sein...",
-      "good": "Bei **Projekt Y** habe ich den Kunden **3 Tage vorher** angerufen und **3 Timelines** präsentiert."
-    }
-  ],
-  "topicSuggestions": [
-    {
-      "topic": "Strategisches Account Management",
-      "searchQuery": "Strategisches Account Management Interview Tipps",
-      "youtubeTitle": "Strategisches Account Management – So überzeugst du im Interview",
-      "category": "rolle",
-      "context": [
-        "In der Rolle wird erwartet, dass du Key Accounts selbst steuerst – das kam in deinen Antworten nicht rüber.",
-        "Empfehlung: Bereite ein konkretes Beispiel vor, wie du einen Account von der Bestandsaufnahme bis zum Upsell geführt hast."
-      ]
-    },
-    {
-      "topic": "STAR-Methode meistern",
-      "searchQuery": "STAR Methode Interview Beispiele deutsch",
-      "youtubeTitle": "Die STAR-Methode in Aktion: So beantwortest du jede Interview-Frage",
-      "category": "interview",
-      "context": [
-        "Deine Antworten blieben bei allgemeinen Aussagen – ohne messbare Ergebnisse fehlt der Beweis.",
-        "Empfehlung: Starte jede Antwort mit der konkreten Situation, dann Aufgabe → Aktion → Ergebnis mit Zahlen."
-      ]
-    }
-  ]
-}
-
-WICHTIG für topicSuggestions:
-- Generiere mindestens 1x category "rolle" (rollenspezifisch: was man für DIESE Stelle können muss) und 1x "interview" (Interview-Technik).
-- Die context-Stichpunkte sind KEINE generischen Tipps. Beziehe dich auf das tatsächliche Interview und was KONKRET gefehlt hat.
-- Schreibe wie ein Head of Recruiting, der ehrlich sagt: "Das brauchst du, um diese Stelle zu kriegen."
-
-KOMMUNIKATIONS-FRAMEWORKS (NUR bei unstrukturiertem Antwortverhalten als topicSuggestion empfehlen):
-
-Wenn der Kandidat erkennbar unstrukturiert, abschweifend oder vage antwortet, empfiehl genau die Frameworks, die zum identifizierten Problem passen. Empfiehl NICHT alle drei pauschal — nur was zum konkreten Verhalten passt!
-
-1. PREP-Framework (bei vagen Argumenten ohne klare Position):
-   - topic: "PREP-Framework: Souveräne Argumentation"
-   - searchQuery: "PREP Methode Interview souverän argumentieren deutsch"
-   - youtubeTitle: "PREP-Methode – So argumentierst du souverän im Interview"
-   - category: "interview"
-   - Wann empfehlen: Kandidat bezieht keine klare Position, bleibt unverbindlich
-
-2. 3-2-1-Framework (bei chaotischen Antworten unter Druck):
-   - topic: "3-2-1-Framework: Spontane Fragen meistern"
-   - searchQuery: "spontane Fragen Interview strukturiert beantworten"
-   - youtubeTitle: "Spontane Interview-Fragen meistern – Das 3-2-1-Framework"
-   - category: "interview"
-   - Wann empfehlen: Kandidat beginnt mit Füllwörtern, schweift ab, verliert den Faden
-
-3. CCC-Framework (bei unklaren Erklärungen komplexer Themen):
-   - topic: "CCC-Framework: Komplexes klar erklären"
-   - searchQuery: "komplexe Themen einfach erklären Interview Technik"
-   - youtubeTitle: "CCC-Framework – Komplexe Sachverhalte klar kommunizieren"
-   - category: "interview"
-   - Wann empfehlen: Kandidat verliert den roten Faden bei komplexen Sachverhalten
-
-REGEL: Wenn der Kandidat strukturiert und klar antwortet → KEIN Framework empfehlen.
-
-NOCHMAL: observation, reason, suggestion sind KURZE STICHPUNKTE (max 8-10 Wörter). KEINE Sätze, KEINE Absätze!`,
+        system: getReportSystemPrompt(locale, tags, dimNames),
         messages: [
             {
                 role: 'user',
-                content: `Erstelle den Feedback-Report für folgendes Mock-Interview:\n\nSTELLE: ${job?.job_title || 'Unbekannt'} bei ${job?.company_name || 'Unbekannt'}\n\nINTERVIEW-PROTOKOLL:\n${conversationText}\n\nAntworte als JSON.`,
+                content: getReportUserMessage(locale, jobTitle, companyName, conversationText),
             },
         ],
     });
@@ -238,18 +125,20 @@ NOCHMAL: observation, reason, suggestion sind KURZE STICHPUNKTE (max 8-10 Wörte
         console.error('❌ [Coaching Report] Raw (first 500):', text.substring(0, 500));
         // Technical fallback — prevents isBrokenReport on frontend
         // but clearly marks this as a generation error, not a content judgement
-        const fallbackDims = (DIMENSION_NAMES_BY_ROUND[round] || DIMENSION_NAMES_BY_ROUND['kennenlernen']).map(name => ({
-            name, score: 3, level: 'red' as const, tag: 'Technischer Fehler',
-            observation: 'Report-Generierung **fehlgeschlagen**', reason: 'JSON konnte nicht **geparst** werden',
-            suggestion: '**Analyse neu generieren**', quote: '—', feedback: '',
+        const fallbackDims = (getDimensionNames(locale, round)).map(name => ({
+            name, score: 3, level: 'red' as const, tag: tags.red,
+            observation: locale === 'en' ? 'Report generation **failed**' : locale === 'es' ? 'Generación de informe **fallida**' : 'Report-Generierung **fehlgeschlagen**',
+            reason: locale === 'en' ? 'JSON could not be **parsed**' : locale === 'es' ? 'JSON no pudo ser **parseado**' : 'JSON konnte nicht **geparst** werden',
+            suggestion: locale === 'en' ? '**Regenerate analysis**' : locale === 'es' ? '**Regenerar análisis**' : '**Analyse neu generieren**',
+            quote: '—', feedback: '',
         }));
         reportJson = {
             overallScore: 3,
             topStrength: '', recommendation: '',
-            whatWorked: 'Die Analyse konnte technisch nicht korrekt erstellt werden.',
-            whatWasMissing: 'Bitte klicke auf "Analyse neu generieren" für einen erneuten Versuch.',
-            recruiterAdvice: 'Ein erneuter Versuch sollte das Problem lösen.',
-            summary: 'Technischer Fehler bei der Report-Generierung.',
+            whatWorked: locale === 'en' ? 'The analysis could not be generated correctly due to a technical issue.' : locale === 'es' ? 'El análisis no se pudo generar correctamente por un error técnico.' : 'Die Analyse konnte technisch nicht korrekt erstellt werden.',
+            whatWasMissing: locale === 'en' ? 'Please click "Regenerate analysis" for another attempt.' : locale === 'es' ? 'Por favor haz clic en "Regenerar análisis" para otro intento.' : 'Bitte klicke auf "Analyse neu generieren" für einen erneuten Versuch.',
+            recruiterAdvice: locale === 'en' ? 'Another attempt should resolve the issue.' : locale === 'es' ? 'Otro intento debería resolver el problema.' : 'Ein erneuter Versuch sollte das Problem lösen.',
+            summary: locale === 'en' ? 'Technical error during report generation.' : locale === 'es' ? 'Error técnico en la generación del informe.' : 'Technischer Fehler bei der Report-Generierung.',
             dimensions: fallbackDims,
             strengths: [], improvements: [], topicSuggestions: [],
         };
@@ -273,7 +162,7 @@ NOCHMAL: observation, reason, suggestion sind KURZE STICHPUNKTE (max 8-10 Wörte
 
     if (updateError) throw new Error(`Failed to save report: ${updateError.message}`);
 
-    // 6. Log
+    // 6. Log — report processes finished session, no live user input
     await supabaseAdmin.from('generation_logs').insert({
         job_id: session.job_id,
         user_id: userId,
@@ -283,7 +172,9 @@ NOCHMAL: observation, reason, suggestion sind KURZE STICHPUNKTE (max 8-10 Wörte
         prompt_tokens: response.usage.input_tokens,
         completion_tokens: response.usage.output_tokens,
         overall_score: score,
-        generated_text: text.substring(0, 500),
+        generated_text: null,
+        content_hash: buildContentHash(text),
+        quality_summary: { pii_flags: [], sanitized: false, source: 'report' },
         created_at: new Date().toISOString(),
     });
 

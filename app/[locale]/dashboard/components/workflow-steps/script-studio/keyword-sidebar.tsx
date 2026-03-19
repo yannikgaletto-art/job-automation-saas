@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, AlertCircle, Building2 } from 'lucide-react';
 import type { ScriptBlock } from './block-editor';
@@ -18,6 +19,7 @@ interface KeywordSidebarProps {
 }
 
 export function KeywordSidebar({ keywords, blocks, mirrorPhrases = [] }: KeywordSidebarProps) {
+    const t = useTranslations('video_letter');
     // Combine all block content for keyword matching
     const allContent = useMemo(() => {
         return blocks.map(b => b.content).join(' ').toLowerCase();
@@ -41,12 +43,12 @@ export function KeywordSidebar({ keywords, blocks, mirrorPhrases = [] }: Keyword
             {/* Mirror Phrases — SPRACHE DER STELLE */}
             {mirrorPhrases.length > 0 && (
                 <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Sprache der Stelle</h4>
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t('sidebar_job_language')}</h4>
                     <div className="flex flex-wrap gap-1.5">
                         {mirrorPhrases.map((phrase) => (
                             <span
                                 key={phrase}
-                                title="Nutze diese Sprache im Video — Recruiter hören es."
+                                title={t('sidebar_tooltip_mirror')}
                                 className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 cursor-help"
                             >
                                 {phrase}
@@ -57,7 +59,7 @@ export function KeywordSidebar({ keywords, blocks, mirrorPhrases = [] }: Keyword
             )}
 
             {/* Keywords Header */}
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0">Keywords</h4>
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0">{t('sidebar_keywords')}</h4>
             {/* Summary Badge */}
             <div className="flex items-center gap-2 text-sm">
                 <div className={`px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -67,14 +69,14 @@ export function KeywordSidebar({ keywords, blocks, mirrorPhrases = [] }: Keyword
                             ? 'bg-amber-100 text-amber-700'
                             : 'bg-gray-100 text-gray-600'
                 }`}>
-                    {coveredCount}/{totalCount} Keywords
+                    {coveredCount}/{totalCount} {t('sidebar_keywords')}
                 </div>
             </div>
 
             {/* Must-Have Keywords */}
             {keywords.mustHave.length > 0 && (
                 <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Must-Have</h4>
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t('sidebar_must_have')}</h4>
                     <div className="flex flex-wrap gap-1.5">
                         <AnimatePresence mode="popLayout">
                             {keywords.mustHave.map((kw) => {
@@ -107,7 +109,7 @@ export function KeywordSidebar({ keywords, blocks, mirrorPhrases = [] }: Keyword
             {/* Nice-to-Have Keywords */}
             {keywords.niceToHave.length > 0 && (
                 <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nice-to-Have</h4>
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t('sidebar_nice_to_have')}</h4>
                     <div className="flex flex-wrap gap-1.5">
                         {keywords.niceToHave.map((kw) => {
                             const covered = isKeywordCovered(kw);
@@ -132,7 +134,7 @@ export function KeywordSidebar({ keywords, blocks, mirrorPhrases = [] }: Keyword
             {/* Company-Specific Keywords */}
             {keywords.companySpecific.length > 0 && (
                 <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Unternehmen</h4>
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t('sidebar_company')}</h4>
                     <div className="flex flex-wrap gap-1.5">
                         {keywords.companySpecific.map((kw) => {
                             const covered = isKeywordCovered(kw);

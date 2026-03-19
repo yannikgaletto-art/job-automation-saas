@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 
 interface ModeToggleProps {
     mode: 'teleprompter' | 'bullets';
@@ -8,6 +9,7 @@ interface ModeToggleProps {
 }
 
 export function ModeToggle({ mode, onChange }: ModeToggleProps) {
+    const t = useTranslations('video_letter');
     return (
         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
             {(['bullets', 'teleprompter'] as const).map((m) => (
@@ -26,7 +28,7 @@ export function ModeToggle({ mode, onChange }: ModeToggleProps) {
                         />
                     )}
                     <span className="relative z-10">
-                        {m === 'bullets' ? 'Stichpunkte' : 'Teleprompter'}
+                        {m === 'bullets' ? t('mode_bullets') : t('mode_teleprompter')}
                     </span>
                 </button>
             ))}

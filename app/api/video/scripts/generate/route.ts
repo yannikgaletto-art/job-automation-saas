@@ -61,18 +61,32 @@ export async function POST(request: NextRequest) {
             force,
             applicant_archetype,
             tone_mode,
+            locale: requestLocale,
         } = await request.json() as {
             jobId: string;
             force?: boolean;
             applicant_archetype?: string;
             tone_mode?: 'standard' | 'direct' | 'initiative';
+            locale?: string;
         };
         if (!jobId) {
             return NextResponse.json({ error: 'Missing jobId', requestId }, { status: 400 });
         }
 
         const userId = user.id;
-        log.info('Generating video script', { jobId, force: !!force, applicant_archetype, tone_mode });
+
+        // Resolve locale: request param → user_settings.language (i18n_protocol §1) → 'de'
+        let locale = requestLocale;
+        if (!locale || !['de', 'en', 'es'].includes(locale)) {
+            const { data: settings } = await supabaseAdmin
+                .from('user_settings')
+                .select('language')
+                .eq('user_id', userId)
+                .maybeSingle();
+            locale = settings?.language || 'de';
+        }
+
+        log.info('Generating video script', { jobId, force: !!force, applicant_archetype, tone_mode, locale });
 
         // Fix 1: Check for existing script before overwriting
         const { data: existingScript } = await supabaseAdmin
@@ -140,114 +154,21 @@ export async function POST(request: NextRequest) {
             ? (clDraft.metadata.generated_content as string).substring(0, 500)
             : '';
 
-        // --- Human Voice Directive ---
-        const toneCalibration = {
-            standard: `TONE_MODE: standard
-- "Sie"-Anrede im Abschluss erlaubt
-- Eröffnung mit Namen + Position (aber KEIN "bewerbe mich"-Satz)
-- Geeignet für: Konzern, Kanzlei, klassische Industrie`,
-            direct: `TONE_MODE: direct
-- "du/ihr"-Anrede im Abschluss
-- Erfahrungs-Block mit einer konkreten Zahl oder einem Datum
-- Geeignet für: Tech, Startup, Scale-up`,
-            initiative: `TONE_MODE: initiative
-- Vorstellung beginnt mit einer Beobachtung über die Firma (mirror_phrases nutzen), NICHT mit dem Namen
-- Abschluss schlägt einen konkreten nächsten Schritt vor
-- Name kommt erst in Satz 2 der Vorstellung
-- Geeignet für: wenn Stellenanzeige "ownership", "proaktiv", "self-starter" enthält
-- WICHTIG: Wenn keine konkreten Firmen-Infos, formuliere Beobachtung über Branche/Rolle. Erfinde NICHTS.`,
-        }[tone_mode ?? 'direct'] || '';
-
-        const archetypeHint = applicant_archetype ? {
-            builder: 'ARCHETYPE: Builder — Ergebnisse, Zahlen, gebaute Dinge betonen.',
-            strategist: 'ARCHETYPE: Stratege — Analyse, Denkweise, Klarheit betonen.',
-            teamplayer: 'ARCHETYPE: Teamplayer — Zusammenarbeit, gemeinsame Erfolge betonen.',
-            specialist: 'ARCHETYPE: Spezialist — Fachtiefe, technisches Wissen betonen.',
-        }[applicant_archetype] || '' : '';
-
-        // Claude Haiku: categorize keywords + generate block content + extract mirror phrases
-        const prompt = `Du schreibst Stichpunkte für ein 60-Sekunden-Video-Pitch.
-Kein Essay. Keine Präsentation. Jemand schaut in eine Kamera und redet.
-
-KONTEXT:
-- Der User liest diese Stichpunkte als Teleprompter
-- Jeder Block wird laut gesprochen, nicht gelesen
-- 60 Sekunden = ca. 130 Wörter gesamt = Kürze ist Pflicht
-- Jeder Satz muss sich natürlich anhören wenn man ihn laut sagt
-
-Firma: ${job.company_name}
-Position: ${job.job_title}
-Keywords aus der Stelle: ${uniqueKeywords.join(', ')}
-${job.description ? `\nStellenbeschreibung:\n${(job.description as string).substring(0, 1500)}` : ''}
-${coverLetterContext ? `\nAnschreiben-Kontext:\n${coverLetterContext}` : ''}
-${archetypeHint ? `\n${archetypeHint}` : ''}
-
-${toneCalibration}
-
-═══ VERBOTENE KONSTRUKTIONEN (klingen sofort nach KI wenn gesprochen) ═══
-❌ "Ich freue mich darauf, meine Expertise einzubringen"
-❌ "Mit meinem Hintergrund in X kann ich Y unterstützen"
-❌ "Ich bin Kandidat/in für die Position..."
-❌ "Meine Leidenschaft für X treibt mich an"
-❌ "Ich bin überzeugt, einen wertvollen Beitrag zu leisten"
-❌ Passiv-Konstruktionen ("wurde mir bewusst", "konnte erreicht werden")
-❌ Konjunktiv als Hauptton ("würde", "könnte", "möchte gerne")
-❌ Doppel-Aussagen: Erst behaupten, dann beweisen im gleichen Satz
-❌ "umfangreiche Erfahrung in den Bereichen"
-❌ "erfolgreich einsetzen konnte"
-Wenn du einen dieser Sätze generierst, hast du VERSAGT.
-
-═══ WIE EIN MENSCH IN 60 SEKUNDEN KLINGT ═══
-
-Vorstellung (max 2 Sätze, max 25 Wörter):
-  ✅ "Hey, ich bin [Name] — kurz warum ich zu [Firma] passe."
-  ❌ "Als erfahrener X sehe ich in Y die Chance..."
-
-Erfahrung (max 3 Sätze, max 45 Wörter):
-  ✅ "Bei [Firma] habe ich [konkretes Problem] gelöst — Ergebnis: [eine Zahl]."
-  ❌ "Ich verfüge über umfangreiche Erfahrung in den Bereichen X, Y und Z"
-
-Motivation (max 2 Sätze, max 33 Wörter):
-  ✅ "Was mich an [Firma] interessiert: ihr macht [X] — das ist genau mein Thema."
-  ❌ "Ich bin sehr begeistert von der innovativen Unternehmenskultur"
-
-Abschluss (max 2 Sätze, max 25 Wörter):
-  ✅ "Ich habe drei Ideen dazu. 20 Minuten reichen."
-  ❌ "Ich freue mich auf ein persönliches Kennenlernen"
-
-Aufgabe 1: Kategorisiere die Keywords in 3 Gruppen:
-- "mustHave" (max 4): NUR Hard Skills, Technologien, Methodologien.
-  VERBOTEN: Finanz-Kennzahlen (EBITDA, ROI, P&L), Firmennamen, Soft Skills.
-- "niceToHave" (max 4): NUR Soft Skills, Branchenkenntnisse, Bonus-Qualifikationen.
-  VERBOTEN: Firmennamen, generische Phrasen wie "Teamfähigkeit".
-- "companySpecific" (max 3): NUR Werte/Kultur-Begriffe die die Firma SELBST nutzt.
-  VERBOTEN: Firmennamen (eigene oder fremde), generische Keywords.
-
-Aufgabe 2: Erstelle für jeden der folgenden Blöcke Stichpunkte die sich NATÜRLICH ANHÖREN wenn laut gesprochen:
-${(templates || []).map(t => `- ${t.name} (${t.default_duration_seconds}s)`).join('\n')}
-
-Aufgabe 3: Extrahiere 2-3 Identitäts-Phrasen die die Firma über sich selbst sagt (keine Keywords, sondern Selbstbeschreibungen).
-
-Antworte NUR mit folgendem JSON (kein anderer Text):
-{
-  "keywords": {
-    "mustHave": ["..."],
-    "niceToHave": ["..."],
-    "companySpecific": ["..."]
-  },
-  "mirror_phrases": ["...", "..."],
-  "blocks": [
-    { "title": "Vorstellung", "content": "..." },
-    { "title": "Motivation", "content": "..." },
-    { "title": "Erfahrung", "content": "..." },
-    { "title": "Abschluss", "content": "..." }
-  ]
-}`;
+        // --- Locale-aware prompt generation ---
+        const { prompt: aiPrompt, titleMap } = getPromptByLocale(
+            locale!,
+            job,
+            uniqueKeywords,
+            coverLetterContext,
+            applicant_archetype,
+            tone_mode,
+            templates || [],
+        );
 
         const aiResponse = await anthropic.messages.create({
             model: 'claude-3-haiku-20240307',
             max_tokens: 950,
-            messages: [{ role: 'user', content: prompt }],
+            messages: [{ role: 'user', content: aiPrompt }],
         });
 
         const aiText = aiResponse.content[0].type === 'text' ? aiResponse.content[0].text : '';
@@ -266,23 +187,22 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
             }
         } catch {
             log.error('Failed to parse generate response', { raw: aiText });
-            // Continue with empty AI suggestions — don't fail the entire flow
         }
 
-        // Build blocks from templates + AI content
-        const blocks: GeneratedBlock[] = (templates || []).map((t, i) => {
-            const aiBlock = aiBlocks.find(b => b.title === t.name);
+        // Build blocks from templates + AI content (locale title-map matching)
+        const blocks: GeneratedBlock[] = (templates || []).map((tmpl, i) => {
+            const localizedTitle = titleMap[tmpl.name] || tmpl.name;
+            const aiBlock = aiBlocks.find(b => b.title === localizedTitle) || aiBlocks.find(b => b.title === tmpl.name);
             return {
                 id: crypto.randomUUID(),
-                templateId: t.id,
-                title: t.name,
-                durationSeconds: t.default_duration_seconds,
-                isRequired: t.is_required,
+                templateId: tmpl.id,
+                title: localizedTitle,
+                durationSeconds: tmpl.default_duration_seconds,
+                isRequired: tmpl.is_required,
                 content: aiBlock?.content || '',
                 sortOrder: i,
             };
         });
-
         // Upsert video_scripts row
         const { error: upsertError } = await supabaseAdmin
             .from('video_scripts')
@@ -301,7 +221,7 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
 
         if (upsertError) {
             log.error('Failed to upsert video_scripts', { error: upsertError.message });
-            return NextResponse.json({ error: 'Script konnte nicht gespeichert werden', requestId }, { status: 500 });
+            return NextResponse.json({ error: 'script_save_failed', requestId }, { status: 500 });
         }
 
         // Double-Assurance: Read-back (§1)
@@ -314,7 +234,7 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
 
         if (!verify) {
             log.error('Double-Assurance failed — script not found after upsert');
-            return NextResponse.json({ error: 'Verifikation fehlgeschlagen', requestId }, { status: 500 });
+            return NextResponse.json({ error: 'script_verify_failed', requestId }, { status: 500 });
         }
 
         // AI Audit Log (PFLICHT)
@@ -327,7 +247,7 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
             iteration: 1,
             prompt_tokens: inputTokens,
             completion_tokens: outputTokens,
-            generated_text: aiText,
+            generated_text: null,
         });
 
         log.info('Video script generated', { blockCount: blocks.length, keywordCount: uniqueKeywords.length });
@@ -352,3 +272,257 @@ Antworte NUR mit folgendem JSON (kein anderer Text):
         return NextResponse.json({ error: errMsg || 'Generation failed', requestId }, { status: 500 });
     }
 }
+
+// --- Locale-aware prompt + title-map ---
+
+interface PromptResult {
+    prompt: string;
+    titleMap: Record<string, string>;
+}
+
+function getPromptByLocale(
+    locale: string,
+    job: { company_name: string; job_title: string; description?: string | unknown },
+    uniqueKeywords: string[],
+    coverLetterContext: string,
+    applicantArchetype: string | undefined,
+    toneMode: 'standard' | 'direct' | 'initiative' | undefined,
+    templates: { name: string; default_duration_seconds: number }[],
+): PromptResult {
+    const TITLE_MAPS: Record<string, Record<string, string>> = {
+        de: { Vorstellung: 'Vorstellung', Erfahrung: 'Erfahrung', Motivation: 'Motivation', Abschluss: 'Abschluss' },
+        en: { Vorstellung: 'Introduction', Erfahrung: 'Experience', Motivation: 'Motivation', Abschluss: 'Closing' },
+        es: { Vorstellung: 'Introducción', Erfahrung: 'Experiencia', Motivation: 'Motivación', Abschluss: 'Cierre' },
+    };
+    const titleMap = TITLE_MAPS[locale] || TITLE_MAPS.de;
+    const blockList = templates.map(t => `- ${titleMap[t.name] || t.name} (${t.default_duration_seconds}s)`).join('\n');
+    const descSnippet = job.description ? (job.description as string).substring(0, 1500) : '';
+    const tm = toneMode ?? 'direct';
+
+    // Tone calibration per locale
+    const toneCalibrations: Record<string, Record<string, string>> = {
+        de: {
+            standard: 'TONE_MODE: standard\n- "Sie"-Anrede im Abschluss erlaubt\n- Eröffnung mit Namen + Position',
+            direct: 'TONE_MODE: direct\n- "du/ihr"-Anrede\n- Erfahrungs-Block mit konkreter Zahl',
+            initiative: 'TONE_MODE: initiative\n- Vorstellung beginnt mit Beobachtung über die Firma, NICHT mit dem Namen\n- Abschluss schlägt konkreten nächsten Schritt vor',
+        },
+        en: {
+            standard: 'TONE_MODE: standard\n- Formal "you" address\n- Open with name + position',
+            direct: 'TONE_MODE: direct\n- Casual "you" address\n- Experience block with a concrete number or date',
+            initiative: 'TONE_MODE: initiative\n- Introduction starts with an observation about the company, NOT with your name\n- Closing proposes a concrete next step',
+        },
+        es: {
+            standard: 'TONE_MODE: standard\n- Tratamiento formal "usted"\n- Apertura con nombre + puesto',
+            direct: 'TONE_MODE: direct\n- Tratamiento informal "tú"\n- Bloque de experiencia con número concreto',
+            initiative: 'TONE_MODE: initiative\n- Introducción comienza con observación sobre la empresa, NO con tu nombre\n- Cierre propone un siguiente paso concreto',
+        },
+    };
+    const toneCalibration = (toneCalibrations[locale] || toneCalibrations.de)[tm] || '';
+
+    // Archetype hints per locale
+    const archetypeHints: Record<string, Record<string, string>> = {
+        de: {
+            builder: 'ARCHETYPE: Builder — Ergebnisse, Zahlen, gebaute Dinge betonen.',
+            strategist: 'ARCHETYPE: Stratege — Analyse, Denkweise, Klarheit betonen.',
+            teamplayer: 'ARCHETYPE: Teamplayer — Zusammenarbeit, gemeinsame Erfolge betonen.',
+            specialist: 'ARCHETYPE: Spezialist — Fachtiefe, technisches Wissen betonen.',
+        },
+        en: {
+            builder: 'ARCHETYPE: Builder — Emphasize results, numbers, things built.',
+            strategist: 'ARCHETYPE: Strategist — Emphasize analysis, thinking, clarity.',
+            teamplayer: 'ARCHETYPE: Team Player — Emphasize collaboration, shared wins.',
+            specialist: 'ARCHETYPE: Specialist — Emphasize depth, technical expertise.',
+        },
+        es: {
+            builder: 'ARCHETYPE: Builder — Enfatizar resultados, números, cosas construidas.',
+            strategist: 'ARCHETYPE: Estratega — Enfatizar análisis, pensamiento, claridad.',
+            teamplayer: 'ARCHETYPE: Team Player — Enfatizar colaboración, logros compartidos.',
+            specialist: 'ARCHETYPE: Especialista — Enfatizar profundidad, conocimiento técnico.',
+        },
+    };
+    const archetypeHint = applicantArchetype
+        ? (archetypeHints[locale] || archetypeHints.de)[applicantArchetype] || ''
+        : '';
+
+    // Build locale-specific prompt
+    if (locale === 'en') {
+        return {
+            titleMap,
+            prompt: `You are writing bullet points for a 60-second video pitch spoken by the APPLICANT.
+No essay. No presentation. A real person looks into a camera and talks about THEMSELVES.
+
+═══ PERSPECTIVE — CRITICAL ═══
+You are writing FROM the applicant's point of view.
+✅ "I built...", "I worked at...", "I want to join..."
+❌ NEVER write as the company: "We're...", "Our mission...", "Join us..."
+❌ NEVER copy company marketing copy or job description sentences verbatim
+Every sentence must be in first-person singular ("I").
+If you write a single sentence from the company's perspective, you have FAILED.
+
+CONTEXT:
+- Each block is read aloud on camera — must sound natural when spoken
+- 60 seconds ≈ 130 words total — zero filler
+- The applicant is speaking TO the hiring manager
+
+Company: ${job.company_name}
+Position: ${job.job_title}
+Keywords from the job: ${uniqueKeywords.join(', ')}
+${descSnippet ? `\nJob description (for context only — do NOT copy verbatim):\n${descSnippet}` : ''}
+${coverLetterContext ? `\nApplicant background (inspiration only — do NOT copy this text verbatim):\n${coverLetterContext}` : ''}
+${archetypeHint ? `\n${archetypeHint}` : ''}
+
+${toneCalibration}
+
+═══ FORBIDDEN CONSTRUCTIONS ═══
+❌ "I look forward to bringing my expertise"
+❌ "With my background in X, I can support Y"
+❌ "I am a candidate for the position of..."
+❌ "My passion for X drives me"
+❌ "We're...", "Our team...", "Our mission..." (company voice — NEVER)
+❌ Passive voice, subjunctive as main tone
+If you generate any of these, you have FAILED.
+
+Task 1: Categorize keywords into 3 groups:
+- "mustHave" (max 4): hard skills, technologies
+- "niceToHave" (max 4): soft skills, industry knowledge
+- "companySpecific" (max 3): company self-description terms
+
+Task 2: Create bullet points for each block (spoken aloud, first-person applicant):
+${blockList}
+
+Task 3: Extract 2-3 identity phrases the company uses about itself (for the sidebar only).
+
+Respond ONLY with JSON:
+{
+  "keywords": { "mustHave": ["..."], "niceToHave": ["..."], "companySpecific": ["..."] },
+  "mirror_phrases": ["..."],
+  "blocks": [
+    { "title": "Introduction", "content": "..." },
+    { "title": "Experience", "content": "..." },
+    { "title": "Motivation", "content": "..." },
+    { "title": "Closing", "content": "..." }
+  ]
+}`,
+        };
+    }
+
+    if (locale === 'es') {
+        return {
+            titleMap,
+            prompt: `Estás escribiendo viñetas para un video-pitch de 60 segundos hablado por el CANDIDATO.
+No es un ensayo. Una persona real mira a la cámara y habla de SÍ MISMA.
+
+═══ PERSPECTIVA — CRÍTICO ═══
+Escribes DESDE el punto de vista del candidato.
+✅ "Construí...", "Trabajé en...", "Quiero unirme..."
+❌ NUNCA escribas como la empresa: "Somos...", "Nuestra misión...", "Únete a nosotros..."
+❌ NUNCA copies literalmente el lenguaje de marketing de la empresa
+Cada frase debe estar en primera persona singular ("yo").
+Si escribes una sola frase desde la perspectiva de la empresa, has FRACASADO.
+
+CONTEXTO:
+- Cada bloque se habla en voz alta mirando a la cámara
+- 60 segundos ≈ 130 palabras — cero relleno
+- El candidato habla AL responsable de selección
+
+Empresa: ${job.company_name}
+Puesto: ${job.job_title}
+Palabras clave del puesto: ${uniqueKeywords.join(', ')}
+${descSnippet ? `\nDescripción del puesto (solo contexto — NO copiar literalmente):\n${descSnippet}` : ''}
+${coverLetterContext ? `\nPerfil del candidato (inspiración — NO copiar este texto literalmente):\n${coverLetterContext}` : ''}
+${archetypeHint ? `\n${archetypeHint}` : ''}
+
+${toneCalibration}
+
+═══ CONSTRUCCIONES PROHIBIDAS ═══
+❌ "Espero con ilusión aportar mi experiencia"
+❌ "Con mi trayectoria en X, puedo apoyar Y"
+❌ "Soy candidato/a para el puesto de..."
+❌ "Somos...", "Nuestro equipo...", "Nuestra misión..." (voz empresa — NUNCA)
+❌ Voz pasiva, condicional como tono principal
+Si generas alguna de estas, has FRACASADO.
+
+Tarea 1: Categoriza palabras clave en 3 grupos:
+- "mustHave" (máx. 4): hard skills, tecnologías
+- "niceToHave" (máx. 4): soft skills, conocimiento sectorial
+- "companySpecific" (máx. 3): autodescripciones de la empresa
+
+Tarea 2: Crea viñetas para cada bloque (primera persona, hablado en voz alta):
+${blockList}
+
+Tarea 3: Extrae 2-3 frases de identidad de la empresa (solo para el panel lateral).
+
+Responde SOLO con JSON:
+{
+  "keywords": { "mustHave": ["..."], "niceToHave": ["..."], "companySpecific": ["..."] },
+  "mirror_phrases": ["..."],
+  "blocks": [
+    { "title": "Introducción", "content": "..." },
+    { "title": "Experiencia", "content": "..." },
+    { "title": "Motivación", "content": "..." },
+    { "title": "Cierre", "content": "..." }
+  ]
+}`,
+        };
+    }
+
+    // Default: DE
+    return {
+        titleMap,
+        prompt: `Du schreibst Stichpunkte für ein 60-Sekunden-Video-Pitch, der vom BEWERBER gesprochen wird.
+Kein Essay. Eine echte Person schaut in eine Kamera und redet über SICH SELBST.
+
+═══ PERSPEKTIVE — KRITISCH ═══
+Du schreibst AUS der Perspektive des Bewerbers.
+✅ "Ich habe gebaut...", "Ich habe bei X gearbeitet...", "Ich möchte bei euch..."
+❌ NIEMALS aus der Firmenperspektive schreiben: "Wir sind...", "Unsere Mission...", "Join us..."
+❌ NIEMALS Firmen-Marketing-Text oder Stellenbeschreibungs-Sätze wörtlich übernehmen
+Jeder Satz muss in der ersten Person Singular stehen ("ich").
+Wenn du einen einzigen Satz aus der Firmenperspektive schreibst, hast du VERSAGT.
+
+KONTEXT:
+- Jeder Block wird laut gesprochen, in die Kamera schauend
+- 60 Sekunden = ca. 130 Wörter gesamt — null Füllwörter
+- Der Bewerber spricht MIT dem Hiring Manager
+
+Firma: ${job.company_name}
+Position: ${job.job_title}
+Keywords aus der Stelle: ${uniqueKeywords.join(', ')}
+${descSnippet ? `\nStellenbeschreibung (nur Kontext — NICHT wörtlich übernehmen):\n${descSnippet}` : ''}
+${coverLetterContext ? `\nBewerber-Hintergrund (Inspiration — NICHT diesen Text wörtlich übernehmen):\n${coverLetterContext}` : ''}
+${archetypeHint ? `\n${archetypeHint}` : ''}
+
+${toneCalibration}
+
+═══ VERBOTENE KONSTRUKTIONEN ═══
+❌ "Ich freue mich darauf, meine Expertise einzubringen"
+❌ "Mit meinem Hintergrund in X kann ich Y unterstützen"
+❌ "Ich bin Kandidat/in für die Position..."
+❌ "Wir sind...", "Unser Team...", "Unsere Mission..." (Firmenstimme — NIEMALS)
+❌ Passiv-Konstruktionen, Konjunktiv als Hauptton
+Wenn du einen dieser Sätze generierst, hast du VERSAGT.
+
+Aufgabe 1: Kategorisiere die Keywords in 3 Gruppen:
+- "mustHave" (max 4): Hard Skills, Technologien
+- "niceToHave" (max 4): Soft Skills, Branchenkenntnisse
+- "companySpecific" (max 3): Firmen-Selbstbeschreibungen
+
+Aufgabe 2: Erstelle Stichpunkte für jeden Block (erste Person, laut gesprochen):
+${blockList}
+
+Aufgabe 3: Extrahiere 2-3 Identitäts-Phrasen der Firma (nur für die Seitenleiste).
+
+Antworte NUR mit JSON:
+{
+  "keywords": { "mustHave": ["..."], "niceToHave": ["..."], "companySpecific": ["..."] },
+  "mirror_phrases": ["..."],
+  "blocks": [
+    { "title": "Vorstellung", "content": "..." },
+    { "title": "Erfahrung", "content": "..." },
+    { "title": "Motivation", "content": "..." },
+    { "title": "Abschluss", "content": "..." }
+  ]
+}`,
+    };
+}
+

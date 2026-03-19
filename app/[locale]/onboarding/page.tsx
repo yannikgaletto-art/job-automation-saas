@@ -2,13 +2,38 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from '@/i18n/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Briefcase, Chrome, Plus, Search, Mail, CheckCircle2 } from 'lucide-react';
 
-// ─── Step Definitions ─────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 2;
+
+const GOAL_OPTIONS = [
+    { key: 'active_applications', labelKey: 'goal_applications' },
+    { key: 'personalization', labelKey: 'goal_personalization' },
+    { key: 'exploring', labelKey: 'goal_exploring' },
+    { key: 'interview_prep', labelKey: 'goal_interview' },
+] as const;
+
+// Animation sequence timing (ms from start):
+// [0]  label_before                              →     0ms
+// [1]  Line a (before_1)                        →   600ms  (+0.6s)
+// [2]  Line b (before_2)                        →  2600ms  (+2s)
+// [3]  Line c (before_3)                        →  3600ms  (+1s)
+// [4]  label_after                               →  8600ms  (+5s pause ← user request)
+// [5]  Line d (after_1)                         →  9100ms  (+0.5s)
+// [6]  Line e (after_2)                         →  9600ms  (+0.5s)
+// [7]  Line f (after_3)                         → 10100ms  (+0.5s)
+// [8]  Question toggle                           → 13100ms  (+3s pause)
+// [9]  Goal 1                                    → 13400ms
+// [10] Goal 2                                    → 13700ms
+// [11] Goal 3                                    → 14000ms
+// [12] Goal 4                                    → 14300ms
+const SEQUENCE_DELAYS = [0, 600, 2600, 3600, 8600, 9100, 9600, 10100, 13100, 13400, 13700, 14000, 14300];
+const TOTAL_SEQUENCE_ITEMS = SEQUENCE_DELAYS.length;
+
+// ─── Step Indicator ───────────────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: number }) {
     const t = useTranslations('onboarding');
@@ -17,10 +42,9 @@ function StepIndicator({ current }: { current: number }) {
             {Array.from({ length: TOTAL_STEPS }, (_, i) => (
                 <div
                     key={i}
-                    className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${i + 1 <= current
-                        ? 'bg-[#002e7a] scale-110'
-                        : 'bg-[#E7E7E5]'
-                        }`}
+                    className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                        i + 1 <= current ? 'bg-[#002e7a] scale-110' : 'bg-[#E7E7E5]'
+                    }`}
                 />
             ))}
             <span className="ml-3 text-xs text-[#94a3b8]">
@@ -41,16 +65,16 @@ const slideVariants = {
 
 export default function OnboardingPage() {
     const router = useRouter();
+    const locale = useLocale();
     const t = useTranslations('onboarding');
     const [step, setStep] = useState(1);
+    const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
     const [privacyAccepted, setPrivacyAccepted] = useState(false);
     const [aiProcessingAccepted, setAiProcessingAccepted] = useState(false);
-    const [termsAccepted, setTermsAccepted] = useState(false);
     const [completing, setCompleting] = useState(false);
     const [completionError, setCompletionError] = useState<string | null>(null);
 
-    // ✅ Mount-guard: if user has already completed onboarding → skip to dashboard
-    // (SICHERHEITSARCHITEKTUR.md Section 1)
+    // ✅ Mount-guard: if already completed → skip to dashboard
     useEffect(() => {
         const checkStatus = async () => {
             try {
@@ -58,46 +82,21 @@ export default function OnboardingPage() {
                 const data = await res.json() as { completed: boolean };
                 if (data.completed) router.replace('/dashboard');
             } catch {
-                // Non-blocking: if this fails, user stays on onboarding
+                // Non-blocking
             }
         };
         checkStatus();
-    }, []); // No dependencies — runs only once on mount
-
-    // Confetti on mount (Step 1 only)
-    useEffect(() => {
-        if (step === 1) {
-            import('canvas-confetti').then(({ default: confetti }) => {
-                const duration = 2000;
-                const end = Date.now() + duration;
-
-                const frame = () => {
-                    confetti({
-                        particleCount: 3,
-                        angle: 60,
-                        spread: 55,
-                        origin: { x: 0, y: 0.7 },
-                        colors: ['#002e7a', '#3b82f6', '#60a5fa', '#93c5fd'],
-                    });
-                    confetti({
-                        particleCount: 3,
-                        angle: 120,
-                        spread: 55,
-                        origin: { x: 1, y: 0.7 },
-                        colors: ['#002e7a', '#3b82f6', '#60a5fa', '#93c5fd'],
-                    });
-                    if (Date.now() < end) {
-                        requestAnimationFrame(frame);
-                    }
-                };
-                frame();
-            });
-        }
-    }, [step]);
+    }, []);
 
     const next = useCallback(() => setStep((s) => Math.min(s + 1, TOTAL_STEPS)), []);
 
-    const allConsentsGiven = privacyAccepted && aiProcessingAccepted && termsAccepted;
+    const toggleGoal = useCallback((key: string) => {
+        setSelectedGoals((prev) =>
+            prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+        );
+    }, []);
+
+    const allConsentsGiven = privacyAccepted && aiProcessingAccepted;
 
     const handleComplete = async () => {
         if (!allConsentsGiven || completing) return;
@@ -108,13 +107,20 @@ export default function OnboardingPage() {
             const res = await fetch('/api/onboarding/complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ step: 5 }),
+                body: JSON.stringify({
+                    step: 2,
+                    language: locale,
+                    onboarding_goals: selectedGoals,
+                    consents: [
+                        { document_type: 'privacy_policy', document_version: 'v1.0', consent_given: true },
+                        { document_type: 'ai_processing', document_version: 'v1.0', consent_given: true },
+                    ],
+                }),
             });
             const data = await res.json() as { success: boolean; error?: string };
 
-            // ✅ router.push NUR bei verifiziertem success:true (SICHERHEITSARCHITEKTUR.md Section 1)
             if (!res.ok || !data.success) {
-                setCompletionError(t('step5.error_save'));
+                setCompletionError(t('step2.error_save'));
                 setCompleting(false);
                 return;
             }
@@ -122,7 +128,7 @@ export default function OnboardingPage() {
             router.push('/dashboard');
         } catch (err) {
             console.error('[Onboarding] Network error:', err);
-            setCompletionError(t('step5.error_network'));
+            setCompletionError(t('step2.error_network'));
             setCompleting(false);
         }
     };
@@ -152,7 +158,11 @@ export default function OnboardingPage() {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                             >
-                                <Step1Welcome onNext={next} />
+                                <Step1Goals
+                                    selectedGoals={selectedGoals}
+                                    onToggleGoal={toggleGoal}
+                                    onNext={next}
+                                />
                             </motion.div>
                         )}
                         {step === 2 && (
@@ -164,49 +174,11 @@ export default function OnboardingPage() {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                             >
-                                <Step2QuickStart onNext={next} />
-                            </motion.div>
-                        )}
-                        {step === 3 && (
-                            <motion.div
-                                key="step-3"
-                                variants={slideVariants}
-                                initial="enter"
-                                animate="center"
-                                exit="exit"
-                                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                            >
-                                <Step3JobQueue onNext={next} />
-                            </motion.div>
-                        )}
-                        {step === 4 && (
-                            <motion.div
-                                key="step-4"
-                                variants={slideVariants}
-                                initial="enter"
-                                animate="center"
-                                exit="exit"
-                                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                            >
-                                <Step4Feedback onNext={next} />
-                            </motion.div>
-                        )}
-                        {step === 5 && (
-                            <motion.div
-                                key="step-5"
-                                variants={slideVariants}
-                                initial="enter"
-                                animate="center"
-                                exit="exit"
-                                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                            >
-                                <Step5Consent
+                                <Step2Consent
                                     privacyAccepted={privacyAccepted}
                                     aiProcessingAccepted={aiProcessingAccepted}
-                                    termsAccepted={termsAccepted}
                                     onTogglePrivacy={() => setPrivacyAccepted((v) => !v)}
                                     onToggleAI={() => setAiProcessingAccepted((v) => !v)}
-                                    onToggleTerms={() => setTermsAccepted((v) => !v)}
                                     onComplete={handleComplete}
                                     completing={completing}
                                     error={completionError}
@@ -220,9 +192,17 @@ export default function OnboardingPage() {
     );
 }
 
-// ─── Step Components ──────────────────────────────────────────────────────────
+// ─── Shared Button ────────────────────────────────────────────────────────────
 
-function StepButton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+function StepButton({
+    onClick,
+    disabled,
+    children,
+}: {
+    onClick: () => void;
+    disabled?: boolean;
+    children: React.ReactNode;
+}) {
     return (
         <motion.button
             whileHover={{ scale: 1.02 }}
@@ -236,203 +216,306 @@ function StepButton({ onClick, disabled, children }: { onClick: () => void; disa
     );
 }
 
-function Step1Welcome({ onNext }: { onNext: () => void }) {
-    const t = useTranslations('onboarding.step1');
-    return (
-        <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-            <h1 className="text-2xl font-bold text-[#0f172a] mb-6">
-                {t('title')}
-            </h1>
-            <div className="bg-[#f8fafc] rounded-xl p-6 mb-8 text-left space-y-4">
-                <p className="text-sm text-[#334155] leading-relaxed"
-                   dangerouslySetInnerHTML={{ __html: t.raw('paragraph1') }}
-                />
-                <p className="text-sm text-[#334155] leading-relaxed"
-                   dangerouslySetInnerHTML={{ __html: t.raw('paragraph2') }}
-                />
-                <p className="text-sm text-[#334155] leading-relaxed"
-                   dangerouslySetInnerHTML={{ __html: t.raw('paragraph3') }}
-                />
-            </div>
-            <StepButton onClick={onNext}>{t('button')}</StepButton>
-        </div>
-    );
-}
+// ─── Step 1: Sequential Animated Text + Goals ─────────────────────────────────
 
-function Step2QuickStart({ onNext }: { onNext: () => void }) {
-    const t = useTranslations('onboarding.step2');
-    const cards = [
-        {
-            icon: Chrome,
-            title: t('card_extension_title'),
-            desc: t('card_extension_desc'),
-        },
-        {
-            icon: Plus,
-            title: t('card_add_job_title'),
-            desc: t('card_add_job_desc'),
-        },
-        {
-            icon: Search,
-            title: t('card_search_title'),
-            desc: t('card_search_desc'),
-        },
-    ];
+function Step1Goals({
+    selectedGoals,
+    onToggleGoal,
+    onNext,
+}: {
+    selectedGoals: string[];
+    onToggleGoal: (key: string) => void;
+    onNext: () => void;
+}) {
+    const t = useTranslations('onboarding.step1');
+
+    // visible[i] = true when item i should appear
+    const [visible, setVisible] = useState<boolean[]>(
+        Array(TOTAL_SEQUENCE_ITEMS).fill(false)
+    );
+
+    // State-driven sequential reveal — reliable in all browsers, no CSS-delay issues
+    useEffect(() => {
+        const timers: ReturnType<typeof setTimeout>[] = [];
+        SEQUENCE_DELAYS.forEach((delay, i) => {
+            timers.push(
+                setTimeout(() => {
+                    setVisible((prev) => {
+                        const next = [...prev];
+                        next[i] = true;
+                        return next;
+                    });
+                }, delay)
+            );
+        });
+        return () => timers.forEach(clearTimeout);
+    }, []);
+
+    const [toggleOpen, setToggleOpen] = useState(false);
+
+    const fadeIn: React.CSSProperties = {
+        transition: 'opacity 400ms ease-out, transform 400ms ease-out',
+    };
+    const show: React.CSSProperties = { opacity: 1, transform: 'translateY(0)' };
+    const hide: React.CSSProperties = { opacity: 0, transform: 'translateY(8px)' };
 
     return (
         <div className="bg-white rounded-2xl shadow-lg p-8">
-            <h2 className="text-xl font-bold text-[#0f172a] mb-6 text-center">
-                {t('title')}
-            </h2>
-            <div className="space-y-4 mb-8">
-                {cards.map((card) => (
-                    <div
-                        key={card.title}
-                        className="flex items-start gap-4 p-4 rounded-xl bg-[#f8fafc] border border-[#E7E7E5]"
-                    >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#002e7a]/10 flex items-center justify-center">
-                            <card.icon className="w-5 h-5 text-[#002e7a]" />
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-semibold text-[#0f172a] mb-1">{card.title}</h3>
-                            <p className="text-xs text-[#64748b] leading-relaxed">{card.desc}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-            <StepButton onClick={onNext}>{t('button')}</StepButton>
-        </div>
-    );
-}
 
-function Step3JobQueue({ onNext }: { onNext: () => void }) {
-    const t = useTranslations('onboarding.step3');
-    return (
-        <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-[#002e7a]/10 flex items-center justify-center mx-auto mb-6">
-                <Briefcase className="w-8 h-8 text-[#002e7a]" />
-            </div>
-            <h2 className="text-xl font-bold text-[#0f172a] mb-4">
-                {t('title')}
-            </h2>
-            <p className="text-sm text-[#64748b] leading-relaxed mb-8">
-                {t('description')}
-            </p>
-            <StepButton onClick={onNext}>{t('button')}</StepButton>
-        </div>
-    );
-}
+            {/* ── Before section ─────────────────────────────── */}
 
-function Step4Feedback({ onNext }: { onNext: () => void }) {
-    const t = useTranslations('onboarding.step4');
-    return (
-        <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-[#002e7a]/10 flex items-center justify-center mx-auto mb-6">
-                <Mail className="w-8 h-8 text-[#002e7a]" />
-            </div>
-            <h2 className="text-xl font-bold text-[#0f172a] mb-4">
-                {t('title')}
-            </h2>
-            <p className="text-sm text-[#64748b] leading-relaxed mb-4">
-                {t('description')}
-            </p>
-            <a
-                href="mailto:yannik.galetto@gmail.com"
-                className="inline-block text-sm font-medium text-[#002e7a] hover:underline mb-8"
+            {/* Label: bold, grey, uppercase */}
+            <p
+                style={{ ...fadeIn, ...(visible[0] ? show : hide) }}
+                className="text-xs font-bold text-[#94a3b8] uppercase tracking-widest mb-3"
             >
-                yannik.galetto@gmail.com
-            </a>
-            <StepButton onClick={onNext}>{t('button')}</StepButton>
+                {t('label_before')}
+            </p>
+
+            {/* Before lines: normal weight */}
+            <div className="mb-8 space-y-1.5">
+                <p style={{ ...fadeIn, ...(visible[1] ? show : hide) }} className="text-sm text-[#94a3b8] font-normal">
+                    {t('before_line_1')}
+                </p>
+                <p style={{ ...fadeIn, ...(visible[2] ? show : hide) }} className="text-sm text-[#94a3b8] font-normal">
+                    {t('before_line_2')}
+                </p>
+                <p style={{ ...fadeIn, ...(visible[3] ? show : hide) }} className="text-sm text-[#94a3b8] font-normal">
+                    {t('before_line_3')}
+                </p>
+            </div>
+
+            {/* ── After section ──────────────────────────────── */}
+
+            {/* Label: bold, navy, uppercase */}
+            <p
+                style={{ ...fadeIn, ...(visible[4] ? show : hide) }}
+                className="text-xs font-bold text-[#002e7a] uppercase tracking-widest mb-3"
+            >
+                {t('label_after')}
+            </p>
+
+            {/* After lines: normal weight (user request) */}
+            <div className="mb-10 space-y-1.5">
+                <p style={{ ...fadeIn, ...(visible[5] ? show : hide) }} className="text-sm text-[#002e7a] font-normal">
+                    {t('after_line_1')}
+                </p>
+                <p style={{ ...fadeIn, ...(visible[6] ? show : hide) }} className="text-sm text-[#002e7a] font-normal">
+                    {t('after_line_2')}
+                </p>
+                <p style={{ ...fadeIn, ...(visible[7] ? show : hide) }} className="text-sm text-[#002e7a] font-normal">
+                    {t('after_line_3')}
+                </p>
+            </div>
+
+            {/* ── Question: Notion-style toggle ──────────────── */}
+
+            <div style={{ ...fadeIn, ...(visible[8] ? show : hide) }}>
+                {/* Toggle header */}
+                <button
+                    onClick={() => setToggleOpen((o) => !o)}
+                    className="flex items-center gap-2 mb-4 group w-full text-left"
+                >
+                    <motion.span
+                        animate={{ rotate: toggleOpen ? 90 : 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className="text-[#94a3b8] group-hover:text-[#37352F] transition-colors flex-shrink-0"
+                    >
+                        {/* Notion-style triangle chevron */}
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path
+                                d="M6 4l4 4-4 4"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                    </motion.span>
+                    <span className="text-base font-semibold text-[#0f172a] group-hover:text-[#002e7a] transition-colors">
+                        {t('question')}
+                    </span>
+                </button>
+
+                {/* Collapsible goals — smooth Notion-style expand */}
+                <AnimatePresence initial={false}>
+                    {toggleOpen && (
+                        <motion.div
+                            key="goals-content"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25, ease: 'easeInOut' }}
+                            style={{ overflow: 'hidden' }}
+                        >
+                            <div className="space-y-2 mb-6 pl-6">
+                                {GOAL_OPTIONS.map((goal, idx) => {
+                                    const isSelected = selectedGoals.includes(goal.key);
+                                    // Goals appear one by one: visible[9..12]
+                                    const goalVisible = visible[9 + idx];
+                                    return (
+                                        <label
+                                            key={goal.key}
+                                            style={{ ...fadeIn, ...(goalVisible ? show : hide) }}
+                                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer select-none transition-colors duration-200 ${
+                                                isSelected
+                                                    ? 'border-[#002e7a] bg-[#002e7a]/5'
+                                                    : 'border-[#E7E7E5] hover:border-[#002e7a]/30'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                                                    isSelected
+                                                        ? 'bg-[#002e7a] border-[#002e7a]'
+                                                        : 'border-[#D6D6D3] bg-white'
+                                                }`}
+                                                style={{ width: '18px', height: '18px' }}
+                                            >
+                                                {isSelected && (
+                                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => onToggleGoal(goal.key)}
+                                                className="sr-only"
+                                            />
+                                            <span className="text-sm text-[#37352F]">{t(goal.labelKey)}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* CTA always visible — independent of toggle state */}
+                <div className="mt-6">
+                    <StepButton onClick={onNext}>{t('button')}</StepButton>
+                </div>
+            </div>
         </div>
     );
 }
 
-function Step5Consent({
+// ─── Step 2: DSGVO Consent — Trust Block + 2 Checkboxen ──────────────────────
+
+const TRUST_POINTS = [
+    { titleKey: 'trust_1_title', detailKey: 'trust_1_detail' },
+    { titleKey: 'trust_2_title', detailKey: 'trust_2_detail' },
+    { titleKey: 'trust_3_title', detailKey: 'trust_3_detail' },
+] as const;
+
+function Step2Consent({
     privacyAccepted,
     aiProcessingAccepted,
-    termsAccepted,
     onTogglePrivacy,
     onToggleAI,
-    onToggleTerms,
     onComplete,
     completing,
     error,
 }: {
     privacyAccepted: boolean;
     aiProcessingAccepted: boolean;
-    termsAccepted: boolean;
     onTogglePrivacy: () => void;
     onToggleAI: () => void;
-    onToggleTerms: () => void;
     onComplete: () => void;
     completing: boolean;
     error: string | null;
 }) {
-    const t = useTranslations('onboarding.step5');
-    const allAccepted = privacyAccepted && aiProcessingAccepted && termsAccepted;
+    const t = useTranslations('onboarding.step2');
+    const allAccepted = privacyAccepted && aiProcessingAccepted;
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-[#002e7a]/10 flex items-center justify-center mx-auto mb-6">
-                <CheckCircle2 className="w-8 h-8 text-[#002e7a]" />
-            </div>
-            <h2 className="text-xl font-bold text-[#0f172a] mb-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8">
+            {/* Title + Description — left-aligned */}
+            <h2 className="text-xl font-bold text-[#0f172a] mb-2">
                 {t('title')}
             </h2>
-            <p className="text-sm text-[#64748b] leading-relaxed mb-6">
+            <p className="text-sm text-[#64748b] leading-relaxed mb-8">
                 {t('description')}
             </p>
 
+            {/* Trust Block — 3 technical facts, no borders */}
+            <div className="space-y-5 mb-8">
+                {TRUST_POINTS.map((point) => (
+                    <div key={point.titleKey} className="flex gap-3">
+                        {/* Checkmark */}
+                        <svg className="w-5 h-5 text-[#002e7a] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <div>
+                            <p className="text-sm font-medium text-[#0f172a]">{t(point.titleKey)}</p>
+                            <p className="text-xs text-[#94a3b8] mt-0.5">{t(point.detailKey)}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-[#E7E7E5] mb-6" />
+
+            {/* Consent Checkboxes — 2 only (no TOS) */}
             <div className="space-y-3 mb-8 text-left">
-                <label className="flex items-start gap-3 cursor-pointer select-none p-3 rounded-lg border border-[#E7E7E5] hover:border-[#002e7a]/30 transition-colors">
-                    <input
-                        type="checkbox"
-                        checked={privacyAccepted}
-                        onChange={onTogglePrivacy}
-                        className="w-4 h-4 mt-0.5 rounded border-[#D6D6D3] text-[#002e7a] focus:ring-[#002e7a] cursor-pointer"
-                    />
-                    <span className="text-sm text-[#37352F]"
-                          dangerouslySetInnerHTML={{
-                              __html: t.raw('privacy_label')
-                                  .replace('<privacyLink>', '<a href="/legal/privacy-policy" target="_blank" rel="noopener noreferrer" class="text-[#002e7a] underline hover:text-[#001d4f]">')
-                                  .replace('</privacyLink>', '</a>')
-                          }}
-                    />
-                </label>
-
-                <label className="flex items-start gap-3 cursor-pointer select-none p-3 rounded-lg border border-[#E7E7E5] hover:border-[#002e7a]/30 transition-colors">
-                    <input
-                        type="checkbox"
-                        checked={aiProcessingAccepted}
-                        onChange={onToggleAI}
-                        className="w-4 h-4 mt-0.5 rounded border-[#D6D6D3] text-[#002e7a] focus:ring-[#002e7a] cursor-pointer"
-                    />
-                    <span className="text-sm text-[#37352F]"
-                          dangerouslySetInnerHTML={{
-                              __html: t.raw('ai_label')
-                                  .replace('<aiLink>', '<a href="/legal/ai-processing" target="_blank" rel="noopener noreferrer" class="text-[#002e7a] underline hover:text-[#001d4f]">')
-                                  .replace('</aiLink>', '</a>')
-                          }}
+                {/* Privacy Policy */}
+                <label className={`flex items-start gap-3 cursor-pointer select-none p-3 rounded-lg border transition-colors ${
+                    privacyAccepted ? 'border-[#002e7a] bg-[#002e7a]/5' : 'border-[#E7E7E5] hover:border-[#002e7a]/30'
+                }`}>
+                    <div
+                        className={`rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                            privacyAccepted ? 'bg-[#002e7a] border-[#002e7a]' : 'border-[#D6D6D3] bg-white'
+                        }`}
+                        style={{ width: '18px', height: '18px' }}
+                    >
+                        {privacyAccepted && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
+                    </div>
+                    <input type="checkbox" checked={privacyAccepted} onChange={onTogglePrivacy} className="sr-only" />
+                    <span
+                        className="text-sm text-[#37352F]"
+                        dangerouslySetInnerHTML={{
+                            __html: t.raw('privacy_label')
+                                .replace('<privacyLink>', '<a href="/legal/privacy-policy" target="_blank" rel="noopener noreferrer" class="text-[#002e7a] underline hover:text-[#001d4f]">')
+                                .replace('</privacyLink>', '</a>'),
+                        }}
                     />
                 </label>
 
-                <label className="flex items-start gap-3 cursor-pointer select-none p-3 rounded-lg border border-[#E7E7E5] hover:border-[#002e7a]/30 transition-colors">
-                    <input
-                        type="checkbox"
-                        checked={termsAccepted}
-                        onChange={onToggleTerms}
-                        className="w-4 h-4 mt-0.5 rounded border-[#D6D6D3] text-[#002e7a] focus:ring-[#002e7a] cursor-pointer"
-                    />
-                    <span className="text-sm text-[#37352F]"
-                          dangerouslySetInnerHTML={{
-                              __html: t.raw('terms_label')
-                                  .replace('<termsLink>', '<a href="/legal/terms-of-service" target="_blank" rel="noopener noreferrer" class="text-[#002e7a] underline hover:text-[#001d4f]">')
-                                  .replace('</termsLink>', '</a>')
-                          }}
+                {/* AI Processing */}
+                <label className={`flex items-start gap-3 cursor-pointer select-none p-3 rounded-lg border transition-colors ${
+                    aiProcessingAccepted ? 'border-[#002e7a] bg-[#002e7a]/5' : 'border-[#E7E7E5] hover:border-[#002e7a]/30'
+                }`}>
+                    <div
+                        className={`rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                            aiProcessingAccepted ? 'bg-[#002e7a] border-[#002e7a]' : 'border-[#D6D6D3] bg-white'
+                        }`}
+                        style={{ width: '18px', height: '18px' }}
+                    >
+                        {aiProcessingAccepted && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
+                    </div>
+                    <input type="checkbox" checked={aiProcessingAccepted} onChange={onToggleAI} className="sr-only" />
+                    <span
+                        className="text-sm text-[#37352F]"
+                        dangerouslySetInnerHTML={{
+                            __html: t.raw('ai_label')
+                                .replace('<aiLink>', '<a href="/legal/ai-processing" target="_blank" rel="noopener noreferrer" class="text-[#002e7a] underline hover:text-[#001d4f]">')
+                                .replace('</aiLink>', '</a>'),
+                        }}
                     />
                 </label>
             </div>
 
+            {/* CTA */}
             <StepButton onClick={onComplete} disabled={!allAccepted || completing}>
                 {completing ? t('submitting') : t('submit')}
             </StepButton>

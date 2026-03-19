@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 3.4
-**Last Updated:** 2026-03-18
+**Version:** 3.5
+**Last Updated:** 2026-03-19
 
 ---
 
@@ -76,6 +76,7 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | Job Search Pipeline | @/lib/services/job-search-pipeline |
 | Onboarding Store | @/store/use-onboarding-store |
 | Company Card | @/components/company/company-intel-card |
+| Mood Symbols (Tag/Nacht) | @/lib/mood/mood-symbols |
 
 ---
 
@@ -103,6 +104,7 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **Formality Toggle i18n (2026-03-18)** | **`language === 'de'` → `language !== 'en' && locale !== 'en'`. ES zeigt Usted/Tú. EN komplett ausgeblendet (kein formell/informell). EN-Locale-Keys von German auf English korrigiert** |
 | **Numbers Saved Button (2026-03-18)** | **Redesign: kleiner right-aligned button → full-width dark-navy matching "Start optimization". Label vereinfacht: "OK — numbers saved" → "Numbers Saved" / "Zahlen gespeichert"** |
 | **Hiring Manager Critique (2026-03-18)** | **Fix: API 400-Error bei leerem `companyName` → Fallback "the company". Locale-aware Prompts: DE/EN/ES. `locale` Prop in `CoverLetterResultView` via `useLocale()` → Critique antwortet in App-Locale** |
+| **Mood Check-in V2 (2026-03-19)** | **Adaptive Check-in mit Tag/Nacht-Symbolen (🌧️→☀️ / 🌑→🌕). Progressive Reduction: 5× Skip → auto-hide. `MoodCheckinContext` in `layout.tsx`. `useMoodCheckIn.tsx` mit Ref-basierter Auth-Subscription (kein Memory Leak). API GET/POST/PATCH mit `.maybeSingle()` und Fail-open. `CheckinSettingsCard` in Settings. i18n (de/en/es). `lib/mood/mood-symbols.ts` als kanonische Utility.** |
 
 ---
 

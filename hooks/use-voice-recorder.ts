@@ -270,6 +270,15 @@ export function useVoiceRecorder({
             const formData = new FormData();
             formData.append('audio', audioBlob, `recording.${ext}`);
 
+            // Derive locale from [locale] URL segment for Whisper language.
+            // Guard: only pass known locales — unknown path segments fallback to 'de'.
+            const SUPPORTED_LOCALES = ['de', 'en', 'es'];
+            const pathSegment = typeof window !== 'undefined'
+                ? window.location.pathname.split('/')[1] || 'de'
+                : 'de';
+            const pathLocale = SUPPORTED_LOCALES.includes(pathSegment) ? pathSegment : 'de';
+            formData.append('locale', pathLocale);
+
             const res = await fetch('/api/coaching/transcribe', {
                 method: 'POST',
                 body: formData,

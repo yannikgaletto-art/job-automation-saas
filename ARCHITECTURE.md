@@ -184,7 +184,7 @@ Zwei separate Terminal-Prozesse sind **IMMER** erforderlich:
 
 ### Kern-Tabellen:
 - `auth.users` (Supabase Auth)
-- `user_profiles` (PII-Verschlüsselung, CV Structured Data, Preferences)
+- `user_profiles` (PII-Verschlüsselung, CV Structured Data, Preferences, Mood Check-in: `checkin_skip_streak`, `show_checkin`)
 - `user_settings` (Onboarding Status, Active CV, LinkedIn/Target Role)
 - `consent_history` (DSGVO Art. 7 Zustimmungen)
 - `documents` (CVs & Anschreiben, PII als JSONB)
@@ -196,7 +196,7 @@ Zwei separate Terminal-Prozesse sind **IMMER** erforderlich:
 - `company_research` (Perplexity-Cache für Unternehmens-Analysen)
 - `application_history` (Manuelles & Auto Tracking)
 - `form_selectors` (Lernsystem für Bewerbungsformulare)
-- `generation_logs` (AI Audit: Token usage & Scores)
+- `generation_logs` (AI Audit: Token usage & Scores — `generated_text` nullable + cleared by Phase 1, write-path NULL'd by Phase 2. `content_hash` for audit.)
 - `validation_logs` (Cover Letter Validation Audit)
 - `job_certificates` (KI-generierte Zertifikats-Empfehlungen)
 - `tasks` (Timeblocking + Focus Mode, source: manual/pulse/coaching)
@@ -204,13 +204,49 @@ Zwei separate Terminal-Prozesse sind **IMMER** erforderlich:
 - `mood_checkins` (Stimmungs-Tracking)
 - `daily_energy` (Energie-Tracking)
 - `daily_briefings` (Tägliche Briefing-Nachrichten)
-- `coaching_sessions` (Interview-Training Sessions)
+- `coaching_sessions` (Interview-Training Sessions — 90d Anonymisierung, 180d Löschung via pg_cron)
 - `community_profiles`, `community_posts`, `community_comments`, `community_upvotes`
 - `volunteering_opportunities`, `volunteering_bookmarks`, `volunteering_votes`
 - `video_approaches` (Video-Token, Upload-Status, Expiry)
 - `video_scripts` (Script Studio: Blocks, Mode, Keywords)
 - `script_block_templates` (System- und Custom-Blockvorlagen)
 - `schema_version` (Interne Versionierung)
+
+---
+
+## 4.1 DATA RETENTION POLICIES (DSGVO — Migrations 20260319)
+
+**Phase 1 — Datenbank-Härtung (deployed ✅):**
+
+| pg_cron Job | Schedule | Aktion | Scope |
+|---|---|---|---|
+| `anonymize-coaching-daily` | 03:00 UTC täglich | 90d: `conversation_history → '[]'`, `coaching_dossier → NULL`. 180d: DELETE. | Nur `completed`/`abandoned` Sessions |
+| `cleanup-serpapi-weekly` | 04:00 UTC montags | `serpapi_raw = NULL` nach 30 Tagen | Nur Terminal-States (`submitted`/`rejected`/`archived`) |
+| `cleanup-firecrawl-weekly` | 05:00 UTC dienstags | `firecrawl_markdown = NULL` nach 14 Tagen | Nur Terminal-States |
+
+**Phase 2 — App-Code-Härtung:**
+
+- `lib/services/pii-sanitizer.ts` — Standalone PII-Pseudonymisierung (de/en/es) vor Claude-API-Calls (DSGVO Art. 28)
+- 5 `generated_text` Write-Pfade auf NULL umgestellt (coaching-service, coaching-report, video-scripts, video-talking-points)
+- `content_hash` (SHA256) für Audit ohne Klartext
+
+**Phase 3 — Audit-Trail + Privacy Policy:**
+
+- `quality_summary` JSONB in `generation_logs` befüllt (`pii_flags`, `sanitized` boolean)
+- Privacy Policy: Azure DI als Sub-Processor, Pseudonymisierungs-Hinweis, Coaching-Retention
+
+---
+
+## 4.2 LEGAL — DRITTLANDTRANSFER STATUS (Art. 46 DSGVO)
+> Last Updated: 2026-03-19
+
+| Anbieter | SCCs | DPA | Zero Data Retention | Status |
+|---|---|---|---|---|
+| Anthropic | ⬜ Angefordert | ⬜ Pending | N/A | 🟡 In Progress |
+| OpenAI | ✅ Standard ToS | ⬜ Pending | ⬜ Aktivieren | 🟡 In Progress |
+| Azure | ✅ Enterprise Agreement | ✅ Inkludiert | N/A (EU Region) | ✅ Compliant |
+| SerpAPI | ⬜ Angefordert | ⬜ Pending | N/A | 🟡 In Progress |
+| Perplexity | ⬜ Angefordert | ⬜ Pending | N/A | 🟡 In Progress |
 
 ---
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Clock, Loader2, Building2, BriefcaseBusiness, PlayCircle, ExternalLink, FileText, BookOpen, GraduationCap, Trash2, CheckCircle2 } from 'lucide-react';
@@ -83,6 +83,7 @@ interface PastSession {
 export default function CoachingPage() {
     const router = useRouter();
     const t = useTranslations('dashboard.coaching');
+    const locale = useLocale();
     const [jobs, setJobs] = useState<JobForCoaching[]>([]);
     const [pastSessions, setPastSessions] = useState<PastSession[]>([]);
     const [loading, setLoading] = useState(true);
@@ -453,7 +454,7 @@ export default function CoachingPage() {
                                         {t('modal_cv_title')}
                                     </h3>
                                     <p className="text-sm mb-5" style={{ color: MUTED }}>
-                                        {selectedJob.job_title} bei {selectedJob.company_name}
+                                        {selectedJob.job_title} {t('modal_cv_at')} {selectedJob.company_name}
                                     </p>
                                     {loadingCvs ? (
                                         <div className="flex items-center justify-center py-8">
@@ -481,7 +482,7 @@ export default function CoachingPage() {
                                                                 {cv.name}
                                                             </span>
                                                             <span className="text-[10px]" style={{ color: MUTED }}>
-                                                                Hochgeladen am {new Date(cv.createdAt).toLocaleDateString('de-DE')}
+                                                                {t('modal_cv_uploaded', { date: new Date(cv.createdAt).toLocaleDateString(locale === 'en' ? 'en-US' : locale === 'es' ? 'es-ES' : 'de-DE') })}
                                                             </span>
                                                         </div>
                                                     </button>
@@ -511,7 +512,7 @@ export default function CoachingPage() {
                                         {t('modal_round_title')}
                                     </h3>
                                     <p className="text-sm mb-5" style={{ color: MUTED }}>
-                                        {selectedJob.job_title} bei {selectedJob.company_name}
+                                        {selectedJob.job_title} {t('modal_cv_at')} {selectedJob.company_name}
                                     </p>
                                     <label className="text-xs font-medium block mb-3" style={{ color: TEXT }}>
                                         {t('modal_round_label')}
@@ -556,7 +557,7 @@ export default function CoachingPage() {
                                         {t('modal_round_title')}
                                     </h3>
                                     <p className="text-sm mb-5" style={{ color: MUTED }}>
-                                        {selectedJob.job_title} bei {selectedJob.company_name}
+                                        {selectedJob.job_title} {t('modal_cv_at')} {selectedJob.company_name}
                                     </p>
                                     <label className="text-xs font-medium block mb-3" style={{ color: TEXT }}>
                                         {t('modal_questions_label')}
@@ -808,7 +809,7 @@ export default function CoachingPage() {
                                                                                         color: topic.category === 'rolle' ? BLUE : '#15803d',
                                                                                     }}
                                                                                 >
-                                                                                    {topic.category === 'rolle' ? 'Für die Rolle' : 'Interview-Technik'}
+                                                                                    {topic.category === 'rolle' ? t('category_role') : t('category_technique')}
                                                                                 </span>
                                                                             )}
                                                                             <a

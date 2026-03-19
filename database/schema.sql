@@ -1,7 +1,7 @@
 -- ============================================
 -- PATHLY V2.0 DATABASE SCHEMA
--- Version: 4.0
--- Last Updated: 2026-03-09
+-- Version: 4.1
+-- Last Updated: 2026-03-20
 -- DSGVO & NIS2 Compliant
 --
 -- ⚠️ AUTORITÄRE QUELLE FÜR LIVE-SCHEMA: supabase/migrations/
@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   -- Focus Mode preference (added Migration 20260225010000)
   skip_focus_confirmation BOOLEAN DEFAULT false,
 
+  -- Onboarding Goals (added Migration 20260320)
+  onboarding_goals TEXT[] DEFAULT '{}',
+
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -91,6 +94,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
   -- Onboarding
   onboarding_completed BOOLEAN DEFAULT false,
   onboarding_step INTEGER DEFAULT 0,
+  onboarding_completed_at TIMESTAMPTZ,
 
   -- Mood Check-in
   last_mood_checkin_at TIMESTAMPTZ,
@@ -515,7 +519,9 @@ CREATE TABLE IF NOT EXISTS generation_logs (
   issues JSONB,
   suggestions JSONB,
 
-  generated_text TEXT,
+  generated_text TEXT,  -- NULLABLE since 2026-03-19 (DSGVO Phase 1: historical data cleared, Phase 2: write-path closed)
+  content_hash TEXT,             -- DSGVO Phase 2: SHA256 hash of generated text (audit without plaintext)
+  quality_summary JSONB,         -- DSGVO Phase 3: PII audit flags (pii_flags, sanitized, source)
 
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -850,6 +856,12 @@ $$ LANGUAGE plpgsql;
 
 SELECT cron.schedule('cleanup-research', '0 2 * * *', 'SELECT cleanup_expired_research()');
 
+-- DSGVO Retention Policies (Migration 20260319)
+-- Job: anonymize-coaching-daily  → 03:00 UTC, 90d anonymize / 180d delete (completed/abandoned only)
+-- Job: cleanup-serpapi-weekly    → 04:00 UTC Mo, 30d serpapi_raw NULL (terminal states only)
+-- Job: cleanup-firecrawl-weekly  → 05:00 UTC Di, 14d firecrawl_markdown NULL (terminal states only)
+-- Full definitions in: supabase/migrations/20260319_dsgvo_retention_policies.sql
+
 -- ============================================
 -- 15. UTILITY FUNCTIONS
 -- ============================================
@@ -882,4 +894,4 @@ CREATE TABLE IF NOT EXISTS schema_version (
   applied_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-INSERT INTO schema_version (version) VALUES ('4.0') ON CONFLICT (version) DO NOTHING;
+INSERT INTO schema_version (version) VALUES ('4.1') ON CONFLICT (version) DO NOTHING;

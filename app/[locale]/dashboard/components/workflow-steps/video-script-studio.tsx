@@ -1,6 +1,8 @@
 "use client";
 
-import { useReducer, useEffect, useCallback, useState } from 'react';
+import { useReducer, useEffect, useCallback, useState, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Save, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { Check } from 'lucide-react';
@@ -115,17 +117,18 @@ function reducer(state: ScriptState, action: ScriptAction): ScriptState {
 
 // --- GeneratingProgress (unified step-tracker design) ---
 
-const GENERATING_STEPS = [
-    'Stellenbeschreibung wird geladen',
-    'Keywords werden extrahiert',
-    'Themenblöcke werden identifiziert',
-    'Skript-Struktur wird aufgebaut',
-    'Formulierungen werden optimiert',
-    'Blockvorschläge werden finalisiert',
-];
-
 function GeneratingProgress() {
+    const t = useTranslations('video_letter');
     const [activeStep, setActiveStep] = useState(0);
+
+    const GENERATING_STEPS = useMemo(() => [
+        t('gen_step_1'),
+        t('gen_step_2'),
+        t('gen_step_3'),
+        t('gen_step_4'),
+        t('gen_step_5'),
+        t('gen_step_6'),
+    ], [t]);
 
     useEffect(() => {
         setActiveStep(0);
@@ -136,7 +139,7 @@ function GeneratingProgress() {
             if (idx >= GENERATING_STEPS.length - 1) clearInterval(interval);
         }, 2500);
         return () => clearInterval(interval);
-    }, []);
+    }, [GENERATING_STEPS.length]);
 
     return (
         <div className="w-full px-6 py-8 bg-[#FAFAF9] rounded-xl border border-slate-200">
@@ -144,10 +147,10 @@ function GeneratingProgress() {
             <div className="flex items-center gap-2.5 mb-1">
                 <LoadingSpinner className="w-5 h-5 text-[#002e7a] shrink-0" />
                 <span className="text-sm font-semibold text-[#37352F]">
-                    Skript wird erstellt…
+                    {t('gen_title')}
                 </span>
             </div>
-            <p className="text-xs text-[#73726E] mb-5 pl-[29px]">Das dauert etwa 10–20 Sekunden</p>
+            <p className="text-xs text-[#73726E] mb-5 pl-[29px]">{t('gen_subtitle')}</p>
 
             {/* Step list */}
             <div className="space-y-2">
@@ -214,6 +217,8 @@ interface VideoScriptStudioProps {
 }
 
 export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScriptStudioProps) {
+    const t = useTranslations('video_letter');
+    const locale = useLocale();
     const [state, dispatch] = useReducer(reducer, initialState);
     const [showPreGenModal, setShowPreGenModal] = useState(false);
 
@@ -224,7 +229,7 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
                 const res = await fetch(`/api/video/scripts?jobId=${jobId}`);
                 const data = await res.json();
 
-                if (!res.ok) throw new Error(data.error || 'Laden fehlgeschlagen');
+                if (!res.ok) throw new Error(data.error || t('error_load_failed'));
 
                 if (data.script) {
                     dispatch({
@@ -293,6 +298,7 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
                 body: JSON.stringify({
                     jobId,
                     force,
+                    locale,
                     ...(activeParams && {
                         applicant_archetype: activeParams.applicant_archetype,
                         tone_mode: activeParams.tone_mode,
@@ -301,7 +307,7 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
             });
             const data = await res.json();
             if (!res.ok || !data.success) {
-                throw new Error(data.error || 'Generierung fehlgeschlagen');
+                throw new Error(data.error || t('error_generic'));
             }
 
             // Handle existing script — show inline confirm instead of window.confirm
@@ -317,7 +323,7 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
             dispatch({ type: 'SET_MIRROR_PHRASES', phrases: kw.mirrorPhrases || [] });
             dispatch({ type: 'SET_PHASE', phase: 'editing' });
         } catch (err) {
-            dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Generierung fehlgeschlagen' });
+            dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : t('error_generic') });
         }
     }, [jobId, state.preGenParams]);
 
@@ -397,12 +403,12 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
                 animate={{ opacity: 1, y: 0 }}
                 className="p-8 bg-red-50 border border-red-200 rounded-xl max-w-sm mx-auto text-center space-y-4"
             >
-                <p className="text-sm text-red-700">{state.error || 'Ein Fehler ist aufgetreten.'}</p>
+                <p className="text-sm text-red-700">{state.error || t('error_generic')}</p>
                 <button
                     onClick={() => handleGenerate()}
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg text-sm"
                 >
-                    Erneut versuchen
+                    {t('error_retry')}
                 </button>
             </motion.div>
         );
@@ -424,13 +430,13 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
                         className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition"
                     >
                         {state.showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        {state.showPreview ? 'Editor' : 'Vorschau'}
+                        {state.showPreview ? t('editor_editor') : t('editor_preview')}
                     </button>
                 </div>
                 <div className="flex items-center gap-3">
                     {state.lastSaved && (
                         <span className="text-xs text-gray-400">
-                            Gespeichert {new Date(state.lastSaved).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                            {t('editor_saved_at', { time: new Date(state.lastSaved).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) })}
                         </span>
                     )}
                     <button
@@ -439,7 +445,7 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
                         className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-md transition flex items-center gap-1.5 disabled:opacity-50"
                     >
                         {state.isSaving ? <LoadingSpinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                        Speichern
+                        {t('editor_save')}
                     </button>
                 </div>
             </div>
@@ -452,20 +458,20 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
                     {state.showOverwriteConfirm && (
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between gap-4 mb-3">
                             <p className="text-sm text-amber-800">
-                                Du hast bereits ein bearbeitetes Skript. Überschreiben mit neuen KI-Vorschlägen?
+                                {t('editor_overwrite_banner')}
                             </p>
                             <div className="flex gap-2 shrink-0">
                                 <button
                                     onClick={() => { dispatch({ type: 'HIDE_OVERWRITE_CONFIRM' }); handleGenerate(true, state.preGenParams || undefined); }}
                                     className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-md transition"
                                 >
-                                    Überschreiben
+                                    {t('editor_overwrite_btn')}
                                 </button>
                                 <button
                                     onClick={() => dispatch({ type: 'HIDE_OVERWRITE_CONFIRM' })}
                                     className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-md transition"
                                 >
-                                    Behalten
+                                    {t('editor_keep_btn')}
                                 </button>
                             </div>
                         </div>
@@ -515,7 +521,7 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
                     }}
                     className="px-6 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white font-medium rounded-lg transition flex items-center gap-2"
                 >
-                    Aufnahme starten <ChevronRight className="w-4 h-4" />
+                    {t('editor_start_recording')} <ChevronRight className="w-4 h-4" />
                 </button>
             </div>
         </motion.div>

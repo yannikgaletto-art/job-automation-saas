@@ -288,6 +288,7 @@ export type Database = {
         Row: {
           company_relevance_score: number | null
           completion_tokens: number | null
+          content_hash: string | null
           created_at: string | null
           generated_text: string | null
           id: string
@@ -300,6 +301,7 @@ export type Database = {
           naturalness_score: number | null
           overall_score: number | null
           prompt_tokens: number | null
+          quality_summary: Json | null
           style_match_score: number | null
           suggestions: Json | null
           user_id: string | null
@@ -307,6 +309,7 @@ export type Database = {
         Insert: {
           company_relevance_score?: number | null
           completion_tokens?: number | null
+          content_hash?: string | null
           created_at?: string | null
           generated_text?: string | null
           id?: string
@@ -319,6 +322,7 @@ export type Database = {
           naturalness_score?: number | null
           overall_score?: number | null
           prompt_tokens?: number | null
+          quality_summary?: Json | null
           style_match_score?: number | null
           suggestions?: Json | null
           user_id?: string | null
@@ -326,6 +330,7 @@ export type Database = {
         Update: {
           company_relevance_score?: number | null
           completion_tokens?: number | null
+          content_hash?: string | null
           created_at?: string | null
           generated_text?: string | null
           id?: string
@@ -338,6 +343,7 @@ export type Database = {
           naturalness_score?: number | null
           overall_score?: number | null
           prompt_tokens?: number | null
+          quality_summary?: Json | null
           style_match_score?: number | null
           suggestions?: Json | null
           user_id?: string | null

@@ -74,28 +74,34 @@ export async function POST(request: Request) {
         // Parse multipart form data
         const formData = await request.formData();
         const audioFile = formData.get('audio') as File | null;
+        const localeRaw = (formData.get('locale') as string) || 'de';
+
+        // Map locale to Whisper-compatible language code
+        const WHISPER_LANG: Record<string, string> = { de: 'de', en: 'en', es: 'es' };
+        const whisperLang = WHISPER_LANG[localeRaw] || 'de';
 
         if (!audioFile) {
-            return NextResponse.json(
-                { error: 'Keine Audio-Datei gefunden' },
-                { status: 400 }
-            );
+            const msg = localeRaw === 'en' ? 'No audio file found' : localeRaw === 'es' ? 'No se encontró archivo de audio' : 'Keine Audio-Datei gefunden';
+            return NextResponse.json({ error: msg }, { status: 400 });
+        }
+
+        // Validate file type
+        const validTypes = ['audio/webm', 'audio/wav', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/m4a'];
+        if (!validTypes.some((t) => audioFile.type.startsWith(t.split('/')[0]))) {
+            const msg = localeRaw === 'en' ? 'Invalid audio format' : localeRaw === 'es' ? 'Formato de audio no válido' : 'Ungültiges Audio-Format';
+            return NextResponse.json({ error: msg }, { status: 400 });
         }
 
         // Validate file size
         if (audioFile.size > MAX_FILE_SIZE) {
-            return NextResponse.json(
-                { error: 'Audio-Datei zu groß (max. 10 MB)' },
-                { status: 400 }
-            );
+            const msg = localeRaw === 'en' ? 'Audio file too large (max. 10 MB)' : localeRaw === 'es' ? 'Archivo de audio demasiado grande (máx. 10 MB)' : 'Audio-Datei zu groß (max. 10 MB)';
+            return NextResponse.json({ error: msg }, { status: 400 });
         }
 
         // Validate minimum size (< 1KB is likely empty/too short)
         if (audioFile.size < 1000) {
-            return NextResponse.json(
-                { error: 'Aufnahme zu kurz. Bitte sprich mindestens 1 Sekunde.' },
-                { status: 400 }
-            );
+            const msg = localeRaw === 'en' ? 'Recording too short. Please speak for at least 1 second.' : localeRaw === 'es' ? 'Grabación demasiado corta. Por favor habla al menos 1 segundo.' : 'Aufnahme zu kurz. Bitte sprich mindestens 1 Sekunde.';
+            return NextResponse.json({ error: msg }, { status: 400 });
         }
 
         // Transcribe via OpenAI Whisper
@@ -103,7 +109,7 @@ export async function POST(request: Request) {
         const transcription = await client.audio.transcriptions.create({
             file: audioFile,
             model: 'whisper-1',
-            language: 'de',
+            language: whisperLang,
             response_format: 'json',
         });
 
@@ -111,10 +117,8 @@ export async function POST(request: Request) {
 
         // Check for hallucinations
         if (!text || isHallucination(text)) {
-            return NextResponse.json(
-                { error: 'Wir konnten dich leider nicht verstehen. Bitte versuche es erneut.' },
-                { status: 422 }
-            );
+            const msg = localeRaw === 'en' ? 'We could not understand you. Please try again.' : localeRaw === 'es' ? 'No pudimos entenderte. Por favor inténtalo de nuevo.' : 'Wir konnten dich leider nicht verstehen. Bitte versuche es erneut.';
+            return NextResponse.json({ error: msg }, { status: 422 });
         }
 
         console.log(`✅ [Voice] Transcribed ${audioFile.size} bytes → ${text.length} chars for user ${user.id}`);

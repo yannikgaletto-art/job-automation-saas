@@ -204,26 +204,29 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="space-y-3">
                 <div>
                     <h3 className="text-sm font-semibold text-[#37352F]">{t('tone_title')}</h3>
                     <p className="text-xs text-[#73726E] mt-0.5">{setupData.styleAnalysisSummary}</p>
                 </div>
 
-                {/* Language Toggle */}
-                <div className="flex items-center gap-0.5 bg-[#E7E7E5] rounded-md p-0.5">
-                    {(['de', 'en'] as const).map((lang) => (
-                        <button
-                            key={lang}
-                            onClick={() => handleLanguageChange(lang)}
-                            className={[
-                                'px-2 py-1 rounded text-xs font-semibold transition-all',
-                                language === lang ? 'bg-white text-[#002e7a] shadow-sm' : 'text-[#73726E]',
-                            ].join(' ')}
-                        >
-                            {lang === 'de' ? 'DE' : 'EN'}
-                        </button>
-                    ))}
+                {/* Language Toggle — left-aligned for visibility */}
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-[#73726E]">{t('language_label')}</span>
+                    <div className="flex items-center gap-0.5 bg-[#E7E7E5] rounded-md p-0.5">
+                        {(['de', 'en'] as const).map((lang) => (
+                            <button
+                                key={lang}
+                                onClick={() => handleLanguageChange(lang)}
+                                className={[
+                                    'px-2 py-1 rounded text-xs font-semibold transition-all',
+                                    language === lang ? 'bg-white text-[#002e7a] shadow-sm' : 'text-[#73726E]',
+                                ].join(' ')}
+                            >
+                                {lang === 'de' ? 'DE' : 'EN'}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 

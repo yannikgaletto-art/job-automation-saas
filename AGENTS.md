@@ -29,6 +29,7 @@
 | **Coaching Report** | `lib/inngest/coaching-report-pipeline.ts` | Async report generation after session complete |
 | **QR Code** | Consent dialog → CV templates | QR generated client-side with consent, embedded in PDF templates |
 | **Avatar Picker** | `components/motion/sidebar.tsx` | Animal avatar stored in `user_profiles.avatar_animal`, Pathly brand colors |
+| **Mood Check-in V2** | `app/[locale]/dashboard/hooks/useMoodCheckIn.tsx` + `app/api/mood/checkin/route.ts` | Adaptive Tag/Nacht-Symbole, Progressive Reduction (5× Skip → auto-hide), `MoodCheckinContext`, `CheckinSettingsCard` in Settings, i18n (de/en/es), `lib/mood/mood-symbols.ts` |
 
 ---
 

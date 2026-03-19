@@ -12,7 +12,6 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { inngest } from '@/lib/inngest/client';
 import { generateAndSaveReport } from '@/lib/services/coaching-report-generator';
-import { getUserLocale } from '@/lib/i18n/get-user-locale';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -90,14 +89,14 @@ export async function POST(
 
         // PRIMARY PATH: Generate report directly (fire-and-forget).
         // Works in localhost dev (no Inngest dev server) and production.
+        // NOTE: locale is read from session.language inside generateAndSaveReport
         const userId = user.id;
-        const userLocale = await getUserLocale(userId);
         generateAndSaveReport(sessionId, userId).catch((err) => {
             console.error('❌ [Coaching] Direct report generation failed — falling back to Inngest:', err);
             // FALLBACK: Inngest async pipeline
             inngest.send({
                 name: 'coaching/generate-report',
-                data: { sessionId, userId, locale: userLocale },
+                data: { sessionId, userId },
             }).catch((inngestErr) => {
                 console.error('❌ [Coaching] Inngest fallback also failed:', inngestErr);
             });

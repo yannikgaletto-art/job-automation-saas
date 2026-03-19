@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft,
@@ -31,15 +32,10 @@ const BORDER = '#E7E7E5';
 // Analysis steps shown while the coaching report is generated in the background.
 // The last step intentionally stays "active" indefinitely — it never completes
 // until Inngest finishes and the page redirects to /analysis.
-const ANALYSIS_STEPS = [
-    'Interview-Antworten werden ausgewertet',
-    'Stärken und Schwächen analysieren',
-    'Verbesserungsvorschläge erstellen',
-    'Feedback-Report wird generiert',
-];
+// Analysis steps are now loaded from translations via the `t` function inside the component.
 
 // CancelButton that appears after 10s (analysis is typically 10–15s).
-function AnalysisCancelButton({ onCancel }: { onCancel: () => void }) {
+function AnalysisCancelButton({ onCancel, cancelLabel }: AnalysisCancelProps) {
     const [visible, setVisible] = useState(false);
     useEffect(() => {
         const timer = setTimeout(() => setVisible(true), 10000);
@@ -55,7 +51,7 @@ function AnalysisCancelButton({ onCancel }: { onCancel: () => void }) {
             className="inline-flex items-center gap-1.5 mt-5 px-4 py-2 text-xs font-medium rounded-lg transition-colors"
             style={{ color: '#DC2626', border: '1px solid #FECACA', background: 'transparent' }}
         >
-            <XCircle className="w-3.5 h-3.5" /> Abbrechen
+            <XCircle className="w-3.5 h-3.5" /> {cancelLabel}
         </motion.button>
     );
 }
@@ -64,11 +60,24 @@ interface HintData {
     [turnNumber: number]: string;
 }
 
+interface AnalysisCancelProps {
+    onCancel: () => void;
+    cancelLabel: string;
+}
+
 export default function CoachingSessionPage() {
     const params = useParams();
     const router = useRouter();
     const sessionId = params.sessionId as string;
     const notify = useNotification();
+    const t = useTranslations('dashboard.coaching.session');
+
+    const ANALYSIS_STEPS = useMemo(() => [
+        t('analysis_step_1'),
+        t('analysis_step_2'),
+        t('analysis_step_3'),
+        t('analysis_step_4'),
+    ], [t]);
 
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -246,7 +255,7 @@ export default function CoachingSessionPage() {
                 body: JSON.stringify({ message: userMessage }),
             });
 
-            if (!res.ok) throw new Error('Nachricht konnte nicht gesendet werden');
+            if (!res.ok) throw new Error(t('send_error'));
 
             const data = await res.json();
 
@@ -286,7 +295,7 @@ export default function CoachingSessionPage() {
         setShowAnalysisPrompt(false);
         try {
             await fetch(`/api/coaching/session/${sessionId}/complete`, { method: 'POST' });
-            notify('Coaching abgeschlossen');
+            notify(t('coaching_complete'));
             startPolling();
         } catch {
             setRequestingAnalysis(false);
@@ -341,10 +350,10 @@ export default function CoachingSessionPage() {
                         <div>
                             <AlertCircle className="h-6 w-6 text-red-400 mb-3" />
                             <p className="text-sm font-medium" style={{ color: TEXT }}>
-                                Die Analyse hat zu lange gedauert.
+                                {t('analysis_timeout')}
                             </p>
                             <p className="text-xs mt-1 mb-4" style={{ color: MUTED }}>
-                                Bitte versuche es später erneut oder gehe zurück.
+                                {t('analysis_timeout_desc')}
                             </p>
                             <div className="flex flex-col gap-2">
                                 <button
@@ -355,14 +364,14 @@ export default function CoachingSessionPage() {
                                     className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg transition-colors hover:bg-blue-50"
                                     style={{ color: BLUE, border: `1px solid ${BLUE}`, background: 'transparent' }}
                                 >
-                                    Erneut versuchen
+                                    {t('retry')}
                                 </button>
                                 <button
                                     onClick={handleCancelAnalysis}
                                     className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg transition-colors"
                                     style={{ color: MUTED }}
                                 >
-                                    <ArrowLeft className="w-3.5 h-3.5" /> Zurück zur Übersicht
+                                    <ArrowLeft className="w-3.5 h-3.5" /> {t('back_overview')}
                                 </button>
                             </div>
                         </div>
@@ -373,10 +382,10 @@ export default function CoachingSessionPage() {
                             <div className="flex items-center gap-2.5 mb-1">
                                 <Loader2 className="w-5 h-5 text-[#002e7a] animate-spin shrink-0" />
                                 <span className="text-sm font-semibold text-[#37352F]">
-                                    Interview wird analysiert…
+                                    {t('analysis_title')}
                                 </span>
                             </div>
-                            <p className="text-xs text-[#73726E] mb-5 pl-[29px]">Das dauert ca. 10–15 Sekunden</p>
+                            <p className="text-xs text-[#73726E] mb-5 pl-[29px]">{t('analysis_time')}</p>
 
                             {/* Steps */}
                             <div className="space-y-2">
@@ -432,7 +441,7 @@ export default function CoachingSessionPage() {
                             </div>
 
                             {/* Cancel — appears after 10s, routes to coaching overview */}
-                            <AnalysisCancelButton onCancel={handleCancelAnalysis} />
+                            <AnalysisCancelButton onCancel={handleCancelAnalysis} cancelLabel={t('cancel_btn')} />
                         </>
                     )}
                 </div>
@@ -490,7 +499,7 @@ export default function CoachingSessionPage() {
                                 className={`h-3.5 w-3.5 transition-transform duration-150 ${dossierOpen ? 'rotate-90' : ''}`}
                                 style={{ color: MUTED }}
                             />
-                            <span className="text-xs font-medium" style={{ color: MUTED }}>Gap-Analyse</span>
+                            <span className="text-xs font-medium" style={{ color: MUTED }}>{t('gap_analysis')}</span>
                         </button>
                         <AnimatePresence>
                             {dossierOpen && (
@@ -503,7 +512,7 @@ export default function CoachingSessionPage() {
                                 >
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <h4 className="text-xs font-semibold mb-1" style={{ color: BLUE }}>Stärken</h4>
+                                            <h4 className="text-xs font-semibold mb-1" style={{ color: BLUE }}>{t('strengths')}</h4>
                                             <ul className="text-xs space-y-1.5" style={{ color: MUTED }}>
                                                 {dossier.strengths.map((s, i) => (
                                                     <li key={i} className="leading-relaxed" dangerouslySetInnerHTML={{
@@ -537,7 +546,7 @@ export default function CoachingSessionPage() {
                                     className={`h-3.5 w-3.5 transition-transform duration-150 ${roleOpen ? 'rotate-90' : ''}`}
                                     style={{ color: MUTED }}
                                 />
-                                <span className="text-xs font-medium" style={{ color: MUTED }}>About the Role</span>
+                                <span className="text-xs font-medium" style={{ color: MUTED }}>{t('about_the_role')}</span>
                             </button>
                             {!analyzingRole && (
                                 <button
@@ -566,13 +575,13 @@ export default function CoachingSessionPage() {
                                     className="text-xs px-2.5 py-1 rounded-md border transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                                     style={{ borderColor: BORDER, color: MUTED, background: 'transparent' }}
                                 >
-                                    {roleData ? 'Neu analysieren' : 'Analysieren'}
+                                    {roleData ? t('reanalyze_btn') : t('analyze_btn')}
                                 </button>
                             )}
                             {analyzingRole && (
                                 <div className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: MUTED }}>
                                     <Loader2 className="h-3 w-3 animate-spin" />
-                                    <span>Analysiert...</span>
+                                    <span>{t('analyzing')}</span>
                                 </div>
                             )}
                         </div>
@@ -589,7 +598,7 @@ export default function CoachingSessionPage() {
                                         <div className="space-y-3">
                                             {roleData.dailyBusiness.length > 0 && (
                                                 <div>
-                                                    <h5 className="text-xs font-semibold mb-1" style={{ color: TEXT }}>Konkrete Aufgaben und Daily Business</h5>
+                                                    <h5 className="text-xs font-semibold mb-1" style={{ color: TEXT }}>{t('role_daily')}</h5>
                                                     <ul className="text-xs space-y-1.5" style={{ color: MUTED }}>
                                                         {roleData.dailyBusiness.map((item, i) => (
                                                             <li key={i} className="leading-relaxed" dangerouslySetInnerHTML={{
@@ -601,7 +610,7 @@ export default function CoachingSessionPage() {
                                             )}
                                             {roleData.cases.length > 0 && (
                                                 <div>
-                                                    <h5 className="text-xs font-semibold mb-1" style={{ color: TEXT }}>Cases im Alltag</h5>
+                                                    <h5 className="text-xs font-semibold mb-1" style={{ color: TEXT }}>{t('role_cases')}</h5>
                                                     <ul className="text-xs space-y-1.5" style={{ color: MUTED }}>
                                                         {roleData.cases.map((item, i) => (
                                                             <li key={i} className="leading-relaxed" dangerouslySetInnerHTML={{
@@ -613,7 +622,7 @@ export default function CoachingSessionPage() {
                                             )}
                                             {roleData.methodology.length > 0 && (
                                                 <div>
-                                                    <h5 className="text-xs font-semibold mb-1" style={{ color: TEXT }}>Arbeitsweisen und Methodik</h5>
+                                                    <h5 className="text-xs font-semibold mb-1" style={{ color: TEXT }}>{t('role_methods')}</h5>
                                                     <ul className="text-xs space-y-1.5" style={{ color: MUTED }}>
                                                         {roleData.methodology.map((item, i) => (
                                                             <li key={i} className="leading-relaxed" dangerouslySetInnerHTML={{
@@ -626,7 +635,7 @@ export default function CoachingSessionPage() {
                                         </div>
                                     ) : (
                                         <p className="text-xs italic py-1" style={{ color: MUTED }}>
-                                            {analyzingRole ? 'Wird analysiert...' : 'Klicke „Analysieren" um Infos zur Rolle zu laden.'}
+                                            {analyzingRole ? t('role_loading') : t('role_empty')}
                                         </p>
                                     )}
                                 </motion.div>
@@ -643,7 +652,7 @@ export default function CoachingSessionPage() {
                                     className={`h-3.5 w-3.5 transition-transform duration-150 ${storyOpen ? 'rotate-90' : ''}`}
                                     style={{ color: MUTED }}
                                 />
-                                <span className="text-xs font-medium" style={{ color: MUTED }}>Meine Geschichte</span>
+                                <span className="text-xs font-medium" style={{ color: MUTED }}>{t('my_story')}</span>
                             </button>
                             {!analyzingStory && (
                                 <button
@@ -672,13 +681,13 @@ export default function CoachingSessionPage() {
                                     className="text-xs px-2.5 py-1 rounded-md border transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                                     style={{ borderColor: BORDER, color: MUTED, background: 'transparent' }}
                                 >
-                                    {myStoryData.length > 0 ? 'Neu analysieren' : 'Analysieren'}
+                                    {myStoryData.length > 0 ? t('reanalyze_btn') : t('analyze_btn')}
                                 </button>
                             )}
                             {analyzingStory && (
                                 <div className="flex items-center gap-1.5 text-xs shrink-0" style={{ color: MUTED }}>
                                     <Loader2 className="h-3 w-3 animate-spin" />
-                                    <span>Analysiert...</span>
+                                    <span>{t('analyzing')}</span>
                                 </div>
                             )}
                         </div>
@@ -701,7 +710,7 @@ export default function CoachingSessionPage() {
                                         </ul>
                                     ) : (
                                         <p className="text-xs italic py-1" style={{ color: MUTED }}>
-                                            {analyzingRole ? 'Wird analysiert...' : 'Klicke „Analysieren" um deine Geschichte zu generieren.'}
+                                            {analyzingRole ? t('story_loading') : t('story_empty')}
                                         </p>
                                     )}
                                 </motion.div>
@@ -736,7 +745,7 @@ export default function CoachingSessionPage() {
                                                     className={`h-3 w-3 transition-transform duration-150 ${isHintOpen ? 'rotate-90' : ''}`}
                                                 />
                                                 <Lightbulb className="h-3 w-3" />
-                                                <span className="font-medium">Wie du antworten kannst</span>
+                                                <span className="font-medium">{t('hint_how')}</span>
                                             </button>
                                             <AnimatePresence>
                                                 {isHintOpen && (
@@ -804,9 +813,9 @@ export default function CoachingSessionPage() {
                                         className="font-semibold underline underline-offset-2 transition-colors hover:opacity-80"
                                         style={{ color: BLUE }}
                                     >
-                                        Hier
+                                        {t('here_link')}
                                     </button>{' '}
-                                    geht&apos;s zu deiner Analyse.
+                                    {t('go_to_analysis')}
                                 </p>
                             </div>
                         </motion.div>
@@ -859,7 +868,7 @@ export default function CoachingSessionPage() {
                                             transition={{ duration: 1.2, repeat: Infinity }}
                                         />
                                         <span className="text-sm font-medium" style={{ color: '#DC2626' }}>
-                                            Aufnahme läuft
+                                            {t('recording')}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-3">
@@ -890,7 +899,7 @@ export default function CoachingSessionPage() {
                                 >
                                     <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: BLUE }} />
                                     <span className="text-sm" style={{ color: BLUE }}>
-                                        Wird transkribiert...
+                                        {t('transcribing')}
                                     </span>
                                 </motion.div>
                             )}
@@ -902,7 +911,7 @@ export default function CoachingSessionPage() {
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                placeholder="Deine Antwort..."
+                                placeholder={t('your_answer')}
                                 rows={2}
                                 className="flex-1 resize-none rounded-xl px-4 py-3 text-sm focus:outline-none transition-colors"
                                 style={{ background: '#F0EFED', color: TEXT, border: `1px solid ${BORDER}` }}
@@ -923,10 +932,10 @@ export default function CoachingSessionPage() {
                                 }}
                                 title={
                                     !voice.isMicAvailable
-                                        ? 'Kein Mikrofon verfügbar'
+                                        ? t('no_mic')
                                         : voice.state === 'recording'
-                                            ? 'Aufnahme stoppen'
-                                            : 'Sprachmemo aufnehmen'
+                                            ? t('stop_recording')
+                                            : t('record_voice')
                                 }
                             >
                                 {voice.state === 'recording'

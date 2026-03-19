@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -23,27 +24,26 @@ interface PreGenerationModalProps {
     jobId?: string;
 }
 
-// --- Data ---
-
-const ARCHETYPES: { id: ApplicantArchetype; label: string; description: string }[] = [
-    { id: 'builder', label: 'Builder', description: 'Ich zeige Ergebnisse & gebaute Dinge' },
-    { id: 'strategist', label: 'Stratege', description: 'Ich zeige Denken & Klarheit' },
-    { id: 'teamplayer', label: 'Teamplayer', description: 'Ich zeige Energie & Zusammenarbeit' },
-    { id: 'specialist', label: 'Spezialist', description: 'Ich zeige Tiefe in meinem Fachgebiet' },
-];
-
-const TONE_OPTIONS: { id: ToneMode; label: string; snippet: string }[] = [
-    { id: 'standard', label: 'Standard', snippet: 'Ich bin Kandidat mit X Jahren Erfahrung in...' },
-    { id: 'direct', label: 'Direkt & klar', snippet: 'In 3 Jahren habe ich X geliefert. Das bringe ich zu euch.' },
-    { id: 'initiative', label: 'Initiative zeigen', snippet: 'Ich habe euren Ansatz analysiert und 3 konkrete Ideen — 20 Min. Call?' },
-];
-
 // --- Component ---
 
 export function PreGenerationModal({ open, onClose, onConfirm }: PreGenerationModalProps) {
+    const t = useTranslations('video_letter');
     const [step, setStep] = useState(1);
     const [archetype, setArchetype] = useState<ApplicantArchetype | null>(null);
     const [tone, setTone] = useState<ToneMode>('direct');
+
+    const ARCHETYPES = useMemo(() => [
+        { id: 'builder' as ApplicantArchetype, label: t('archetype_builder'), description: t('archetype_builder_desc') },
+        { id: 'strategist' as ApplicantArchetype, label: t('archetype_strategist'), description: t('archetype_strategist_desc') },
+        { id: 'teamplayer' as ApplicantArchetype, label: t('archetype_teamplayer'), description: t('archetype_teamplayer_desc') },
+        { id: 'specialist' as ApplicantArchetype, label: t('archetype_specialist'), description: t('archetype_specialist_desc') },
+    ], [t]);
+
+    const TONE_OPTIONS = useMemo(() => [
+        { id: 'standard' as ToneMode, label: t('tone_standard'), snippet: t('tone_standard_snippet') },
+        { id: 'direct' as ToneMode, label: t('tone_direct'), snippet: t('tone_direct_snippet') },
+        { id: 'initiative' as ToneMode, label: t('tone_initiative'), snippet: t('tone_initiative_snippet') },
+    ], [t]);
 
     const canNext = step === 1 ? archetype !== null : true;
 
@@ -68,7 +68,7 @@ export function PreGenerationModal({ open, onClose, onConfirm }: PreGenerationMo
     return (
         <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
             <DialogContent className="max-w-[520px] bg-[#FAFAF9] border-[#E7E7E5] p-0 gap-0">
-                <DialogTitle className="sr-only">Video-Skript konfigurieren</DialogTitle>
+                <DialogTitle className="sr-only">{t('modal_sr_title')}</DialogTitle>
 
                 {/* Progress Dots */}
                 <div className="flex items-center justify-center gap-2 pt-6 pb-2">
@@ -88,8 +88,8 @@ export function PreGenerationModal({ open, onClose, onConfirm }: PreGenerationMo
                     <AnimatePresence mode="wait">
                         {step === 1 && (
                             <StepWrapper key="step1">
-                                <h3 className="text-lg font-semibold text-[#37352F] mb-1">Wie willst du rüberkommen?</h3>
-                                <p className="text-sm text-[#73726E] mb-5">Wähle den Stil, der am besten zu dir passt.</p>
+                                <h3 className="text-lg font-semibold text-[#37352F] mb-1">{t('step1_title')}</h3>
+                                <p className="text-sm text-[#73726E] mb-5">{t('step1_subtitle')}</p>
                                 <div className="flex flex-col gap-2">
                                     {ARCHETYPES.map(a => (
                                         <button
@@ -124,33 +124,33 @@ export function PreGenerationModal({ open, onClose, onConfirm }: PreGenerationMo
 
                         {step === 2 && (
                             <StepWrapper key="step2">
-                                <h3 className="text-lg font-semibold text-[#37352F] mb-1">Wie direkt soll dein Stil sein?</h3>
-                                <p className="text-sm text-[#73726E] mb-5">Jeder Stil ist professionell — du entscheidest nur das Level.</p>
+                                <h3 className="text-lg font-semibold text-[#37352F] mb-1">{t('step2_title')}</h3>
+                                <p className="text-sm text-[#73726E] mb-5">{t('step2_subtitle')}</p>
                                 <div className="flex flex-col gap-2">
-                                    {TONE_OPTIONS.map(t => (
+                                    {TONE_OPTIONS.map(tone_opt => (
                                         <button
-                                            key={t.id}
-                                            onClick={() => setTone(t.id)}
+                                            key={tone_opt.id}
+                                            onClick={() => setTone(tone_opt.id)}
                                             className={cn(
                                                 'flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-all',
-                                                tone === t.id
+                                                tone === tone_opt.id
                                                     ? 'border-[#37352F] bg-[#37352F]/5'
                                                     : 'border-[#E7E7E5] bg-white hover:border-[#B4B4B0]'
                                             )}
                                         >
                                             <div className={cn(
                                                 'w-4 h-4 rounded-full border-2 shrink-0 transition-colors',
-                                                tone === t.id ? 'border-[#012e7a] bg-[#012e7a]' : 'border-[#D1D5DB]'
+                                                tone === tone_opt.id ? 'border-[#012e7a] bg-[#012e7a]' : 'border-[#D1D5DB]'
                                             )}>
-                                                {tone === t.id && (
+                                                {tone === tone_opt.id && (
                                                     <div className="w-full h-full flex items-center justify-center">
                                                         <div className="w-1.5 h-1.5 bg-white rounded-full" />
                                                     </div>
                                                 )}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-semibold text-[#37352F]">{t.label}</p>
-                                                <p className="text-xs text-[#73726E] italic">„{t.snippet}"</p>
+                                                <p className="text-sm font-semibold text-[#37352F]">{tone_opt.label}</p>
+                                                <p className="text-xs text-[#73726E] italic">„{tone_opt.snippet}"</p>
                                             </div>
                                         </button>
                                     ))}
@@ -166,7 +166,7 @@ export function PreGenerationModal({ open, onClose, onConfirm }: PreGenerationMo
                                 onClick={() => setStep(1)}
                                 className="flex items-center gap-1.5 text-sm text-[#73726E] hover:text-[#37352F] transition"
                             >
-                                <ChevronLeft className="w-4 h-4" /> Zurück
+                                <ChevronLeft className="w-4 h-4" /> {t('nav_back')}
                             </button>
                         ) : <div />}
 
@@ -176,14 +176,14 @@ export function PreGenerationModal({ open, onClose, onConfirm }: PreGenerationMo
                                 disabled={!canNext}
                                 className="flex items-center gap-1.5 px-5 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white text-sm font-medium rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                                Weiter <ChevronRight className="w-4 h-4" />
+                                {t('nav_next')} <ChevronRight className="w-4 h-4" />
                             </button>
                         ) : (
                             <button
                                 onClick={handleConfirm}
                                 className="flex items-center gap-2 px-5 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white text-sm font-medium rounded-lg transition"
                             >
-                                <Sparkles className="w-4 h-4" /> Skript erstellen
+                                <Sparkles className="w-4 h-4" /> {t('nav_create_script')}
                             </button>
                         )}
                     </div>

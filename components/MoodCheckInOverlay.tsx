@@ -1,58 +1,56 @@
 'use client';
 
 /**
- * MoodCheckInOverlay — Soft frosted-glass overlay for midday mood tracking.
- * Shows when last_mood_checkin_at is NULL or older than 3 hours.
- * After submission: POST /api/mood/checkin, then dismiss.
+ * MoodCheckInOverlay — V2
+ *
+ * Changes from V1:
+ * - Removed textarea (note field)
+ * - Dynamic day/night symbols via useMoodSymbol
+ * - All strings use i18n (useTranslations('mood'))
+ * - onSkip prop for progressive reduction
+ * - onSubmit prop delegates to hook (no direct API call here)
+ * - Loading state with checkin_submitting text
  */
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const MOOD_OPTIONS = [
-    { value: 1, label: 'Sehr niedrig', icon: '🌑' },
-    { value: 2, label: 'Niedrig', icon: '🌒' },
-    { value: 3, label: 'Mittel', icon: '🌓' },
-    { value: 4, label: 'Gut', icon: '🌔' },
-    { value: 5, label: 'Sehr gut', icon: '🌕' },
-];
+import { useTranslations } from 'next-intl';
+import { useTimeOfDay, getSymbolsForTime } from '@/lib/mood/mood-symbols';
 
 interface MoodCheckInOverlayProps {
     visible: boolean;
     onDismiss: () => void;
+    onSkip: () => Promise<{ hidden: boolean }>;
+    onSubmit: (score: number) => Promise<void>;
 }
 
-export function MoodCheckInOverlay({ visible, onDismiss }: MoodCheckInOverlayProps) {
+export function MoodCheckInOverlay({ visible, onDismiss, onSkip, onSubmit }: MoodCheckInOverlayProps) {
     const [selectedMood, setSelectedMood] = useState<number | null>(null);
-    const [note, setNote] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const t = useTranslations('mood');
+    const timeOfDay = useTimeOfDay();
+    const symbols = getSymbolsForTime(timeOfDay);
+
+    const moodOptions = [1, 2, 3, 4, 5].map((value) => ({
+        value,
+        label: t(`mood_${value}` as `mood_1` | `mood_2` | `mood_3` | `mood_4` | `mood_5`),
+        icon: symbols[value - 1],
+    }));
 
     const handleSubmit = async () => {
         if (!selectedMood) return;
-
         setSubmitting(true);
         try {
-            const res = await fetch('/api/mood/checkin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    mood: selectedMood,
-                    context: 'midday',
-                    note: note.trim() || null,
-                }),
-            });
-
-            if (!res.ok) {
-                console.error('[MoodCheckIn] API error:', await res.text());
-            }
-        } catch (err) {
-            console.error('[MoodCheckIn] Network error:', err);
+            await onSubmit(selectedMood);
         } finally {
             setSubmitting(false);
             setSelectedMood(null);
-            setNote('');
-            onDismiss();
         }
+    };
+
+    const handleSkip = async () => {
+        await onSkip();
+        // Toast for "auto_hidden" is handled by the parent when hidden = true
     };
 
     return (
@@ -74,15 +72,15 @@ export function MoodCheckInOverlay({ visible, onDismiss }: MoodCheckInOverlayPro
                     >
                         {/* Header */}
                         <p className="text-xs text-[#94a3b8] mb-1 tracking-wide uppercase">
-                            Kurzer Check-in
+                            {t('checkin_label')}
                         </p>
                         <h2 className="text-xl font-semibold text-[#0f172a] mb-5">
-                            Wie geht es dir gerade?
+                            {t('checkin_question')}
                         </h2>
 
                         {/* Mood selector */}
                         <div className="flex gap-3 justify-center mb-6">
-                            {MOOD_OPTIONS.map((opt) => (
+                            {moodOptions.map((opt) => (
                                 <motion.button
                                     key={opt.value}
                                     whileHover={{ scale: 1.12 }}
@@ -107,15 +105,6 @@ export function MoodCheckInOverlay({ visible, onDismiss }: MoodCheckInOverlayPro
                             ))}
                         </div>
 
-                        {/* Optional note */}
-                        <textarea
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                            placeholder="Optional: kurze Notiz..."
-                            rows={2}
-                            className="w-full resize-none rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] px-3 py-2 text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:ring-1 focus:ring-[#002e7a] mb-5"
-                        />
-
                         {/* Submit */}
                         <motion.button
                             whileHover={{ scale: 1.02 }}
@@ -124,15 +113,15 @@ export function MoodCheckInOverlay({ visible, onDismiss }: MoodCheckInOverlayPro
                             disabled={!selectedMood || submitting}
                             className="w-full py-3 bg-[#002e7a] text-white border-none rounded-xl text-sm font-semibold cursor-pointer tracking-tight hover:bg-[#001d4f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            {submitting ? 'Speichern...' : 'Check-in abschließen'}
+                            {submitting ? t('checkin_submitting') : t('checkin_cta')}
                         </motion.button>
 
                         {/* Skip link */}
                         <button
-                            onClick={onDismiss}
+                            onClick={handleSkip}
                             className="mt-3 text-xs text-[#94a3b8] hover:text-[#64748b] bg-transparent border-none cursor-pointer transition-colors"
                         >
-                            Jetzt nicht
+                            {t('checkin_skip')}
                         </button>
                     </motion.div>
                 </motion.div>

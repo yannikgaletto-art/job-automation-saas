@@ -9,7 +9,18 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { buildCoachingSystemPrompt, COACHING_PROMPT_VERSION, type InterviewRound } from '@/lib/prompts/coaching-system-prompt';
+import {
+    type CoachingLocale,
+    getMaxTurnMessage,
+    getFarewellSystemPrompt,
+    getFarewellUserMessage,
+    getFarewellFallback,
+    getHintSystemPrompt,
+    getHintUserMessage,
+    getKickoffPrompt,
+} from '@/lib/prompts/coaching-prompt-i18n';
 import type { CoachingDossier, ChatMessage } from '@/types/coaching';
+import { sanitizeForAI, buildContentHash } from '@/lib/services/pii-sanitizer';
 
 // Isolated clients — NOT from model-router (Forbidden File)
 let coachingClient: Anthropic | null = null;
@@ -69,11 +80,12 @@ export async function sendCoachingMessage(
     const conversationHistory: ChatMessage[] = session.conversation_history || [];
     const currentTurn = (session.turn_count || 0) + 1;
     const maxQuestions = session.max_questions || 5;
+    const locale: CoachingLocale = session.language || 'de';
 
     // 2. Check max turns
     if (currentTurn > maxQuestions * 2) {
         return {
-            aiMessage: 'Das Interview ist nun abgeschlossen. Bitte klicke auf "Interview beenden", um deinen Feedback-Report zu erhalten.',
+            aiMessage: getMaxTurnMessage(locale),
             hint: '',
             turnNumber: currentTurn,
             isComplete: true,
@@ -82,7 +94,11 @@ export async function sendCoachingMessage(
         };
     }
 
-    // 3. Add user message to history
+    // 3. DSGVO Phase 3: Sanitize current user message BEFORE push
+    // warningFlags captured here for quality_summary audit trail (Art. 15)
+    const { warningFlags } = sanitizeForAI(userMessage);
+
+    // Add ORIGINAL user message to history (user's own data, Art. 6.1b)
     const userMsg: ChatMessage = {
         role: 'user',
         content: userMessage,
@@ -109,46 +125,30 @@ export async function sendCoachingMessage(
         dossier,
         round,
         maxQuestions,
+        locale,
     });
 
     // 6. Build messages for Claude (convert to Anthropic format)
+    // DSGVO Phase 2: Sanitize user messages before sending to Claude (Art. 28)
+    // conversation_history keeps ORIGINAL messages (user's data, Art. 6.1b)
     const anthropicMessages: Anthropic.MessageParam[] = conversationHistory.map((msg) => ({
         role: msg.role === 'coach' ? 'assistant' as const : 'user' as const,
-        content: msg.content,
+        content: msg.role === 'user' ? sanitizeForAI(msg.content).sanitized : msg.content,
     }));
 
     // 6b. HARD STOP: If this is the last answer, generate farewell via Haiku.
     if (currentTurn >= maxQuestions) {
-        // Generate situationally-aware farewell using HINT_MODEL (cheap, already initialized)
-        const userAnswers = conversationHistory
-            .filter(m => m.role === 'user')
-            .map(m => m.content)
-            .join('\n---\n');
-
-        let farewell = 'Danke für das Gespräch.';
+        // BUG#1 FIX: userAnswers was computed but never used in farewell call — removed
+        let farewell = getFarewellFallback(locale);
         try {
             const client = getClient();
             const farewellResponse = await client.messages.create({
                 model: HINT_MODEL,
                 max_tokens: 100,
                 temperature: 0.5,
-                system: `Du bist ein Recruiter, der gerade ein Vorstellungsgespräch beendet hat. Schreibe einen kurzen, warmen Abschiedssatz (1-2 Sätze).
-
-WICHTIG:
-- Du bist ein Recruiter. Du gibst KEINE inhaltliche Bewertung, KEINE Tipps, KEINE Kritik. Das kommt später in der schriftlichen Analyse.
-- Verabschiede dich professionell und menschlich, wie ein echter Recruiter nach einem Gespräch: Danke sagen, ggf. auf nächste Schritte verweisen.
-- Tonalität: warm, freundlich, kurz. Wie ein Mensch, nicht wie eine Maschine.
-- Bei kurzem Gespräch (1 Frage): Kurzer, netter Abschluss.
-- Bei längerem Gespräch (3-5 Fragen): Etwas ausführlicher, "hat Spaß gemacht".
-- Schreibe KEINEN Verweis auf eine Analyse oder einen Link. Kein Markdown, keine Emojis.
-- Natürliches Deutsch, duze den Kandidaten.
-
-Beispiele:
-- "Hey, danke für das Gespräch! Wir schauen uns alles in Ruhe an und melden uns dann bei dir."
-- "Vielen Dank, dass du dir die Zeit genommen hast! Hat mich echt gefreut, und wir hören uns."
-- "Danke dir, das war ein guter Austausch! Wir melden uns zeitnah mit Feedback."`,
+                system: getFarewellSystemPrompt(locale),
                 messages: [
-                    { role: 'user', content: `Das Interview hatte ${maxQuestions} Frage(n). Schreibe jetzt den Abschiedssatz.` },
+                    { role: 'user', content: getFarewellUserMessage(locale, maxQuestions) },
                 ],
             });
 
@@ -224,9 +224,9 @@ Beispiele:
             model: HINT_MODEL,
             max_tokens: 300,
             temperature: 0.3,
-            system: 'Du bist ein Karriere-Coach. Generiere 3 kurze Stichpunkte als Muster-Antwort auf die Interview-Frage, die der Kandidat gerade beantwortet hat. Beziehe dich auf die Frage, nicht auf die Antwort. Schreibe NUR 3 Stichpunkte, jeder beginnt mit einem Spiegelstrich. Kein Fließtext, kein Markdown.',
+            system: getHintSystemPrompt(locale),
             messages: [
-                { role: 'user', content: `Die Interview-Frage war zum Thema: ${conversationHistory.filter(m => m.role === 'coach').slice(-1)[0]?.content?.substring(0, 300) || 'Allgemeine Frage'}\n\nGib 3 kurze Muster-Antwort-Stichpunkte.` },
+                { role: 'user', content: getHintUserMessage(locale, conversationHistory.filter(m => m.role === 'coach').slice(-1)[0]?.content?.substring(0, 300) || (locale === 'en' ? 'General question' : locale === 'es' ? 'Pregunta general' : 'Allgemeine Frage')) },
             ],
         });
         hint = hintResponse.content
@@ -254,7 +254,7 @@ Beispiele:
         console.error('❌ [Coaching] Failed to update session:', updateError.message);
     }
 
-    // 12. Log to generation_logs
+    // 12. Log to generation_logs (DSGVO Phase 2: no plaintext, hash only)
     await supabaseAdmin.from('generation_logs').insert({
         job_id: session.job_id,
         user_id: userId,
@@ -263,7 +263,9 @@ Beispiele:
         iteration: currentTurn,
         prompt_tokens: response.usage.input_tokens,
         completion_tokens: response.usage.output_tokens,
-        generated_text: aiText.substring(0, 500),
+        generated_text: null,
+        content_hash: buildContentHash(aiText),
+        quality_summary: { pii_flags: warningFlags, sanitized: warningFlags.length > 0 },
         created_at: new Date().toISOString(),
     });
 
@@ -309,6 +311,7 @@ export async function getInitialCoachingMessage(
 
     // Build system prompt
     const round = (session.interview_round as InterviewRound) || 'kennenlernen';
+    const locale: CoachingLocale = session.language || 'de';
     const systemPrompt = buildCoachingSystemPrompt({
         userName: 'Kandidat/in',
         jobTitle: job?.job_title || 'Unbekannte Stelle',
@@ -316,15 +319,12 @@ export async function getInitialCoachingMessage(
         dossier,
         round,
         maxQuestions: session.max_questions || 5,
+        locale,
     });
 
     // Get the first message from Claude (round-aware kickoff)
     const client = getClient();
-    const kickoffPrompt = round === 'case_study'
-        ? 'Bitte begrüße mich kurz und präsentiere dann sofort das vollständige Case-Study-Szenario zur Bearbeitung.'
-        : round === 'deep_dive'
-            ? 'Bitte begrüße mich kurz, erkläre dass wir heute in fachliche Tiefe gehen, und stelle die erste Hauptfrage.'
-            : 'Bitte starte das Interview.';
+    const kickoffPrompt = getKickoffPrompt(locale, round);
 
     const response = await client.messages.create({
         model: COACHING_MODEL,
@@ -363,7 +363,8 @@ export async function getInitialCoachingMessage(
         })
         .eq('id', sessionId);
 
-    // Log
+    // Log (DSGVO Phase 2: no plaintext, hash only)
+    // getInitialCoachingMessage has no user input → quality_summary null
     await supabaseAdmin.from('generation_logs').insert({
         job_id: session.job_id,
         user_id: userId,
@@ -372,7 +373,9 @@ export async function getInitialCoachingMessage(
         iteration: 0,
         prompt_tokens: response.usage.input_tokens,
         completion_tokens: response.usage.output_tokens,
-        generated_text: aiText.substring(0, 500),
+        generated_text: null,
+        content_hash: buildContentHash(aiText),
+        quality_summary: null,
         created_at: new Date().toISOString(),
     });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import type { ScriptBlock } from './block-editor';
@@ -23,6 +24,7 @@ export function ScriptPreview({ blocks, mode, wpmSpeed, onWpmChange, isOverlay =
 // --- Bullets View ---
 
 function BulletsView({ blocks, isOverlay }: { blocks: ScriptBlock[]; isOverlay: boolean }) {
+    const t = useTranslations('video_letter');
     const visibleBlocks = blocks.filter(b => b.content.trim());
     return (
         <div className={`space-y-2 ${isOverlay ? 'p-3' : 'p-4'}`}>
@@ -46,7 +48,7 @@ function BulletsView({ blocks, isOverlay }: { blocks: ScriptBlock[]; isOverlay: 
             </AnimatePresence>
             {visibleBlocks.length === 0 && (
                 <p className={`text-sm text-center py-4 ${isOverlay ? 'text-white/50' : 'text-gray-400'}`}>
-                    Noch keine Stichpunkte vorhanden
+                    {t('preview_empty_bullets')}
                 </p>
             )}
         </div>
@@ -112,6 +114,7 @@ function TeleprompterView({
     onWpmChange: (wpm: number) => void;
     isOverlay: boolean;
 }) {
+    const t = useTranslations('video_letter');
     const scrollRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
 
@@ -176,12 +179,12 @@ function TeleprompterView({
                     className={`p-2 rounded-full transition ${isOverlay
                         ? 'bg-white/20 text-white hover:bg-white/30'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                    aria-label="Zurücksetzen"
+                    aria-label={t('preview_reset')}
                 >
                     <RotateCcw className="w-4 h-4" />
                 </button>
                 <div className="flex items-center gap-2 text-xs">
-                    <span className={isOverlay ? 'text-white/60' : 'text-gray-500'}>Speed</span>
+                    <span className={isOverlay ? 'text-white/60' : 'text-gray-500'}>{t('preview_speed')}</span>
                     <input
                         type="range" min={100} max={300} step={20} value={wpmSpeed}
                         onChange={(e) => onWpmChange(parseInt(e.target.value))}
@@ -204,7 +207,7 @@ function TeleprompterView({
                     <pre className="whitespace-pre-wrap font-sans m-0">{fullText}</pre>
                 ) : (
                     <p className={`text-sm text-center py-8 ${isOverlay ? 'text-white/40' : 'text-gray-400'}`}>
-                        Schreibe Text in deine Blöcke, um die Teleprompter-Vorschau zu sehen
+                    {t('preview_empty_teleprompter')}
                     </p>
                 )}
             </div>
