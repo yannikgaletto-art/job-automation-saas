@@ -1,6 +1,6 @@
 ---
-Version: 1.0.0
-Last Updated: 2026-02-26
+Version: 1.1.0
+Last Updated: 2026-03-21
 Status: ACTIVE — PFLICHTLEKTÜRE für ALLE Agenten
 ---
 
@@ -62,7 +62,7 @@ const handleComplete = async () => {
     const res = await fetch('/api/onboarding/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ step: 6 }),
+      body: JSON.stringify({ step: 2 }),
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
@@ -188,8 +188,10 @@ if (!verify) throw new Error('CV_SAFETY: Upload verification failed — document
   - `tasks`, `pomodoro_sessions`, `mood_checkins`, `daily_energy`, `daily_briefings`
   - `coaching_sessions`, `job_certificates`, `validation_logs`
   - `community_posts`, `community_comments`, `community_upvotes` (user_id für Write)
-  - `volunteering_bookmarks`, `volunteering_votes` (user_id für Write)\n  - `video_approaches`, `video_scripts` (user_id für Write)\n  - `script_block_templates` (user_id für Write, NULL für system read)
-- RLS MUSS für alle diese Tabellen aktiviert sein (✅ geprüft am 2026-03-09)
+  - `volunteering_bookmarks`, `volunteering_votes` (user_id für Write)
+  - `video_approaches`, `video_scripts` (user_id für Write)
+  - `script_block_templates` (user_id für Write, NULL für system read)
+- RLS MUSS für alle diese Tabellen aktiviert sein (✅ geprüft am 2026-03-21)
 - Service Role Key: NUR serverseitig, nie im Frontend
 
 ### Korrekte Query-Signatur (Beispiel Job Queue):

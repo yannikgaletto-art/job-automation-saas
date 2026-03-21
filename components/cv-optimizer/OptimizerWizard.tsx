@@ -6,7 +6,6 @@ import { createPortal } from 'react-dom';
 
 import { useState, useEffect, useMemo, useRef } from "react"
 import { motion } from "framer-motion"
-import { TemplateSelector } from "./TemplateSelector"
 import { DiffReview } from "./DiffReview"
 import { InlineCvEditor } from "./InlineCvEditor"
 import { CvStructuredData, CvOptimizationProposal, UserDecisions } from "@/types/cv"

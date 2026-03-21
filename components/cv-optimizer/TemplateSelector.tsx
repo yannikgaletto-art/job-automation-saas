@@ -27,12 +27,11 @@ export const TEMPLATES = [
 ]
 
 interface TemplateSelectorProps {
-    userId: string;
     initialTemplateId?: string;
     onSelected?: (templateId: string) => void;
 }
 
-export function TemplateSelector({ userId, initialTemplateId = "notion_modern", onSelected }: TemplateSelectorProps) {
+export function TemplateSelector({ initialTemplateId = "notion_modern", onSelected }: TemplateSelectorProps) {
     const [selectedId, setSelectedId] = useState(initialTemplateId);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -43,7 +42,7 @@ export function TemplateSelector({ userId, initialTemplateId = "notion_modern", 
             const res = await fetch('/api/onboarding/template', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, template_id: id })
+                body: JSON.stringify({ template_id: id })
             });
             if (res.ok) {
                 onSelected?.(id);

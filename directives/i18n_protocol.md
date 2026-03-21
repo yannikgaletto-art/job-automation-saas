@@ -1,9 +1,9 @@
 # i18n Protocol — Pathly V2.0
 
 **Status:** AKTIV — Tier 1 vollständig (inkl. Cover Letter Wizard). Tier 2 (JobSwipeView, CV-Templates) offen.
-**Version:** 1.3 (Cover Letter Wizard Complete)
+**Version:** 1.4 (Mood Check-in V2 Namespace + latin-ext bestätigt)
 **Erstellt:** 2026-03-17
-**Letzte Änderung:** 2026-03-18
+**Letzte Änderung:** 2026-03-21
 **Sprachen:** Deutsch (de), Englisch (en), Spanisch (es)
 
 ---
@@ -136,7 +136,7 @@ errors.network.timeout
 Aktuell: `app/layout.tsx` lädt `Inter({ subsets: ['latin'] })`.  
 Das subset `latin` enthält **nicht** alle Spanisch-Sonderzeichen (ñ, á, é, í, ó, ú, ü).
 
-**Pflicht-Änderung in Phase 1 Batch 1.1:**
+**Pflicht-Änderung in Phase 1 Batch 1.1:** ✅ **UMGESETZT** (bestätigt in `app/layout.tsx`)
 ```
 Inter({ subsets: ['latin', 'latin-ext'] })
 ```
@@ -182,6 +182,7 @@ Nach der Umstrukturierung zu `app/[locale]/layout.tsx` wird `lang={locale}` dyna
 | `command_palette` | `command-palette.tsx` | 12 | ✅ Vollständig |
 | `dashboard.nav` | `sidebar.tsx`, `layout.tsx` | ~30 | ✅ Vollständig (frühere Phase) |
 | `dashboard.job_search` | `JobSwipeView.tsx` | ~15 | ⚠️ Offen — Tier 2 |
+| `mood_checkin` | `useMoodCheckIn.tsx`, `MoodCheckInOverlay`, `CheckinSettingsCard` | ~15 | ✅ Vollständig (de/en/es) |
 | `cv_templates` | `ValleyTemplate`, `TechTemplate` | ? | ⏳ Deferred — kein useTranslations in PDF-Render |
 
 ---

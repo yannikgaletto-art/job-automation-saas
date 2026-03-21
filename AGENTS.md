@@ -1,8 +1,8 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 4.0  
-**Last Updated:** 2026-03-16  
+**Version:** 5.0  
+**Last Updated:** 2026-03-21  
 **Status:** Active  
 
 ---
@@ -61,6 +61,42 @@ See `lib/ai/model-router.ts` — single source of truth.
 | `write_cover_letter`, `optimize_cv` | Claude Sonnet 4.5 |
 | `cv_match`, `cv_parse` | Claude Haiku 4.5 |
 | `document_extraction` (PRIMARY) | Azure Document Intelligence (EU) |
+
+---
+
+## 4. PROJECT STRUCTURE — MULTI-REPO
+
+Pathly besteht aus **zwei getrennten Projekten** die unabhängig deployt werden:
+
+| Projekt | Pfad | Port (lokal) | Zweck |
+|---------|------|-------------|-------|
+| **Pathly SaaS** | `/Users/yannik/.gemini/antigravity/Pathly_SaaS/` | `3000` | Vollprodukt — App, DB, AI, Inngest |
+| **Pathly Website** | `/Users/yannik/.gemini/antigravity/pathly-website/` | `3001` | Statische Marketing-Landing-Page |
+
+**Verbindung:** Nur via `NEXT_PUBLIC_APP_URL` in der Website `.env.local` → zeigt auf die deployed SaaS-App.  
+**Keine shared Code-Basis, keine shared DB, keine API-Verbindung** zwischen den beiden Projekten.
+
+### Pathly Website — Tech Stack & Regeln
+
+- **Framework:** Next.js 14 (App Router, TypeScript, Tailwind CSS)
+- **Animation:** Framer Motion v12 — **ACHTUNG:** `initial={{ opacity: 0 }}` mit SSR verursacht Hydration-Flash. Für above-the-fold Content **immer CSS `@keyframes`** verwenden (Klassen `hero-fade-in` bis `hero-fade-in-delay-4` in `globals.css`).
+- **Constants First (REGEL 7):** Alle Texte in `lib/constants.ts` — nie hardcoded in Komponenten.
+- **Kein externes Icon-Package:** SVG inline oder Tailwind-Shapes.
+- **SSG-Bug-Prävention:** `new Date()` niemals auf Modul-Level verwenden (friert bei Build-Time ein). Nur in `useEffect` oder Client-Komponenten.
+- **Security Headers:** In `next.config.mjs` — X-Frame-Options, CSP, Referrer-Policy, Permissions-Policy.
+
+### Pathly Website — Schlüssel-Dateien
+
+| Datei | Zweck |
+|-------|-------|
+| `lib/constants.ts` | Single Source of Truth für alle Texte (REGEL 7) |
+| `next.config.mjs` | Security Headers + `images.unoptimized: true` |
+| `app/globals.css` | Design-Tokens, CSS-Variablen, hero-fade-in Keyframes |
+| `tailwind.config.ts` | Design-System-Tokens (navy, muted, border etc.) |
+| `DESIGN.md` | Design-System-Dokumentation |
+| `components/layout/Navbar.tsx` | Sticky Nav, scroll-aware blur, hamburger inline SVG |
+| `components/sections/Hero.tsx` | Hero ohne Framer Motion SSR-Abhängigkeit (CSS animations) |
+| `components/ui/CountUp.tsx` | Native `IntersectionObserver` + `getBoundingClientRect` mount-check |
 
 ---
 

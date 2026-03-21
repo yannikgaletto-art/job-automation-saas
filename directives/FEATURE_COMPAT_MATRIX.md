@@ -1,7 +1,7 @@
 # FEATURE COMPATIBILITY MATRIX & ARCHITECTURE OWNERSHIP
 
 > **Authority:** CLAUDE.md v2.4 | BINDEND
-> **Last Updated:** 2026-03-03 (Cross-Feature-Shield + Certificates Pipeline Fixes)
+> **Last Updated:** 2026-03-21 (Cross-Feature-Shield + Certificates Pipeline Fixes + Mood Check-in V2 Silo)
 > **Scope:** OptInModules × TonePresets × IntroFocus — Source of Truth + Feature-Silo Rules
 
 ---
@@ -217,7 +217,6 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via Migration
 | URL Fallback | `applyUrlFallback()` nach HEAD-check (§10) — 14 Provider |
 | State Persist | `initialData` + `onDataLoaded` Props überleben Tab-Wechsel |
 | Parallel Perplexity | `Promise.allSettled()` statt `for...of` in Phase 2 |
->>>>>>> 5db9f9b (docs: update CLAUDE.md v2.4, FEATURE_COMPAT_MATRIX (Certificates silo), MASTER_PROMPT_TEMPLATE (Forbidden Files))
 
 ---
 
@@ -333,4 +332,41 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via Migration
 | 60s Recording Limit | Shared mit `step-5-video.tsx` (Coaching-Pattern) |
 | Safari Compat | `MediaRecorder.isTypeSupported()` für MIME-Auswahl |
 | State Management | `useReducer` lokal im Parent, kein globaler Store |
+
+---
+
+## 8. Feature-Silo: Mood Check-in V2
+
+> **Added:** 2026-03-21 | **Owner:** `useMoodCheckIn.tsx` + `MoodCheckInOverlay`
+
+### 8.1 Erlaubte Dateien (Scope)
+
+| Datei | Rolle |
+|---|---|
+| `app/[locale]/dashboard/hooks/useMoodCheckIn.tsx` | Frontend — Hook + Context + Provider |
+| `components/MoodCheckInOverlay.tsx` | Frontend — Overlay-Komponente |
+| `app/[locale]/dashboard/settings/checkin-settings-card.tsx` | Frontend — Settings-Karte (show/hide) |
+| `app/api/mood/checkin/route.ts` | API — GET/POST/PATCH |
+| `lib/mood/mood-symbols.ts` | Utility — Kanonische Tag/Nacht-Symbole |
+| `supabase/migrations/20260320_mood_checkin_v2.sql` | DB Schema — skip_streak + show_checkin |
+
+### 8.2 Verbotene Dateien (Sperrzone)
+
+| Datei | Grund |
+|---|---|
+| `lib/ai/model-router.ts` | SHARED — kein AI-Call in Mood Check-in |
+| `lib/inngest/cv-match-pipeline.ts` | Fremdes Feature |
+| `lib/inngest/cover-letter-*.ts` | Fremdes Feature |
+| `lib/inngest/certificates-pipeline.ts` | Fremdes Feature |
+| `middleware.ts` | System-Level |
+
+### 8.3 Bekannte Patterns
+
+| Pattern | Details |
+|---|---|
+| Progressive Reduction | 5× Skip → `show_checkin = false`, Wiederaktivierung via Settings |
+| Tag/Nacht-Symbole | `mood-symbols.ts` — Adaptive Symbole je nach Tageszeit |
+| Fail-open API | `.maybeSingle()` + catch → Check-in nie blockierend |
+| Context Provider | `MoodCheckinProvider` in `dashboard/layout.tsx` |
+| RLS | `user_profiles` Policy deckt `checkin_skip_streak` + `show_checkin` ab |
 
