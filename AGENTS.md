@@ -1,8 +1,8 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 5.0  
-**Last Updated:** 2026-03-21  
+**Version:** 5.1  
+**Last Updated:** 2026-03-22  
 **Status:** Active  
 
 ---
@@ -79,24 +79,39 @@ Pathly besteht aus **zwei getrennten Projekten** die unabhängig deployt werden:
 ### Pathly Website — Tech Stack & Regeln
 
 - **Framework:** Next.js 14 (App Router, TypeScript, Tailwind CSS)
-- **Animation:** Framer Motion v12 — **ACHTUNG:** `initial={{ opacity: 0 }}` mit SSR verursacht Hydration-Flash. Für above-the-fold Content **immer CSS `@keyframes`** verwenden (Klassen `hero-fade-in` bis `hero-fade-in-delay-4` in `globals.css`).
+- **Animation — KRITISCH:** Framer Motion `initial={{ opacity: 0 }}` mit SSR verursacht Hydration-Flash UND triggert nicht für above-the-fold Elemente. Für jede Animation gilt:
+  - **Above-the-fold (Hero):** Immer **pure CSS `@keyframes`** in `globals.css` (Klassen `hero-fade-in` bis `hero-fade-in-delay-4`, `marker-highlight`, `marker-badge`, `animate-fade-in`).
+  - **Interaktive Client-Elemente:** Framer Motion OK (Navbar Mobile Menu, PhoneCarousel). `useInView` / `getBoundingClientRect` / `requestAnimationFrame` sind NICHT zuverlässig für above-the-fold SSR-Content.
+  - **Tab-Übergänge:** CSS `animate-fade-in` Klasse.
 - **Constants First (REGEL 7):** Alle Texte in `lib/constants.ts` — nie hardcoded in Komponenten.
 - **Kein externes Icon-Package:** SVG inline oder Tailwind-Shapes.
-- **SSG-Bug-Prävention:** `new Date()` niemals auf Modul-Level verwenden (friert bei Build-Time ein). Nur in `useEffect` oder Client-Komponenten.
-- **Security Headers:** In `next.config.mjs` — X-Frame-Options, CSP, Referrer-Policy, Permissions-Policy.
+- **SSG-Bug-Prävention:** `new Date()` niemals auf Modul-Level verwenden. Nur in Render-Funktionen oder `useEffect`.
+- **Security Headers:** In `next.config.mjs` — X-Frame-Options, CSP (inkl. `https://tally.so` in `script-src`), Referrer-Policy, Permissions-Policy.
+- **Server Components by Default:** Sections sind Server Components (kein `"use client"`) — nur UI-Elemente mit State/Events brauchen Client-Direktive.
 
 ### Pathly Website — Schlüssel-Dateien
 
 | Datei | Zweck |
-|-------|-------|
+|-------|
 | `lib/constants.ts` | Single Source of Truth für alle Texte (REGEL 7) |
-| `next.config.mjs` | Security Headers + `images.unoptimized: true` |
-| `app/globals.css` | Design-Tokens, CSS-Variablen, hero-fade-in Keyframes |
+| `next.config.mjs` | Security Headers + CSP (Tally.so erlaubt) |
+| `app/globals.css` | Design-Tokens, CSS-Variablen, hero-fade-in + marker Keyframes |
 | `tailwind.config.ts` | Design-System-Tokens (navy, muted, border etc.) |
 | `DESIGN.md` | Design-System-Dokumentation |
+| `public/og-image.png` | Open Graph / Twitter Card Bild (1200×630) |
 | `components/layout/Navbar.tsx` | Sticky Nav, scroll-aware blur, hamburger inline SVG |
-| `components/sections/Hero.tsx` | Hero ohne Framer Motion SSR-Abhängigkeit (CSS animations) |
-| `components/ui/CountUp.tsx` | Native `IntersectionObserver` + `getBoundingClientRect` mount-check |
+| `components/layout/Footer.tsx` | Logo, Impressum/Datenschutz Links, Copyright runtime |
+| `components/sections/Hero.tsx` | Fullscreen Headline (100svh), below-fold CTAs/Phone/Stats |
+| `components/ui/HighlightText.tsx` | Marker-Highlight-Animation via CSS @keyframes (marker-highlight + marker-badge Klassen) |
+| `components/ui/CountUp.tsx` | Zahlen-Animation via native `getBoundingClientRect` mount-check |
+| `components/ui/PhoneCarousel.tsx` | Auto-cycling Screenshots, prefers-reduced-motion Fallback |
+| `components/ui/ShimmerButton.tsx` | Primary CTA, unterstützt `data-tally-*` Attribute |
+| `components/ui/FeatureChip.tsx` | Floating Hero-Chips mit CSS Animation |
+
+### Pathly Website — Offene Punkte (User-Action)
+
+- **Impressum:** `app/impressum/page.tsx` — `[Adresse eintragen]` und `[PLZ Ort]` ersetzen (rechtlich erforderlich vor Go-Live)
+- **Tally Form ID:** `NEXT_PUBLIC_TALLY_FORM_ID=xxxx` in `.env.local` eintragen (Wartelisten-Button)
 
 ---
 
