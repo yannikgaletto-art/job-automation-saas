@@ -123,14 +123,20 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
             "xmlns='http://www.w3.org/TR/REC-html40'>" +
             "<head><meta charset='utf-8'><title>Cover Letter</title></head><body>";
         const footer = "</body></html>";
-        const content = currentLetter.split(/\n\n+/).map(p => `<p style="font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; margin-bottom: 12pt;">${p}</p>`).join("");
+        const content = currentLetter
+            .split(/\n\n+/)
+            .filter(p => p.trim().length > 0)
+            .map(p => `<p style="font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; margin-bottom: 12pt;">${p.trim()}</p>`)
+            .join("");
         const sourceHTML = header + content + footer;
 
         const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
         const fileDownload = document.createElement("a");
         document.body.appendChild(fileDownload);
         fileDownload.href = source;
-        const safeCompanyName = setupContext?.companyName?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'company';
+        // FIX: use companyName prop (from job data, always set) instead of
+        // setupContext.companyName which is hardcoded '' in buildContext()
+        const safeCompanyName = companyName?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'company';
         fileDownload.download = `${t('result_filename')}_${safeCompanyName}.doc`;
         fileDownload.click();
         document.body.removeChild(fileDownload);

@@ -64,6 +64,8 @@ export const polishCoverLetter = inngest.createFunction(
         let currentText = originalText;
         let polishImproved = false;
         const polishWarnings: string[] = [];
+        const isEnglish = setupContext?.tone?.targetLanguage === 'en';
+        const t = (de: string, en: string) => isEnglish ? en : de;
 
         console.log(`[Polish] Starting for draft=${draftId} user=${userId.substring(0, 8)}…`);
 
@@ -92,10 +94,11 @@ export const polishCoverLetter = inngest.createFunction(
                 }
 
                 const fluffFeedback = fluffScan.matches.map(
-                    m => `BLACKLIST-TREFFER: "${m.pattern}" — Ersetze durch konkrete, belegbare Aussage.`
+                    m => `${t('BLACKLIST-TREFFER', 'BLACKLIST HIT')}: "${m.pattern}" — ${t('Ersetze durch konkrete, belegbare Aussage.', 'Replace with a specific, evidence-based statement.')}`
                 );
 
-                const fixPrompt = `Du bist ein Senior-Karriereberater. Das folgende Anschreiben enthält generische KI-Phrasen.
+                const fixPrompt = t(
+                    `Du bist ein Senior-Karriereberater. Das folgende Anschreiben enthält generische KI-Phrasen.
 
 AKTUELLES ANSCHREIBEN:
 ---
@@ -106,7 +109,20 @@ ERKANNTE PROBLEME:
 ${fluffFeedback.join('\n')}
 
 AUFGABE: Ersetze ALLE markierten Passagen durch konkrete, belegbare Aussagen. Behalte Struktur und Länge bei.
-GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, keine Kommentare.`;
+GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, keine Kommentare.`,
+                    `You are a senior career advisor. The following cover letter contains generic AI phrases.
+
+CURRENT COVER LETTER:
+---
+${currentText}
+---
+
+DETECTED ISSUES:
+${fluffFeedback.join('\n')}
+
+TASK: Replace ALL flagged passages with specific, evidence-based statements. Maintain structure and length.
+RETURN ONLY THE REVISED TEXT! No introductions, no markdown, no comments.`
+                );
 
                 try {
                     const message = await anthropic.messages.create({
@@ -147,7 +163,8 @@ GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, kei
                     const pipelineResult = await runMultiAgentPipeline(
                         currentText,
                         jobData,
-                        companyResearch
+                        companyResearch,
+                        setupContext?.tone?.targetLanguage,
                     );
 
                     if (pipelineResult.pipelineImproved) {

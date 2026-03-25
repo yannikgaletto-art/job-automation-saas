@@ -185,10 +185,30 @@ async function fixParagraph(
     targetFix: string,
     setupContext?: CoverLetterSetupContext
 ): Promise<CoverLetterResult> {
-    const lang = setupContext?.tone?.targetLanguage === 'en' ? 'English' : 'Deutsch';
+    const isEnglish = setupContext?.tone?.targetLanguage === 'en';
+    const lang = isEnglish ? 'English' : 'Deutsch';
     console.log(`[CoverLetterGen] Applying instruction-based fix: "${targetFix}"`);
 
-    const prompt = `Du bist ein professioneller Senior-Karriereberater und Experte für Copywriting.
+    // FIX: Use locale-aware instruction text so Claude doesn't anchor to German
+    // when the target language is English.
+    const prompt = isEnglish
+        ? `You are a professional senior career advisor and expert copywriter.
+Here is the applicant's currently generated cover letter:
+---
+${currentLetter}
+---
+
+YOUR TASK:
+Revise this cover letter based on the following critique or instruction:
+>> "${targetFix}" <<
+
+RULES:
+1. If the instruction refers to a specific paragraph, change only what is necessary and leave the rest intact.
+2. If the instruction is global ("write more casually", "shorten everything", "make it more enthusiastic"), adapt the entire text fluidly and naturally.
+3. Maintain structure and format (paragraphs separated by blank lines) unless the instruction demands otherwise.
+4. RETURN ONLY THE REVISED TEXT! No introductions, no markdown (except line breaks), no comments, no explanations.
+5. Target language: ${lang}`
+        : `Du bist ein professioneller Senior-Karriereberater und Experte für Copywriting.
 Hier ist das aktuell generierte Anschreiben eines Bewerbers:
 ---
 ${currentLetter}

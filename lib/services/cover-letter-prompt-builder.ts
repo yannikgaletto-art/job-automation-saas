@@ -56,15 +56,22 @@ export function buildSystemPrompt(
     feedback: string[],
     lastWordCount: number
 ): string {
-    const lang = ctx?.tone.targetLanguage === 'en' ? 'English' : 'Deutsch';
-    const companyName = job?.company_name || ctx?.companyName || 'das Unternehmen';
-    const jobTitle = job?.job_title || 'die ausgeschriebene Stelle';
+    const isEnglish = ctx?.tone.targetLanguage === 'en';
+    const lang = isEnglish ? 'English' : 'Deutsch';
+    // Locale helper: returns EN string when targetLanguage is 'en', DE otherwise.
+    // Used for all text that Claude should output verbatim in the cover letter.
+    const t = (de: string, en: string) => isEnglish ? en : de;
+    const companyName = job?.company_name || ctx?.companyName || t('das Unternehmen', 'the company');
+    const jobTitle = job?.job_title || t('die ausgeschriebene Stelle', 'the advertised position');
 
     // ─── B1.6: Ansprechperson-Binding (Cascading Fallback) ────────────────────
     const isDuForm = ctx?.tone.formality === 'du';
     let contactPersonGreeting: string;
     if (ctx?.tone.contactPerson) {
-        const name = ctx.tone.contactPerson.trim();
+        // Strip common greeting prefixes to prevent double-salutation
+        // e.g. user types "Hello Mr. Curry" → would become "Dear Hello Mr. Curry" without this guard
+        const rawName = ctx.tone.contactPerson.trim();
+        const name = rawName.replace(/^(dear|hello|hi|hallo|liebe[rs]?|sehr geehrte[rs]?|good\s+(?:morning|afternoon|evening))\s+/i, '').trim();
         if (lang === 'English') {
             contactPersonGreeting = `"Dear ${name},"`;
         } else if (isDuForm) {
@@ -180,7 +187,8 @@ VERBOTEN: Oberflächliche Name-Dropping von Philosophen ohne Bezug, Arroganz, ak
     const isGenuineAnalysis = isCustomStyle && style && (
         (style.rhetorical_devices?.length ?? 0) > 0 ||
         (style.forbidden_constructs?.length ?? 0) > 0 ||
-        style.tone !== 'professional' // Default fallback always returns 'professional'
+        style.tone !== 'professional' || // Default fallback always returns 'professional'
+        typeof style.max_commas_per_sentence === 'number' // Any numeric extraction = genuine analysis
     );
 
     const customStyleBlock = isCustomStyle && style ? (
@@ -197,7 +205,11 @@ ${(style.forbidden_constructs || []).length > 0 ? `VERBOTEN (User nutzt diese NI
 Du MUSST den Ton, die Satzstruktur und die Konjunktionen aus DIESEM Schreibstil übernehmen.
 Der Output soll klingen, als hätte der Bewerber selbst geschrieben.
 Nutze die extrahierten Konjunktionen statt generischer Übergänge.
-Kalibriere deinen Output auf dieses Muster — übernimm den Stil, nicht den Inhalt.`
+Kalibriere deinen Output auf dieses Muster — übernimm den Stil, nicht den Inhalt.
+
+${!style.rhetorical_contrast_pattern ? t('VERBOTEN: Die Struktur "nicht [nur] X, sondern [auch] Y" — der User nutzt sie nie.', 'FORBIDDEN: The structure "not [only] X, but [also] Y" — the user never uses it.') : ''}
+${!style.uses_em_dash ? t('VERBOTEN: Gedankenstriche (– oder —) als Satzzeichen.', 'FORBIDDEN: Em-dashes (– or —) as punctuation.') : ''}
+${t(`SATZBAU: Max. ${style.max_commas_per_sentence ?? 1} Komma(s) pro Satz — exakt wie im Stil des Users.`, `SENTENCE STRUCTURE: Max. ${style.max_commas_per_sentence ?? 1} comma(s) per sentence — exactly like the user's style.`)}`
             // Partial style: use what we have (rhythm data) but note limited calibration
             : `SCHREIBRHYTHMUS (aus Stilanalyse — nur teilweise verfügbar):
 Satzlänge: ${style.sentence_length || 'medium'}
@@ -297,14 +309,14 @@ ${enablePingPong ? `
 Nach dem Zitat und dem Brückensatz fügst du ZWEI weitere Sätze hinzu (Antithese + Synthese):
 
 ANTITHESE (1 Satz): Beschreibe, wie du diesen Gedanken früher ANDERS gesehen hast.
-→ Formuliere es als Lernkurve oder Erkenntnisgewinn: "Bei [CV-Station] dachte ich zunächst, dass..."
+→ Formuliere es als Lernkurve oder Erkenntnisgewinn: "${t('Bei [CV-Station] dachte ich zunächst, dass...', 'At [CV-Station] I initially thought that...')}"
 → NIEMALS negativ über frühere Arbeitgeber klingen. Das ist VERBOTEN.
 → KEIN echter Fehler, kein Versagen — eine Perspektiventwicklung.
-→ KEIN Pseudo-Kontrast wie "Ich sah das ähnlich, aber jetzt noch mehr so." — Das ist VERBOTEN.
+→ KEIN Pseudo-Kontrast wie "${t('Ich sah das ähnlich, aber jetzt noch mehr so.', 'I saw it similarly, but now even more so.')}" — Das ist VERBOTEN.
 
 SYNTHESE (1 Satz): Verbinde die Erkenntnis DIREKT mit ${companyName} — baue eine konkrete Brücke.
 → PFLICHT: Der Satz muss einen konkreten ${companyName}-Bezug enthalten (Website, Werte, Projekt).
-→ Beispiel: "Da ich gelesen habe, dass ${companyName} [konkreter Firmenbezug], möchte ich mich kurz vorstellen."
+→ Beispiel: "${t(`Da ich gelesen habe, dass ${companyName} [konkreter Firmenbezug], möchte ich mich kurz vorstellen.`, `Having read that ${companyName} [specific company reference], I would like to briefly introduce myself.`)}"
 → KEINE abstrakte Reflexion ohne Firmenbezug. Der Leser muss verstehen WARUM genau DIESES Unternehmen.
 
 LIMITS:
@@ -320,9 +332,9 @@ PFLICHT-FORMAT:
 "${ctx!.selectedQuote!.quote}"
 – ${ctx!.selectedQuote!.author}
 
-Diesen Gedanken habe ich bei meiner Arbeit als [Rolle] bei [Firma] täglich gelebt, als ich [konkretes Beispiel]...
+${t('Diesen Gedanken habe ich bei meiner Arbeit als [Rolle] bei [Firma] täglich gelebt, als ich [konkretes Beispiel]...', 'I lived this philosophy daily during my work as [Role] at [Company], when I [specific example]...')}
 
-Das Zitat dient als Brücke zwischen dem Vordenker und der konkreten Berufserfahrung. Maximal 2 Sätze für Zitat + Brücke, dann direkt in die Station.` : '';
+${t('Das Zitat dient als Brücke zwischen dem Vordenker und der konkreten Berufserfahrung. Maximal 2 Sätze für Zitat + Brücke, dann direkt in die Station.', 'The quote serves as a bridge between the thought leader and the specific professional experience. Maximum 2 sentences for quote + bridge, then directly into the station.')}` : '';
 
     // ─── Hook-Block (wiederverwendbar für Intro oder Body) ─────────────────────
     const hookContent = ctx?.selectedHook?.content || '';
@@ -372,7 +384,7 @@ KEIN neuer Einleitungssatz — du bist bereits im Hauptteil. Maximal 2 Sätze f�
             newsSection = `[REGEL: NEWS-BINDING — HAUPTTEIL-ÜBERGANG]
 Die folgende News MUSS organisch als ÜBERGANGSSATZ zwischen dem ersten und zweiten Stations-Absatz eingebaut werden:
 "${ctx!.selectedNews!.title}" (${ctx!.selectedNews!.date}${ctx!.selectedNews!.source ? `, ${ctx!.selectedNews!.source}` : ''})
-Formuliere es als Brücke: "Gerade weil ${companyName} kürzlich [News-Bezug], sehe ich meine Erfahrung in [nächste Station] als besonders relevant..."
+Formuliere es als Brücke: "${t(`Gerade weil ${companyName} kürzlich [News-Bezug], sehe ich meine Erfahrung in [nächste Station] als besonders relevant...`, `Precisely because ${companyName} recently [news reference], I see my experience in [next station] as particularly relevant...`)}"
 NIEMALS die Quelle direkt nennen — der Kandidat soll wirken, als hätte er die News natürlich mitbekommen.`;
         } else {
             // Kein Intro-Anker → News bekommt die Einleitung
@@ -427,8 +439,8 @@ Job-Anforderungen als Signal: ${JSON.stringify(job?.requirements?.slice(0, 3) ||
 INSTRUKTION: Formuliere einen knappen 90-Tage-Plan (max. 60 Wörter) mit EXAKT 3 Punkten.
 Jeder Punkt adressiert eines der oben genannten Firma-Probleme DIREKT, verknüpft mit einer konkreten Erfahrung aus dem CV.
 Format (als Fließtext mit Zeilenumbrüchen, KEINE Bullet-Point-Symbole):
-"In den ersten 90 Tagen würde ich drei Dinge priorisieren: Erstens [Problem der Firma → CV-Station]. Zweitens [zweites Problem → CV-Beweis]. Drittens [strategischer Ausblick]."
-VERBOTEN: "In den ersten 30 Tagen werde ich zuhören und verstehen" — das ist FLUFF.
+"${t('In den ersten 90 Tagen würde ich drei Dinge priorisieren: Erstens [Problem der Firma → CV-Station]. Zweitens [zweites Problem → CV-Beweis]. Drittens [strategischer Ausblick].', 'During the first 90 days, I would prioritize three things: First [company problem → CV station]. Second [second problem → CV proof]. Third [strategic outlook].')}"
+VERBOTEN: "${t('In den ersten 30 Tagen werde ich zuhören und verstehen', 'During the first 30 days I will listen and understand')}" — das ist FLUFF.
 VERBOTEN: Mehr als 60 Wörter für diesen Block.`;
         } else {
             // Fallback-Pfad: Keine Perplexity-Daten → Plan basierend auf Job-Requirements
@@ -440,8 +452,8 @@ INSTRUKTION: Formuliere einen knappen 90-Tage-Plan (max. 60 Wörter) mit EXAKT 3
 Leite aus den Job-Anforderungen die wahrscheinlichsten Aufgaben der ersten 90 Tage ab.
 Verknüpfe jeden Punkt mit einer konkreten Erfahrung aus dem CV.
 Format (Fließtext, KEINE Bullet-Point-Symbole):
-"In den ersten 90 Tagen würde ich drei Dinge priorisieren: Erstens [Anforderung → CV-Beweis]. Zweitens [zweite Anforderung → Beweis]. Drittens [strategischer Ausblick]."
-VERBOTEN: "In den ersten 30 Tagen werde ich zuhören und verstehen" — das ist FLUFF.
+"${t('In den ersten 90 Tagen würde ich drei Dinge priorisieren: Erstens [Anforderung → CV-Beweis]. Zweitens [zweite Anforderung → Beweis]. Drittens [strategischer Ausblick].', 'During the first 90 days, I would prioritize three things: First [requirement → CV proof]. Second [second requirement → proof]. Third [strategic outlook].')}"
+VERBOTEN: "${t('In den ersten 30 Tagen werde ich zuhören und verstehen', 'During the first 30 days I will listen and understand')}" — das ist FLUFF.
 VERBOTEN: Mehr als 60 Wörter für diesen Block.`;
         }
     }
@@ -459,12 +471,12 @@ Nicht "Ich kann das", sondern "Hier habe ich das gelöst: [konkret]".`;
     if (modules.vulnerabilityInjector) {
         vulnerabilitySection = `[REGEL: VULNERABILITY INJECTOR — MAX. 2x VERWENDEN]
 Baue 1-2 strategische, authentische Schwächen oder Lernkurven ein.
-Format: "Ich habe bei [Station] schnell gemerkt, dass mein erster Ansatz zu komplex gedacht war. Das hat mich gezwungen, radikal zu vereinfachen — ein Prinzip, das ich auch in eurem [Firmen-Kontext] sehe."
+Format: "${t('Ich habe bei [Station] schnell gemerkt, dass mein erster Ansatz zu komplex gedacht war. Das hat mich gezwungen, radikal zu vereinfachen — ein Prinzip, das ich auch in eurem [Firmen-Kontext] sehe.', 'I quickly realized at [Station] that my initial approach was too complex. This forced me to radically simplify — a principle I also see in your [company context].')}"
 REGELN:
 - Darf NIE wie eine Entschuldigung klingen — immer als Wachstum framen
 - MAXIMAL 2 Stellen im gesamten Anschreiben
 - Jede Vulnerability MUSS in [VUL]...[/VUL] Tags eingeschlossen werden (wird nach Generierung automatisch geprüft und entfernt)
-- Beispiel: [VUL]Ich habe bei Fraunhofer schnell gemerkt, dass...[/VUL]`;
+- Beispiel: ${t('[VUL]Ich habe bei Fraunhofer schnell gemerkt, dass...[/VUL]', '[VUL]I quickly realized at Fraunhofer that...[/VUL]')}`;
     }
 
     // ─── B3.2: Persona-Kontext (Hiring Manager Panel) ──────────────────────
@@ -481,10 +493,16 @@ Bevorzugter Stil: ${persona.preferredStyle}
 
     const wordCountFeedback = (() => {
         if (lastWordCount > 380) {
-            return `WORTANZAHL: Vorherige Version hatte ${lastWordCount} Wörter — ZU LANG. Kürze um ${lastWordCount - 350} Wörter. Maximal 3 Sätze pro Absatz.`;
+            return t(
+                `WORTANZAHL: Vorherige Version hatte ${lastWordCount} Wörter — ZU LANG. Kürze um ${lastWordCount - 350} Wörter. Maximal 3 Sätze pro Absatz.`,
+                `WORD COUNT: Previous version had ${lastWordCount} words — TOO LONG. Shorten by ${lastWordCount - 350} words. Maximum 3 sentences per paragraph.`
+            );
         }
         if (lastWordCount < 250 && lastWordCount > 0) {
-            return `WORTANZAHL: Vorherige Version hatte ${lastWordCount} Wörter — ZU KURZ. Füge ${280 - lastWordCount} Wörter hinzu. Erweitere den Beweis-Absatz.`;
+            return t(
+                `WORTANZAHL: Vorherige Version hatte ${lastWordCount} Wörter — ZU KURZ. Füge ${280 - lastWordCount} Wörter hinzu. Erweitere den Beweis-Absatz.`,
+                `WORD COUNT: Previous version had ${lastWordCount} words — TOO SHORT. Add ${280 - lastWordCount} words. Expand the proof paragraph.`
+            );
         }
         return '';
     })();
@@ -498,15 +516,15 @@ ${wordCountFeedback ? `\n${wordCountFeedback}` : ''}`
 
     // ─── MASTER PROMPT ASSEMBLY ───────────────────────────────────────────────
     return `
-=== SEKTION 1: ROLLE & OUTPUT-FORMAT ===
-Du bist ein Senior-Karriereberater und exzellenter Schreiber.
-Deine Aufgabe: Schreibe ein Anschreiben für die Stelle "${jobTitle}" bei "${companyName}".
+=== ${t('SEKTION 1: ROLLE & OUTPUT-FORMAT', 'SECTION 1: ROLE & OUTPUT FORMAT')} ===
+${t('Du bist ein Senior-Karriereberater und exzellenter Schreiber.', 'You are a senior career advisor and excellent writer.')}
+${t(`Deine Aufgabe: Schreibe ein Anschreiben für die Stelle "${jobTitle}" bei "${companyName}".`, `Your task: Write a cover letter for the position "${jobTitle}" at "${companyName}".`)}
 
 OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
-- Nur der reine Briefkörper: Von der Anrede bis zur Grußformel
-- KEIN Datum, KEINE Adresszeilen, KEIN Betreff
+- ${t('Nur der reine Briefkörper: Von der Anrede bis zur Grußformel', 'Only the pure letter body: From the salutation to the closing formula')}
+- ${t('KEIN Datum, KEINE Adresszeilen, KEIN Betreff', 'NO date, NO address lines, NO subject line')}
 - KEIN Markdown: kein **bold**, kein *italic*, keine - Bullet-Points im Text
-- Sprache: ${lang} — keine einzige Ausnahme
+- Sprache: ${lang} — ${t('keine einzige Ausnahme', 'no single exception. The ENTIRE letter must be in English')}
 - Länge: ${modules.first90DaysHypothesis
             // WHY: Der 90-Tage-Block kostete ~60 Wörter extra. Ohne Budget-Reduktion
             // überschreitet das Anschreiben eine DIN-A4-Seite. Der Haupttext wird daher
@@ -551,9 +569,9 @@ ${introGuidance && hasQuote && focus === 'quote'
             : 'Der gesamte erste Absatz (Aufhänger + Motivation) darf MAXIMAL 2 SÄTZE lang sein! Keine generischen Abhandlungen über Innovation. Kurz, knackig, direkt zum Punkt.'
         }
 
-[PFLICHT — ÜBERGANGSSATZ]: ${introGuidance && hasQuote && focus === 'quote' ? 'Die EINLEITUNG (nach dem Zitat und dem Begründungssatz)' : 'Der ERSTE Absatz'} MUSS zwingend mit diesem Satz enden:
-${isDuForm ? '"Daher möchte ich mich bei euch kurz vorstellen."' : '"Daher möchte ich mich bei Ihnen kurz vorstellen."'}
-Dieser Satz ist NICHT optional. Er bildet die Brücke zum Hauptteil.
+[MANDATORY — TRANSITION SENTENCE]: ${introGuidance && hasQuote && focus === 'quote' ? (isEnglish ? 'The INTRODUCTION (after the quote and the bridging sentence)' : 'Die EINLEITUNG (nach dem Zitat und dem Begründungssatz)') : (isEnglish ? 'The FIRST paragraph' : 'Der ERSTE Absatz')} MUST end with this exact sentence:
+${isEnglish ? '"That is why I would like to briefly introduce myself."' : isDuForm ? '"Daher möchte ich mich bei euch kurz vorstellen."' : '"Daher möchte ich mich bei Ihnen kurz vorstellen."'}
+This sentence is NOT optional. It bridges to the main body.
 
 ${newsSection}
 
@@ -587,16 +605,21 @@ ${vulnerabilitySection}
 
 ${personaSection}
 
-=== SEKTION 5: ABSCHLUSS & CALL TO ACTION ===
-[REGEL: SCHLUSSTEIL]
-- VERBOTEN: Fasse am Ende NICHT noch einmal die Karrierestationen oder Erfahrungen zusammen ("Mit über X Jahren Erfahrung...", "Meine direkte Arbeitsweise..."). Das ist Fluff.
-- VERBOTEN: Das Zitat oder den Aufhänger aus dem ersten Absatz hier noch einmal erwähnen. Schreibe keine poetischen Sprachbilder am Ende.
-- Der Schlusssatz ist ein DIREKTER, KURZER Call-to-Action auf Augenhöhe (max 2 Sätze). Bette einen konkreten Gesprächsvorschlag ein.
-- Beispiel: ${isDuForm ? '"Ich würde mich freuen, in einem kurzen Gespräch zu zeigen, wie ich [konkreter Punkt] bei euch vorantreiben kann."' : '"Lassen Sie uns in einem kurzen Gespräch ausloten, wie ich [konkreter Punkt] bei Ihnen vorantreiben kann."'}
+=== SECTION 5: CLOSING & CALL TO ACTION ===
+[RULE: CLOSING]
+- FORBIDDEN: Do NOT summarize career stations or experience again at the end. That is filler.
+- FORBIDDEN: Do NOT repeat the quote or hook from the opening paragraph. No poetic metaphors at the end.
+- The closing sentence is a DIRECT, SHORT call-to-action at eye level (max 2 sentences). Embed a concrete conversation proposal.
+- Example: ${isEnglish
+    ? '"I would welcome the opportunity to discuss in a brief call how I could contribute to [specific point] at ' + companyName + '."'
+    : isDuForm
+        ? '"Ich würde mich freuen, in einem kurzen Gespräch zu zeigen, wie ich [konkreter Punkt] bei euch vorantreiben kann."'
+        : '"Lassen Sie uns in einem kurzen Gespräch ausloten, wie ich [konkreter Punkt] bei Ihnen vorantreiben kann."'}
+- Sign-off: ${isEnglish ? 'End with "Kind regards," or "Best regards," — NEVER use German closing formulas like "Mit freundlichen Grüßen".' : 'Beende mit "Mit freundlichen Grüßen" oder (bei Du-Form) "Viele Grüße".'}
 
-=== SEKTION 6: VERBESSERUNGS-FEEDBACK ===
-${feedbackSection || 'Erste Version — kein vorheriges Feedback.'}
+=== ${t('SEKTION 6: VERBESSERUNGS-FEEDBACK', 'SECTION 6: IMPROVEMENT FEEDBACK')} ===
+${feedbackSection || t('Erste Version — kein vorheriges Feedback.', 'First version — no previous feedback.')}
 
-Schreibe jetzt das Anschreiben. Beginne direkt mit der Anrede:
+${t('Schreibe jetzt das Anschreiben. Beginne direkt mit der Anrede:', 'Write the cover letter now. Start directly with the salutation:')}
 `.trim();
 }

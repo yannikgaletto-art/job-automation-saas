@@ -1,8 +1,8 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 5.1  
-**Last Updated:** 2026-03-22  
+**Version:** 5.2  
+**Last Updated:** 2026-03-24  
 **Status:** Active  
 
 ---
@@ -88,6 +88,7 @@ Pathly besteht aus **zwei getrennten Projekten** die unabhängig deployt werden:
 - **SSG-Bug-Prävention:** `new Date()` niemals auf Modul-Level verwenden. Nur in Render-Funktionen oder `useEffect`.
 - **Security Headers:** In `next.config.mjs` — X-Frame-Options, CSP (inkl. `https://tally.so` in `script-src`), Referrer-Policy, Permissions-Policy.
 - **Server Components by Default:** Sections sind Server Components (kein `"use client"`) — nur UI-Elemente mit State/Events brauchen Client-Direktive.
+- **Scroll-Driven Sections (GSAP):** Sections die `ScrollTrigger` nutzen, werden als `"use client"` Client Components implementiert. Muster: `400vh` äußerer Container + `sticky top-0 h-screen` innerer Wrapper → Viewport bleibt während Animation gelockt. Referenz-Implementation: `ScrollSection.tsx`, `Comparison.tsx`.
 
 ### Pathly Website — Schlüssel-Dateien
 
@@ -95,13 +96,15 @@ Pathly besteht aus **zwei getrennten Projekten** die unabhängig deployt werden:
 |-------|
 | `lib/constants.ts` | Single Source of Truth für alle Texte (REGEL 7) |
 | `next.config.mjs` | Security Headers + CSP (Tally.so erlaubt) |
-| `app/globals.css` | Design-Tokens, CSS-Variablen, hero-fade-in + marker Keyframes |
+| `app/globals.css` | Design-Tokens, CSS-Variablen, hero-fade-in + marker + `typewriter-cursor` + `cursor-blink-7` Keyframes |
 | `tailwind.config.ts` | Design-System-Tokens (navy, muted, border etc.) |
 | `DESIGN.md` | Design-System-Dokumentation |
 | `public/og-image.png` | Open Graph / Twitter Card Bild (1200×630) |
 | `components/layout/Navbar.tsx` | Sticky Nav, scroll-aware blur, hamburger inline SVG |
 | `components/layout/Footer.tsx` | Logo, Impressum/Datenschutz Links, Copyright runtime |
 | `components/sections/Hero.tsx` | Fullscreen Headline (100svh), below-fold CTAs/Phone/Stats |
+| `components/sections/ScrollSection.tsx` | Hero scroll-driven typewriter (400vh sticky, GSAP ScrollTrigger) |
+| `components/sections/Comparison.tsx` | Vorher/Nachher Vergleich (400vh sticky, sequentielle Animation links→rechts, `data-flipper` Wrapper für Flip-Animation, transparente Container) |
 | `components/ui/HighlightText.tsx` | Marker-Highlight-Animation via CSS @keyframes (marker-highlight + marker-badge Klassen) |
 | `components/ui/CountUp.tsx` | Zahlen-Animation via native `getBoundingClientRect` mount-check |
 | `components/ui/PhoneCarousel.tsx` | Auto-cycling Screenshots, prefers-reduced-motion Fallback |

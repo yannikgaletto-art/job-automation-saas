@@ -145,10 +145,16 @@ const anthropic = new Anthropic({
 });
 
 export interface StyleAnalysis {
-    tone: 'professional' | 'enthusiastic' | 'technical' | 'conversational';
+    tone: 'professional' | 'enthusiastic' | 'technical' | 'conversational' | 'storytelling' | 'philosophical';
     sentence_length: 'short' | 'medium' | 'long'; // avg 10-15 / 16-25 / 26+ words
     conjunctions: string[]; // Top 5 most used (e.g., ["Daher", "Deshalb", "Gleichzeitig"])
     greeting: string; // e.g., "Sehr geehrte Damen und Herren" or "Hallo [Name]"
+    rhetorical_devices: string[]; // e.g., ["quote", "anecdote", "rhetorical_question"]
+    forbidden_constructs: string[]; // Constructs the user never uses
+    // ─── Structural Pattern Fields (Anti-Generic) ─────────────────────────────
+    max_commas_per_sentence: number;       // Avg comma count per sentence (e.g. 1)
+    uses_em_dash: boolean;                  // Does the author use – or — as punctuation?
+    rhetorical_contrast_pattern: boolean;   // Does the author use "nicht X, sondern Y" / "not X, but Y"?
 }
 
 /**
@@ -169,15 +175,20 @@ export async function analyzeWritingStyle(
 
     try {
         const message = await anthropic.messages.create({
-            model: 'claude-3-haiku-20240307',
-            max_tokens: 512,
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 1000,
             temperature: 0,
             system: `You are a writing style analyzer. Extract style patterns from cover letters.
-Return ONLY valid JSON with these 4 keys:
-- tone: "professional" | "enthusiastic" | "technical" | "conversational"
+Return ONLY valid JSON with these 9 keys:
+- tone: "professional" | "enthusiastic" | "technical" | "conversational" | "storytelling" | "philosophical"
 - sentence_length: "short" | "medium" | "long"
 - conjunctions: array of top 5 conjunctions used (German: Daher, Deshalb, etc.)
-- greeting: the exact greeting used (e.g., "Sehr geehrte Damen und Herren")`,
+- greeting: the exact greeting used (e.g., "Sehr geehrte Damen und Herren")
+- rhetorical_devices: array of rhetorical devices
+- forbidden_constructs: array of patterns to avoid
+- max_commas_per_sentence: integer
+- uses_em_dash: boolean
+- rhetorical_contrast_pattern: boolean`,
             messages: [{
                 role: 'user',
                 content: `Analyze the writing style of this cover letter:

@@ -43,11 +43,46 @@ export async function judgeCoverLetter(
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    const companyName = job?.company_name || 'das Unternehmen';
+    const isEnglish = setupContext?.tone?.targetLanguage === 'en';
+    const companyName = job?.company_name || (isEnglish ? 'the company' : 'das Unternehmen');
     const enablePingPong = setupContext?.optInModules?.pingPong ?? setupContext?.enablePingPong ?? false;
     const hasQuote = !!setupContext?.selectedQuote?.quote;
 
-    const judgePrompt = `Du bist ein strenger Anschreiben-Qualitätsprüfer. Prüfe NUR harte Constraints.
+    const judgePrompt = isEnglish
+        ? `You are a strict cover letter quality checker. Check ONLY hard constraints.
+
+COVER LETTER:
+***
+${text}
+***
+
+HARD CONSTRAINT CHECKS (each violation = fail):
+
+1. GPT-BLACKLIST: Does the text contain any of these forbidden phrases?
+   - "I am excited to apply", "I am confident that", "my passion for"
+   - "ideal for this position", "With great enthusiasm", "I am writing to apply"
+   - "Ich freue mich sehr darauf", "hiermit bewerbe ich mich"
+   If YES → fail_reason: "BLACKLIST: [found phrase]"
+
+2. COMPANY MENTION: Is "${companyName}" (or a recognizable variant) mentioned at least once in the text?
+   If NO → fail_reason: "COMPANY: Company name missing from text"
+
+3. WORD COUNT: Does the text have between 150 and 500 words?
+   If NO → fail_reason: "LENGTH: Text has [N] words (allowed: 150-500)"
+${enablePingPong && hasQuote ? `
+4. PING-PONG: Does the introduction contain a REAL antithesis — an earlier different perspective of the candidate?
+   Pseudo-contrast (FAILS): "I saw it the same way", "always have", "even more convinced"
+   If no real contrast → fail_reason: "PING-PONG: No real perspective shift in the introduction"` : ''}
+
+Additionally: Name at most 2 optional improvement suggestions (weaknesses), if you notice anything.
+
+Respond ONLY as valid JSON:
+{
+  "pass": true/false,
+  "fail_reasons": ["..."],
+  "weaknesses": ["..."]
+}`
+        : `Du bist ein strenger Anschreiben-Qualitätsprüfer. Prüfe NUR harte Constraints.
 
 ANSCHREIBEN:
 ***

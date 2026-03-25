@@ -46,7 +46,7 @@ interface JobData {
 }
 
 // ─── GPT-4o Language Judge + Claim Extractor (Agent 2) ────────────────────────
-async function runGPTLanguageJudge(coverLetter: string): Promise<GPTJudgeResult> {
+async function runGPTLanguageJudge(coverLetter: string, isEnglish: boolean): Promise<GPTJudgeResult> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
         return { improvedText: coverLetter, externalClaims: [], changes: [], hadIssues: false };
@@ -54,7 +54,31 @@ async function runGPTLanguageJudge(coverLetter: string): Promise<GPTJudgeResult>
 
     const blacklistSection = BLACKLIST_PATTERNS.map(p => `- "${p.pattern}"`).join('\n');
 
-    const systemPrompt = `Du bist ein Language Judge. Deine Aufgabe:
+    const systemPrompt = isEnglish
+        ? `You are a Language Judge. Your task:
+1. Find all sentences that sound like AI (apply blacklist)
+2. Check sentence length and rhythm: no sentence over 30 words without a comma
+3. Check: Does this sound like a real person or like ChatGPT?
+4. Replace all flagged passages with more authentic formulations
+5. Keep the structure and all facts
+
+BLACKLIST (these phrases MUST be removed/replaced):
+${blacklistSection}
+
+Additionally: Extract all external, publicly verifiable claims from the text.
+External claims are: Company names with specific statements, named news/events,
+quotes with author attribution, public statistics or metrics about companies.
+NO CV statements of the candidate (personal experiences, roles, achievements).
+
+Output as JSON:
+{
+  "improved_text": "The improved text",
+  "changes": ["Description of each change"],
+  "had_issues": true/false,
+  "external_claims": ["Claim 1", "Claim 2"]
+}
+If no external claims present: "external_claims": []`
+        : `Du bist ein Language Judge. Deine Aufgabe:
 1. Finde alle Sätze die nach KI klingen (Blacklist anwenden)
 2. Prüfe Satz-Länge und -Rhythmus: kein Satz über 30 Wörter ohne Komma
 3. Prüfe: Klingt das wie ein echter Mensch oder wie ChatGPT?
@@ -91,7 +115,7 @@ Wenn keine externen Claims vorhanden: "external_claims": []`;
                 max_tokens: 2500,
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Prüfe und verbessere dieses Anschreiben:\n\n${coverLetter}` },
+                    { role: 'user', content: `${isEnglish ? 'Review and improve this cover letter' : 'Prüfe und verbessere dieses Anschreiben'}:\n\n${coverLetter}` },
                 ],
                 response_format: { type: 'json_object' },
             }),
@@ -123,6 +147,7 @@ Wenn keine externen Claims vorhanden: "external_claims": []`;
 async function runPerplexityFactCheck(
     externalClaims: string[],
     companyName: string,
+    isEnglish: boolean,
 ): Promise<{
     verified: boolean;
     issues: string[];
@@ -133,7 +158,22 @@ async function runPerplexityFactCheck(
         return { verified: true, issues: [], corrections: [] };
     }
 
-    const prompt = `Prüfe NUR diese externen Claims auf Faktentreue:
+    const prompt = isEnglish
+        ? `Check ONLY these external claims for factual accuracy:
+${externalClaims.map((c, i) => `${i + 1}. ${c}`).join('\n')}
+
+Company: ${companyName}
+
+CV statements of the candidate are NOT in this list and should not be evaluated.
+Check only: Are the stated facts correct? Do the named news/events exist?
+
+Output as JSON:
+{
+  "verified": true/false,
+  "issues": ["List of problematic claims"],
+  "corrections": ["Suggested corrections"]
+}`
+        : `Prüfe NUR diese externen Claims auf Faktentreue:
 ${externalClaims.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
 Unternehmen: ${companyName}
@@ -196,6 +236,7 @@ export async function runMultiAgentPipeline(
     coverLetter: string,
     jobData?: JobData,
     companyResearch?: CompanyResearchData,
+    targetLanguage?: 'de' | 'en',
 ): Promise<PipelineResult> {
     const warnings: string[] = [];
     let finalText = coverLetter;
@@ -204,8 +245,9 @@ export async function runMultiAgentPipeline(
     let extractedClaims: string[] = [];
     let perplexityVerified: boolean | undefined;
     let perplexityIssues: string[] = [];
+    const isEnglish = targetLanguage === 'en';
 
-    const companyName = jobData?.company_name || 'das Unternehmen';
+    const companyName = jobData?.company_name || (isEnglish ? 'the company' : 'das Unternehmen');
 
     // ── Step 1: GPT-4o Language Judge + Claim Extraction ──────────────────
     if (!process.env.OPENAI_API_KEY) {
@@ -214,7 +256,7 @@ export async function runMultiAgentPipeline(
     } else {
         try {
             console.log('🔍 [Pipeline:GPT-4o] Running Language Judge + Claim Extraction...');
-            const gptResult = await runGPTLanguageJudge(finalText);
+            const gptResult = await runGPTLanguageJudge(finalText, isEnglish);
 
             extractedClaims = gptResult.externalClaims;
             console.log(`📋 [Pipeline:GPT-4o] Extracted ${extractedClaims.length} external claims`);
@@ -244,7 +286,7 @@ export async function runMultiAgentPipeline(
     } else {
         try {
             console.log(`🔍 [Pipeline:Perplexity] Fact-checking ${extractedClaims.length} external claims...`);
-            const factResult = await runPerplexityFactCheck(extractedClaims, companyName);
+            const factResult = await runPerplexityFactCheck(extractedClaims, companyName, isEnglish);
 
             perplexityVerified = factResult.verified;
             perplexityIssues = factResult.issues;

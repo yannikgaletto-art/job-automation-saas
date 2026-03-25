@@ -79,8 +79,11 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const isFormal = selectedPreset === 'formal';
 
     // Ensure the store always has a valid tone on mount (for default selection)
+    // FIX: Only initialize if tone is completely absent. Previously this would
+    // overwrite a persisted targetLanguage='en' with the local `language` state
+    // (initialized from setupData.detectedJobLanguage='de' for German jobs).
     useEffect(() => {
-        if (!tone?.preset) {
+        if (!tone?.preset && !tone?.targetLanguage) {
             syncTone(toneSource, selectedPreset, selectedDocId);
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps

@@ -105,6 +105,8 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **Numbers Saved Button (2026-03-18)** | **Redesign: kleiner right-aligned button → full-width dark-navy matching "Start optimization". Label vereinfacht: "OK — numbers saved" → "Numbers Saved" / "Zahlen gespeichert"** |
 | **Hiring Manager Critique (2026-03-18)** | **Fix: API 400-Error bei leerem `companyName` → Fallback "the company". Locale-aware Prompts: DE/EN/ES. `locale` Prop in `CoverLetterResultView` via `useLocale()` → Critique antwortet in App-Locale** |
 | **Mood Check-in V2 (2026-03-19)** | **Adaptive Check-in mit Tag/Nacht-Symbolen (🌧️→☀️ / 🌑→🌕). Progressive Reduction: 5× Skip → auto-hide. `MoodCheckinContext` in `layout.tsx`. `useMoodCheckIn.tsx` mit Ref-basierter Auth-Subscription (kein Memory Leak). API GET/POST/PATCH mit `.maybeSingle()` und Fail-open. `CheckinSettingsCard` in Settings. i18n (de/en/es). `lib/mood/mood-symbols.ts` als kanonische Utility.** |
+| **Cover Letter Language Fix (2026-03-25)** | **Locale-aware generation pipeline. `t(de, en)` helper used across `cover-letter-prompt-builder.ts`, `cover-letter-polish.ts`, `multi-agent-pipeline.ts`, and `cover-letter-judge.ts`. Complete prevention of DE/EN language mix when 'Eng' tone is selected.** |
+| **CL Style Anti-Generic (2026-03-25)** | **Extended `StyleAnalysis` with 3 structural fields (`max_commas_per_sentence`, `uses_em_dash`, `rhetorical_contrast_pattern`). Haiku uses 1000 tokens for 9 fields. Prompt builder injects locale-aware structural constraints (blocking em-dashes, "nicht X, sondern Y", enforcing comma budget) natively in `customStyleBlock`.** |
 
 ---
 
