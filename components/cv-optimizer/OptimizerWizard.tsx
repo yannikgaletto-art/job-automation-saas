@@ -43,6 +43,7 @@ export interface OptimizerWizardProps {
     jobId: string
     liveMatchResult?: any | null
     onGoToCoverLetter?: () => void
+    onComplete?: () => void
 }
 
 // --- Cancel Button for CV Optimizer (appears after 15s) ---
@@ -66,7 +67,7 @@ function OptCancelButton({ onCancel, label }: { onCancel: () => void; label: str
     );
 }
 
-export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: OptimizerWizardProps) {
+export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onComplete }: OptimizerWizardProps) {
     const t = useTranslations('cv_optimizer');
     const locale = useLocale();
     const [step, setStep] = useState<1 | 2>(1);
@@ -333,6 +334,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter }: O
         const res = await saveCvDecisions(jobId, decisions, proposal);
         if (res.success) {
             setStep(2); // -> Preview
+            onComplete?.();
         } else {
         }
     };

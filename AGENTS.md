@@ -70,7 +70,7 @@ Pathly besteht aus **zwei getrennten Projekten** die unabhängig deployt werden:
 
 | Projekt | Pfad | Port (lokal) | Zweck |
 |---------|------|-------------|-------|
-| **Pathly SaaS** | `/Users/yannik/.gemini/antigravity/Pathly_SaaS/` | `3000` | Vollprodukt — App, DB, AI, Inngest |
+| **Pathly SaaS** | `/Users/yannik/.gemini/antigravity/Pathly_SaaS/` | `3000` | Vollprodukt — App, DB, AI, Inngest (requires `npx inngest-cli dev -u http://localhost:3000/api/inngest`) |
 | **Pathly Website** | `/Users/yannik/.gemini/antigravity/pathly-website/` | `3001` | Statische Marketing-Landing-Page |
 
 **Verbindung:** Nur via `NEXT_PUBLIC_APP_URL` in der Website `.env.local` → zeigt auf die deployed SaaS-App.  

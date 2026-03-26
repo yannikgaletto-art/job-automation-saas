@@ -478,6 +478,9 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                     jobId={job.id}
                                     liveMatchResult={liveMatchResult ?? job.metadata?.cv_match ?? null}
                                     onGoToCoverLetter={() => setActiveTab(3)}
+                                    onComplete={() => {
+                                        setOptimisticStep(prev => Math.max(prev ?? job.workflowStep, 80));
+                                    }}
                                 />
                             </div>
                         )}

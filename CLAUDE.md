@@ -107,6 +107,8 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **Mood Check-in V2 (2026-03-19)** | **Adaptive Check-in mit Tag/Nacht-Symbolen (🌧️→☀️ / 🌑→🌕). Progressive Reduction: 5× Skip → auto-hide. `MoodCheckinContext` in `layout.tsx`. `useMoodCheckIn.tsx` mit Ref-basierter Auth-Subscription (kein Memory Leak). API GET/POST/PATCH mit `.maybeSingle()` und Fail-open. `CheckinSettingsCard` in Settings. i18n (de/en/es). `lib/mood/mood-symbols.ts` als kanonische Utility.** |
 | **Cover Letter Language Fix (2026-03-25)** | **Locale-aware generation pipeline. `t(de, en)` helper used across `cover-letter-prompt-builder.ts`, `cover-letter-polish.ts`, `multi-agent-pipeline.ts`, and `cover-letter-judge.ts`. Complete prevention of DE/EN language mix when 'Eng' tone is selected.** |
 | **CL Style Anti-Generic (2026-03-25)** | **Extended `StyleAnalysis` with 3 structural fields (`max_commas_per_sentence`, `uses_em_dash`, `rhetorical_contrast_pattern`). Haiku uses 1000 tokens for 9 fields. Prompt builder injects locale-aware structural constraints (blocking em-dashes, "nicht X, sondern Y", enforcing comma budget) natively in `customStyleBlock`.** |
+| **CV Match Pipeline (2026-03-26)** | **Local dev fix: `inngest dev` server must be running to process `cv-match/analyze` events. Frontend stale detection aligned with Backend (4min threshold) to prevent dead-zone where frontend looped but API rejected retries.** |
+| **CV Optimizer Reload Bug (2026-03-26)** | **Added missing `onComplete` callback in `OptimizerWizard` and bound it to `optimisticStep` in `UnifiedJobRow`. The Job Queue now instantly advances to "Cover Letter" visually after "Save" without requiring a page reload.** |
 
 ---
 
