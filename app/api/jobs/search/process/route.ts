@@ -3,7 +3,7 @@ export const maxDuration = 60; // Required for Vercel Pro — pipeline can take 
 
 /**
  * POST /api/jobs/search/process
- * Deep pipeline: Firecrawl → GPT-4o-mini Harvester → Claude Judge
+ * Deep pipeline: Firecrawl → Claude Haiku Harvester → Claude Judge
  * Processes a single job and saves to job_queue.
  */
 

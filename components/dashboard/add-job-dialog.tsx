@@ -27,7 +27,7 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
     const [errorRequestId, setErrorRequestId] = useState<string | null>(null);
 
     const isUrlValid = /^https?:\/\/.+\..+/.test(companyWebsite);
-    const isFormValid = company.length >= 2 && jobTitle.length >= 2 && description.length >= 500 && description.length <= 7000 && isUrlValid;
+    const isFormValid = company.length >= 2 && jobTitle.length >= 2 && description.length >= 500 && description.length <= 7000 && companyWebsite.length > 0;
     const isSubmitting = isLoading;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -86,7 +86,7 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                     <p className="text-xs text-gray-400 mt-1">{t('tip')}</p>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} noValidate className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="company">{t('company_label')} <span className="text-red-500">*</span></Label>
@@ -150,12 +150,15 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                         />
                     </div>
 
-                    {error && !errorRequestId && (
+                    {error && (
                         <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600 flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                                 <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                                 <span>{error}</span>
                             </div>
+                            {errorRequestId && (
+                                <p className="text-xs text-red-400 pl-6">Ref: {errorRequestId}</p>
+                            )}
                         </div>
                     )}
 
@@ -163,7 +166,7 @@ export function AddJobDialog({ isOpen, onClose, onJobAdded }: AddJobDialogProps)
                         <Button variant="outline" onClick={onClose} disabled={isSubmitting} type="button">
                             {t('cancel')}
                         </Button>
-                        <Button type="submit" disabled={!isFormValid || isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Button type="submit" disabled={!isFormValid || isSubmitting} className="bg-[#002e7a] hover:bg-[#001f5c] text-white">
                             {isSubmitting ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

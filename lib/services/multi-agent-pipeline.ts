@@ -1,22 +1,27 @@
 /**
  * Multi-Agent Pipeline — Pathly V2.0
- * Claude (Writer) → GPT-4o (Language Judge + Claim Extractor) → Perplexity Sonar (Fact Checker)
+ * Claude Sonnet (Writer) → Claude Sonnet (Language Judge + Claim Extractor) → Perplexity Sonar (Fact Checker)
  *
  * Reference: QUALITY_CV_COVER_LETTER.md B2.1
  *
  * Design:
  * - Sequential: Claude already ran in generator loop
- * - GPT-4o extracts externalClaims[] alongside language fixes
+ * - Claude Sonnet extracts externalClaims[] alongside language fixes
  * - Perplexity receives ONLY externalClaims — never the full CL text
  * - If externalClaims is empty: Perplexity-Call skipped entirely (cost-save)
  * - Graceful Degradation: Missing API keys → warning, CL delivered anyway
  * - No second Judge call after pipeline (Yannik Correction #1)
+ *
+ * MIGRATION NOTE (2026-03-28):
+ * - Replaced GPT-4o Language Judge with Claude 4.5 Sonnet via model-router
+ * - Perplexity Fact Checker remains unchanged
  */
 
 import { BLACKLIST_PATTERNS } from './anti-fluff-blacklist';
+import { complete } from '@/lib/ai/model-router';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface GPTJudgeResult {
+interface JudgeResult {
     improvedText: string;
     externalClaims: string[];  // Externe, verifizierbare Claims (für Perplexity)
     changes: string[];
@@ -27,7 +32,7 @@ interface PipelineResult {
     finalText: string;
     pipelineImproved: boolean;
     pipelineWarnings: string[];
-    gptChanges?: string[];
+    judgeChanges?: string[];
     perplexityVerified?: boolean;
     perplexityIssues?: string[];
 }
@@ -45,13 +50,8 @@ interface JobData {
     [key: string]: unknown;
 }
 
-// ─── GPT-4o Language Judge + Claim Extractor (Agent 2) ────────────────────────
-async function runGPTLanguageJudge(coverLetter: string, isEnglish: boolean): Promise<GPTJudgeResult> {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-        return { improvedText: coverLetter, externalClaims: [], changes: [], hadIssues: false };
-    }
-
+// ─── Claude Sonnet Language Judge + Claim Extractor (Agent 2) ─────────────────
+async function runLanguageJudge(coverLetter: string, isEnglish: boolean): Promise<JudgeResult> {
     const blacklistSection = BLACKLIST_PATTERNS.map(p => `- "${p.pattern}"`).join('\n');
 
     const systemPrompt = isEnglish
@@ -103,33 +103,29 @@ Output als JSON:
 Wenn keine externen Claims vorhanden: "external_claims": []`;
 
     try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                temperature: 0.3,
-                max_tokens: 2500,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `${isEnglish ? 'Review and improve this cover letter' : 'Prüfe und verbessere dieses Anschreiben'}:\n\n${coverLetter}` },
-                ],
-                response_format: { type: 'json_object' },
-            }),
+        const userPrompt = `${isEnglish ? 'Review and improve this cover letter' : 'Prüfe und verbessere dieses Anschreiben'}:\n\n${coverLetter}`;
+
+        const response = await complete({
+            taskType: 'language_judge',
+            systemPrompt,
+            prompt: userPrompt,
+            temperature: 0.3,
+            maxTokens: 2500,
         });
 
-        if (!response.ok) {
-            throw new Error(`GPT-4o API error: ${response.status} ${response.statusText}`);
+        // Robust JSON parsing — Claude may wrap in markdown
+        let parsed: any;
+        try {
+            parsed = JSON.parse(response.text);
+        } catch {
+            const jsonMatch = response.text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                parsed = JSON.parse(jsonMatch[0]);
+            } else {
+                throw new Error('No JSON found in Language Judge response');
+            }
         }
 
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (!content) throw new Error('Empty GPT-4o response');
-
-        const parsed = JSON.parse(content);
         return {
             improvedText: parsed.improved_text || coverLetter,
             externalClaims: parsed.external_claims || [],
@@ -137,7 +133,7 @@ Wenn keine externen Claims vorhanden: "external_claims": []`;
             hadIssues: parsed.had_issues ?? false,
         };
     } catch (error) {
-        console.error('❌ [Pipeline:GPT-4o] Language Judge failed:', error);
+        console.error('❌ [Pipeline:Sonnet] Language Judge failed:', error);
         throw error;
     }
 }
@@ -241,7 +237,7 @@ export async function runMultiAgentPipeline(
     const warnings: string[] = [];
     let finalText = coverLetter;
     let improved = false;
-    let gptChanges: string[] = [];
+    let judgeChanges: string[] = [];
     let extractedClaims: string[] = [];
     let perplexityVerified: boolean | undefined;
     let perplexityIssues: string[] = [];
@@ -249,30 +245,30 @@ export async function runMultiAgentPipeline(
 
     const companyName = jobData?.company_name || (isEnglish ? 'the company' : 'das Unternehmen');
 
-    // ── Step 1: GPT-4o Language Judge + Claim Extraction ──────────────────
-    if (!process.env.OPENAI_API_KEY) {
-        warnings.push('GPT-4o Language Judge übersprungen (OPENAI_API_KEY fehlt). Single-Agent-Mode.');
-        console.warn('⚠️ [Pipeline] OPENAI_API_KEY missing — skipping GPT-4o judge');
+    // ── Step 1: Claude Sonnet Language Judge + Claim Extraction ───────────
+    if (!process.env.ANTHROPIC_API_KEY) {
+        warnings.push('Language Judge übersprungen (ANTHROPIC_API_KEY fehlt). Single-Agent-Mode.');
+        console.warn('⚠️ [Pipeline] ANTHROPIC_API_KEY missing — skipping Language Judge');
     } else {
         try {
-            console.log('🔍 [Pipeline:GPT-4o] Running Language Judge + Claim Extraction...');
-            const gptResult = await runGPTLanguageJudge(finalText, isEnglish);
+            console.log('🔍 [Pipeline:Sonnet] Running Language Judge + Claim Extraction...');
+            const judgeResult = await runLanguageJudge(finalText, isEnglish);
 
-            extractedClaims = gptResult.externalClaims;
-            console.log(`📋 [Pipeline:GPT-4o] Extracted ${extractedClaims.length} external claims`);
+            extractedClaims = judgeResult.externalClaims;
+            console.log(`📋 [Pipeline:Sonnet] Extracted ${extractedClaims.length} external claims`);
 
-            if (gptResult.hadIssues && gptResult.changes.length > 0) {
-                finalText = gptResult.improvedText;
-                gptChanges = gptResult.changes;
+            if (judgeResult.hadIssues && judgeResult.changes.length > 0) {
+                finalText = judgeResult.improvedText;
+                judgeChanges = judgeResult.changes;
                 improved = true;
-                console.log(`✅ [Pipeline:GPT-4o] ${gptResult.changes.length} improvement(s) applied`);
+                console.log(`✅ [Pipeline:Sonnet] ${judgeResult.changes.length} improvement(s) applied`);
             } else {
-                console.log('✅ [Pipeline:GPT-4o] No issues found — text is clean');
+                console.log('✅ [Pipeline:Sonnet] No issues found — text is clean');
             }
         } catch (error) {
             const errMsg = error instanceof Error ? error.message : String(error);
-            warnings.push(`GPT-4o Language Judge fehlgeschlagen: ${errMsg}. Original-Text wird beibehalten.`);
-            console.warn(`⚠️ [Pipeline:GPT-4o] Graceful degradation — continuing without GPT-4o`);
+            warnings.push(`Language Judge fehlgeschlagen: ${errMsg}. Original-Text wird beibehalten.`);
+            console.warn(`⚠️ [Pipeline:Sonnet] Graceful degradation — continuing without Language Judge`);
         }
     }
 
@@ -310,7 +306,7 @@ export async function runMultiAgentPipeline(
         finalText,
         pipelineImproved: improved,
         pipelineWarnings: warnings,
-        gptChanges: gptChanges.length > 0 ? gptChanges : undefined,
+        judgeChanges: judgeChanges.length > 0 ? judgeChanges : undefined,
         perplexityVerified,
         perplexityIssues: perplexityIssues.length > 0 ? perplexityIssues : undefined,
     };

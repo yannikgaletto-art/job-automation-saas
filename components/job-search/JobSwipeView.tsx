@@ -2,8 +2,18 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
-import { ExternalLink, CheckCircle2, XIcon, Briefcase, Euro, MapPin, ArrowRight, X, BriefcaseBusiness } from 'lucide-react';
+import { ExternalLink, CheckCircle2, XIcon, X, Briefcase, Euro, MapPin, ArrowRight, BriefcaseBusiness, Globe } from 'lucide-react';
+
 import { useJobQueueCount } from '@/store/use-job-queue-count';
+import { useTranslations } from 'next-intl';
+
+// ─── Filter label lookup (mirrors i18n keys in locale files) ────────
+// Keeping this as a static map avoids prop-drilling t() through 3 layers.
+// Keys match WERTE_FILTER_KEYS in page.tsx and i18n keys filter_wert_*.
+const WERTE_FILTER_KEYS = [
+    'nachhaltigkeit', 'innovation', 'social_impact', 'deep_tech',
+    'dei', 'gemeinwohl', 'circular_economy', 'new_work',
+] as const;
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -29,49 +39,6 @@ interface JobSwipeViewProps {
     jobs: SwipeJob[];
 }
 
-// ─── Important Keywords for Bolding ──────────────────────────────
-
-const IMPORTANT_KEYWORDS = [
-    'Innovation', 'Innovationen', 'Digital', 'Digitalisierung', 'Transformation',
-    'Startup', 'Scaleup', 'KMU', 'Consulting', 'Beratung',
-    'Manager', 'Lead', 'Senior', 'Director', 'Head',
-    'Strategie', 'Strategy', 'Nachhaltigkeit', 'Sustainability',
-    'R&D', 'Forschung', 'Entwicklung', 'Technologie', 'Technology',
-    'KI', 'AI', 'Machine Learning', 'Software', 'Plattform',
-    'Remote', 'Hybrid', 'Karriere', 'Wachstum', 'Impact',
-    'Fördermittel', 'Finanzierung', 'Investment',
-    'Mission', 'Vision', 'Potenzial', 'Führung',
-];
-
-function highlightKeywords(text: string) {
-    const parts: { text: string; bold: boolean }[] = [];
-    let remaining = text;
-
-    while (remaining.length > 0) {
-        let earliestIdx = remaining.length;
-        let matchedKw = '';
-
-        for (const kw of IMPORTANT_KEYWORDS) {
-            const idx = remaining.indexOf(kw);
-            if (idx >= 0 && idx < earliestIdx) {
-                earliestIdx = idx;
-                matchedKw = kw;
-            }
-        }
-
-        if (!matchedKw) {
-            parts.push({ text: remaining, bold: false });
-            break;
-        }
-
-        if (earliestIdx > 0) {
-            parts.push({ text: remaining.slice(0, earliestIdx), bold: false });
-        }
-        parts.push({ text: matchedKw, bold: true });
-        remaining = remaining.slice(earliestIdx + matchedKw.length);
-    }
-    return parts;
-}
 
 // ─── Company Initial Avatar ──────────────────────────────────────
 
@@ -88,18 +55,22 @@ function getAvatarColor(name: string): string {
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+
 // ─── Swipe Card ──────────────────────────────────────────────────
+
 
 function SwipeCard({
     job,
     isTop,
     addingToQueue,
     onSwipe,
+    t,
 }: {
     job: SwipeJob;
     isTop: boolean;
     addingToQueue: boolean;
     onSwipe: (direction: 'left' | 'right') => void;
+    t: ReturnType<typeof useTranslations>;
 }) {
     const x = useMotionValue(0);
     const rotate = useTransform(x, [-300, 0, 300], [-15, 0, 15]);
@@ -120,12 +91,7 @@ function SwipeCard({
         }
     };
 
-    // Extract bullet points from description
-    const bullets = job.description
-        .split(/[.!?\n]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 15 && s.length < 200)
-        .slice(0, 3);
+
 
     const avatarColor = getAvatarColor(job.company_name);
     const initial = job.company_name.charAt(0).toUpperCase();
@@ -186,7 +152,7 @@ function SwipeCard({
                                 {job.already_in_queue && (
                                     <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">
                                         <CheckCircle2 className="w-3 h-3" />
-                                        In Queue
+                                        {t('swipe_in_queue')}
                                     </span>
                                 )}
                             </div>
@@ -208,7 +174,7 @@ function SwipeCard({
 
                 {/* Steckbrief — compact metadata rows */}
                 <div className="px-6 space-y-2.5 flex-1">
-                    {/* Schedule type */}
+                    {/* Schedule type — SerpAPI returns in user's hl language */}
                     {job.detected_extensions?.schedule_type && (
                         <div className="flex items-center gap-2.5">
                             <Briefcase className="w-4 h-4 text-[#A8A29E] shrink-0" />
@@ -234,12 +200,12 @@ function SwipeCard({
                         <span className="text-sm text-[#37352F]">{job.location}</span>
                         {job.detected_extensions?.work_from_home && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f0f4ff] text-[#002e7a] border border-[#002e7a]/10">
-                                Remote
+                                {t('remote_badge')}
                             </span>
                         )}
                     </div>
 
-                    {/* Matched filters */}
+                    {/* Matched filters — translated via i18n */}
                     {job.matched_filters && job.matched_filters.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap pt-1">
                             {job.matched_filters.map(f => (
@@ -247,29 +213,30 @@ function SwipeCard({
                                     key={f}
                                     className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
                                 >
-                                    {f}
+                                    {WERTE_FILTER_KEYS.includes(f as any) ? t(`filter_wert_${f}`) : f}
                                 </span>
                             ))}
                         </div>
                     )}
 
-                    {/* Job highlights — always visible */}
-                    {bullets.length > 0 && (
+                    {/* Description — formatted as bullet list (matches List view) */}
+                    {job.description && (
                         <div className="pt-2">
-                            <p className="text-[10px] uppercase tracking-wider text-[#A8A29E] font-medium mb-1.5">Top Aufgaben</p>
-                            <ul className="text-xs text-[#37352F] leading-relaxed space-y-1.5 list-none ml-0">
-                                {bullets.map((bullet, idx) => (
-                                    <li key={idx} className="flex items-start gap-1.5">
-                                        <span className="text-[#A8A29E] mt-0.5 shrink-0">·</span>
-                                        <span className="line-clamp-2">
-                                            {highlightKeywords(bullet).map((part, pIdx) =>
-                                                part.bold
-                                                    ? <strong key={pIdx} className="font-semibold text-[#37352F]">{part.text}</strong>
-                                                    : <span key={pIdx}>{part.text}</span>
-                                            )}
-                                        </span>
-                                    </li>
-                                ))}
+                            <p className="text-[10px] text-[#A8A29E] uppercase tracking-wider mb-1 flex items-center gap-1">
+                                <Globe className="w-3 h-3" />
+                                {t('desc_original_lang')}
+                            </p>
+                            <ul className="space-y-0.5">
+                                {job.description
+                                    .split(/(?<=[.!?])\s+/)
+                                    .filter((s: string) => s.trim().length > 15)
+                                    .slice(0, 3)
+                                    .map((sentence: string, i: number) => (
+                                        <li key={i} className="flex items-start gap-1.5 text-xs text-[#73726E] leading-relaxed">
+                                            <span className="w-1 h-1 rounded-full bg-[#002e7a] mt-1.5 shrink-0 opacity-40" />
+                                            <span className="line-clamp-1">{sentence.trim()}</span>
+                                        </li>
+                                    ))}
                             </ul>
                         </div>
                     )}
@@ -287,7 +254,7 @@ function SwipeCard({
                             className="flex items-center justify-center gap-1.5 text-xs text-[#73726E] hover:text-[#002e7a] transition-colors mb-3"
                         >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            Website ansehen
+                            {t('swipe_view_website')}
                         </a>
                     )}
 
@@ -300,12 +267,12 @@ function SwipeCard({
                                 className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-red-200 text-red-500 font-medium text-sm hover:bg-red-50 hover:border-red-300 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 <XIcon className="w-5 h-5" />
-                                Skip
+                                {t('swipe_skip')}
                             </button>
                             {job.already_in_queue ? (
                                 <div className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-green-50 text-green-700 font-medium text-sm border-2 border-green-200">
                                     <CheckCircle2 className="w-5 h-5" />
-                                    Bereits in Queue
+                                    {t('swipe_already_in_queue')}
                                 </div>
                             ) : (
                                 <button
@@ -324,7 +291,7 @@ function SwipeCard({
                                     )}
                                     <span className={`relative z-10 flex items-center gap-2 transition-opacity ${addingToQueue ? 'opacity-80' : ''}`}>
                                         <CheckCircle2 className="w-5 h-5" />
-                                        {addingToQueue ? 'Hinzufügen' : 'Zur Queue'}
+                                        {addingToQueue ? t('swipe_adding') : t('swipe_to_queue')}
                                     </span>
                                 </button>
                             )}
@@ -338,7 +305,7 @@ function SwipeCard({
 
 // ─── Queue Full Modal (Swipe) ─────────────────────────────────────
 
-function SwipeQueueFullModal({ onClose }: { onClose: () => void }) {
+function SwipeQueueFullModal({ onClose, t }: { onClose: () => void; t: ReturnType<typeof useTranslations> }) {
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -365,10 +332,9 @@ function SwipeQueueFullModal({ onClose }: { onClose: () => void }) {
                 <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
                     <BriefcaseBusiness className="w-6 h-6 text-amber-500" />
                 </div>
-                <h3 className="text-base font-bold text-[#37352F] mb-1.5">Job Queue ist voll</h3>
+                <h3 className="text-base font-bold text-[#37352F] mb-1.5">{t('queue_full_title')}</h3>
                 <p className="text-sm text-[#73726E] leading-relaxed mb-5">
-                    Du hast bereits <strong>5 aktive Jobs</strong> in deiner Job Queue.
-                    Schliesse bestehende Jobs ab oder lösche sie, bevor du neue hinzufügst.
+                    {t('queue_full_body')}
                 </p>
                 <div className="flex flex-col gap-2">
                     <a
@@ -376,13 +342,13 @@ function SwipeQueueFullModal({ onClose }: { onClose: () => void }) {
                         className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-[#002e7a] text-white text-sm font-semibold hover:bg-[#001f5c] transition-colors"
                     >
                         <ArrowRight className="w-4 h-4" />
-                        Zur Job Queue
+                        {t('swipe_go_to_queue')}
                     </a>
                     <button
                         onClick={onClose}
                         className="w-full py-2.5 px-4 rounded-xl border border-[#E7E7E5] text-sm text-[#73726E] font-medium hover:bg-[#F7F7F5] transition-colors"
                     >
-                        Schließen
+                        {t('queue_full_close')}
                     </button>
                 </div>
             </motion.div>
@@ -400,6 +366,7 @@ export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
     const [showQueueFull, setShowQueueFull] = useState(false);
     const { increment } = useJobQueueCount();
     const dwellStartRef = useRef<number>(Date.now());
+    const t = useTranslations('dashboard.job_search');
 
     // Reset dwell timer when card changes
     useEffect(() => {
@@ -477,6 +444,19 @@ export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
                 if (res.ok) {
                     const data = await res.json();
                     if (!data.duplicate) {
+                        // §12.5: Swipe skips SteckbriefPreview → auto-confirm
+                        // Transitions pending_review → pending so job appears in Queue
+                        if (data.job?.id) {
+                            try {
+                                await fetch('/api/jobs/confirm', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ jobId: data.job.id }),
+                                });
+                            } catch (confirmErr) {
+                                console.warn('[SwipeView] Auto-confirm failed:', confirmErr);
+                            }
+                        }
                         increment();
                     }
                 } else {
@@ -511,12 +491,12 @@ export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
                 >
                     <CheckCircle2 className="w-10 h-10 text-emerald-500" />
                 </motion.div>
-                <h3 className="text-lg font-bold text-[#37352F] mb-1">Alle Jobs gesehen</h3>
+                <h3 className="text-lg font-bold text-[#37352F] mb-1">{t('swipe_all_seen')}</h3>
                 <p className="text-sm text-[#73726E] mb-1">
-                    {swipedJobs.size} Jobs durchgesehen
+                    {t('swipe_jobs_reviewed', { count: swipedJobs.size })}
                 </p>
                 <p className="text-xs text-[#A8A29E]">
-                    Starte eine neue Suche für mehr Ergebnisse
+                    {t('swipe_new_search_hint')}
                 </p>
             </div>
         );
@@ -528,7 +508,7 @@ export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
     return (
         <>
             <AnimatePresence>
-                {showQueueFull && <SwipeQueueFullModal onClose={() => setShowQueueFull(false)} />}
+                {showQueueFull && <SwipeQueueFullModal onClose={() => setShowQueueFull(false)} t={t} />}
             </AnimatePresence>
             <div className="flex flex-col items-center">
                 {/* Progress counter */}
@@ -575,6 +555,7 @@ export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
                                     isTop={true}
                                     addingToQueue={addingToQueue}
                                     onSwipe={handleSwipe}
+                                    t={t}
                                 />
                             </motion.div>
                         )}
@@ -597,6 +578,7 @@ export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
                                     isTop={false}
                                     addingToQueue={false}
                                     onSwipe={() => { }}
+                                    t={t}
                                 />
                             </motion.div>
                         )}
@@ -607,11 +589,11 @@ export default function JobSwipeView({ jobs }: JobSwipeViewProps) {
                 <div className="flex items-center gap-4 mt-4 text-[10px] text-[#A8A29E]">
                     <span className="flex items-center gap-1">
                         <kbd className="px-1.5 py-0.5 rounded border border-[#E7E7E5] bg-[#F7F7F5] text-[10px] font-mono">←</kbd>
-                        Skip
+                        {t('swipe_skip')}
                     </span>
                     <span className="flex items-center gap-1">
                         <kbd className="px-1.5 py-0.5 rounded border border-[#E7E7E5] bg-[#F7F7F5] text-[10px] font-mono">→</kbd>
-                        Zur Queue
+                        {t('swipe_to_queue')}
                     </span>
                 </div>
             </div>

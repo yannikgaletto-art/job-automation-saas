@@ -58,7 +58,8 @@ export async function POST(request: NextRequest) {
         const { count: activeJobCount, error: countError } = await supabaseAdmin
             .from('job_queue')
             .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId);
+            .eq('user_id', userId)
+            .in('status', ['pending', 'ready_for_review', 'ready_to_apply', 'submitted']);
 
         if (!countError && (activeJobCount ?? 0) >= 5) {
             console.log(`[${requestId}] route=jobs/ingest step=limit_check blocked count=${activeJobCount}`);
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
         try {
             console.log(`[${requestId}] route=jobs/ingest step=ai_parse_requirements`);
 
-            if (process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY) {
+            if (process.env.ANTHROPIC_API_KEY) {
                 const extractionSchema = {
                     company: "string — company name",
                     jobTitle: "string — exact job title",

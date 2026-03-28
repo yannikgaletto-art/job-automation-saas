@@ -3,10 +3,11 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { BLACKLIST_PATTERNS, scanForFluff } from '@/lib/services/anti-fluff-blacklist';
+import { complete } from '@/lib/ai/model-router';
 
 /**
  * POST /api/cover-letter/kill-fluff
- * On-demand fluff removal using GPT-4o (or local fallback).
+ * On-demand fluff removal using Claude 4.5 Sonnet (or local fallback).
  *
  * Input: { coverLetterText: string, jobId: string }
  * Output: { cleanedText: string, removedPhrases: string[], changeCount: number }
@@ -14,6 +15,8 @@ import { BLACKLIST_PATTERNS, scanForFluff } from '@/lib/services/anti-fluff-blac
  * Auth: Required (401 without session)
  * Security: jobId must belong to user (403 if foreign — Yannik Correction #4)
  * Cost: ~$0.003-0.005 per call
+ *
+ * MIGRATION NOTE (2026-03-28): Replaced GPT-4o with Claude Sonnet via model-router
  */
 export async function POST(request: NextRequest) {
     try {
@@ -58,25 +61,14 @@ export async function POST(request: NextRequest) {
         const localScan = scanForFluff(coverLetterText);
         const removedPhrases: string[] = localScan.matches.map(m => m.pattern);
 
-        // Step 2: GPT-4o cleanup (if API key available)
-        if (process.env.OPENAI_API_KEY && localScan.found) {
+        // Step 2: Claude Sonnet cleanup (if API key available + fluff found)
+        if (process.env.ANTHROPIC_API_KEY && localScan.found) {
             try {
                 const blacklistSection = BLACKLIST_PATTERNS.map(p => `- "${p.pattern}" (${p.reason})`).join('\n');
 
-                const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                    },
-                    body: JSON.stringify({
-                        model: 'gpt-4o',
-                        temperature: 0.3,
-                        max_tokens: 2500,
-                        messages: [
-                            {
-                                role: 'system',
-                                content: `Du bist ein Fluff-Killer für Anschreiben. Ersetze alle generischen KI-Phrasen durch konkrete, authentische Formulierungen.
+                const response = await complete({
+                    taskType: 'kill_fluff',
+                    systemPrompt: `Du bist ein Fluff-Killer für Anschreiben. Ersetze alle generischen KI-Phrasen durch konkrete, authentische Formulierungen.
 
 BLACKLIST (MUSS entfernt/ersetzt werden):
 ${blacklistSection}
@@ -89,42 +81,33 @@ ZUSÄTZLICH ENTFERNEN:
 REGELN:
 - Behalte Struktur, Länge und Fakten bei
 - Ersetze Fluff durch konkrete, belegbare Aussagen
-- Gib NUR den bereinigten Text zurück, kein JSON, kein Markdown`
-                            },
-                            {
-                                role: 'user',
-                                content: coverLetterText,
-                            },
-                        ],
-                    }),
+- Gib NUR den bereinigten Text zurück, kein JSON, kein Markdown`,
+                    prompt: coverLetterText,
+                    temperature: 0.3,
+                    maxTokens: 2500,
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    const cleanedText = data.choices?.[0]?.message?.content?.trim() || coverLetterText;
-
-                    return NextResponse.json({
-                        success: true,
-                        cleanedText,
-                        removedPhrases,
-                        changeCount: removedPhrases.length,
-                    });
-                }
-            } catch (gptError) {
-                console.error('❌ [KillFluff] GPT-4o failed, falling back to local scan:', gptError);
+                return NextResponse.json({
+                    success: true,
+                    cleanedText: response.text.trim(),
+                    removedPhrases,
+                    changeCount: removedPhrases.length,
+                });
+            } catch (claudeError) {
+                console.error('❌ [KillFluff] Claude Sonnet failed, falling back to local scan:', claudeError);
             }
         }
 
-        // Fallback: Return original text with identified phrases (no GPT-4o improvement)
+        // Fallback: Return original text with identified phrases (no AI improvement)
         return NextResponse.json({
             success: true,
             cleanedText: coverLetterText,
             removedPhrases,
-            changeCount: 0, // No actual changes made without GPT-4o
-            warning: !process.env.OPENAI_API_KEY
-                ? 'GPT-4o nicht verfügbar (OPENAI_API_KEY fehlt). Nur Scan, keine Verbesserung.'
+            changeCount: 0, // No actual changes made without Claude
+            warning: !process.env.ANTHROPIC_API_KEY
+                ? 'Claude Sonnet nicht verfügbar (ANTHROPIC_API_KEY fehlt). Nur Scan, keine Verbesserung.'
                 : localScan.found
-                    ? 'GPT-4o Verbesserung fehlgeschlagen. Nur lokaler Scan.'
+                    ? 'Claude Sonnet Verbesserung fehlgeschlagen. Nur lokaler Scan.'
                     : 'Kein Fluff gefunden — Text ist sauber.',
         });
 
@@ -136,3 +119,4 @@ REGELN:
         );
     }
 }
+

@@ -34,15 +34,9 @@ interface EnrichedJob extends SerpApiJob {
 
 const EXPERIENCE_LEVELS = ['Entry', 'Mid', 'Senior', 'Lead'] as const;
 const ORG_TYPES = ['Startup', 'Konzern', 'NGO', 'Staat'] as const;
-const WERTE_FILTERS = [
-    { key: 'nachhaltigkeit', label: 'Nachhaltigkeit' },
-    { key: 'innovation', label: 'Innovation' },
-    { key: 'social_impact', label: 'Social Impact' },
-    { key: 'deep_tech', label: 'Deep Tech' },
-    { key: 'dei', label: 'Diversity / Equity / Inclusion' },
-    { key: 'gemeinwohl', label: 'Gemeinwohl' },
-    { key: 'circular_economy', label: 'Circular Economy' },
-    { key: 'new_work', label: 'New Work' },
+const WERTE_FILTER_KEYS = [
+    'nachhaltigkeit', 'innovation', 'social_impact', 'deep_tech',
+    'dei', 'gemeinwohl', 'circular_economy', 'new_work',
 ] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -456,30 +450,30 @@ export default function JobSearchPage() {
                                 <div>
                                     <label className="text-xs font-medium text-[#73726E] mb-1.5 block">{t('filter_values')}</label>
                                     <div className="flex gap-2 mb-2">
-                                        {WERTE_FILTERS.slice(0, 4).map(wf => (
+                                        {WERTE_FILTER_KEYS.slice(0, 4).map(key => (
                                             <button
-                                                key={wf.key}
-                                                onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
-                                                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
+                                                key={key}
+                                                onClick={() => toggleFilter(key, selectedWerte, setSelectedWerte)}
+                                                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(key)
                                                     ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
                                                     : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
                                                     }`}
                                             >
-                                                {wf.label}
+                                                {t(`filter_wert_${key}`)}
                                             </button>
                                         ))}
                                     </div>
                                     <div className="flex gap-2">
-                                        {WERTE_FILTERS.slice(4).map(wf => (
+                                        {WERTE_FILTER_KEYS.slice(4).map(key => (
                                             <button
-                                                key={wf.key}
-                                                onClick={() => toggleFilter(wf.key, selectedWerte, setSelectedWerte)}
-                                                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(wf.key)
+                                                key={key}
+                                                onClick={() => toggleFilter(key, selectedWerte, setSelectedWerte)}
+                                                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${selectedWerte.includes(key)
                                                     ? 'border-[#002e7a] text-[#002e7a] bg-[#f0f4ff] font-medium'
                                                     : 'border-[#E7E7E5] text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a]'
                                                     }`}
                                             >
-                                                {wf.label}
+                                                {t(`filter_wert_${key}`)}
                                             </button>
                                         ))}
                                     </div>
@@ -792,7 +786,7 @@ function JobRow({ job, starredUrls, toggleStar, onDelete, onJobAdded }: { job: E
                             )}
                             {job.detected_extensions?.work_from_home && (
                                 <span className="px-1.5 py-0.5 rounded bg-[#f0f4ff] text-[10px] text-[#002e7a] border border-[#002e7a]/10">
-                                    Remote
+                                    {t('remote_badge')}
                                 </span>
                             )}
                         </div>
@@ -814,7 +808,7 @@ function JobRow({ job, starredUrls, toggleStar, onDelete, onJobAdded }: { job: E
                                                                     'bg-slate-50 text-slate-600 border-slate-200'
                                         }`}
                                 >
-                                    {WERTE_FILTERS.find(wf => wf.key === filter) ? t(`filter_wert_${filter}`) : filter}
+                                    {WERTE_FILTER_KEYS.includes(filter as any) ? t(`filter_wert_${filter}`) : filter}
                                 </span>
                             ))}
                         </div>
@@ -858,76 +852,27 @@ function JobRow({ job, starredUrls, toggleStar, onDelete, onJobAdded }: { job: E
                         <div className="px-4 pb-4 border-t border-[#E7E7E5] space-y-3 pt-3">
 
 
-                            {/* Description — scannable bullet points with important keyword highlighting */}
-                            {job.description && (() => {
-                                const IMPORTANT_KEYWORDS = [
-                                    'Innovation', 'Innovationen', 'Digital', 'Digitalisierung', 'Transformation',
-                                    'Startup', 'Scaleup', 'KMU', 'Consulting', 'Beratung',
-                                    'Manager', 'Lead', 'Senior', 'Director', 'Head',
-                                    'Strategie', 'Strategy', 'Nachhaltigkeit', 'Sustainability',
-                                    'R&D', 'Forschung', 'Entwicklung', 'Technologie', 'Technology',
-                                    'KI', 'AI', 'Machine Learning', 'Software', 'Plattform',
-                                    'Remote', 'Hybrid', 'Karriere', 'Wachstum', 'Impact',
-                                    'Fortune', 'Global', 'weltweit', 'international',
-                                    'Fördermittel', 'Finanzierung', 'Investment',
-                                    'Mission', 'Vision', 'Potenzial', 'Führung',
-                                ];
-
-                                const bullets = job.description
-                                    .split(/[.!?\n]+/)
-                                    .map((s: string) => s.trim())
-                                    .filter((s: string) => s.length > 15 && s.length < 200)
-                                    .slice(0, 4);
-
-                                if (bullets.length === 0) return null;
-
-                                const highlightKeywords = (text: string) => {
-                                    const parts: { text: string; bold: boolean }[] = [];
-                                    let remaining = text;
-
-                                    while (remaining.length > 0) {
-                                        let earliestIdx = remaining.length;
-                                        let matchedKw = '';
-
-                                        for (const kw of IMPORTANT_KEYWORDS) {
-                                            const idx = remaining.indexOf(kw);
-                                            if (idx >= 0 && idx < earliestIdx) {
-                                                earliestIdx = idx;
-                                                matchedKw = kw;
-                                            }
-                                        }
-
-                                        if (!matchedKw) {
-                                            parts.push({ text: remaining, bold: false });
-                                            break;
-                                        }
-
-                                        if (earliestIdx > 0) {
-                                            parts.push({ text: remaining.slice(0, earliestIdx), bold: false });
-                                        }
-                                        parts.push({ text: matchedKw, bold: true });
-                                        remaining = remaining.slice(earliestIdx + matchedKw.length);
-                                    }
-                                    return parts;
-                                };
-
-                                return (
-                                    <ul className="text-xs text-[#37352F] leading-relaxed space-y-1.5 mt-2 list-none ml-0">
-                                        {bullets.map((bullet: string, idx: number) => (
-                                            <li key={idx} className="flex items-start gap-1.5">
-                                                <span className="text-[#A8A29E] mt-0.5 shrink-0">·</span>
-                                                <span className="line-clamp-2">
-                                                    {highlightKeywords(bullet).map((part, pIdx) =>
-                                                        part.bold
-                                                            ? <strong key={pIdx} className="font-semibold text-[#37352F]">{part.text}</strong>
-                                                            : <span key={pIdx}>{part.text}</span>
-                                                    )}
-                                                </span>
-                                            </li>
-                                        ))}
+                            {/* Description — SerpAPI snippet, formatted as bullet list */}
+                            {job.description && (
+                                <div className="mt-2">
+                                    <p className="text-[10px] text-[#A8A29E] uppercase tracking-wider mb-1 flex items-center gap-1">
+                                        <Globe className="w-3 h-3" />
+                                        {t('desc_original_lang')}
+                                    </p>
+                                    <ul className="space-y-1">
+                                        {job.description
+                                            .split(/(?<=[.!?])\s+/)
+                                            .filter((s: string) => s.trim().length > 15)
+                                            .slice(0, 5)
+                                            .map((sentence: string, i: number) => (
+                                                <li key={i} className="flex items-start gap-2 text-xs text-[#73726E] leading-relaxed">
+                                                    <span className="w-1 h-1 rounded-full bg-[#002e7a] mt-1.5 shrink-0 opacity-40" />
+                                                    <span>{sentence.trim()}</span>
+                                                </li>
+                                            ))}
                                     </ul>
-                                );
-                            })()}
+                                </div>
+                            )}
 
                             {/* Actions */}
                             <div className="flex items-center gap-2 pt-1">
@@ -939,7 +884,7 @@ function JobRow({ job, starredUrls, toggleStar, onDelete, onJobAdded }: { job: E
                                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E7E7E5] text-xs font-semibold text-[#002e7a] hover:bg-[#002e7a]/5 transition-colors"
                                     >
                                         <ExternalLink className="w-3 h-3" />
-                                        Website
+                                        {t('open_posting')}
                                     </a>
                                 )}
                                 {!job.already_in_queue ? (
@@ -951,7 +896,7 @@ function JobRow({ job, starredUrls, toggleStar, onDelete, onJobAdded }: { job: E
                                                 ? 'border-[#002e7a] text-[#002e7a] bg-[#002e7a]/5'
                                                 : 'border-[#E7E7E5] text-[#A8A29E] hover:border-[#002e7a] hover:text-[#002e7a]'
                                                 }`}
-                                            title="Job merken"
+                                            title={t('star_button')}
                                         >
                                             <Star className={`w-4 h-4 ${starredUrls.has(job.apply_link) ? 'fill-[#002e7a]' : ''}`} />
                                         </button>
@@ -1329,6 +1274,11 @@ function AddToQueueButton({ job, onJobAdded }: { job: EnrichedJob; onJobAdded: (
     const [previewData, setPreviewData] = useState<any>(null);
     const t = useTranslations('dashboard.job_search');
     const increment = useJobQueueCount(s => s.increment);
+
+    // §Issue-4: Sync parent prop → local state (one-way: false→true only)
+    useEffect(() => {
+        if (job.already_in_queue) setAdded(true);
+    }, [job.already_in_queue]);
 
     const handleAdd = async (e: React.MouseEvent) => {
         e.stopPropagation();

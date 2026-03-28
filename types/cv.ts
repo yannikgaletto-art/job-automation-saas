@@ -124,6 +124,7 @@ export const cvChangeSchema = z.object({
 });
 
 export const cvOptimizationProposalSchema = z.object({
+    translated: cvStructuredDataSchema.optional(),
     optimized: cvStructuredDataSchema,
     changes: z.array(cvChangeSchema)
 });
@@ -146,6 +147,7 @@ export interface CvChange {
 }
 
 export interface CvOptimizationProposal {
+    translated?: CvStructuredData;
     optimized: CvStructuredData;
     changes: CvChange[];
 }

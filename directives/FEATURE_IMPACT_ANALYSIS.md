@@ -24,11 +24,12 @@ erzeugen inkonsistente Seitenlayouts: manche CVs haben 1.5 Seiten, andere 4+ Sei
 │  Layer 1: AI Content-Length Guardrails            │
 │  (cv/optimize/route.ts — PROMPT v2.1)            │
 │                                                   │
-│  ├─ Max 4 Bullets pro Erfahrung                   │
+│  ├─ Max 3 Bullets pro Erfahrung                   │
 │  ├─ Max 20 Wörter pro Bullet                      │
 │  ├─ Max 3 Sätze Summary                           │
-│  ├─ >5 Erfahrungen → ältere auf 2 Bullets         │
-│  └─ >3 Ausbildungen → nur 2 vollständig           │
+│  ├─ >5 Erfahrungen → ältere auf 1 Bullet           │
+│  ├─ Quality Gate: jeder Change braucht Substanz    │
+│  └─ Authentic Keyword Weaving (ATS-Keywords)       │
 ├──────────────────────────────────────────────────┤
 │  Layer 2: Template Page Structure                 │
 │  (ValleyTemplate.tsx / TechTemplate.tsx)           │
@@ -72,6 +73,7 @@ erzeugen inkonsistente Seitenlayouts: manche CVs haben 1.5 Seiten, andere 4+ Sei
 
 | Risiko | Wahrscheinlichkeit | Mitigation |
 |--------|--------------------| ------------|
-| Claude ignoriert Constraints | 15% | `PROMPT_VERSION` tracking, Git-Tag `cv-optimizer-v2-pre` für Rollback |
-| 20-Wort-Limit zu restriktiv | 20% | User-Feedback beobachten, ggf. auf 25 erhöhen |
+| Claude ignoriert Constraints | 15% | `PROMPT_VERSION` tracking, Self-Judge Validation + Backend cap bei 12 |
+| 20-Wort-Limit führt zu Overflow | 10% | Layer 2 Templates + ≥5-Stationen-Regel (1 Bullet) + ≥6 Stationen (1 Bullet älteste 2) |
+| Keyword Weaving halluziniert | 15% | Authenticity Gate im Prompt + Before-Text Sanitizer blockt ungenaue Pfade |
 | Bestehende CVs haben V1-Format | 100% (erwartet) | Alle V2-Felder sind `nullish()` — backward compatible |

@@ -108,13 +108,19 @@ Pathly besteht aus **zwei getrennten Projekten** die unabhängig deployt werden:
 | `components/ui/HighlightText.tsx` | Marker-Highlight-Animation via CSS @keyframes (marker-highlight + marker-badge Klassen) |
 | `components/ui/CountUp.tsx` | Zahlen-Animation via native `getBoundingClientRect` mount-check |
 | `components/ui/PhoneCarousel.tsx` | Auto-cycling Screenshots, prefers-reduced-motion Fallback |
+| `components/ui/FeatureCardStack.tsx` | Interaktiver 3D Card-Stack für Feature-Screenshots (drag, swipe, zoom-on-hover) |
 | `components/ui/ShimmerButton.tsx` | Primary CTA, unterstützt `data-tally-*` Attribute |
 | `components/ui/FeatureChip.tsx` | Floating Hero-Chips mit CSS Animation |
+| `components/sections/Testimonials.tsx` | Animated Photo-Stack Testimonials (Framer Motion, Autoplay, Inline SVGs) |
+| `components/sections/FAQ.tsx` | Server Component mit JSON-LD Schema (SEO) |
+| `components/ui/FAQCarousel.tsx` | Horizontales Client-Carousel via `framer-motion` layout constraints |
+| `components/sections/FinalCTA.tsx` | Inline-Email Warteliste (kein Tally), 3 States (idle/submitting/done) |
+| `app/impressum/page.tsx` | Static Impressum rendert dynamisch aus `lib/constants.ts` (IMPRESSUM) |
 
 ### Pathly Website — Offene Punkte (User-Action)
 
-- **Impressum:** `app/impressum/page.tsx` — `[Adresse eintragen]` und `[PLZ Ort]` ersetzen (rechtlich erforderlich vor Go-Live)
-- **Tally Form ID:** `NEXT_PUBLIC_TALLY_FORM_ID=xxxx` in `.env.local` eintragen (Wartelisten-Button)
+- **Impressum vervollständigen:** In `lib/constants.ts` unter `IMPRESSUM.sections` müssen `[Straße und Hausnummer]`, `[PLZ] [Ort]` und `[Telefonnummer eintragen]` überschrieben werden (rechtlich erforderlich vor Go-Live). Die DEV-only Warnung auf der Page verschwindet dann.
+- **Warteliste-Endpoint:** In `FinalCTA.tsx` den simulierten Submit (`setTimeout`) durch einen echten API-Call (z.B. Resend/Supabase) ersetzen.
 
 ---
 

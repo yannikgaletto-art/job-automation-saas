@@ -16,9 +16,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X } from "lucide-react";
+import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/motion/button";
 import { useNotification } from "@/hooks/use-notification";
+import { useTranslations } from "next-intl";
 
 type DocumentEntry = {
     id: string;
@@ -31,6 +32,7 @@ type CategoryMap = Record<string, string[]>; // categoryName → [documentId, ..
 
 const STORAGE_KEY = 'pathly_cl_categories';
 const COLLAPSED_KEY = 'pathly_cl_collapsed';
+const CV_HINT_DISMISSED_KEY = 'pathly_cv_hint_dismissed';
 
 function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("de-DE", {
@@ -66,6 +68,7 @@ export function ActiveCVCard() {
     const [docs, setDocs] = useState<DocumentEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const notify = useNotification();
+    const t = useTranslations('upload');
     const [uploading, setUploading] = useState<string | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadStatus, setUploadStatus] = useState<string>('');
@@ -80,6 +83,56 @@ export function ActiveCVCard() {
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
     const [newCategoryName, setNewCategoryName] = useState('');
     const [showAddCategory, setShowAddCategory] = useState(false);
+
+    // CV upload hint dialog
+    const [showCvHint, setShowCvHint] = useState(false);
+    const [pendingCvFile, setPendingCvFile] = useState<File | null>(null);
+    const cvHintDismissedRef = useRef(false);
+
+    useEffect(() => {
+        try {
+            cvHintDismissedRef.current = localStorage.getItem(CV_HINT_DISMISSED_KEY) === 'true';
+        } catch {}
+    }, []);
+
+    const handleCvUploadClick = () => {
+        if (cvHintDismissedRef.current) {
+            cvRef.current?.click();
+        } else {
+            setShowCvHint(true);
+        }
+    };
+
+    const handleCvHintContinue = () => {
+        setShowCvHint(false);
+        if (pendingCvFile) {
+            handleUpload(pendingCvFile, 'cv');
+            setPendingCvFile(null);
+        } else {
+            cvRef.current?.click();
+        }
+    };
+
+    const handleCvHintDismissForever = () => {
+        try { localStorage.setItem(CV_HINT_DISMISSED_KEY, 'true'); } catch {}
+        cvHintDismissedRef.current = true;
+        setShowCvHint(false);
+        if (pendingCvFile) {
+            handleUpload(pendingCvFile, 'cv');
+            setPendingCvFile(null);
+        } else {
+            cvRef.current?.click();
+        }
+    };
+
+    const handleCvFileSelect = (file: File) => {
+        if (cvHintDismissedRef.current) {
+            handleUpload(file, 'cv');
+        } else {
+            setPendingCvFile(file);
+            setShowCvHint(true);
+        }
+    };
 
     const loadDocs = async () => {
         try {
@@ -102,7 +155,7 @@ export function ActiveCVCard() {
     const handleUpload = async (file: File, type: 'cv' | 'cover_letter') => {
         setUploading(type);
         setUploadProgress(0);
-        setUploadStatus('Datei wird hochgeladen...');
+        setUploadStatus(t('status_uploading'));
 
         try {
             const fd = new FormData();
@@ -117,16 +170,16 @@ export function ActiveCVCard() {
                     if (e.lengthComputable) {
                         const pct = Math.round((e.loaded / e.total) * 80);
                         setUploadProgress(pct);
-                        if (pct >= 50) setUploadStatus('🔵 KI-Analyse & Speicherung läuft...');
-                        else if (pct >= 20) setUploadStatus('🔵 Azure EU liest deinen Lebenslauf aus...');
-                        else setUploadStatus('Datei wird hochgeladen...');
+                        if (pct >= 50) setUploadStatus(t('status_analyzing'));
+                        else if (pct >= 20) setUploadStatus(t('status_reading'));
+                        else setUploadStatus(t('status_uploading'));
                     }
                 };
 
                 xhr.onload = () => {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         setUploadProgress(100);
-                        setUploadStatus('Fertig ✅ — Analyse läuft im Hintergrund');
+                        setUploadStatus(t('status_done'));
                         resolve();
                     } else {
                         try {
@@ -301,12 +354,12 @@ export function ActiveCVCard() {
             {uploading && (
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center text-xs">
-                        <span className="text-[#73726E]">{uploadStatus || 'Datei wird hochgeladen...'}</span>
+                        <span className="text-[#73726E]">{uploadStatus || t('status_uploading')}</span>
                         <div className="flex items-center gap-2">
                             {uploadProgress >= 20 && uploadProgress < 100 && (
-                                <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 font-medium">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block" />
-                                    Azure EU
+                                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 font-medium">
+                                    <ShieldCheck className="w-3 h-3" />
+                                    EU
                                 </span>
                             )}
                             <span className="font-mono text-[#73726E]">{uploadProgress}%</span>
@@ -320,7 +373,7 @@ export function ActiveCVCard() {
                     </div>
                     {uploadProgress >= 20 && uploadProgress < 100 && (
                         <p className="text-[10px] text-slate-400">
-                            Deine Daten werden auf EU-Servern (Microsoft Azure) verarbeitet.
+                            {t('eu_privacy_note')}
                         </p>
                     )}
                 </div>
@@ -336,7 +389,7 @@ export function ActiveCVCard() {
                     <Button
                         variant="secondary"
                         className="text-xs h-8"
-                        onClick={() => cvRef.current?.click()}
+                        onClick={handleCvUploadClick}
                         disabled={!!uploading || cvDocs.length >= 3}
                         title={cvDocs.length >= 3 ? 'Bitte lösche erst einen bestehenden Lebenslauf' : undefined}
                     >
@@ -350,7 +403,7 @@ export function ActiveCVCard() {
                 ) : cvDocs.length === 0 ? (
                     <div
                         className="border-2 border-dashed border-[#E7E7E5] rounded-lg p-5 text-center cursor-pointer hover:border-[#012e7a]/40 hover:bg-[#F0F7FF]/30 transition-all"
-                        onClick={() => cvRef.current?.click()}
+                        onClick={handleCvUploadClick}
                     >
                         <Plus className="w-5 h-5 text-[#A8A29E] mx-auto mb-1" />
                         <p className="text-sm text-[#73726E]">Noch kein CV hochgeladen</p>
@@ -361,7 +414,7 @@ export function ActiveCVCard() {
                     </ul>
                 )}
                 <input ref={cvRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) { handleUpload(f, 'cv'); e.target.value = ''; } }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { handleCvFileSelect(f); e.target.value = ''; } }}
                 />
             </div>
 
@@ -519,6 +572,88 @@ export function ActiveCVCard() {
                     onChange={e => { const f = e.target.files?.[0]; if (f) { handleUpload(f, 'cover_letter'); e.target.value = ''; } }}
                 />
             </div>
+            {/* CV Upload Hint Dialog */}
+            {showCvHint && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+                        onClick={() => { setShowCvHint(false); setPendingCvFile(null); }}
+                    />
+                    {/* Dialog */}
+                    <div className="relative bg-white rounded-2xl shadow-2xl border border-[#E7E7E5] w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        {/* Header accent */}
+                        <div className="h-1 bg-gradient-to-r from-[#012e7a] via-[#012e7a]/60 to-transparent" />
+
+                        <div className="p-6">
+                            {/* Icon + Title */}
+                            <div className="flex items-start gap-3 mb-4">
+                                <div className="p-2 bg-[#012e7a]/10 rounded-xl shrink-0">
+                                    <FileText className="w-5 h-5 text-[#012e7a]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-semibold text-[#37352F] leading-snug">
+                                        {t('cv_hint_title')}
+                                    </h3>
+                                    <p className="text-sm text-[#73726E] mt-1">
+                                        {t('cv_hint_description')}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Example */}
+                            <div className="bg-[#FAFAF9] border border-[#E7E7E5] rounded-xl p-4 mb-5">
+                                <p className="text-xs font-semibold text-[#37352F] mb-2 uppercase tracking-wide">
+                                    {t('cv_hint_example_label')}
+                                </p>
+                                <div className="space-y-2.5">
+                                    <div>
+                                        <p className="text-sm font-medium text-[#37352F]">
+                                            Fraunhofer IGD — UX Researcher
+                                        </p>
+                                        <ul className="mt-1 space-y-0.5">
+                                            <li className="text-xs text-[#73726E] flex items-start gap-1.5">
+                                                <span className="text-[#012e7a] mt-0.5">•</span>
+                                                {t('cv_hint_bullet_1')}
+                                            </li>
+                                            <li className="text-xs text-[#73726E] flex items-start gap-1.5">
+                                                <span className="text-[#012e7a] mt-0.5">•</span>
+                                                {t('cv_hint_bullet_2')}
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div className="border-t border-dashed border-[#E7E7E5]" />
+                                    <div>
+                                        <p className="text-sm font-medium text-[#37352F] flex items-center gap-2">
+                                            <span className="text-red-400 text-xs">✗</span>
+                                            {t('cv_hint_bad_label')}
+                                        </p>
+                                        <p className="text-xs text-[#A8A29E] mt-0.5 italic">
+                                            {t('cv_hint_bad_example')}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={handleCvHintContinue}
+                                    className="w-full px-4 py-2.5 bg-[#012e7a] text-white text-sm font-medium rounded-lg hover:bg-[#011f5e] transition-colors"
+                                >
+                                    {t('cv_hint_continue')}
+                                </button>
+                                <button
+                                    onClick={handleCvHintDismissForever}
+                                    className="w-full px-4 py-2 text-xs text-[#A8A29E] hover:text-[#73726E] transition-colors"
+                                >
+                                    {t('cv_hint_dismiss')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

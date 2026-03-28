@@ -13,22 +13,52 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { searchJobs, type JobSearchFilters } from '@/lib/services/job-search-pipeline';
-import OpenAI from 'openai';
+import { searchJobs, type JobSearchFilters, type SerpLocale } from '@/lib/services/job-search-pipeline';
+import { complete } from '@/lib/ai/model-router';
 
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const MAX_SAVED_SEARCHES = 10;
+
+// ─── SerpAPI locale derivation ────────────────────────────────────
+// SerpAPI has TWO independent params:
+//   `hl` = metadata language (posted_at, salary, schedule_type strings)
+//   `gl` = geographic country (which job index to search)
+// `hl` follows the USER'S UI locale. `gl` follows the JOB LOCATION.
+
+const LOCATION_GL_MAP: Record<string, string> = {
+    'deutschland': 'de', 'germany': 'de', 'berlin': 'de',
+    'münchen': 'de', 'munich': 'de', 'hamburg': 'de',
+    'frankfurt': 'de', 'köln': 'de', 'cologne': 'de',
+    'düsseldorf': 'de', 'stuttgart': 'de', 'hannover': 'de',
+    'nürnberg': 'de', 'leipzig': 'de', 'dresden': 'de',
+    'österreich': 'at', 'austria': 'at', 'wien': 'at', 'vienna': 'at',
+    'schweiz': 'ch', 'switzerland': 'ch', 'zürich': 'ch',
+    'uk': 'gb', 'united kingdom': 'gb', 'london': 'gb',
+    'usa': 'us', 'united states': 'us', 'new york': 'us', 'san francisco': 'us',
+    'españa': 'es', 'spain': 'es', 'madrid': 'es', 'barcelona': 'es',
+};
+
+function deriveSerpLocale(location: string, userLocale: string): SerpLocale {
+    const lower = location.toLowerCase().trim();
+    let gl = 'de'; // Default: German job market
+    for (const [key, country] of Object.entries(LOCATION_GL_MAP)) {
+        if (lower.includes(key)) { gl = country; break; }
+    }
+    const hl = ['de', 'en', 'es'].includes(userLocale) ? userLocale : 'de';
+    return { hl, gl };
+}
+
+
 
 // ─── Mission Mode: Intent → Keywords ─────────────────────────────
 
 async function translateMissionIntent(
     intent: string,
     fallbackLocation: string,
+    locale: string = 'de',
 ): Promise<{ query: string; location: string }> {
     try {
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-        const systemPrompt = `Du bist ein HR-Suchexperte. Der User beschreibt seine Karriere-Vision als Freitext.
+        const systemPromptDE = `Du bist ein HR-Suchexperte. Der User beschreibt seine Karriere-Vision als Freitext.
 Deine Aufgabe: Übersetze die Vision in einen KONKRETEN Jobtitel oder Berufsbezeichnung, die auf Google Jobs tatsächlich gefunden wird.
 
 Regeln:
@@ -46,19 +76,50 @@ Antworte AUSSCHLIESSLICH in diesem JSON-Format:
 {"query": "...", "location": "..."}
 Keine Erklärungen, kein Markdown, nur das nackte JSON-Objekt.`;
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: intent },
-            ],
-            response_format: { type: 'json_object' },
-            max_tokens: 100,
+        const systemPromptEN = `You are an HR search expert. The user describes their career vision as free text.
+Your task: Translate the vision into a CONCRETE job title that is actually found on Google Jobs.
+
+Rules:
+1. The search term MUST be a real job title (e.g. "Sustainability Manager", "Data Engineer", "Product Manager"), NOT an abstract concept
+2. Max 4 words, in the language most common on the job market
+3. If the vision is abstract, find the closest real, existing job title
+4. Extract location (if mentioned, otherwise "Germany")
+
+Respond EXCLUSIVELY in this JSON format:
+{"query": "...", "location": "..."}
+No explanations, no markdown, just the raw JSON object.`;
+
+        const systemPromptES = `Eres un experto en búsqueda de RRHH. El usuario describe su visión profesional como texto libre.
+Tu tarea: Traduce la visión a un TÍTULO DE PUESTO CONCRETO que se encuentre realmente en Google Jobs.
+
+Reglas:
+1. El término de búsqueda DEBE ser un título de puesto real (ej. "Sustainability Manager", "Ingeniero de Datos"), NO un concepto abstracto
+2. Máximo 4 palabras, en el idioma más común en el mercado laboral
+3. Si la visión es abstracta, encuentra el título de puesto real más cercano
+4. Extraer ubicación (si se menciona, sino "Alemania")
+
+Responde EXCLUSIVAMENTE en este formato JSON:
+{"query": "...", "location": "..."}
+Sin explicaciones, sin markdown, solo el objeto JSON.`;
+
+        const systemPrompt = locale === 'en' ? systemPromptEN : locale === 'es' ? systemPromptES : systemPromptDE;
+
+        const response = await complete({
+            taskType: 'classify_job_board', // Cheap Haiku task: structured classification
+            systemPrompt,
+            prompt: intent,
             temperature: 0.3,
+            maxTokens: 100,
         });
 
-        const raw = completion.choices[0].message.content || '{}';
-        const parsed = JSON.parse(raw);
+        // Robust JSON parsing — no response_format: json_object in Anthropic SDK
+        let parsed: { query?: string; location?: string };
+        try {
+            parsed = JSON.parse(response.text.trim());
+        } catch {
+            const jsonMatch = response.text.match(/\{[\s\S]*?\}/);
+            parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+        }
 
         const extractedQuery = typeof parsed.query === 'string' && parsed.query.trim()
             ? parsed.query.trim()
@@ -104,8 +165,18 @@ export async function POST(request: NextRequest) {
         let serpApiQuery = trimmedQuery;
         let serpApiLocation = trimmedLocation;
 
+        // ─── Read user locale from DB ─────────────────────────────────
+        // Used for: (1) SerpAPI `hl` param (metadata language)
+        //           (2) Mission Mode prompt language
+        const { data: userSettings } = await supabase
+            .from('user_settings')
+            .select('language')
+            .eq('user_id', user.id)
+            .single();
+        const userLocale = userSettings?.language || 'de';
+
         if (searchMode === 'mission') {
-            const translated = await translateMissionIntent(trimmedQuery, trimmedLocation);
+            const translated = await translateMissionIntent(trimmedQuery, trimmedLocation, userLocale);
             serpApiQuery = translated.query;
             serpApiLocation = translated.location;
         }
@@ -132,9 +203,9 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // ─── 1. Cache Check (uses original intent as key) ───────────
-        // Skip cache when Werte-Filters are active (§12.4) because the
-        // enriched query differs from the cached non-filtered query.
+        // ─── §12.4 Cache Check (skip if empty or stale) ────────────
+        // Note: We DO NOT skip cache for locale changes — SerpAPI language
+        // is now derived from job location, not user UI locale.
         const hasWerteFilters = filters?.werte && filters.werte.length > 0;
         const { data: cached } = await supabase
             .from('saved_job_searches')
@@ -148,6 +219,7 @@ export async function POST(request: NextRequest) {
             const fetchedAt = new Date(cached.fetched_at).getTime();
             const now = Date.now();
             const hasResults = (cached.results || []).length > 0;
+            // GUARD: never serve empty cached results — re-fetch instead
             if (now - fetchedAt < CACHE_TTL_MS && hasResults) {
                 console.log(`✅ [Search] Cache hit for "${trimmedQuery}" in "${trimmedLocation}"`);
 
@@ -164,9 +236,11 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // ─── 2. SerpAPI Fetch (uses extracted keywords for mission) ──
-        console.log(`✅ [Search] Querying SerpAPI: "${serpApiQuery}" in "${serpApiLocation}"`);
-        const jobs = await searchJobs(serpApiQuery, serpApiLocation, filters);
+        // ─── 2. SerpAPI Fetch ─────────────────────────────────────────
+        // hl = user locale (metadata language), gl = location (job market)
+        const serpLocale = deriveSerpLocale(serpApiLocation, userLocale);
+        console.log(`✅ [Search] Querying SerpAPI: "${serpApiQuery}" in "${serpApiLocation}" [hl=${serpLocale.hl}, gl=${serpLocale.gl}]`);
+        const jobs = await searchJobs(serpApiQuery, serpApiLocation, filters, serpLocale);
 
         // ─── 3. Cross-Queue Check ────────────────────────────────────
         const enriched = await enrichWithQueueStatus(supabase, user.id, jobs);
@@ -270,7 +344,8 @@ async function enforceMaxSearches(supabase: any, userId: string) {
     }
 }
 
-// ─── GPT-4o-mini Werte-Filter Tagging ─────────────────────────────
+// ─── Claude 4.5 Haiku Werte-Filter Tagging ──────────────────────────
+// MIGRATION NOTE (2026-03-28): Replaced GPT-4o-mini with Claude Haiku via model-router
 
 async function tagJobsWithFilters(
     jobs: any[],
@@ -281,14 +356,11 @@ async function tagJobsWithFilters(
         return jobs.map(j => ({ ...j, matched_filters: [] }));
     }
 
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) {
+    if (!process.env.ANTHROPIC_API_KEY) {
         return jobs.map(j => ({ ...j, matched_filters: [] }));
     }
 
     try {
-        const openai = new OpenAI({ apiKey: openaiKey });
-
         const jobSummaries = jobs.map((j, i) =>
             `Job ${i}: "${j.title}" bei ${j.company_name}. ${(j.description || '').slice(0, 200)}`
         ).join('\n');
@@ -308,27 +380,28 @@ async function tagJobsWithFilters(
             .map(f => `"${f}": ${filterLabels[f] || f}`)
             .join(', ');
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            temperature: 0,
-            max_tokens: 500,
-            response_format: { type: 'json_object' },
-            messages: [
-                {
-                    role: 'system',
-                    content: `Klassifiziere Jobs nach Werte-Filtern. Aktive Filter: ${filterDescriptions}.
+        const response = await complete({
+            taskType: 'classify_job_board',
+            systemPrompt: `Klassifiziere Jobs nach Werte-Filtern. Aktive Filter: ${filterDescriptions}.
 Für jeden Job: Gib nur die Filter zurück, die WIRKLICH aus dem Text ersichtlich sind. Halluziniere NICHT.
 Antwort als JSON: {"tags": [["filter1"], ["filter1", "filter2"], [], ...]}
-Das Array hat exakt ${jobs.length} Einträge (einer pro Job). Leeres Array = kein Filter passt.`
-                },
-                { role: 'user', content: jobSummaries }
-            ],
+Das Array hat exakt ${jobs.length} Einträge (einer pro Job). Leeres Array = kein Filter passt.`,
+            prompt: jobSummaries,
+            temperature: 0,
+            maxTokens: 500,
         });
 
-        const text = completion.choices[0]?.message?.content?.trim();
+        const text = response.text.trim();
         if (!text) return jobs.map(j => ({ ...j, matched_filters: [] }));
 
-        const parsed = JSON.parse(text);
+        // Robust JSON parsing
+        let parsed: { tags?: string[][] };
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            const jsonMatch = text.match(/\{[\s\S]*?\}/);
+            parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { tags: [] };
+        }
         const tags: string[][] = parsed.tags || [];
 
         return jobs.map((job, i) => ({

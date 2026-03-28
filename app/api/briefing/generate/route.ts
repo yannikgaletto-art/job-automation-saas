@@ -3,21 +3,21 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/briefing/generate
  * KI-generiertes Morning Briefing. Cached in daily_briefings table.
- * Fallback-Text wenn OpenAI nicht verfügbar.
+ * Fallback-Text wenn Anthropic nicht verfügbar.
+ *
+ * MIGRATION NOTE (2026-03-28): Replaced GPT-4o-mini with Claude 4.5 Haiku via model-router
  */
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
-import OpenAI from 'openai';
+import { complete } from '@/lib/ai/model-router';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
 );
-
-const openai = new OpenAI();
 
 export async function GET() {
     try {
@@ -78,31 +78,28 @@ export async function GET() {
         const firstBlock = todayTasks?.[0];
         const pendingCount = pendingJobs?.length ?? 0;
 
-        // Generate with GPT-4o-mini
+        // Generate with Claude 4.5 Haiku
         let message: string;
         try {
             const firstBlockText = firstBlock
                 ? `${firstBlock.title} um ${new Date(firstBlock.scheduled_start).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
                 : 'noch kein Block geplant';
 
-            const completion = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
-                messages: [{
-                    role: 'user',
-                    content: `Du bist ein motivierender, empathischer Pathly-Assistent.
+            const response = await complete({
+                taskType: 'briefing_generate',
+                prompt: `Du bist ein motivierender, empathischer Pathly-Assistent.
 Schreibe 2 kurze, persönliche Sätze für das Morning Briefing.
 Kontext:
 - Gestern abgeschlossene Tasks: ${completedCount}
 - Erster Fokus-Block heute: ${firstBlockText}
 - Offene Bewerbungen: ${pendingCount}
 Ton: kurz, klar, motivierend. Kein Corporate-Sprech. Kein übertriebenes Lob.
-Antworte nur mit den 2 Sätzen, nichts anderes.`
-                }],
-                max_tokens: 100,
+Antworte nur mit den 2 Sätzen, nichts anderes.`,
+                maxTokens: 100,
                 temperature: 0.8,
             });
 
-            message = completion.choices[0].message.content ?? 'Starte deinen Tag mit Fokus und Intention.';
+            message = response.text.trim() || 'Starte deinen Tag mit Fokus und Intention.';
         } catch {
             message = completedCount > 0
                 ? `Gestern hast du ${completedCount} Task${completedCount > 1 ? 's' : ''} erledigt. Mach weiter so — Schritt für Schritt.`
@@ -134,3 +131,4 @@ Antworte nur mit den 2 Sätzen, nichts anderes.`
         });
     }
 }
+

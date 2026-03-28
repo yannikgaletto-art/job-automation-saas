@@ -194,6 +194,14 @@ No adjectives without evidence. No "motivated", "passionate", "dedicated".\n`;
             ? `\n4. USER METRICS (provided by user — only integrate if factually relevant to the respective position):\n${metricsContext}\n`
             : '';
 
+        // Extract missing ATS keywords from the match result for Keyword Weaving
+        const missingKeywords: string[] = Array.isArray(cv_match_result?.keywordsMissing)
+            ? cv_match_result.keywordsMissing.slice(0, 7)
+            : [];
+        const keywordBlock = missingKeywords.length > 0
+            ? `\n5. MISSING ATS KEYWORDS (from CV Match — integrate authentically where possible):\n${missingKeywords.map(k => `- ${k}`).join('\n')}\n`
+            : '';
+
         const prompt = `
 You are a world-class career consultant and CV optimizer.
 Your task: receive a CV JSON (CV SSoT) and an analysis (CV Match Result), then produce a precise optimization diff-list and an adjusted full CV.
@@ -218,9 +226,9 @@ ${summaryInstruction}
 [LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION}]
 HARD RULE: The final CV MUST fit on exactly 2 printed A4 pages. NEVER generate content for 3+ pages.
 - Max 3 bullet points per experience entry (quality over quantity — user can add more)
-- Max 12 words per bullet point. Must fit on ONE printed line. Be surgical and precise.
+- Max 20 words per bullet point. Aim for high information density — every word must be earned.
 - Summary: max 3 sentences
-- If ≥5 experience entries: oldest entries get max 1–2 bullets
+- If ≥5 experience entries: oldest entries get max 1 bullet
 - If ≥6 experience entries: oldest 2 entries get max 1 bullet each
 - If >3 education entries: only 2 most relevant get full description
 - Skills: max 3 categories, max 8 items per category
@@ -228,7 +236,22 @@ HARD RULE: The final CV MUST fit on exactly 2 printed A4 pages. NEVER generate c
 - Page budget:
   → Page 1: Header + Summary + Experience + Education
   → Page 2: Skills, Languages, Certificates (right column)
-- LESS IS MORE. The user can always add more later.
+
+QUALITY GATE (MANDATORY):
+- Every change MUST have at least ONE of these justifications:
+  (a) Integrates a missing ATS keyword authentically
+  (b) Makes the bullet MORE SPECIFIC (adds tools, metrics, outcomes)
+  (c) Merges multiple generic bullets into one concrete bullet
+- Pure shortening without adding substance is NOT a valid change. If the only improvement is fewer words, do NOT propose that change.
+- Removing concrete details (project names, technologies, metrics) to save words is FORBIDDEN.
+
+AUTHENTIC KEYWORD WEAVING:
+- For each MISSING ATS KEYWORD listed in input section 5:
+  1. Search the CV for REAL experience that relates to this keyword
+  2. If found: reformulate the relevant bullet so the keyword appears naturally
+  3. If NOT found: do NOT integrate it. Honesty > ATS score.
+- Example: keyword "Risk Management" + CV has "NIS-2 Compliance" → reformulate as "Led NIS-2 risk management and compliance processes"
+- Counter-example: keyword "Emergency Planning" + CV has nothing → do NOT insert.
 
 SECTION DISTRIBUTION (MANDATORY):
 - Your changes MUST cover at least 2 different sections. Do NOT spend all 12 changes on experience alone.
@@ -243,6 +266,7 @@ Before returning your output, mentally verify:
 4. Count total skill items. If >24, remove least relevant.
 5. Count certificates. If >6, keep only the 6 most relevant.
 6. If total content is likely to overflow 2 pages, aggressively cut the oldest/weakest entries.
+7. For each change: does it pass the QUALITY GATE? If not, drop it.
 If any check fails, revise your output before returning.
 [END LAYOUT CONSTRAINTS]
 
@@ -262,6 +286,7 @@ ${JSON.stringify(requirementRows, null, 2)}
 3. SELECTED TEMPLATE ID:
 ${template_id}
 ${metricsBlock}
+${keywordBlock}
 
 **CRITICAL OUTPUT RULES:**
 - "before" and "after" fields MUST be plain strings, never arrays.
@@ -360,6 +385,90 @@ Must conform to the following Zod schema:
                 reason: c.reason || 'KI-Optimierung',
                 requirementRef: c.requirementRef ?? null,
             }));
+
+        // ── Before-Text Sanitizer ──────────────────────────────────────
+        // Replace AI-generated 'before' values with ground-truth from the CV.
+        // Runs unconditionally — LLMs hallucinate 'before' regardless of language.
+        // Changes where path lookup fails are DROPPED to prevent misleading diffs.
+        interface LookupFailure { changeId: string; reason: string; path: string; }
+        const lookupFailures: LookupFailure[] = [];
+        const verifiedChanges: typeof rawJson.changes = [];
+
+        for (const change of rawJson.changes) {
+            // ADD changes have no 'before' — always pass through
+            if (change.type === 'add') {
+                verifiedChanges.push(change);
+                continue;
+            }
+
+            const { section, entityId, field, bulletId } = change.target;
+
+            // personalInfo — flat object, no arrays
+            if (section === 'personalInfo' && field) {
+                const realBefore = (translatedCv.personalInfo as any)?.[field];
+                if (realBefore != null) {
+                    change.before = String(realBefore);
+                    verifiedChanges.push(change);
+                } else {
+                    lookupFailures.push({ changeId: change.id, reason: 'personalInfo field not found', path: `personalInfo.${field}` });
+                }
+                continue;
+            }
+
+            // Array sections — experience, education, skills, languages, certifications
+            const sectionArray = (translatedCv as any)?.[section];
+            if (!Array.isArray(sectionArray) || !entityId) {
+                lookupFailures.push({ changeId: change.id, reason: 'section not array or entityId missing', path: `${section}.${entityId}` });
+                continue;
+            }
+
+            const entity = sectionArray.find((e: any) => e.id === entityId);
+            if (!entity) {
+                lookupFailures.push({ changeId: change.id, reason: 'entityId not found', path: `${section}.${entityId}` });
+                continue;
+            }
+
+            // Bullet-level lookup (experience.description)
+            if (bulletId && Array.isArray(entity.description)) {
+                const bullet = entity.description.find((b: any) => b.id === bulletId);
+                if (bullet) {
+                    change.before = bullet.text;
+                    verifiedChanges.push(change);
+                } else {
+                    lookupFailures.push({ changeId: change.id, reason: 'bulletId not found', path: `${section}.${entityId}.description.${bulletId}` });
+                }
+                continue;
+            }
+
+            // Field-level lookup
+            if (field) {
+                const realValue = entity[field];
+                if (realValue != null) {
+                    change.before = Array.isArray(realValue)
+                        ? realValue.map((x: any) => typeof x === 'string' ? x : x.text).join(', ')
+                        : String(realValue);
+                    verifiedChanges.push(change);
+                } else {
+                    lookupFailures.push({ changeId: change.id, reason: 'field not found on entity', path: `${section}.${entityId}.${field}` });
+                }
+            } else {
+                lookupFailures.push({ changeId: change.id, reason: 'no field or bulletId specified', path: `${section}.${entityId}` });
+            }
+        }
+
+        // Replace with verified-only changes
+        const droppedCount = rawJson.changes.length - verifiedChanges.length;
+        rawJson.changes = verifiedChanges;
+
+        if (lookupFailures.length > 0) {
+            log.warn('Before-text sanitizer: changes dropped due to path mismatch', {
+                job_id,
+                total_before_sanitize: droppedCount + verifiedChanges.length,
+                dropped: droppedCount,
+                remaining: verifiedChanges.length,
+                failures: lookupFailures,
+            });
+        }
 
         // Backend-cap: limit to 12 most relevant changes
         // Prompt already asks for max 12, but enforce as safety net

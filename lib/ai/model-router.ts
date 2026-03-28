@@ -38,12 +38,13 @@ export const MODELS = {
 // ============================================================================
 
 export type TaskType =
-    // Cheap tier (GPT-4o-mini)
+    // Cheap tier (Claude Haiku)
     | 'parse_html'
     | 'extract_job_fields'
     | 'detect_ats_system'
     | 'classify_job_board'
     | 'summarize_job_description'
+    | 'briefing_generate'
     // Premium tier (Claude Sonnet)
     | 'write_cover_letter'
     | 'personalize_intro'
@@ -52,6 +53,8 @@ export type TaskType =
     | 'cv_match'
     | 'cv_parse'
     | 'translate_cv'
+    | 'language_judge'
+    | 'kill_fluff'
     // Certificate pipeline
     | 'analyze_skill_gaps'
     | 'synthesize_certificates';
@@ -62,17 +65,20 @@ export type TaskType =
 
 export function selectModel(taskType: TaskType) {
     const routingMap: Record<TaskType, keyof typeof MODELS> = {
-        // Cheap tasks
+        // Cheap tasks (Claude 4.5 Haiku — $0.25/1M tokens)
         parse_html: 'CLAUDE_HAIKU',
         extract_job_fields: 'CLAUDE_HAIKU',
-        detect_ats_system: 'GPT_4O_MINI',
-        classify_job_board: 'GPT_4O_MINI',
-        summarize_job_description: 'GPT_4O_MINI',
-        // Premium tasks (creative writing only)
+        detect_ats_system: 'CLAUDE_HAIKU',
+        classify_job_board: 'CLAUDE_HAIKU',
+        summarize_job_description: 'CLAUDE_HAIKU',
+        briefing_generate: 'CLAUDE_HAIKU',
+        // Premium tasks (Claude 4.5 Sonnet — creative writing, language quality)
         write_cover_letter: 'CLAUDE_SONNET',
         personalize_intro: 'CLAUDE_SONNET',
         generate_motivation_text: 'CLAUDE_SONNET',
         optimize_cv: 'CLAUDE_SONNET',
+        language_judge: 'CLAUDE_SONNET',
+        kill_fluff: 'CLAUDE_SONNET',
         // Structured analysis (Haiku: fast + cheap, no creative writing needed)
         cv_match: 'CLAUDE_HAIKU',
         cv_parse: 'CLAUDE_HAIKU',
@@ -139,7 +145,7 @@ export async function complete(
         const response = await client.messages.create({
             model: model.id,
             max_tokens: request.maxTokens ?? 4096,
-            temperature: request.temperature ?? 1.0,
+            temperature: request.temperature ?? 0,
             system: request.systemPrompt,
             messages: [{ role: 'user', content: request.prompt }],
         });

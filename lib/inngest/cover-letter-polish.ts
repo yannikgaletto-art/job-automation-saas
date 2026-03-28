@@ -4,7 +4,7 @@
  *
  * Steps:
  *   1. Anti-Fluff Re-Gen (if fluff found during sync scan)
- *   2. GPT-4o Language Judge + Claim Extraction (if OPENAI_API_KEY available)
+ *   2. Claude Sonnet Language Judge + Claim Extraction (if ANTHROPIC_API_KEY available)
  *   3. Perplexity Fact Check on extracted claims (if PERPLEXITY_API_KEY available)
  *   4. JSONB Merge-Update on documents.metadata
  *

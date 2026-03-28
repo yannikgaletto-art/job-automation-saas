@@ -1,11 +1,10 @@
 /**
- * Job Search Pipeline — SerpAPI → Firecrawl → GPT-4o-mini → Claude Judge
+ * Job Search Pipeline — SerpAPI → Firecrawl → Claude Haiku Harvester → Claude Sonnet Judge
  * 
  * Implements the full pipeline from JOB_SEARCH_SPEC.md.
  * Each step is independent and testable.
  */
 
-import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -109,10 +108,13 @@ export interface JobSearchFilters {
     werte?: string[];        // ['nachhaltigkeit', 'innovation', ...]
 }
 
+export interface SerpLocale { hl: string; gl: string; }
+
 export async function searchJobs(
     query: string,
     location: string,
     filters?: JobSearchFilters,
+    serpLocale: SerpLocale = { hl: 'de', gl: 'de' },
 ): Promise<SerpApiJob[]> {
     const apiKey = process.env.SERPAPI_KEY;
     if (!apiKey) throw new Error('SERPAPI_KEY not configured');
@@ -124,12 +126,12 @@ export async function searchJobs(
 
     // ── Progressive search: week → month → synonyms+month ──
     // Step 1: Last 7 days
-    let rawJobs = await fetchSerpApiJobs(baseQuery, 'date_posted:week', apiKey);
+    let rawJobs = await fetchSerpApiJobs(baseQuery, 'date_posted:week', apiKey, serpLocale);
     console.log(`[Search] Step 1 (week): ${rawJobs.length} results for "${baseQuery}"`);
 
     // Step 2: Widen to last 30 days if too few
     if (rawJobs.length < MIN_RESULTS) {
-        const monthJobs = await fetchSerpApiJobs(baseQuery, 'date_posted:month', apiKey);
+        const monthJobs = await fetchSerpApiJobs(baseQuery, 'date_posted:month', apiKey, serpLocale);
         console.log(`[Search] Step 2 (month): ${monthJobs.length} results`);
         rawJobs = deduplicateRawJobs([...rawJobs, ...monthJobs]);
     }
@@ -138,7 +140,7 @@ export async function searchJobs(
     if (rawJobs.length < MIN_RESULTS) {
         const synonymQuery = generateSynonymQuery(query, location);
         if (synonymQuery && synonymQuery !== baseQuery) {
-            const synonymJobs = await fetchSerpApiJobs(synonymQuery, 'date_posted:month', apiKey);
+            const synonymJobs = await fetchSerpApiJobs(synonymQuery, 'date_posted:month', apiKey, serpLocale);
             console.log(`[Search] Step 3 (synonyms "${synonymQuery}"): ${synonymJobs.length} results`);
             rawJobs = deduplicateRawJobs([...rawJobs, ...synonymJobs]);
         }
@@ -222,11 +224,12 @@ export async function searchJobs(
 
 // ─── SerpAPI fetch helper ─────────────────────────────────────────
 
-async function fetchSerpApiJobs(query: string, dateChip: string, apiKey: string): Promise<any[]> {
+async function fetchSerpApiJobs(query: string, dateChip: string, apiKey: string, serpLocale: SerpLocale = { hl: 'de', gl: 'de' }): Promise<any[]> {
     const params = new URLSearchParams({
         engine: 'google_jobs',
         q: query,
-        hl: 'de',
+        hl: serpLocale.hl,
+        gl: serpLocale.gl,
         chips: dateChip,
         api_key: apiKey,
     });
@@ -445,15 +448,15 @@ async function scrapeWithFirecrawl(url: string): Promise<string | null> {
     }
 }
 
-// ─── Step 3a: GPT-4o-mini Harvester ──────────────────────────────
+// ─── Step 3a: Claude Haiku Harvester ─────────────────────────────
 
 export async function harvestJobData(
     markdown: string,
     fallbackDescription: string,
 ): Promise<HarvestedData | null> {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-        console.warn('⚠️ [Pipeline] OPENAI_API_KEY not set, skipping harvester');
+        console.warn('⚠️ [Pipeline] ANTHROPIC_API_KEY not set, skipping harvester');
         return null;
     }
 
@@ -488,13 +491,13 @@ export async function harvestJobData(
         return null;
     }
 
-    const openai = new OpenAI({ apiKey });
+    const anthropic = new Anthropic({ apiKey });
 
     const systemPrompt = `Du bist ein präziser Daten-Extraktions-Assistent.
+Antworte NUR mit reinem JSON. Keine Markdown-Codeblocks, keine Einleitung, kein Erklärungstext.
 Extrahiere die folgenden Felder aus dem Markdown einer Stellenanzeige.
 Halte dich STRIKT an das JSON-Schema.
 Erfinde NICHTS. Wenn ein Feld im Text nicht vorkommt: null zurückgeben.
-Antworte NUR mit validem JSON, kein Markdown.
 
 WICHTIG für Listen (hard_requirements, soft_requirements, tasks, benefits_and_perks):
 - Schreibe verdichtete, vollständige Sätze — ca. 20% kürzer als das Original.
@@ -533,22 +536,23 @@ JSON-Schema:
 }`;
 
     try {
-        console.log('✅ [Pipeline] GPT-4o-mini harvesting...');
-        const completion = await withRetry(async () =>
-            openai.chat.completions.create({
-                model: 'gpt-4o-mini',
+        console.log('✅ [Pipeline] Claude Haiku harvesting...');
+        const message = await withRetry(async () =>
+            anthropic.messages.create({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 3000,
                 temperature: 0,
-                max_tokens: 2500,
-                response_format: { type: 'json_object' },
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt },
-                ],
+                system: systemPrompt,
+                messages: [{ role: 'user', content: userPrompt }],
             })
         );
 
-        const text = completion.choices[0]?.message?.content?.trim();
-        if (!text) return null;
+        const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
+        if (!raw) return null;
+
+        // Extract JSON — handle potential markdown wrapping from Haiku
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        const text = jsonMatch ? jsonMatch[0] : raw;
 
         const parsed = JSON.parse(text) as HarvestedData;
         console.log(`✅ [Pipeline] Harvester: extracted ${Object.keys(parsed).filter(k => (parsed as any)[k] !== null).length} fields`);

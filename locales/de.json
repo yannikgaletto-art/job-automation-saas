@@ -211,7 +211,25 @@
       "preview_cancel": "Abbrechen",
       "preview_confirm": "Steckbrief bestätigen",
       "bookmark_job": "Job merken",
-      "star_button": "Job vormerken"
+      "star_button": "Job vormerken",
+      "swipe_top_tasks": "Top Aufgaben",
+      "swipe_view_website": "Website ansehen",
+      "swipe_skip": "Überspringen",
+      "swipe_to_queue": "Zur Queue",
+      "swipe_adding": "Hinzufügen",
+      "swipe_in_queue": "In Queue",
+      "swipe_already_in_queue": "Bereits in Queue",
+      "swipe_go_to_queue": "Zur Job Queue",
+      "swipe_all_seen": "Alle Jobs gesehen",
+      "swipe_jobs_reviewed": "{count} Jobs durchgesehen",
+      "swipe_new_search_hint": "Starte eine neue Suche für mehr Ergebnisse",
+      "schedule_fulltime": "Vollzeit",
+      "schedule_parttime": "Teilzeit",
+      "schedule_freelance": "Freelance",
+      "schedule_contractor": "Freiberuflich",
+      "schedule_internship": "Praktikum",
+      "remote_badge": "Remote",
+      "desc_original_lang": "Originalsprache"
     },
     "job_queue": {
       "title": "Job Queue",
@@ -843,7 +861,19 @@
     "confirm_none_reviewed_title": "Keine Änderung geprüft",
     "confirm_none_reviewed_desc": "Du hast noch keine Änderung einzeln überprüft. Möchtest du alle 12 Vorschläge automatisch übernehmen oder lieber kurz drüberschauen?",
     "confirm_review_first": "Ich schaue kurz drüber",
-    "confirm_accept_all_continue": "Alle übernehmen & weiter"
+    "confirm_accept_all_continue": "Alle übernehmen & weiter",
+    "group_profile_skills": "Profil & Skills",
+    "keyword_badge": "{n} ATS Keywords",
+    "matched_label": "Abgedeckt",
+    "changes_badge": "{n} Änderungen",
+    "section_label_summary": "Zusammenfassung",
+    "section_label_skills": "Kenntnisse",
+    "section_label_education": "Ausbildung",
+    "section_label_languages": "Sprachen",
+    "section_label_certificates": "Zertifikate",
+    "ats_sidebar_title": "ATS Keywords",
+    "ats_sidebar_covered": "abgedeckt",
+    "change_limit_info": "Wir fokussieren auf die wirkungsvollsten Änderungen (max. 12), damit dein CV auf 2 Seiten passt. Stationen ohne Vorschlag sind bereits gut aufgestellt."
 
   },
 
@@ -1232,5 +1262,21 @@
     "auto_hidden": "Check-in ausgeblendet. Reaktivieren in Einstellungen → Persönlich.",
     "checkin_reactivate": "Mood Check-in reaktivieren",
     "checkin_reactivate_desc": "Check-in wurde nach 5× Überspringen ausgeblendet."
+  },
+  "upload": {
+    "status_uploading": "Datei wird hochgeladen…",
+    "status_reading": "Dein Lebenslauf wird ausgelesen…",
+    "status_analyzing": "KI-Analyse & Speicherung läuft…",
+    "status_done": "Fertig ✅ — Analyse läuft im Hintergrund",
+    "eu_privacy_note": "Deine Daten werden DSGVO-konform auf EU-Servern extrahiert und verarbeitet.",
+    "cv_hint_title": "Kurzer Hinweis zu deinem Lebenslauf",
+    "cv_hint_description": "Damit Pathly deinen CV wirklich optimieren kann, brauchen wir nicht nur deine Stationen — sondern auch 2–3 Stichpunkte pro Station.",
+    "cv_hint_example_label": "So sollte es aussehen",
+    "cv_hint_bullet_1": "Konzeption und Durchführung von 12+ Usability-Tests",
+    "cv_hint_bullet_2": "Analyse qualitativer Daten und Erstellung von Handlungsempfehlungen",
+    "cv_hint_bad_label": "Nur der Firmenname reicht nicht",
+    "cv_hint_bad_example": "\"Fraunhofer IGD — UX Researcher\" ohne weitere Details",
+    "cv_hint_continue": "Verstanden — Lebenslauf hochladen",
+    "cv_hint_dismiss": "Habe ich gelesen — nicht mehr anzeigen"
   }
 }

@@ -7,42 +7,148 @@ import { useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from "framer-motion"
 import { Check, X, ArrowRight, ChevronRight } from "lucide-react"
 import { CvChange, CvOptimizationProposal, CvStructuredData } from "@/types/cv"
+import { applyOptimizations } from "@/lib/utils/cv-merger"
 import { cn } from "@/lib/utils"
 
 export interface DiffReviewProps {
     originalCv: CvStructuredData;
     proposal: CvOptimizationProposal;
+    atsKeywords: string[];
     onSave: (finalCv: CvStructuredData, acceptedChanges: CvChange[]) => void;
     onCancel: () => void;
 }
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface StationGroup {
+    id: string;
+    label: string;               // Company + Role, or "Profil & Skills"
+    sublabel?: string;            // Role for experience stations
+    isProfileGroup: boolean;
+    changes: CvChange[];
+    keywordHits: { count: number; matched: string[] };
+    /** Sub-section labels within the Profile group (Summary, Skills, etc.) */
+    sectionChanges?: { sectionKey: string; changes: CvChange[] }[];
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const SECTION_KEYS: Record<string, string> = {
-    experience: "section_experience",
-    education: "section_education",
-    skills: "section_skills",
-    personalInfo: "section_personalInfo",
-    languages: "section_languages",
-    certificates: "section_certificates",
-    certifications: "section_certifications",
-    summary: "section_summary",
+const SECTION_LABEL_KEYS: Record<string, string> = {
+    personalInfo: "section_label_summary",
+    skills: "section_label_skills",
+    education: "section_label_education",
+    languages: "section_label_languages",
+    certificates: "section_label_certificates",
+    certifications: "section_label_certificates",
 };
 
-const TYPE_KEYS: Record<string, string> = {
-    modify: "type_modify",
-    add: "type_add",
-    remove: "type_remove",
-};
+/**
+ * Group changes by Station (experience) or into a "Profil & Skills" bucket.
+ * Education changes are placed in the Profil group (not their own stations).
+ */
+function groupChangesByStation(
+    changes: CvChange[],
+    cv: CvStructuredData
+): StationGroup[] {
+    // Experience stations: grouped by entityId
+    const expMap = new Map<string, CvChange[]>();
+    // Everything else → Profil group
+    const profileChanges: CvChange[] = [];
 
-// Highlight keywords that differ between before and after (very simple word-diff)
+    for (const change of changes) {
+        const section = change.target.section;
+        if (section === 'experience' && change.target.entityId) {
+            const key = change.target.entityId;
+            if (!expMap.has(key)) expMap.set(key, []);
+            expMap.get(key)!.push(change);
+        } else {
+            profileChanges.push(change);
+        }
+    }
+
+    const groups: StationGroup[] = [];
+
+    // Build experience stations
+    for (const [entityId, stationChanges] of expMap) {
+        const exp = cv.experience?.find((e: any) => e.id === entityId);
+        const company = exp?.company || 'Unknown';
+        const role = exp?.role || '';
+        groups.push({
+            id: `station-${entityId}`,
+            label: company,
+            sublabel: role,
+            isProfileGroup: false,
+            changes: stationChanges,
+            keywordHits: { count: 0, matched: [] }, // computed later
+        });
+    }
+
+    // Build profile group (if any non-experience changes)
+    if (profileChanges.length > 0) {
+        // Sub-group by section within Profile
+        const sectionMap = new Map<string, CvChange[]>();
+        for (const c of profileChanges) {
+            const sec = c.target.section;
+            if (!sectionMap.has(sec)) sectionMap.set(sec, []);
+            sectionMap.get(sec)!.push(c);
+        }
+        groups.push({
+            id: 'station-profile',
+            label: '', // resolved via i18n key
+            isProfileGroup: true,
+            changes: profileChanges,
+            keywordHits: { count: 0, matched: [] },
+            sectionChanges: Array.from(sectionMap.entries()).map(([sectionKey, changes]) => ({
+                sectionKey,
+                changes,
+            })),
+        });
+    }
+
+    return groups;
+}
+
+/**
+ * Compute ATS keyword impact for a station group.
+ * Uses DELTA scoring: a keyword only counts if it appears in `after` but NOT in `before`.
+ */
+function computeKeywordHits(
+    group: StationGroup,
+    atsKeywords: string[]
+): { count: number; matched: string[] } {
+    if (!atsKeywords?.length) return { count: 0, matched: [] };
+
+    const hits = new Set<string>();
+    const lowerKeywords = atsKeywords.map(k => k.toLowerCase());
+
+    for (const change of group.changes) {
+        if (!change.after) continue;
+        const afterLower = change.after.toLowerCase();
+        const beforeLower = change.before?.toLowerCase() || '';
+
+        for (let i = 0; i < lowerKeywords.length; i++) {
+            const kw = lowerKeywords[i];
+            // Delta: only count if NEW in after (not already in before)
+            if (afterLower.includes(kw) && !beforeLower.includes(kw)) {
+                hits.add(atsKeywords[i]); // preserve original case for display
+            }
+        }
+    }
+
+    return { count: hits.size, matched: [...hits] };
+}
+
+/**
+ * Highlight words in 'after' text that differ from 'before' text.
+ * New words get a subtle underline instead of bold color.
+ */
 function highlightNew(before: string, after: string): ReactNode {
     const beforeWords = new Set(before.toLowerCase().split(/\s+/));
     const parts = after.split(/(\s+)/);
     return parts.map((part, i) => {
         const isNew = part.trim() && !beforeWords.has(part.toLowerCase().replace(/[.,;:()]/g, ""));
         return isNew
-            ? <strong key={i} className="font-semibold text-[#012e7a]">{part}</strong>
+            ? <span key={i} className="underline decoration-[#012e7a]/40 font-medium">{part}</span>
             : <span key={i}>{part}</span>;
     });
 }
@@ -71,7 +177,7 @@ function ChangeRow({
                 isRejected ? "border-gray-200 opacity-45" :
                     "border-gray-200 bg-white"
         )}>
-            {/* Row header — clickable toggle (div, not button, to avoid nested-button hydration error) */}
+            {/* Row header — div, not button, to avoid nested-button hydration error */}
             <div
                 role="button"
                 tabIndex={0}
@@ -119,7 +225,7 @@ function ChangeRow({
                 </div>
             </div>
 
-            {/* Expandable Before / After table */}
+            {/* Expandable Before / After — stacked blocks instead of table */}
             <AnimatePresence initial={false}>
                 {open && (
                     <motion.div
@@ -130,7 +236,6 @@ function ChangeRow({
                         className="overflow-hidden"
                     >
                         {change.type === 'remove' ? (
-                            /* Remove layout: single box with strikethrough + explanation */
                             <div className="mx-4 mb-4 border border-red-100 rounded-lg overflow-hidden text-sm bg-red-50/30">
                                 <div className="px-3 py-3">
                                     <p className="text-gray-400 line-through leading-relaxed">{change.before}</p>
@@ -138,28 +243,25 @@ function ChangeRow({
                                 </div>
                             </div>
                         ) : (
-                            /* Modify/Add layout: Before/After table */
-                            <div className="mx-4 mb-4 border border-gray-100 rounded-lg overflow-hidden text-sm">
-                                <table className="w-full table-fixed">
-                                    <thead>
-                                        <tr className="bg-gray-50 border-b border-gray-100">
-                                            <th className="w-1/2 px-3 py-2 text-left text-xs font-semibold text-gray-500 tracking-wide">{t('col_before')}</th>
-                                            <th className="w-1/2 px-3 py-2 text-left text-xs font-semibold text-[#012e7a] tracking-wide border-l border-gray-100">{t('col_after')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr className="align-top">
-                                            <td className="px-3 py-3 text-gray-500 leading-relaxed">
-                                                {change.before || <span className="text-gray-300 italic">—</span>}
-                                            </td>
-                                            <td className="px-3 py-3 leading-relaxed border-l border-gray-100 text-gray-800">
-                                                {change.before
-                                                    ? highlightNew(change.before, change.after || "")
-                                                    : <span className="text-[#012e7a]">{change.after}</span>}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                            <div className="mx-4 mb-4 space-y-2">
+                                {/* Before block — muted, strikethrough, left-border accent */}
+                                {change.before && (
+                                    <div className="border-l-2 border-[#002e7a]/20 pl-3 py-2">
+                                        <p className="text-xs text-gray-400 font-medium mb-1">{t('col_before')}</p>
+                                        <p className="text-sm text-[#73726E] line-through leading-relaxed">
+                                            {change.before}
+                                        </p>
+                                    </div>
+                                )}
+                                {/* After block — primary text, keywords underlined */}
+                                <div className="border-l-2 border-[#012e7a]/30 pl-3 py-2">
+                                    <p className="text-xs text-[#012e7a] font-medium mb-1">{t('col_after')}</p>
+                                    <p className="text-sm text-[#37352F] leading-relaxed">
+                                        {change.before
+                                            ? highlightNew(change.before, change.after || "")
+                                            : <span className="text-[#012e7a] font-medium">{change.after}</span>}
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </motion.div>
@@ -169,48 +271,65 @@ function ChangeRow({
     );
 }
 
-function TypeGroup({
-    typeKey,
-    changes,
+function StationGroupComponent({
+    group,
     decisions,
     onDecide,
     onBulkDecide,
+    defaultOpen,
     t,
 }: {
-    typeKey: string;
-    changes: CvChange[];
+    group: StationGroup;
     decisions: Record<string, 'accepted' | 'rejected'>;
     onDecide: (id: string, d: 'accepted' | 'rejected') => void;
     onBulkDecide: (ids: string[], d: 'accepted' | 'rejected') => void;
+    defaultOpen: boolean;
     t: ReturnType<typeof useTranslations>;
 }) {
-    const [open, setOpen] = useState(false);
-    const ids = changes.map(c => c.id);
-    const pending = changes.filter(c => !decisions[c.id]).length;
+    const [open, setOpen] = useState(defaultOpen);
+    const ids = group.changes.map(c => c.id);
+    const pending = group.changes.filter(c => !decisions[c.id]).length;
+    const hasKeywords = group.keywordHits.count > 0;
 
-    const typeLabel = TYPE_KEYS[typeKey] ? t(TYPE_KEYS[typeKey]) : typeKey;
+    const label = group.isProfileGroup
+        ? t('group_profile_skills')
+        : group.label;
 
     return (
-        <div className="ml-5">
-            {/* Type header — split into toggle + bulk to avoid button-in-button */}
-            <div className="flex items-center gap-2 py-1.5 group">
-                {/* Toggle clickable area */}
+        <div className="border-b border-gray-100 last:border-0 pb-3 last:pb-0">
+            {/* Station header — div role="button" to avoid nested-button hydration error */}
+            <div className="flex items-center gap-2 py-2.5 group">
                 <div
                     role="button"
                     tabIndex={0}
                     onClick={() => setOpen(o => !o)}
                     onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setOpen(o => !o)}
-                    className="flex items-center gap-2 flex-1 cursor-pointer text-sm text-gray-600 hover:text-gray-900 select-none"
+                    className="flex items-center gap-2 flex-1 cursor-pointer select-none"
                 >
                     <ChevronRight className={cn(
-                        "w-3.5 h-3.5 text-gray-400 transition-transform duration-200",
+                        "w-4 h-4 text-gray-500 transition-transform duration-200",
                         open && "rotate-90"
                     )} />
-                    <span className="text-sm font-medium">{typeLabel}</span>
-                    <span className="ml-1 text-xs text-gray-400">({changes.length})</span>
+                    <div className="flex flex-col">
+                        <span className="text-base font-semibold text-gray-900">{label}</span>
+                        {group.sublabel && (
+                            <span className="text-sm text-[#73726E]">{group.sublabel}</span>
+                        )}
+                    </div>
+                    <span className="text-xs text-gray-400 ml-1">({group.changes.length})</span>
                 </div>
-                {/* Pending badge + bulk actions */}
+
+                {/* ATS keyword badge + pending badge + bulk actions */}
                 <div className="flex items-center gap-2 shrink-0">
+                    {hasKeywords ? (
+                        <span className="text-[10px] bg-[#012e7a]/10 text-[#012e7a] px-2 py-0.5 rounded-full font-semibold">
+                            🎯 {t('keyword_badge', { n: group.keywordHits.count })}
+                        </span>
+                    ) : (
+                        <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                            {t('changes_badge', { n: group.changes.length })}
+                        </span>
+                    )}
                     {pending > 0 && (
                         <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
                             {t('pending_badge', { n: pending })}
@@ -229,77 +348,7 @@ function TypeGroup({
                 </div>
             </div>
 
-            <AnimatePresence initial={false}>
-                {open && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.15 }}
-                        className="overflow-hidden"
-                    >
-                        <div className="ml-5 mt-1 space-y-2 pb-2">
-                            {changes.map(change => (
-                                <ChangeRow
-                                    key={change.id}
-                                    change={change}
-                                    decision={decisions[change.id]}
-                                    onDecide={onDecide}
-                                    t={t}
-                                />
-                            ))}
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
-    );
-}
-
-function SectionGroup({
-    sectionKey,
-    changesByType,
-    decisions,
-    onDecide,
-    onBulkDecide,
-    t,
-}: {
-    sectionKey: string;
-    changesByType: Record<string, CvChange[]>;
-    decisions: Record<string, 'accepted' | 'rejected'>;
-    onDecide: (id: string, d: 'accepted' | 'rejected') => void;
-    onBulkDecide: (ids: string[], d: 'accepted' | 'rejected') => void;
-    t: ReturnType<typeof useTranslations>;
-}) {
-    const [open, setOpen] = useState(false);
-    const total = Object.values(changesByType).flat().length;
-    const pending = Object.values(changesByType).flat().filter(c => !decisions[c.id]).length;
-
-    const sectionLabel = SECTION_KEYS[sectionKey]
-        ? t(SECTION_KEYS[sectionKey])
-        : sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1);
-
-    return (
-        <div className="border-b border-gray-100 last:border-0 pb-3 last:pb-0">
-            <button
-                onClick={() => setOpen(o => !o)}
-                className="flex items-center gap-2 py-2.5 w-full text-left group"
-            >
-                <ChevronRight className={cn(
-                    "w-4 h-4 text-gray-500 transition-transform duration-200",
-                    open && "rotate-90"
-                )} />
-                <span className="text-base font-semibold text-gray-900">{sectionLabel}</span>
-                <span className="text-xs text-gray-400">({total})</span>
-                {pending > 0 && (
-                    <div className="ml-auto flex flex-col items-end gap-0.5">
-                        <span className="text-[10px] bg-[#012e7a]/10 text-[#012e7a] px-2 py-0.5 rounded-full font-semibold">
-                            {t('outstanding_badge', { n: pending })}
-                        </span>
-                    </div>
-                )}
-            </button>
-
+            {/* Station body */}
             <AnimatePresence initial={false}>
                 {open && (
                     <motion.div
@@ -309,18 +358,51 @@ function SectionGroup({
                         transition={{ duration: 0.18 }}
                         className="overflow-hidden"
                     >
-                        <div className="space-y-1">
-                            {Object.entries(changesByType).map(([typeKey, changes]) => (
-                                <TypeGroup
-                                    key={typeKey}
-                                    typeKey={typeKey}
-                                    changes={changes}
-                                    decisions={decisions}
-                                    onDecide={onDecide}
-                                    onBulkDecide={onBulkDecide}
-                                    t={t}
-                                />
-                            ))}
+                        <div className="ml-6 mt-1 space-y-2 pb-2">
+                            {/* Profile group: sub-section labels */}
+                            {group.isProfileGroup && group.sectionChanges ? (
+                                group.sectionChanges.map(({ sectionKey, changes }) => (
+                                    <div key={sectionKey}>
+                                        <p className="text-xs uppercase tracking-wide text-gray-400 font-medium mb-1.5 mt-2">
+                                            {SECTION_LABEL_KEYS[sectionKey]
+                                                ? t(SECTION_LABEL_KEYS[sectionKey])
+                                                : sectionKey}
+                                        </p>
+                                        <div className="space-y-2">
+                                            {changes.map(change => (
+                                                <ChangeRow
+                                                    key={change.id}
+                                                    change={change}
+                                                    decision={decisions[change.id]}
+                                                    onDecide={onDecide}
+                                                    t={t}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                /* Experience stations: flat list */
+                                group.changes.map(change => (
+                                    <ChangeRow
+                                        key={change.id}
+                                        change={change}
+                                        decision={decisions[change.id]}
+                                        onDecide={onDecide}
+                                        t={t}
+                                    />
+                                ))
+                            )}
+
+                            {/* Matched keywords list */}
+                            {group.keywordHits.matched.length > 0 && (
+                                <div className="mt-3 pt-2 border-t border-gray-50">
+                                    <p className="text-xs text-[#73726E]">
+                                        <span className="font-medium">{t('matched_label')}:</span>{' '}
+                                        {group.keywordHits.matched.join(', ')}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </motion.div>
                 )}
@@ -331,10 +413,11 @@ function SectionGroup({
 
 // ── Main DiffReview ────────────────────────────────────────────────────────
 
-export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffReviewProps) {
+export function DiffReview({ originalCv, proposal, atsKeywords, onSave, onCancel }: DiffReviewProps) {
     const t = useTranslations('diff_review');
     const [decisions, setDecisions] = useState<Record<string, 'accepted' | 'rejected'>>({});
     const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+    const [showInfo, setShowInfo] = useState(false);
 
     const handleDecide = (id: string, d: 'accepted' | 'rejected') => {
         setDecisions(prev => {
@@ -356,26 +439,73 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
         });
     };
 
-    // Group: section → type → changes[]
-    const grouped = useMemo(() => {
-        const map: Record<string, Record<string, CvChange[]>> = {};
-        for (const change of proposal.changes) {
-            const sec = change.target.section;
-            const typ = change.type;
-            if (!map[sec]) map[sec] = {};
-            if (!map[sec][typ]) map[sec][typ] = [];
-            map[sec][typ].push(change);
+    // Station-based grouping with ATS keyword impact scoring
+    const stationGroups = useMemo(() => {
+        const groups = groupChangesByStation(proposal.changes, originalCv);
+
+        // Compute keyword hits for each group (delta-impact)
+        for (const group of groups) {
+            group.keywordHits = computeKeywordHits(group, atsKeywords);
         }
-        return map;
-    }, [proposal.changes]);
+
+        // Sort: keyword hits desc → change count desc
+        // Profile group anchored last unless it has the highest impact
+        groups.sort((a, b) => {
+            // Primary: keyword hits (descending)
+            if (b.keywordHits.count !== a.keywordHits.count) {
+                return b.keywordHits.count - a.keywordHits.count;
+            }
+            // Secondary: change count (descending)
+            return b.changes.length - a.changes.length;
+        });
+
+        return groups;
+    }, [proposal.changes, originalCv, atsKeywords]);
+
+    // First group ID (highest impact) for default-open
+    const firstGroupId = stationGroups[0]?.id || '';
+
+    // Reactive ATS keyword coverage — updates as user accepts/rejects changes
+    // Uses partial-token matching: multi-word keywords match if ≥2/3 of tokens appear
+    const keywordCoverage = useMemo(() => {
+        if (!atsKeywords?.length) return { covered: 0, set: new Set<string>() };
+
+        const coveredSet = new Set<string>();
+        const activeChanges = proposal.changes.filter(c => decisions[c.id] !== 'rejected');
+        // Collect all active after-texts into one corpus for efficient matching
+        const corpus = activeChanges
+            .map(c => c.after?.toLowerCase() ?? '')
+            .join(' ');
+
+        for (const kw of atsKeywords) {
+            const kwLower = kw.toLowerCase();
+            // Single-word keywords: exact include
+            const tokens = kwLower.split(/\s+/).filter(Boolean);
+            if (tokens.length <= 1) {
+                if (corpus.includes(kwLower)) coveredSet.add(kwLower);
+                continue;
+            }
+            // Multi-word: count how many tokens appear in the corpus
+            const matchedTokens = tokens.filter(t => corpus.includes(t));
+            const threshold = Math.ceil(tokens.length * 2 / 3);
+            if (matchedTokens.length >= threshold) coveredSet.add(kwLower);
+        }
+
+        return { covered: coveredSet.size, set: coveredSet };
+    }, [atsKeywords, proposal.changes, decisions]);
 
     const totalCount = proposal.changes.length;
     const acceptedCount = proposal.changes.filter(c => decisions[c.id] === 'accepted').length;
     const rejectedCount = proposal.changes.filter(c => decisions[c.id] === 'rejected').length;
     const pendingCount = totalCount - acceptedCount - rejectedCount;
 
+    /**
+     * FIX: Compute finalCv from accepted changes only (not proposal.optimized).
+     * proposal.optimized contains ALL changes applied — using it ignores rejections
+     * until page reload. Instead, we use applyOptimizations() with the translated
+     * base CV and only the accepted changes.
+     */
     const handleFinalize = () => {
-        // If the user hasn't reviewed a single change, ask before proceeding
         const noneReviewed = acceptedCount === 0 && rejectedCount === 0;
         if (noneReviewed && totalCount > 0) {
             setShowConfirmPopup(true);
@@ -383,14 +513,22 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
         }
         // Undecided changes are accepted by default
         const accepted = proposal.changes.filter(c => decisions[c.id] !== 'rejected');
-        onSave(proposal.optimized, accepted);
+        const choices: Record<string, 'accepted'> = {};
+        accepted.forEach(c => { choices[c.id] = 'accepted'; });
+        const baseCv = proposal.translated ?? originalCv;
+        const finalCv = applyOptimizations(baseCv, { choices, appliedChanges: accepted });
+        onSave(finalCv, accepted);
     };
 
     const handleConfirmAcceptAll = () => {
         setShowConfirmPopup(false);
-        handleAcceptAll();
+        handleBulkDecide(proposal.changes.map(c => c.id), 'accepted');
         const accepted = proposal.changes;
-        onSave(proposal.optimized, accepted);
+        const choices: Record<string, 'accepted'> = {};
+        accepted.forEach(c => { choices[c.id] = 'accepted'; });
+        const baseCv = proposal.translated ?? originalCv;
+        const finalCv = applyOptimizations(baseCv, { choices, appliedChanges: accepted });
+        onSave(finalCv, accepted);
     };
 
     const handleAcceptAll = () => handleBulkDecide(proposal.changes.map(c => c.id), 'accepted');
@@ -411,6 +549,13 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
                 </div>
                 <div className="flex items-center gap-2">
                     <button
+                        onClick={() => setShowInfo(prev => !prev)}
+                        className="text-xs w-6 h-6 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-colors border border-blue-200/50"
+                        title={t('change_limit_info')}
+                    >
+                        ℹ
+                    </button>
+                    <button
                         onClick={handleRejectAll}
                         className="text-xs px-3 py-1.5 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors border border-gray-200"
                     >
@@ -425,19 +570,81 @@ export function DiffReview({ originalCv, proposal, onSave, onCancel }: DiffRevie
                 </div>
             </div>
 
-            {/* Notion-style grouped tree */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 max-h-[60vh] space-y-1">
-                {Object.entries(grouped).map(([sectionKey, changesByType]) => (
-                    <SectionGroup
-                        key={sectionKey}
-                        sectionKey={sectionKey}
-                        changesByType={changesByType}
-                        decisions={decisions}
-                        onDecide={handleDecide}
-                        onBulkDecide={handleBulkDecide}
-                        t={t}
-                    />
-                ))}
+            {/* Collapsible info panel */}
+            {showInfo && (
+                <div className="mx-6 mt-2 px-3 py-2 bg-blue-50/60 border border-blue-100 rounded-lg">
+                    <p className="text-[11px] text-blue-700/80 leading-relaxed">
+                        {t('change_limit_info')}
+                    </p>
+                </div>
+            )}
+
+            {/* Main content: Station groups + ATS sidebar */}
+            <div className="flex-1 overflow-y-auto max-h-[60vh]">
+                <div className={cn(
+                    "grid gap-4 px-6 py-4",
+                    atsKeywords.length > 0 ? "grid-cols-[1fr_200px]" : "grid-cols-1"
+                )}>
+                    {/* Station-grouped tree */}
+                    <div className="space-y-1 min-w-0">
+                        {stationGroups.map((group) => (
+                            <StationGroupComponent
+                                key={group.id}
+                                group={group}
+                                decisions={decisions}
+                                onDecide={handleDecide}
+                                onBulkDecide={handleBulkDecide}
+                                defaultOpen={group.id === firstGroupId}
+                                t={t}
+                            />
+                        ))}
+                    </div>
+
+                    {/* ATS Keywords sidebar — sticky, only shown when keywords exist */}
+                    {atsKeywords.length > 0 && (
+                        <div className="sticky top-0 self-start">
+                            <div className="border border-gray-100 rounded-lg bg-gray-50/50 p-3">
+                                <p className="text-xs font-semibold text-gray-900 mb-0.5">
+                                    {t('ats_sidebar_title')}
+                                </p>
+                                <p className="text-[10px] text-[#73726E] mb-3">
+                                    {keywordCoverage.covered}/{atsKeywords.length} {t('ats_sidebar_covered')}
+                                </p>
+                                {/* Coverage progress bar */}
+                                <div className="w-full h-1 bg-gray-200 rounded-full mb-3 overflow-hidden">
+                                    <div
+                                        className="h-full bg-[#012e7a] rounded-full transition-all duration-300"
+                                        style={{ width: `${atsKeywords.length > 0 ? (keywordCoverage.covered / atsKeywords.length) * 100 : 0}%` }}
+                                    />
+                                </div>
+                                <ul className="space-y-1.5">
+                                    {atsKeywords.map(kw => {
+                                        const isCovered = keywordCoverage.set.has(kw.toLowerCase());
+                                        return (
+                                            <li key={kw} className="flex items-center gap-1.5 text-xs">
+                                                {isCovered ? (
+                                                    <span className="w-4 h-4 rounded-full bg-[#012e7a]/10 flex items-center justify-center shrink-0">
+                                                        <Check className="w-2.5 h-2.5 text-[#012e7a]" />
+                                                    </span>
+                                                ) : (
+                                                    <span className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                                                        <span className="w-1.5 h-0.5 bg-gray-300 rounded-full" />
+                                                    </span>
+                                                )}
+                                                <span className={cn(
+                                                    "leading-tight",
+                                                    isCovered ? "text-[#37352F] font-medium" : "text-[#73726E]"
+                                                )}>
+                                                    {kw}
+                                                </span>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Confirm popup — shown when user clicks Preview without reviewing any change */}

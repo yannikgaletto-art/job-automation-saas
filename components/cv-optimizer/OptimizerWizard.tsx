@@ -155,10 +155,14 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                     if (jobRes) {
                         setJobData(jobRes);
 
-                        // Restore state if optimization was already completed previously
-                        if (jobRes.cv_optimization_proposal && jobRes.cv_optimization_user_decisions) {
+                        // Restore state: proposal is always restored if it exists.
+                        // If decisions also exist → full restore (Step 2 skip below).
+                        // If only proposal exists → user still sees DiffReview (Step 1).
+                        if (jobRes.cv_optimization_proposal) {
                             setProposal(jobRes.cv_optimization_proposal);
-                            setUserDecisions(jobRes.cv_optimization_user_decisions);
+                            if (jobRes.cv_optimization_user_decisions) {
+                                setUserDecisions(jobRes.cv_optimization_user_decisions);
+                            }
                         }
                     }
                     if (userRes) {
@@ -702,6 +706,11 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                             <DiffReview
                                 originalCv={cvData}
                                 proposal={proposal}
+                                atsKeywords={
+                                    jobData?.metadata?.cv_match?.keywordsMissing
+                                    || jobData?.buzzwords
+                                    || []
+                                }
                                 onSave={handleSaveDiffs}
                                 onCancel={() => setProposal(null)}
                             />
