@@ -1,246 +1,110 @@
-import Anthropic from '@anthropic-ai/sdk';
+/**
+ * quote-matcher.ts
+ * ─────────────────────────────────────────────────────────
+ * PRIMARY quote selection from the curated quote_pool table.
+ * FALLBACK: returns null → caller decides (AI generation or skip).
+ *
+ * Usage in cover-letter pipeline:
+ *   const quote = await matchQuote({ jobTitle, theme, locale })
+ *   if (!quote) { /* use AI fallback * / }
+ */
 
-// Initialize Anthropic client (isolated — does NOT use shared model-router.ts)
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
+import { createClient } from '@/lib/supabase/server'
 
-export interface QuoteSuggestion {
-    quote: string;
-    author: string;
-    source?: string; // e.g. "Buch", "Interview", "Shareholder Letter"
-    relevance_score: number; // 0-1
-    match_score?: number; // 0-1 (kept for interface compatibility)
-    matched_value: string; // The specific company value this quote supports
-    value_connection: string; // Explanation
-    language: 'en' | 'de';
-    verified_url?: string; // kept for interface compatibility (always undefined now)
+export interface QuoteMatch {
+  id: string
+  theme: string
+  person: string
+  quote_en: string
+  quote_de: string
+  context: string | null
+  role_keywords: string[]
+  /** 'pool' = curated table, 'ai' = AI-generated fallback */
+  source: 'pool' | 'ai'
+  /** Locale-resolved quote text ready to inject */
+  text: string
 }
 
-
-// ─── Banned Authors ──────────────────────────────────────────────────────────
-// Authors that should never appear in a professional cover letter
-const BANNED_AUTHORS = [
-    'anonymous', 'unknown', 'unbekannt', 'autor unbekannt',
-    'various', 'n/a', 'na', '-', '', 'zitat', 'quote'
-];
-
-// Reduced from original list — Bill Gates is now allowed per user's real examples.
-// Only polarizing/overused tech CEOs remain banned.
-const BANNED_THINKERS = ['elon musk', 'jeff bezos', 'mark zuckerberg'];
-
-// Obvious spam / placeholder patterns in quote text
-const SPAM_PATTERNS = [
-    /lorem ipsum/i,
-    /\[insert quote\]/i,
-    /placeholder/i,
-    /example quote/i,
-];
-
-
-// ─── Stage 1: Claude One-Shot (Thinker + Quote in a single call) ─────────────
-
-interface ClaudeQuoteResult {
-    name: string;
-    quote: string;
-    source: string;
-    why: string;
-    matchedValue: string;
-    confidence: 'high' | 'low';
+export interface MatchQuoteOptions {
+  /** Job title from job_queue — used for keyword matching */
+  jobTitle: string
+  /** Optional: explicit theme override (e.g. from company research) */
+  theme?: string
+  /** Locale for quote text selection ('de' | 'en' | 'es') */
+  locale?: string
+  /** How many candidates to return (default: 3) */
+  limit?: number
 }
 
-async function fetchQuotesFromClaude(
-    companyName: string,
-    companyValues: string[],
-    companyVision: string,
-    jobTitle: string,
-    jobField: string,
-    language: 'de' | 'en'
-): Promise<ClaudeQuoteResult[]> {
-    const langInstruction = language === 'de'
-        ? 'Zitate dürfen auf Deutsch ODER Englisch sein. Bei deutschen Zitaten: verwende korrekt ä, ö, ü.'
-        : 'Quotes should be in English.';
+/**
+ * Returns up to `limit` curated quotes ranked by keyword overlap
+ * with the given jobTitle (and optional theme).
+ *
+ * Returns empty array if no quotes match (→ trigger AI fallback).
+ */
+export async function matchQuotes(
+  options: MatchQuoteOptions
+): Promise<QuoteMatch[]> {
+  const { jobTitle, theme, locale = 'de', limit = 3 } = options
+  const supabase = await createClient()
 
-    try {
-        const message = await anthropic.messages.create({
-            model: 'claude-sonnet-4-5-20250929',
-            max_tokens: 1500,
-            temperature: 0.8,
-            system: 'Du bist ein Experte für Vordenker und Intellektuelle aus allen Epochen und Disziplinen. Antworte AUSSCHLIESSLICH mit validem JSON. Kein Markdown, kein Text davor oder danach.',
-            messages: [{
-                role: 'user',
-                content: `KONTEXT:
-- Unternehmen: "${companyName}"
-- Stelle: "${jobTitle || 'Fachkraft'}"
-- Branche: "${jobField || 'Allgemein'}"
-- Unternehmenswerte: ${JSON.stringify(companyValues)}
-${companyVision ? `- Vision: "${companyVision}"` : ''}
+  // Build role keyword tokens from job title (lowercase, split on spaces/slashes)
+  const titleTokens = jobTitle
+    .toLowerCase()
+    .split(/[\s/,()]+/)
+    .filter((t) => t.length > 2)
 
-AUFGABE:
-Gib mir 3 echte, bekannte Vordenker mit je EINEM echten Zitat, das thematisch zum Unternehmen und seinem Kontext passt.
+  let query = supabase
+    .from('quote_pool')
+    .select('id, theme, person, quote_en, quote_de, context, role_keywords')
+    .eq('is_active', true)
 
-REGELN:
-1. VERBOTEN als Vordenker: ${BANNED_THINKERS.join(', ')}. Zu polarisierend.
-2. Wähle Vordenker aus VERSCHIEDENEN Epochen und Disziplinen (Wissenschaft, Praxis, Philosophie).
-3. Das Zitat muss REAL sein — ein Zitat, das du sicher aus deinem Trainingswissen kennst.
-   - KEINE Paraphrasierungen, KEINE "attributed to"-Zitate.
-   - Wenn du dir bei einem Zitat NICHT 100% sicher bist, setze "confidence": "low".
-4. Das Zitat muss thematisch zum UNTERNEHMEN und seinen WERTEN passen, nicht zwingend zur exakten Stelle.
-5. Max. 30 Wörter pro Zitat. Kurze, prägnante Zitate wirken in Anschreiben besser.
-6. ${langInstruction}
-7. "source" = Werk/Buch/Rede/Interview aus dem das Zitat stammt (z.B. "Reinventing Organizations", "TED Talk 2014").
-
-OUTPUT (JSON Array):
-[
-  {
-    "name": "Vorname Nachname",
-    "quote": "Der exakte Zitat-Text",
-    "source": "Werk oder Kontext des Zitats",
-    "why": "Warum passt dieses Zitat zum Unternehmen (1 Satz, deutsch)",
-    "matchedValue": "Exakter Text des Unternehmenswertes, der am besten passt",
-    "confidence": "high"
+  // If theme is provided directly (e.g. from Perplexity company research), filter by it
+  if (theme) {
+    query = query.eq('theme', theme)
   }
-]`
-            }]
-        });
 
-        const rawText = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
+  const { data, error } = await query
 
-        // Parse JSON — handle potential markdown wrapping
-        let jsonText = rawText;
-        const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch && jsonMatch[1]) {
-            jsonText = jsonMatch[1].trim();
-        }
+  if (error || !data || data.length === 0) {
+    return []
+  }
 
-        const parsed = JSON.parse(jsonText);
-        const results: ClaudeQuoteResult[] = Array.isArray(parsed) ? parsed : parsed.quotes || [];
+  // Score each quote by keyword overlap with jobTitle tokens
+  const scored = data.map((row) => {
+    const keywordsLower = row.role_keywords.map((k: string) => k.toLowerCase())
+    const score = titleTokens.reduce((acc, token) => {
+      const hit = keywordsLower.some((kw) => kw.includes(token) || token.includes(kw))
+      return acc + (hit ? 1 : 0)
+    }, 0)
+    return { ...row, score }
+  })
 
-        return results.filter(r => r.name && r.quote && r.confidence);
-    } catch (error) {
-        console.error('❌ [Stage 1] Claude One-Shot failed:', error instanceof Error ? error.message : error);
-        return [];
-    }
+  // Sort by score desc, take top N
+  const topMatches = scored
+    .filter((r) => r.score > 0 || !!theme) // if theme given, include even score=0
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+
+  return topMatches.map((row) => ({
+    id: row.id,
+    theme: row.theme,
+    person: row.person,
+    quote_en: row.quote_en,
+    quote_de: row.quote_de,
+    context: row.context,
+    role_keywords: row.role_keywords,
+    source: 'pool' as const,
+    text: locale === 'en' ? row.quote_en : row.quote_de,
+  }))
 }
 
-
-// ─── Stage 2: Rule-Based Validation ──────────────────────────────────────────
-
-interface ValidationResult {
-    approved: boolean;
-    reason: string;
-}
-
-function validateQuote(
-    quote: string,
-    author: string,
-    confidence: 'high' | 'low'
-): ValidationResult {
-    const authorNorm = author.trim().toLowerCase();
-
-    // 1. Author must be a real named person
-    if (!author.trim() || BANNED_AUTHORS.includes(authorNorm)) {
-        return { approved: false, reason: `Autor unbekannt oder anonym: "${author}"` };
-    }
-
-    // 2. Author must not be banned thinker
-    if (BANNED_THINKERS.some(b => authorNorm.includes(b))) {
-        return { approved: false, reason: `Autor auf Bannliste: "${author}"` };
-    }
-
-    // 3. Quote must be at least 8 words
-    const wordCount = quote.trim().split(/\s+/).length;
-    if (wordCount < 8) {
-        return { approved: false, reason: `Zitat zu kurz (${wordCount} Wörter, min. 8)` };
-    }
-
-    // 4. Quote must not exceed 30 words
-    if (wordCount > 30) {
-        return { approved: false, reason: `Zitat zu lang (${wordCount} Wörter, max. 30)` };
-    }
-
-    // 5. Quote must not be obvious spam/placeholder
-    for (const pattern of SPAM_PATTERNS) {
-        if (pattern.test(quote)) {
-            return { approved: false, reason: 'Zitat enthält Placeholder-Text' };
-        }
-    }
-
-    // 6. NEW: Anti-hallucination — reject low-confidence quotes
-    if (confidence === 'low') {
-        return { approved: false, reason: 'Claude unsicher über Authentizität (confidence: low)' };
-    }
-
-    // 7. NEW: Anti-hallucination — reject quotes shorter than 5 words within quotation marks
-    const innerQuoteMatch = quote.match(/["""„](.*?)["""]/);
-    if (innerQuoteMatch && innerQuoteMatch[1].trim().split(/\s+/).length < 5) {
-        return { approved: false, reason: 'Zitat-Fragment zu kurz (< 5 Wörter innerhalb Anführungszeichen)' };
-    }
-
-    return { approved: true, reason: 'Bekannter Autor, ausreichende Länge, hohe Konfidenz.' };
-}
-
-
-// ─── Main Pipeline (2 Stages) ────────────────────────────────────────────────
-
-export async function suggestRelevantQuotes(
-    companyName: string,
-    companyValues: string[],
-    companyVision: string = '',
-    jobTitle: string = '',
-    jobField: string = '',
-    language: 'de' | 'en' = 'de'
-): Promise<QuoteSuggestion[]> {
-    // Guard: empty values → early return
-    if (!companyValues || companyValues.length === 0) {
-        console.error('❌ [QuotePipeline] No companyValues provided — returning []');
-        return [];
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // STAGE 1: Claude One-Shot (Thinker + Quote in one call)
-    // ═══════════════════════════════════════════════════════════════════════
-    console.log('🔍 [Stage 1] Claude One-Shot for:', jobTitle, '|', companyName);
-    const claudeResults = await fetchQuotesFromClaude(
-        companyName, companyValues, companyVision, jobTitle, jobField, language
-    );
-
-    if (claudeResults.length === 0) {
-        console.error('❌ [Stage 1] No quotes from Claude — returning []');
-        return [];
-    }
-    console.log(`✅ [Stage 1] ${claudeResults.length} quotes: ${claudeResults.map(r => r.name).join(', ')}`);
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // STAGE 2: Rule-Based Validation (fast, no AI call)
-    // ═══════════════════════════════════════════════════════════════════════
-    console.log('🔍 [Stage 2] Validating quotes (rule-based)...');
-    const approvedQuotes: QuoteSuggestion[] = [];
-
-    for (const result of claudeResults) {
-        const verdict = validateQuote(result.quote, result.name, result.confidence);
-
-        if (verdict.approved) {
-            approvedQuotes.push({
-                quote: result.quote,
-                author: result.name,
-                source: result.source || '',
-                relevance_score: 0.85,
-                match_score: 0.85, // fixed score — no embedding scoring anymore
-                matched_value: result.matchedValue || companyValues[0] || companyName,
-                value_connection: result.why,
-                language: /[äöüßÄÖÜ]/.test(result.quote) ? 'de' : 'en',
-            });
-            console.log(`  ✅ ${result.name}: APPROVED — ${verdict.reason}`);
-        } else {
-            console.log(`  ❌ ${result.name}: REJECTED — ${verdict.reason}`);
-        }
-    }
-
-    if (approvedQuotes.length === 0) {
-        console.error('❌ [Stage 2] All quotes rejected — returning []');
-        return [];
-    }
-    console.log(`✅ [Stage 2] ${approvedQuotes.length} quotes approved`);
-
-    // Return top 3 (was top 5, but Claude only generates 3)
-    return approvedQuotes.slice(0, 3);
+/**
+ * Convenience: get the single best match, or null (→ AI fallback).
+ */
+export async function matchQuote(
+  options: MatchQuoteOptions
+): Promise<QuoteMatch | null> {
+  const results = await matchQuotes({ ...options, limit: 1 })
+  return results[0] ?? null
 }
