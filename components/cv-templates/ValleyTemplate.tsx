@@ -182,7 +182,7 @@ export function ValleyTemplate({ data, qrBase64, labels }: { data: CvStructuredD
                                         {exp.company}{exp.location ? ` \u2022 ${exp.location}` : ''}
                                     </Text>
                                 )}
-                                {exp.description?.slice(0, 3).map((b) => (
+                                {exp.description?.slice(0, 5).map((b) => (
                                     <View key={b.id} style={s.bulletRow}>
                                         <Text style={s.bulletDot}>{'\u2022'}</Text>
                                         <RenderBullet text={b.text} />

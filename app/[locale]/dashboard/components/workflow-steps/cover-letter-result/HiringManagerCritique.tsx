@@ -135,12 +135,19 @@ export function HiringManagerCritique({
                         </div>
                     </div>
 
-                    {/* Critique blockquote */}
-                    <blockquote className="border-l-2 border-amber-300 pl-3 py-1">
-                        <p className="text-xs text-[#37352F] leading-relaxed italic">
-                            &ldquo;{critique!.critique}&rdquo;
-                        </p>
+                    {/* Critique blockquote — rendered with paragraph splits */}
+                    <blockquote className="border-l-2 border-amber-300 pl-3 py-1 space-y-2">
+                        {critique!.critique.split(/\n\n+/).map((para, i) => (
+                            <p key={i} className="text-xs text-[#37352F] leading-relaxed italic">
+                                {para.split(/(\*\*[^*]+\*\*)/).map((chunk, j) =>
+                                    chunk.startsWith('**') && chunk.endsWith('**')
+                                        ? <strong key={j} className="not-italic font-semibold">{chunk.slice(2, -2)}</strong>
+                                        : chunk
+                                )}
+                            </p>
+                        ))}
                     </blockquote>
+
 
                     {/* Action Button */}
                     <button

@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
-import { suggestRelevantQuotes, type QuoteSuggestion } from './quote-matcher';
+// quote-matcher import removed — quotes now served by lib/services/quote-service.ts (DB-backed)
 import { recordCacheHit, recordCacheMiss } from './cache-monitor';
 
 const supabase = createClient(
@@ -33,7 +33,7 @@ interface EnrichmentResult {
     company_values: string[];
     tech_stack: string[];
     linkedin_activity: any[];
-    suggested_quotes: QuoteSuggestion[];
+    suggested_quotes: any[];
     perplexity_citations: string[];
     needs_company_context?: boolean;
 }
@@ -181,9 +181,8 @@ async function fetchCompanyIntel(
                             Otherwise, output in English.`
                         },
                         {
-                            role: 'user',
-                            content: `Find PUBLIC information about ${companyName}.${contextString}
-                                                        Required information:
+                                                content: `Find PUBLIC information about ${companyName}.${contextString}
+                                                         Required information:
                              1. Recent news (last 3 months) - specifically look for recent funding, valuation, seed rounds, or major growth.
                              2. Company Vision & Mission (what is their ultimate goal?).
                              3. Key Projects or Core Products.
@@ -191,19 +190,21 @@ async function fetchCompanyIntel(
                              5. Last 5-7 LinkedIn posts from ${companyName} official page.
                              6. Current strategic challenges: What is ${companyName} visibly struggling with or actively trying to solve right now? Examples: scaling issues, team building, entering new markets, technical debt, competition pressure. STRICT FORMAT: Exactly 2 bullet points, maximum 15 words each.
                              7. Roadmap signals: Any public hints about ${companyName}'s direction in the next 6-12 months (expansion plans, product launches, hiring patterns, public announcements). STRICT FORMAT: Exactly 2 bullet points, maximum 15 words each.
+                             8. Industry segment: Classify ${companyName} into ONE concise industry tag in English. Examples: "HealthTech", "SaaS", "E-Commerce", "Fintech", "EdTech", "MediaTech", "CleanTech", "Consulting", "Manufacturing", "Retail", "Logistics". Use well-known industry taxonomy.
                              
                              For LinkedIn posts, extract:
                              - Post content (first 200 chars)
                              - Theme/Category (e.g., "Team Culture", "Product Launch")
                              - Engagement (likes + comments approx)
                              - Date posted (approx)
-                                                        Output as JSON:
+                                                         Output as JSON:
                              {
                                "recent_news": ["headline1", "headline2"],
                                "vision_and_mission": "...",
                                "key_projects": ["project1", "project2"],
                                "funding_status": "...",
                                "company_values": ["value1", "value2"],
+                               "industry_segment": "HealthTech",
                                "current_challenges": ["challenge1 (max 15 words)", "challenge2 (max 15 words)"],
                                "roadmap_signals": ["signal1 (max 15 words)", "signal2 (max 15 words)"],
                                "linkedin_activity": [
@@ -345,6 +346,7 @@ async function fetchCompanyIntel(
                 vision_and_mission: parsed.vision_and_mission || "",
                 key_projects: parsed.key_projects || [],
                 funding_status: parsed.funding_status || "",
+                industry_segment: parsed.industry_segment || "", // e.g. "HealthTech" — drives quote category routing
                 // First 90 Days data — strictly capped by Perplexity prompt
                 current_challenges: (parsed.current_challenges || []).slice(0, 2),
                 roadmap_signals: (parsed.roadmap_signals || []).slice(0, 2),
@@ -385,6 +387,7 @@ async function saveToCache(
             vision_and_mission: (intel as any).vision_and_mission || "",
             key_projects: (intel as any).key_projects || [],
             funding_status: (intel as any).funding_status || "",
+            industry_segment: (intel as any).industry_segment || "", // drives quote category routing
             // First 90 Days fields — persisted in intel_data JSONB (no migration needed)
             current_challenges: (intel as any).current_challenges || [],
             roadmap_signals: (intel as any).roadmap_signals || [],

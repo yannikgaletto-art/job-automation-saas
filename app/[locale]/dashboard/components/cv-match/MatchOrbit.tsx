@@ -1,25 +1,26 @@
 "use client";
 
 /**
- * MatchOrbit — Interactive CV Match Score Visualization (v3)
+ * MatchOrbit — Interactive CV Match Score Visualization (v5 — Steckbrief Cards)
  *
- * Center: overall match label with 3-phase animation (navy → color → expand)
- * 4 Satellites: Technical, Soft, Experience, Domain — click to expand detail card
- * 1 Summary Satellite: Strengths / Gaps / Potential — click to expand summary card
+ * Layout: Side-by-Side (Orbit LEFT | Steckbrief Card Stack RIGHT)
+ * Center: 3-phase animation (navy → color-reveal → expand)
+ * 4 Satellites: Technical, Soft, Experience, Domain
+ * 1 Summary Satellite: Strengths / Gaps / Potential
  *
- * v3 changes:
- * - Much bigger orbit (radius 155, center 110, satellites 72) to fill available space
- * - Full satellite labels (no truncation)
- * - isFromCache controls animation phases correctly
- * - Only lucide-react icons, no emoji
+ * v5 changes:
+ * - Right panel now shows Steckbrief cards (not simple text lists)
+ * - Center click = ALL cards, satellite click = filtered by orbitCategory
+ * - Cards have chips, context, gaps sections matching the UI mockup
+ * - V1 backward compat: old cached data (no _schemaVersion) auto-mapped to cards
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
-import type { ScoreCategory, ScoreLevel } from '@/lib/services/cv-match-analyzer';
+import type { ScoreCategory, ScoreLevel, RequirementRow, OrbitCategory } from '@/lib/services/cv-match-analyzer';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, AlertCircle, Sparkles, ChevronDown } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Sparkles, Settings2 } from 'lucide-react';
 
 // --- Types ---
 
@@ -39,6 +40,8 @@ interface MatchOrbitProps {
         languageMatch: ScoreCategory;
     };
     summaryData: SummaryData;
+    overallRecommendation?: string;
+    requirementRows: RequirementRow[];
     onCenterClick?: () => void;
     isFromCache?: boolean;
 }
@@ -55,9 +58,9 @@ type OrbitPhase = 'initial' | 'colorReveal' | 'expand';
 
 // --- Constants ---
 
-const ORBIT_RADIUS = 155;
+const ORBIT_RADIUS = 175;
 const CENTER_SIZE = 110;
-const SAT_SIZE = 72;
+const SAT_SIZE = 90;
 
 // --- Helpers ---
 
@@ -70,15 +73,15 @@ export function getMatchFitKey(score: number): 'fit_strong' | 'fit_partial' | 'f
 function getFitColor(score: number) {
     if (score >= 70) return {
         bg: 'bg-green-50', border: 'border-green-300', text: 'text-green-700',
-        glow: 'shadow-[0_0_24px_rgba(34,197,94,0.25)]',
+        glow: 'shadow-[0_0_28px_rgba(34,197,94,0.28)]',
     };
     if (score >= 50) return {
         bg: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-700',
-        glow: 'shadow-[0_0_24px_rgba(234,179,8,0.25)]',
+        glow: 'shadow-[0_0_28px_rgba(234,179,8,0.28)]',
     };
     return {
         bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-700',
-        glow: 'shadow-[0_0_24px_rgba(239,68,68,0.25)]',
+        glow: 'shadow-[0_0_28px_rgba(239,68,68,0.28)]',
     };
 }
 
@@ -105,11 +108,47 @@ function polarToOffset(angleDeg: number, radius: number) {
     return { x: Math.cos(rad) * radius, y: Math.sin(rad) * radius };
 }
 
-/** Bold the first term before a colon/dash for visual hierarchy */
-function boldFirst(text: string): React.ReactNode {
-    const m = text.match(/^([^:,\-–]+)[:\-–,]\s*(.*)/);
-    if (m) return <><strong className="font-semibold text-[#37352F]">{m[1].trim()}</strong>{' — '}{m[2]}</>;
-    return text;
+/** Get icon for orbit category */
+function getCategoryIcon(category: string) {
+    switch (category) {
+        case 'technical': return <Settings2 size={14} className="text-slate-500" />;
+        case 'soft': return <Sparkles size={14} className="text-slate-500" />;
+        case 'experience': return <AlertCircle size={14} className="text-slate-500" />;
+        case 'domain': return <CheckCircle2 size={14} className="text-slate-500" />;
+        default: return <Settings2 size={14} className="text-slate-500" />;
+    }
+}
+
+/**
+ * Normalize V1 cached rows to V2 card format.
+ * V1 rows have: requirement, status, currentState, suggestion, category
+ * V2 rows have: title, orbitCategory, level, relevantChips, context, gaps, additionalChips
+ */
+function normalizeRowToV2(row: RequirementRow): RequirementRow {
+    // Already V2 if it has orbitCategory
+    if (row.orbitCategory && row.relevantChips) return row;
+
+    // V1 → V2 mapping
+    const categoryMap: Record<string, OrbitCategory> = {
+        'technical': 'technical', 'tech': 'technical', 'education': 'experience',
+        'experience': 'experience', 'leadership': 'soft', 'communication': 'soft',
+        'domain knowledge': 'domain', 'domain': 'domain', 'language': 'language',
+    };
+
+    const statusToLevel: Record<string, ScoreLevel> = {
+        'met': 'strong', 'partial': 'solid', 'missing': 'gap',
+    };
+
+    return {
+        ...row,
+        title: row.title || row.requirement || row.category || '',
+        orbitCategory: categoryMap[(row.category || 'domain').toLowerCase()] || 'domain',
+        level: row.level || statusToLevel[row.status || ''] || 'solid',
+        relevantChips: row.relevantChips || [],
+        context: row.context || row.currentState || '',
+        gaps: row.gaps || (row.suggestion ? [row.suggestion] : []),
+        additionalChips: row.additionalChips || [],
+    };
 }
 
 // --- Level Dots Badge ---
@@ -133,108 +172,259 @@ function LevelDotsBadge({ level, t }: { level: ScoreLevel; t: ReturnType<typeof 
     );
 }
 
-// --- Detail Card (below orbit) ---
+// --- Steckbrief Card ---
 
-function DetailCard({
-    config,
-    summaryData,
-    t,
-}: {
-    config: SatelliteConfig;
-    summaryData: SummaryData;
-    t: ReturnType<typeof useTranslations>;
-}) {
-    const cardRef = useRef<HTMLDivElement>(null);
-    const level = (config.data.level ?? 'solid') as ScoreLevel;
+function SteckbriefCard({ row, index, t }: { row: RequirementRow; index: number; t: ReturnType<typeof useTranslations> }) {
+    const normalized = normalizeRowToV2(row);
+    const level = (normalized.level ?? 'solid') as ScoreLevel;
+    // BF-1: V1 cached rows have 'status' field and old-style additionalChips (tools, not recommendations).
+    // Only show the new "EMPFEHLUNGEN" label for V2 data.
+    const isV1Row = !!row.status;
 
-    useEffect(() => {
-        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, [config.key]);
-
-    if (config.isSummary) {
-        const sections = [
-            { label: t('strengths'), items: summaryData.strengths, icon: <CheckCircle2 size={14} className="text-green-500" /> },
-            { label: t('gaps'), items: summaryData.gaps, icon: <AlertCircle size={14} className="text-red-400" /> },
-            { label: t('potential'), items: summaryData.potentialHighlights, icon: <Sparkles size={14} className="text-amber-500" /> },
-        ];
-
-        return (
-            <motion.div
-                ref={cardRef}
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                className="overflow-hidden"
-            >
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mt-4">
-                    <h3 className="text-sm font-semibold text-[#37352F] mb-4">
-                        {t(config.i18nKey)}
-                    </h3>
-                    <div className="space-y-5">
-                        {sections.map(({ label, items, icon }) => (
-                            <div key={label}>
-                                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                                    {icon} {label}
-                                </p>
-                                {items.length > 0 ? (
-                                    <ul className="space-y-2 pl-1">
-                                        {items.map((item, i) => (
-                                            <li key={i} className="text-sm text-[#37352F] flex gap-2.5 items-start leading-relaxed">
-                                                <span className="text-slate-300 mt-0.5 shrink-0">•</span>
-                                                <span>{boldFirst(item)}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-xs text-slate-400 italic pl-1">—</p>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </motion.div>
-        );
-    }
-
-    // Standard detail card
     return (
         <motion.div
-            ref={cardRef}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="overflow-hidden"
+            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{
+                duration: 0.3,
+                delay: index * 0.06,
+                ease: [0.25, 0.46, 0.45, 0.94],
+            }}
+            className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
         >
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mt-4">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-[#37352F]">
-                        {t(config.i18nKey)}
-                    </h3>
-                    <LevelDotsBadge level={level} t={t} />
+            {/* Header */}
+            <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    {getCategoryIcon(normalized.orbitCategory)}
+                    <h4 className="text-sm font-semibold text-[#37352F]">
+                        {normalized.title}
+                    </h4>
                 </div>
+                <LevelDotsBadge level={level} t={t} />
+            </div>
 
-                {config.data.reasons.length > 0 ? (
-                    <ul className="space-y-2.5 pl-1">
-                        {config.data.reasons.map((reason, i) => (
-                            <li key={i} className="text-sm text-[#37352F] flex gap-2.5 items-start leading-relaxed">
-                                <span className="text-slate-300 mt-0.5 shrink-0">•</span>
-                                <span>{boldFirst(reason)}</span>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-xs text-slate-400 italic">—</p>
+            <div className="px-4 pb-4 space-y-3">
+                {/* Relevant Skills — Chips */}
+                {normalized.relevantChips.length > 0 && (
+                    <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
+                            {t('card_relevant_skills')}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {normalized.relevantChips.map((chip, i) => (
+                                <span
+                                    key={i}
+                                    className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium
+                                               bg-blue-50 text-blue-700 border border-blue-100
+                                               shadow-[0_0_6px_rgba(59,130,246,0.15)]"
+                                >
+                                    {chip}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Context — Assessment Text */}
+                {normalized.context && (
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                        {normalized.context.split(/(?<=[.!?])\s+/).map((sentence, i) => {
+                            if (i === 0) {
+                                return (
+                                    <span key={i}>
+                                        {sentence.split(/(\*\*[^*]+\*\*)/).map((part, j) => {
+                                            if (part.startsWith('**') && part.endsWith('**')) {
+                                                return <strong key={j} className="font-semibold text-[#37352F]">{part.slice(2, -2)}</strong>;
+                                            }
+                                            return <span key={j}>{part}</span>;
+                                        })}
+                                        {' '}
+                                    </span>
+                                );
+                            }
+                            return <span key={i}>{sentence} </span>;
+                        })}
+                    </p>
+                )}
+
+                {/* Gaps — Red alert section */}
+                {normalized.gaps.length > 0 && (
+                    <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-red-500 mb-1.5 flex items-center gap-1">
+                            <AlertCircle size={11} className="text-red-400" />
+                            {t('card_gaps_title')}
+                        </p>
+                        <ul className="space-y-1 pl-0.5">
+                            {normalized.gaps.map((gap, i) => (
+                                <li key={i} className="text-xs text-[#37352F] flex gap-2 items-start leading-relaxed">
+                                    <span className="text-red-400 mt-0.5 shrink-0">•</span>
+                                    <span>
+                                        {gap.split(/(\*\*[^*]+\*\*)/).map((part, j) => {
+                                            if (part.startsWith('**') && part.endsWith('**')) {
+                                                return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>;
+                                            }
+                                            return <span key={j}>{part}</span>;
+                                        })}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {/* Recommendations (V2) or Additional Tools (V1 cached) */}
+                {normalized.additionalChips.length > 0 && (
+                    <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
+                            {t('card_additional_tools')}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {normalized.additionalChips.map((chip, i) => (
+                                <span
+                                    key={i}
+                                    className={cn(
+                                        'inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium',
+                                        isV1Row
+                                            ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                            : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                    )}
+                                >
+                                    {chip}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
                 )}
             </div>
         </motion.div>
     );
 }
 
+// --- Summary Card (redesigned as Steckbrief) ---
+
+interface SummaryCardProps {
+    summaryData: SummaryData;
+    overallRecommendation?: string;
+    t: ReturnType<typeof useTranslations>;
+}
+
+function SummaryCard({ summaryData, overallRecommendation, t }: SummaryCardProps) {
+    const summaryLevel: ScoreLevel =
+        (summaryData.gaps.length > summaryData.strengths.length) ? 'gap'
+            : (summaryData.strengths.length > summaryData.gaps.length) ? 'strong'
+            : 'solid';
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="p-4 space-y-3 overflow-y-auto"
+        >
+            {/* Summary Steckbrief Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                {/* Header */}
+                <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Sparkles size={14} className="text-slate-500" />
+                        <h4 className="text-sm font-semibold text-[#37352F]">
+                            {t('breakdown_summary')}
+                        </h4>
+                    </div>
+                    <LevelDotsBadge level={summaryLevel} t={t} />
+                </div>
+
+                <div className="px-4 pb-4 space-y-3">
+                    {/* Strengths — Green chips */}
+                    {summaryData.strengths.length > 0 && (
+                        <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-green-600 mb-1.5 flex items-center gap-1">
+                                <CheckCircle2 size={11} className="text-green-500" />
+                                {t('strengths')}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {summaryData.strengths.slice(0, 3).map((s, i) => (
+                                    <span key={i} className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium bg-green-50 text-green-700 border border-green-100">
+                                        {s}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Gaps — Red section */}
+                    {summaryData.gaps.length > 0 && (
+                        <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-red-500 mb-1.5 flex items-center gap-1">
+                                <AlertCircle size={11} className="text-red-400" />
+                                {t('gaps')}
+                            </p>
+                            <ul className="space-y-1 pl-0.5">
+                                {summaryData.gaps.slice(0, 3).map((gap, i) => (
+                                    <li key={i} className="text-xs text-[#37352F] flex gap-2 items-start leading-relaxed">
+                                        <span className="text-red-400 mt-0.5 shrink-0">•</span>
+                                        <span>{gap}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {/* Potential Highlights — Amber recommendations */}
+                    {summaryData.potentialHighlights.length > 0 && (
+                        <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-600 mb-1.5 flex items-center gap-1">
+                                <Sparkles size={11} className="text-amber-500" />
+                                {t('potential')}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {summaryData.potentialHighlights.slice(0, 3).map((p, i) => (
+                                    <span key={i} className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                                        {p}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Overall Recommendation — Context (after Potential as per user request) */}
+                    {overallRecommendation && (
+                        <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
+                                {t('summary_overall')}
+                            </p>
+                            <p className="text-xs text-slate-600 leading-relaxed">{overallRecommendation}</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </motion.div>
+    );
+}
+
+// --- Empty State placeholder for right panel ---
+
+function EmptyCardState({ t }: { t: ReturnType<typeof useTranslations> }) {
+    return (
+        <div className="flex flex-col items-center justify-center h-full min-h-[220px] text-center px-6">
+            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                    className="text-slate-400">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 8v4M12 16h.01" />
+                </svg>
+            </div>
+            <p className="text-xs text-slate-400">{t('card_empty_hint')}</p>
+        </div>
+    );
+}
+
 // --- Main Orbit Component ---
 
-export function MatchOrbit({ overallScore, breakdown, summaryData, onCenterClick, isFromCache }: MatchOrbitProps) {
+export function MatchOrbit({ overallScore, breakdown, summaryData, overallRecommendation, requirementRows, onCenterClick, isFromCache }: MatchOrbitProps) {
     const t = useTranslations('cv_match');
     const prefersReducedMotion = useReducedMotion();
     const [activeSatellite, setActiveSatellite] = useState<string | null>(null);
@@ -251,10 +441,7 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, onCenterClick
             setPhase('expand');
             return;
         }
-
-        // Phase 1: 2 seconds navy
         const t1 = setTimeout(() => setPhase('colorReveal'), 2000);
-        // Phase 2: 0.5s later — satellites fly out
         const t2 = setTimeout(() => setPhase('expand'), 2500);
         return () => { clearTimeout(t1); clearTimeout(t2); };
     }, [isFromCache, prefersReducedMotion]);
@@ -264,6 +451,7 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, onCenterClick
         softSkills:       breakdown?.softSkills        ?? { level: 'solid' as ScoreLevel, reasons: [] },
         experienceLevel:  breakdown?.experienceLevel   ?? { level: 'solid' as ScoreLevel, reasons: [] },
         domainKnowledge:  breakdown?.domainKnowledge   ?? { level: 'solid' as ScoreLevel, reasons: [] },
+        languageMatch:    breakdown?.languageMatch     ?? { level: 'solid' as ScoreLevel, reasons: [] },
     };
 
     const summaryLevel: ScoreLevel =
@@ -272,32 +460,55 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, onCenterClick
             : 'solid';
 
     const satellites: SatelliteConfig[] = [
-        { key: 'technical',  i18nKey: 'breakdown_technical',  angle: -72,  data: safe.technicalSkills  },
+        { key: 'technical',  i18nKey: 'breakdown_technical',  angle: -60,  data: safe.technicalSkills  },
         { key: 'soft',       i18nKey: 'breakdown_soft',       angle: 0,    data: safe.softSkills       },
-        { key: 'experience', i18nKey: 'breakdown_experience', angle: 72,   data: safe.experienceLevel  },
-        { key: 'domain',     i18nKey: 'breakdown_domain',     angle: 144,  data: safe.domainKnowledge  },
-        { key: 'summary',    i18nKey: 'breakdown_summary',    angle: -144, data: { level: summaryLevel, reasons: [] }, isSummary: true },
+        { key: 'experience', i18nKey: 'breakdown_experience', angle: 60,   data: safe.experienceLevel  },
+        { key: 'domain',     i18nKey: 'breakdown_domain',     angle: 120,  data: safe.domainKnowledge  },
+        { key: 'language',   i18nKey: 'breakdown_language',   angle: 180,  data: safe.languageMatch    },
+        { key: 'summary',    i18nKey: 'breakdown_summary',    angle: -120, data: { level: summaryLevel, reasons: [] }, isSummary: true },
     ];
+
+    // Filter requirement rows based on active satellite
+    const filteredRows = useMemo(() => {
+        if (!activeSatellite || activeSatellite === 'center') {
+            // Center click → show all cards
+            return requirementRows.map(normalizeRowToV2);
+        }
+        if (activeSatellite === 'summary') {
+            return []; // Summary has its own special rendering
+        }
+        // Satellite click → filter by orbitCategory
+        return requirementRows
+            .map(normalizeRowToV2)
+            .filter(row => row.orbitCategory === activeSatellite);
+    }, [activeSatellite, requirementRows]);
 
     const handleSatelliteClick = useCallback((key: string) => {
         setActiveSatellite(prev => (prev === key ? null : key));
     }, []);
 
     const handleCenterClick = useCallback(() => {
-        setActiveSatellite(null);
+        setActiveSatellite(prev => (prev === 'center' ? null : 'center'));
         onCenterClick?.();
     }, [onCenterClick]);
 
-    const containerSize = (ORBIT_RADIUS + SAT_SIZE) * 2 + 32;
+    // Orbit canvas size
+    const containerSize = (ORBIT_RADIUS + SAT_SIZE) * 2 + 24;
 
     const centerClasses = phase === 'initial'
-        ? 'bg-[#002e7a] border-[#002e7a] text-white shadow-[0_0_28px_rgba(0,46,122,0.4)]'
+        ? 'bg-[#002e7a] border-[#002e7a] shadow-[0_0_32px_rgba(0,46,122,0.5)]'
         : cn(fitColor.bg, fitColor.border, fitColor.text, fitColor.glow);
 
+    const showSummary = activeSatellite === 'summary';
+    const showCards = activeSatellite === 'center' || (activeSatellite != null && activeSatellite !== 'summary');
+    const showEmpty = !activeSatellite;
+
     return (
-        <div className="space-y-0">
+        <div className="flex flex-col md:flex-row gap-4 items-start">
+
+            {/* ── LEFT: Orbit Canvas ── */}
             <div
-                className="relative mx-auto"
+                className="relative shrink-0 mx-auto md:mx-0"
                 style={{ width: containerSize, height: containerSize }}
             >
                 {/* Decorative orbit ring */}
@@ -316,6 +527,7 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, onCenterClick
                     className={cn(
                         'absolute z-10 rounded-full flex flex-col items-center justify-center border-2 cursor-pointer transition-colors duration-700',
                         centerClasses,
+                        activeSatellite === 'center' && 'ring-2 ring-[#002e7a]/30',
                     )}
                     style={{
                         width: CENTER_SIZE, height: CENTER_SIZE,
@@ -325,18 +537,22 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, onCenterClick
                     whileHover={!prefersReducedMotion ? { scale: 1.05 } : {}}
                     whileTap={!prefersReducedMotion ? { scale: 0.97 } : {}}
                     transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                    aria-label={t(fitKey)}
+                    aria-label={phase !== 'initial' ? t(fitKey) : 'Match'}
                 >
-                    <span className="text-[11px] font-medium opacity-70 leading-none">Match</span>
-                    <motion.span
-                        className="text-[13px] font-bold leading-tight text-center px-2"
-                        key={phase}
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4 }}
-                    >
-                        {phase === 'initial' ? t('orbit_loading') : t(fitKey)}
-                    </motion.span>
+                    {phase !== 'initial' && (
+                        <>
+                            <span className="text-[10px] font-medium opacity-60 leading-none">Match</span>
+                            <motion.span
+                                className="text-[13px] font-bold leading-tight text-center px-2 mt-0.5"
+                                key={phase}
+                                initial={{ opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4 }}
+                            >
+                                {t(fitKey)}
+                            </motion.span>
+                        </>
+                    )}
                 </motion.button>
 
                 {/* Satellites */}
@@ -365,7 +581,7 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, onCenterClick
                                 : { x: 0, y: 0, opacity: 0, scale: 0 }
                             }
                             animate={phase === 'expand'
-                                ? { x: offset.x, y: offset.y, opacity: 1, scale: isActive ? 1.12 : 1 }
+                                ? { x: offset.x, y: offset.y, opacity: 1, scale: isActive ? 1.1 : 1 }
                                 : { x: 0, y: 0, opacity: 0, scale: 0 }
                             }
                             transition={
@@ -373,21 +589,21 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, onCenterClick
                                     ? { duration: 0 }
                                     : {
                                         type: 'spring',
-                                        stiffness: 400,
-                                        damping: 25,
-                                        delay: phase === 'expand' ? 0.1 + index * 0.1 : 0,
+                                        stiffness: 380,
+                                        damping: 26,
+                                        delay: phase === 'expand' ? 0.1 + index * 0.08 : 0,
                                     }
                             }
-                            whileHover={!prefersReducedMotion ? { scale: isActive ? 1.12 : 1.08 } : {}}
+                            whileHover={!prefersReducedMotion ? { scale: isActive ? 1.1 : 1.07 } : {}}
                             whileTap={!prefersReducedMotion ? { scale: 0.95 } : {}}
                             onClick={() => handleSatelliteClick(sat.key)}
                             aria-label={t(sat.i18nKey)}
                             aria-pressed={isActive}
                         >
-                            <span className="text-[10px] font-medium text-[#37352F] leading-tight text-center px-1 max-w-[64px]">
+                            <span className="text-[10px] font-medium text-[#37352F] leading-tight text-center px-2 w-full hyphens-auto">
                                 {t(sat.i18nKey)}
                             </span>
-                            <span className="flex gap-0.5 mt-0.5">
+                            <span className="flex gap-0.5 mt-1">
                                 {[0, 1, 2].map(i => (
                                     <span
                                         key={i}
@@ -400,17 +616,73 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, onCenterClick
                 })}
             </div>
 
-            {/* Detail Card — below orbit */}
-            <AnimatePresence mode="wait">
-                {activeSatellite && (
-                    <DetailCard
-                        key={activeSatellite}
-                        config={satellites.find(s => s.key === activeSatellite)!}
-                        summaryData={summaryData}
-                        t={t}
-                    />
-                )}
-            </AnimatePresence>
+            {/* ── RIGHT: Steckbrief Card Stack Panel ── */}
+            <div
+                className="flex-1 self-stretch rounded-xl border border-slate-200 bg-[#FAFAF9] shadow-sm overflow-hidden"
+                style={{ minHeight: containerSize }}
+            >
+                <AnimatePresence mode="wait">
+                    {/* Summary special view */}
+                    {showSummary && (
+                        <SummaryCard
+                            key="summary"
+                            summaryData={summaryData}
+                            overallRecommendation={overallRecommendation}
+                            t={t}
+                        />
+                    )}
+
+                    {/* Steckbrief cards */}
+                    {showCards && !showSummary && (
+                        <motion.div
+                            key={`cards-${activeSatellite}`}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="p-4 space-y-3 overflow-y-auto"
+                            style={{ maxHeight: containerSize + 100 }}
+                        >
+                            {/* Section title */}
+                            <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 pb-1">
+                                {activeSatellite === 'center'
+                                    ? t('card_default_title')
+                                    : satellites.find(s => s.key === activeSatellite)
+                                        ? t(satellites.find(s => s.key === activeSatellite)!.i18nKey)
+                                        : t('card_default_title')
+                                }
+                            </h3>
+                            {filteredRows.map((row, i) => (
+                                <SteckbriefCard
+                                    key={`${row.orbitCategory}-${i}`}
+                                    row={row}
+                                    index={i}
+                                    t={t}
+                                />
+                            ))}
+                            {filteredRows.length === 0 && (
+                                <p className="text-xs text-slate-400 italic py-4 text-center">
+                                    {t('card_not_analyzed')}
+                                </p>
+                            )}
+                        </motion.div>
+                    )}
+
+                    {/* Empty state */}
+                    {showEmpty && (
+                        <motion.div
+                            key="empty"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="h-full"
+                        >
+                            <EmptyCardState t={t} />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
         </div>
     );
 }

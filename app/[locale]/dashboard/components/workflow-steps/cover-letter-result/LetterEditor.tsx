@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { Pencil, Loader2 } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 interface LetterEditorProps {
     letter: string
@@ -8,6 +9,7 @@ interface LetterEditorProps {
 }
 
 export function LetterEditor({ letter, onLetterChange, fixingParagraphIndex }: LetterEditorProps) {
+    const t = useTranslations('cover_letter')
     const [paragraphs, setParagraphs] = useState<string[]>([])
 
     // Sync paragraphs when external letter changes (e.g., after targeted fix)
@@ -23,7 +25,13 @@ export function LetterEditor({ letter, onLetterChange, fixingParagraphIndex }: L
     }
 
     return (
-        <div className="bg-white p-8 rounded-lg border border-[#E7E7E5] shadow-sm font-serif text-[11pt] leading-relaxed text-[#000] space-y-4">
+        <div className="space-y-1.5">
+            <p className="text-[10px] text-[#A8A29E] flex items-center gap-1 select-none">
+                <Pencil className="w-2.5 h-2.5" />
+                {t('editor_manual_hint')}
+            </p>
+            <div className="bg-white p-8 rounded-lg border border-[#E7E7E5] shadow-sm font-serif text-[11pt] leading-relaxed text-[#000] space-y-4">
+
             {paragraphs.map((p, idx) => (
                 <div key={idx} className="relative group">
                     {fixingParagraphIndex === idx ? (
@@ -46,6 +54,7 @@ export function LetterEditor({ letter, onLetterChange, fixingParagraphIndex }: L
                     </p>
                 </div>
             ))}
+            </div>
         </div>
     )
 }

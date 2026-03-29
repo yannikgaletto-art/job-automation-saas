@@ -70,13 +70,15 @@ REGELN:
 - Beziehe dich auf eine KONKRETE LÜCKE (fehlende Zahlen, unklare Teamgröße, vage Ergebnisse)
 - Keine generischen Kommentare
 - Direkte Rede (Ich-Perspektive)
+- Kurze, klare Sätze — maximal 20 Wörter pro Satz
+- Die "critique" darf 2-3 Sätze lang sein, getrennt durch \\n\\n für Absätze
 - Einen konkreten Verbesserungsvorschlag
 
 Antworte NUR als valides JSON:
 {
   "persona": "Skeptischer HR-Chef",
   "role": "Head of People @ ${companyName}",
-  "critique": "Der Teil über [X] klingt gut, aber ich frage mich: [konkrete Frage].",
+  "critique": "Der Teil über [X] klingt gut.\\n\\nAber ich vermisse: [konkrete Frage]. Was waren die messbaren Ergebnisse?",
   "fixSuggestion": "Erwähne [konkretes Detail] bei Station [X]"
 }`,
             en: `You are a skeptical, experienced Hiring Manager at ${companyName} for the role "${jobTitle}".
@@ -91,13 +93,15 @@ RULES:
 - Focus on a CONCRETE GAP (missing numbers, unclear team size, vague results)
 - No generic comments like "could be better"
 - Write in first person (I-perspective as the hiring manager)
+- Keep sentences SHORT — max 20 words per sentence
+- The "critique" field may be 2-3 short sentences, separated by \\n\\n for paragraph breaks
 - Provide a specific improvement suggestion
 
 Respond ONLY as valid JSON:
 {
   "persona": "Skeptical HR Director",
   "role": "Head of People @ ${companyName}",
-  "critique": "The part about [X] sounds good, but as a hiring manager I wonder: [specific question].",
+  "critique": "The strategic thinking here is solid.\\n\\nBut I notice a critical absence: you don't mention a single quantifiable outcome. How many clients? What was the revenue impact?",
   "fixSuggestion": "Mention [specific detail] for the [X] role"
 }`,
             es: `Eres un Director de Recursos Humanos escéptico y experimentado en ${companyName} para el puesto "${jobTitle}".
@@ -112,13 +116,15 @@ REGLAS:
 - Céntrate en una BRECHA CONCRETA (números faltantes, tamaño de equipo poco claro, resultados vagos)
 - Sin comentarios genéricos
 - Primera persona (perspectiva del director)
+- Oraciones cortas — máximo 20 palabras por oración
+- El campo "critique" puede tener 2-3 oraciones cortas, separadas por \\n\\n para párrafos
 - Proporciona una sugerencia de mejora específica
 
 Responde SOLO como JSON válido:
 {
   "persona": "Director de RRHH Escéptico",
   "role": "Head of People @ ${companyName}",
-  "critique": "La parte sobre [X] suena bien, pero como director me pregunto: [pregunta concreta].",
+  "critique": "La estrategia aquí es sólida.\\n\\nPero me falta un dato clave: no mencionas ningún resultado cuantificable. ¿Cuántos clientes? ¿Cuál fue el impacto en ingresos?",
   "fixSuggestion": "Menciona [detalle concreto] para el puesto [X]"
 }`
         };
@@ -129,11 +135,12 @@ Responde SOLO como JSON válido:
 
         const message = await anthropic.messages.create({
             model: 'claude-haiku-4-5-20251001',
-            max_tokens: 300,
+            max_tokens: 450,
             temperature: 0.3,
             system: 'You are a hiring manager simulator. Respond only with valid JSON.',
             messages: [{ role: 'user', content: prompt }]
         });
+
 
         const content = message.content[0].type === 'text' ? message.content[0].text : '';
 

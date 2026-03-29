@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 
         const { data: pass1Data } = await supabase
             .from('company_research')
-            .select('intel_data, suggested_quotes, recent_news, linkedin_activity, perplexity_citations')
+            .select('intel_data, recent_news, linkedin_activity, perplexity_citations')
             .eq('job_id', jobId)
             .maybeSingle();
 
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
         if (!research && job.company_name) {
             const { data } = await supabase
                 .from('company_research')
-                .select('intel_data, suggested_quotes, recent_news, linkedin_activity, perplexity_citations')
+                .select('intel_data, recent_news, linkedin_activity, perplexity_citations')
                 .eq('company_name', job.company_name)
                 .gt('expires_at', new Date().toISOString())
                 .order('researched_at', { ascending: false })
@@ -154,21 +154,9 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        // 5. Quotes (Führungspersönlichkeiten — falls vorhanden)
-        (research?.suggested_quotes || []).slice(0, 1).forEach((q: any, i: number) => {
-            if (q?.quote) {
-                hooks.push({
-                    id: `quote-${i}`,
-                    type: 'quote',
-                    label: `Zitat: ${q.author || 'Führungsperson'}`,
-                    content: `"${q.quote}" – ${q.author || ''}`,
-                    sourceName: q.author || '',
-                    sourceUrl: '',
-                    sourceAge: '',
-                    relevanceScore: q.match_score || 0.7,
-                });
-            }
-        });
+        // 5. Quotes — now served on-demand via /api/cover-letter/quotes (DB-backed quote-service.ts).
+        // The old suggested_quotes field in company_research is always [] since 2026-03-29.
+        // Users select quotes in the Cover Letter Wizard via the QuoteSelector component.
 
         // Fallback: Manual entry — immer als letzte Option
         hooks.push({
@@ -201,8 +189,9 @@ export async function GET(req: NextRequest) {
         // ─── Style Info (Step C) ───────────────────────────────────────
         const hasStyleSample = !!styleDoc;
         const styleAnalysisSummary = styleDoc?.metadata?.style_analysis
-            ? `${styleDoc.metadata.style_analysis.tone || 'Formal'}, Ø ${styleDoc.metadata.style_analysis.avg_sentence_length || '?'} Wörter/Satz`
-            : 'Kein Style-Sample — Standardton';
+            ? `${styleDoc.metadata.style_analysis.tone || 'Formal'}`
+            : '';
+
 
         const detectedJobLanguage: TargetLanguage =
             (job.metadata?.language || 'de') as TargetLanguage;

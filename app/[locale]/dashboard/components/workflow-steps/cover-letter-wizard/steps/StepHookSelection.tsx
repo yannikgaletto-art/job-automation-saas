@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl';
 import { HookCard } from '../cards/HookCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse, SelectedHook, SelectedQuote } from '@/types/cover-letter-setup';
-import { Sparkles, ChevronRight, ChevronDown, Search, SkipForward, RefreshCw, Quote, ExternalLink, Globe } from 'lucide-react';
+import { SlideToActionButton } from '@/components/motion/slide-action-button';
+import { Sparkles, ChevronRight, ChevronDown, Search, SkipForward, RefreshCw, Quote, Globe } from 'lucide-react';
 
 // ─── State Machine ─────────────────────────────────────────────────
 type Phase = 'idle' | 'analyzing' | 'results' | 'quotePrompt' | 'quoteSearching' | 'quoteResults';
@@ -203,19 +204,13 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     </p>
                 </div>
 
-                <button
-                    onClick={() => handleAnalyze()}
-                    disabled={!websiteInput || websiteInput.trim().length < 4}
-                    className={[
-                        'flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg transition-colors shadow-sm',
-                        websiteInput && websiteInput.trim().length >= 4
-                            ? 'bg-[#002e7a] text-white hover:bg-[#001e5a]'
-                            : 'bg-[#E7E7E5] text-[#A8A29E] cursor-not-allowed',
-                    ].join(' ')}
-                >
-                    <Sparkles className="w-4 h-4" />
-                    {t('analyze_btn', { company: companyName })}
-                </button>
+                <div className="w-full max-w-md flex justify-center">
+                    <SlideToActionButton
+                        text={t('analyze_btn', { company: companyName })}
+                        disabled={!websiteInput || websiteInput.trim().length < 4}
+                        onAction={() => handleAnalyze()}
+                    />
+                </div>
 
                 {validationWarning && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 mt-3 max-w-md">
@@ -487,8 +482,8 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                         — {q.author}
                                     </span>
                                     {q.source && (
-                                        <span className="text-[10px] text-[#A8A29E] flex items-center gap-0.5">
-                                            <ExternalLink className="w-2.5 h-2.5" /> {q.source}
+                                        <span className="text-[10px] text-[#A8A29E]">
+                                            ({q.source})
                                         </span>
                                     )}
                                 </div>

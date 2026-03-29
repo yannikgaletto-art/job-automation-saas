@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * CVMatchTab — Iteration Redesign.
- * - Match Score: Progress bar instead of circle, with top 3 bullets strictly under it.
- * - Score Breakdown: Expandable disclosure instead of truncation.
- * - Anforderungs-Check: 2fr_3fr_4fr columns with clear headers and full badge status.
+ * CVMatchTab — V5 Steckbrief Card Redesign.
+ * - MatchOrbit: Shows Steckbrief cards in right panel (replaces old table).
+ * - ATS Keywords: Expandable toggle below the orbit.
+ * - Next Step: CTA to proceed to CV Optimizer.
  *
  * i18n: All UI strings use useTranslations('cv_match').
  */
@@ -17,7 +17,7 @@ import { CVMatchResult } from '@/lib/services/cv-match-analyzer';
 import { MatchOrbit } from './MatchOrbit';
 import { Button } from '@/components/motion/button';
 import {
-    Loader2, CheckCircle2, AlertCircle, Zap, ChevronDown
+    Loader2, CheckCircle2, AlertCircle, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CVSelectDialog, type CVOption } from '@/components/dashboard/cv-select-dialog';
@@ -32,86 +32,6 @@ interface CVMatchTabProps {
     onNextStep?: () => void;
 }
 
-// --- Status Badge ---
-function StatusBadge({ status, t }: { status: 'met' | 'partial' | 'missing'; t: ReturnType<typeof useTranslations> }) {
-    const config = {
-        met: { icon: CheckCircle2, bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-100', label: t('status_met') },
-        partial: { icon: Zap, bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-100', label: t('status_partial') },
-        missing: { icon: AlertCircle, bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-100', label: t('status_missing') },
-    }[status];
-    const Icon = config.icon;
-    return (
-        <span className={cn("inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium border", config.bg, config.text, config.border)}>
-            <Icon size={12} />
-            {config.label}
-        </span>
-    );
-}
-
-
-/** Expandable table cell for Anforderungs-Check rows */
-/**
- * Split text into sentences for structured rendering.
- * Handles common abbreviations (e.g., "ca.", "z.B.", "1.3") to avoid false splits.
- */
-function splitSentences(text: string): string[] {
-    // Protect known abbreviations from sentence splitting
-    const protected_ = text
-        .replace(/\bca\./g, 'ca\u0000')
-        .replace(/\bz\.B\./g, 'z\u0000B\u0000')
-        .replace(/\bbzw\./g, 'bzw\u0000')
-        .replace(/\bd\.h\./g, 'd\u0000h\u0000')
-        .replace(/\bu\.a\./g, 'u\u0000a\u0000')
-        .replace(/\bi\.e\./g, 'i\u0000e\u0000')
-        .replace(/\be\.g\./g, 'e\u0000g\u0000')
-        .replace(/(\d)\./g, '$1\u0000'); // protect "1.3", "2025."
-
-    const raw = protected_.split(/(?<=[.!?])\s+/);
-    return raw
-        .map(s => s.replace(/\u0000/g, '.').trim())
-        .filter(s => s.length > 0);
-}
-
-function ExpandableCell({ text, t }: { text: string; t: ReturnType<typeof useTranslations> }) {
-    const [expanded, setExpanded] = useState(false);
-    const sentences = splitSentences(text);
-    const isLong = sentences.length > 1 || text.length > 100;
-
-    return (
-        <div>
-            {expanded ? (
-                <div className="space-y-1.5">
-                    {sentences.map((sentence, i) => (
-                        <p key={i} className={cn(
-                            'text-xs leading-relaxed',
-                            i === 0
-                                ? 'font-semibold text-[#37352F]'
-                                : 'text-slate-600'
-                        )}>
-                            {sentence}
-                        </p>
-                    ))}
-                </div>
-            ) : (
-                <p className="text-xs leading-relaxed">
-                    <span className="font-semibold text-[#37352F]">{sentences[0]}</span>
-                    {sentences.length > 1 && (
-                        <span className="text-slate-500">{' '}{sentences[1]}</span>
-                    )}
-                </p>
-            )}
-            {isLong && (
-                <button
-                    onClick={() => setExpanded(!expanded)}
-                    className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
-                >
-                    <ChevronDown size={12} className={cn("transition-transform duration-200", expanded && "rotate-180")} />
-                    {expanded ? t('show_less') : t('show_more')}
-                </button>
-            )}
-        </div>
-    );
-}
 
 // --- Cancel Button (appears after delay so user is never stuck) ---
 function CancelButton({ onCancel, t }: { onCancel: () => void; t: ReturnType<typeof useTranslations> }) {
@@ -145,7 +65,6 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     const notify = useNotification();
     const [matchData, setMatchData] = useState<CVMatchResult | null>(null);
     const [loadingStep, setLoadingStep] = useState(0);
-    const [requirementsOpen, setRequirementsOpen] = useState(false);
     const [atsOpen, setAtsOpen] = useState(false);
     const [isMatchFromCache, setIsMatchFromCache] = useState(true);
 
@@ -282,7 +201,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
 
             // Poll for results (Inngest processes in background)
             let attempts = 0;
-            const maxAttempts = 50; // 50 × 3s = 150s max — CV Match takes 60-80s
+            const maxAttempts = 60; // 60 × 3s = 180s max — single Sonnet call expected in 40-70s
 
             pollingRef.current = setInterval(async () => {
                 attempts++;
@@ -535,102 +454,20 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
         const keywordsFound = Array.isArray(matchData.keywordsFound) ? matchData.keywordsFound : [];
         const keywordsMissing = Array.isArray(matchData.keywordsMissing) ? matchData.keywordsMissing : [];
 
-        const metCount = rows.filter(r => r.status === 'met').length;
-        const totalCount = rows.length;
-        const metPercent = totalCount > 0 ? Math.round((metCount / totalCount) * 100) : 0;
-
         const score = typeof matchData.overallScore === 'number' ? matchData.overallScore : parseInt(String(matchData.overallScore ?? 0), 10);
 
         return (
             <div className="p-5 bg-[#FAFAF9] rounded-b-xl border-t border-slate-200 space-y-4" style={{ minHeight: 600 }}>
 
-                {/* ── MatchOrbit + Detail Card ── */}
+                {/* ── MatchOrbit + Steckbrief Card Stack ── */}
                 <MatchOrbit
                     overallScore={score}
                     breakdown={matchData.scoreBreakdown}
                     summaryData={{ strengths, gaps, potentialHighlights }}
-                    onCenterClick={() => setRequirementsOpen(true)}
+                    overallRecommendation={typeof matchData.overallRecommendation === 'string' ? matchData.overallRecommendation : undefined}
+                    requirementRows={rows}
                     isFromCache={isMatchFromCache}
                 />
-
-                {/* ── Requirements Check (Toggle) ── */}
-                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                    <button
-                        onClick={() => setRequirementsOpen(!requirementsOpen)}
-                        className="w-full px-4 py-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors"
-                    >
-                        <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                            {t('toggle_requirements')}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-400">{metCount}/{totalCount}</span>
-                            <div className="w-20 h-1 bg-slate-100 rounded overflow-hidden">
-                                <div className="h-1 bg-green-500 rounded" style={{ width: `${metPercent}%` }} />
-                            </div>
-                            <ChevronDown
-                                size={14}
-                                className={cn("text-slate-400 transition-transform duration-200", requirementsOpen && "rotate-180")}
-                            />
-                        </div>
-                    </button>
-
-                    <AnimatePresence>
-                        {requirementsOpen && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                className="overflow-hidden"
-                            >
-                                <table className="w-full table-fixed">
-                                    <colgroup>
-                                        <col className="w-[22%]" />
-                                        <col className="w-[36%]" />
-                                        <col className="w-[42%]" />
-                                    </colgroup>
-                                    <thead>
-                                        <tr className="bg-slate-50 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                                            <th className="px-4 py-2 text-left font-semibold">{t('req_col_requirement')}</th>
-                                            <th className="px-4 py-2 text-left font-semibold">{t('req_col_current')}</th>
-                                            <th className="px-4 py-2 text-left font-semibold">{t('req_col_suggestion')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {rows.map((row, i) => (
-                                            <motion.tr
-                                                key={i}
-                                                initial={{ opacity: 0, y: 5 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: i * 0.04 }}
-                                                className="group hover:bg-slate-50 transition-colors"
-                                            >
-                                                {/* Requirement — with bold category label */}
-                                                <td className="py-3 px-4 align-top">
-                                                    <StatusBadge status={row.status} t={t} />
-                                                    {row.category && (
-                                                        <p className="text-[10px] font-bold text-[#002e7a] mt-1.5 uppercase tracking-wider">{row.category}</p>
-                                                    )}
-                                                    <p className="text-xs text-slate-700 mt-0.5 leading-snug">{row.requirement}</p>
-                                                </td>
-
-                                                {/* Current State — expandable teaser */}
-                                                <td className="py-3 px-4 align-top border-l border-slate-100">
-                                                    <ExpandableCell text={row.currentState} t={t} />
-                                                </td>
-
-                                                {/* Recommendation — expandable teaser */}
-                                                <td className="py-3 px-4 align-top border-l border-slate-100">
-                                                    <ExpandableCell text={row.suggestion || ''} t={t} />
-                                                </td>
-                                            </motion.tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
 
                 {/* ── ATS Keywords (Toggle) ── */}
                 <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">

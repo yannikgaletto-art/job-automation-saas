@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { PDFViewer, usePDF } from '@react-pdf/renderer';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { pdf, usePDF } from '@react-pdf/renderer';
 import { CvStructuredData } from '@/types/cv';
 import { TechTemplate } from './TechTemplate';
 import { ValleyTemplate } from './ValleyTemplate';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, RefreshCw } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { getCvTemplateLabels, CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 
@@ -27,6 +27,135 @@ function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: s
     }
 }
 
+/**
+ * Desktop PDF viewer using pdf().toBlob() + iframe.
+ *
+ * Uses the same proven rendering approach as DownloadButton.tsx:
+ * pdf(document).toBlob() works reliably with Turbopack because it does
+ * NOT depend on Web Workers or the internal <PDFViewer> iframe mechanism
+ * that silently fails in dev mode.
+ *
+ * The blob URL is managed via useRef + useEffect cleanup to prevent
+ * memory leaks (URL.revokeObjectURL on unmount or re-render).
+ */
+function DesktopPdfViewer({ data, templateId, qrBase64, labels }: {
+    data: CvStructuredData;
+    templateId: string;
+    qrBase64?: string;
+    labels: CvTemplateLabels;
+}) {
+    const [blobUrl, setBlobUrl] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const blobUrlRef = useRef<string | null>(null);
+
+    // Track current render generation to ignore stale async calls
+    const generationRef = useRef(0);
+
+    useEffect(() => {
+        const generation = ++generationRef.current;
+        let cancelled = false;
+
+        async function generate() {
+            setLoading(true);
+            setError(null);
+
+            try {
+                const document = resolveTemplate(data, templateId, qrBase64, labels);
+                const blob = await pdf(document).toBlob();
+
+                if (cancelled || generation !== generationRef.current) return;
+
+                // Revoke previous URL to prevent memory leak
+                if (blobUrlRef.current) {
+                    URL.revokeObjectURL(blobUrlRef.current);
+                }
+
+                const url = URL.createObjectURL(blob);
+                blobUrlRef.current = url;
+                setBlobUrl(url);
+            } catch (err) {
+                if (cancelled || generation !== generationRef.current) return;
+                console.error('[PdfViewer] Blob generation failed:', err);
+                setError(err instanceof Error ? err.message : 'PDF generation failed');
+            } finally {
+                if (!cancelled && generation === generationRef.current) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        generate();
+
+        return () => {
+            cancelled = true;
+            // Revoke on cleanup (unmount or dependency change)
+            if (blobUrlRef.current) {
+                URL.revokeObjectURL(blobUrlRef.current);
+                blobUrlRef.current = null;
+            }
+        };
+    }, [data, templateId, qrBase64, labels]);
+
+    if (loading) {
+        return (
+            <div className="w-full rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-gray-50 h-[800px] flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-8 h-8 text-[#012e7a] animate-spin" />
+                    <p className="text-sm text-gray-400">Generating PDF…</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error || !blobUrl) {
+        return (
+            <div className="w-full rounded-lg overflow-hidden border border-red-200 bg-red-50 h-[200px] flex flex-col items-center justify-center gap-3">
+                <p className="text-sm text-red-600 font-medium">
+                    PDF konnte nicht gerendert werden.
+                </p>
+                <button
+                    onClick={() => {
+                        // Force re-generate by toggling loading
+                        setLoading(true);
+                        setError(null);
+                        generationRef.current++;
+                        const gen = generationRef.current;
+                        const document = resolveTemplate(data, templateId, qrBase64, labels);
+                        pdf(document).toBlob().then(blob => {
+                            if (gen !== generationRef.current) return;
+                            if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+                            const url = URL.createObjectURL(blob);
+                            blobUrlRef.current = url;
+                            setBlobUrl(url);
+                            setLoading(false);
+                        }).catch((e) => {
+                            if (gen !== generationRef.current) return;
+                            setError(e.message ?? 'Retry failed');
+                            setLoading(false);
+                        });
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#012e7a] text-white text-sm font-medium rounded-lg hover:bg-[#012e7a]/90 transition-colors"
+                >
+                    <RefreshCw className="w-4 h-4" /> Erneut versuchen
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="w-full rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-gray-50">
+            <iframe
+                src={`${blobUrl}#toolbar=0`}
+                width="100%"
+                height="800px"
+                style={{ border: 'none', display: 'block' }}
+                title="CV Preview"
+            />
+        </div>
+    );
+}
+
 export default function PdfViewerWrapper({ data, templateId, qrBase64 }: PdfViewerWrapperProps) {
     const [isMobile, setIsMobile] = useState(false);
     const [hasMounted, setHasMounted] = useState(false);
@@ -41,8 +170,6 @@ export default function PdfViewerWrapper({ data, templateId, qrBase64 }: PdfView
         return () => window.removeEventListener('resize', check);
     }, []);
 
-    const document = useMemo(() => resolveTemplate(data, templateId, qrBase64, labels), [data, templateId, qrBase64, labels]);
-
     if (!hasMounted) {
         return (
             <div className="animate-pulse h-[800px] w-full bg-gray-100 rounded-md flex items-center justify-center">
@@ -52,31 +179,46 @@ export default function PdfViewerWrapper({ data, templateId, qrBase64 }: PdfView
     }
 
     if (isMobile) {
-        return <MobileDownload document={document} />;
+        return <MobileDownload data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} />;
     }
 
-    return (
-        <div className="w-full rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-gray-50">
-            <PDFViewer
-                width="100%"
-                height="800px"
-                style={{ border: 'none' }}
-                showToolbar={true}
-            >
-                {document}
-            </PDFViewer>
-        </div>
-    );
+    return <DesktopPdfViewer data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} />;
 }
 
 /**
- * Mobile fallback: uses usePDF() hook to generate a blob URL,
- * then shows a styled download button instead of trying to render an iframe.
+ * Mobile fallback: uses pdf().toBlob() to generate a download link.
+ * Same proven approach as DownloadButton.
  */
-function MobileDownload({ document }: { document: React.ReactElement }) {
-    const [instance] = usePDF({ document: document as any });
+function MobileDownload({ data, templateId, qrBase64, labels }: {
+    data: CvStructuredData;
+    templateId: string;
+    qrBase64?: string;
+    labels: CvTemplateLabels;
+}) {
+    const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    if (instance.loading) {
+    useEffect(() => {
+        let cancelled = false;
+        async function generate() {
+            try {
+                const document = resolveTemplate(data, templateId, qrBase64, labels);
+                const blob = await pdf(document).toBlob();
+                if (cancelled) return;
+                setDownloadUrl(URL.createObjectURL(blob));
+            } catch (e) {
+                if (cancelled) return;
+                setError(e instanceof Error ? e.message : 'PDF generation failed');
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+        generate();
+        return () => { cancelled = true; };
+    }, [data, templateId, qrBase64, labels]);
+
+    if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
                 <Loader2 className="w-8 h-8 text-[#012e7a] animate-spin" />
@@ -85,11 +227,11 @@ function MobileDownload({ document }: { document: React.ReactElement }) {
         );
     }
 
-    if (instance.error) {
+    if (error) {
         return (
             <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
                 <p className="text-red-600 text-sm font-medium">Error generating PDF</p>
-                <p className="text-gray-400 text-xs">{String(instance.error)}</p>
+                <p className="text-gray-400 text-xs">{error}</p>
             </div>
         );
     }
@@ -104,7 +246,7 @@ function MobileDownload({ document }: { document: React.ReactElement }) {
                 <p className="text-gray-500 text-sm">Tap below to download your PDF.</p>
             </div>
             <button
-                onClick={() => instance.url && window.open(instance.url, '_blank')}
+                onClick={() => downloadUrl && window.open(downloadUrl, '_blank')}
                 className="px-8 py-3.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white font-medium rounded-xl shadow-sm transition-all w-full max-w-xs flex items-center justify-center gap-2"
             >
                 <Download className="w-5 h-5" />

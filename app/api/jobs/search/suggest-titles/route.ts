@@ -54,7 +54,7 @@ export async function GET() {
         const anthropic = new Anthropic({ apiKey });
 
         const message = await anthropic.messages.create({
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 200,
             temperature: 0,
             system: 'Du bist ein Karriereberater. Analysiere den Lebenslauf und schlage die 5 passendsten Jobtitel vor. Antworte NUR mit einem JSON-Array von Strings, kein Markdown.',

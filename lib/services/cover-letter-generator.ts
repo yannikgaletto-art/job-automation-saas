@@ -82,7 +82,7 @@ export async function generateCoverLetterWithQuality(
 
     const { data: jobData, error: jobError } = await supabaseAdmin
         .from('job_queue')
-        .select(`*, company_research(intel_data, suggested_quotes)`)
+        .select(`*, company_research(intel_data)`)
         .eq('id', jobId)
         .eq('user_id', userId)
         .single();

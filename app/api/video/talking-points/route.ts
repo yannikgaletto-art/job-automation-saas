@@ -71,7 +71,7 @@ Regeln:
 - Nur das JSON Array, kein anderer Text`;
 
         const aiResponse = await anthropic.messages.create({
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 300,
             messages: [{ role: 'user', content: prompt }],
         });
@@ -110,7 +110,7 @@ Regeln:
         await supabaseAdmin.from('generation_logs').insert({
             user_id: userId,
             job_id: jobId,
-            model_name: 'claude-3-haiku-20240307',
+            model_name: 'claude-haiku-4-5-20251001',
             iteration: 1,
             prompt_tokens: inputTokens,
             completion_tokens: outputTokens,

@@ -63,6 +63,9 @@ See `lib/ai/model-router.ts` — single source of truth.
 | `document_extraction` (PRIMARY) | Azure Document Intelligence (EU) |
 | `transcribe` (Coaching) | OpenAI Whisper |
 
+> **CRITICAL RULE:** All modelsMUST be version 4.5 (e.g., `claude-sonnet-4-5-20250929`). Using ANY `claude-3-5...` or `claude-3...` model is **STRICTLY FORBIDDEN**.
+> **AI WRITING CONSTRAINTS:** Any generation prompt MUST explicitly enforce max. 30 words per sentence (ideal 20-25) and forbid nested clauses.
+
 ---
 
 ## 4. PROJECT STRUCTURE — MULTI-REPO

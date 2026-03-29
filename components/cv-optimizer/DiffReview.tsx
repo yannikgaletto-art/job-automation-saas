@@ -2,15 +2,17 @@
 
 import type { ReactNode } from "react"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useTranslations } from 'next-intl'
+import { useLocale } from 'next-intl'
 import { motion, AnimatePresence } from "framer-motion"
-import { Check, X, ArrowRight, ChevronRight } from "lucide-react"
+import { Check, X, ArrowRight, ChevronRight, Plus, Loader2 } from "lucide-react"
 import { CvChange, CvOptimizationProposal, CvStructuredData } from "@/types/cv"
 import { applyOptimizations } from "@/lib/utils/cv-merger"
 import { cn } from "@/lib/utils"
 
 export interface DiffReviewProps {
+    jobId: string;
     originalCv: CvStructuredData;
     proposal: CvOptimizationProposal;
     atsKeywords: string[];
@@ -323,7 +325,7 @@ function StationGroupComponent({
                 <div className="flex items-center gap-2 shrink-0">
                     {hasKeywords ? (
                         <span className="text-[10px] bg-[#012e7a]/10 text-[#012e7a] px-2 py-0.5 rounded-full font-semibold">
-                            🎯 {t('keyword_badge', { n: group.keywordHits.count })}
+                            {t('keyword_badge', { n: group.keywordHits.count })}
                         </span>
                     ) : (
                         <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
@@ -411,13 +413,316 @@ function StationGroupComponent({
     );
 }
 
+// ── ATS Keyword Modal ──────────────────────────────────────────────────────
+
+function AtsKeywordModal({
+    keyword,
+    cv,
+    onClose,
+    onBulletGenerated,
+    t,
+    locale,
+}: {
+    keyword: string;
+    cv: CvStructuredData;
+    onClose: () => void;
+    onBulletGenerated: (change: CvChange, stationId: string) => void;
+    t: ReturnType<typeof useTranslations>;
+    locale: string;
+}) {
+    const stations = cv.experience || [];
+    const [selectedStationIdx, setSelectedStationIdx] = useState(0);
+    const [userInput, setUserInput] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState(false);
+    // After generation: editable preview text (null = not yet generated)
+    const [previewText, setPreviewText] = useState<string | null>(null);
+    // Cleanup ref
+    const autoCloseRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+    useEffect(() => {
+        return () => { if (autoCloseRef.current) clearTimeout(autoCloseRef.current); };
+    }, []);
+
+    const hasNoStations = stations.length === 0;
+
+    // Heuristic: recommend stations where the keyword already appears in bullets
+    const recommendedIndices = useMemo(() => {
+        const kwLower = keyword.toLowerCase();
+        return stations
+            .map((s, i) => {
+                const bullets = s.description?.map(d => d.text).join(' ').toLowerCase() || '';
+                const roleMatch = s.role?.toLowerCase().includes(kwLower) || false;
+                return (bullets.includes(kwLower) || roleMatch) ? i : -1;
+            })
+            .filter(i => i >= 0);
+    }, [keyword, stations]);
+
+    // Step 1: Call API → set previewText for editing. Do NOT add to CV yet.
+    const handleGenerate = useCallback(async () => {
+        if (!userInput.trim() || isGenerating) return;
+        setError('');
+        setIsGenerating(true);
+
+        const station = stations[selectedStationIdx];
+        if (!station) {
+            setError(t('ats_modal_error'));
+            setIsGenerating(false);
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/cv/optimize/bullet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    keyword,
+                    user_input: userInput.trim(),
+                    station_company: station.company || '',
+                    station_role: station.role || '',
+                    locale,
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setError(t('ats_modal_error'));
+                setIsGenerating(false);
+                return;
+            }
+
+            // Show editable preview — user must explicitly click 'Add to CV'
+            setPreviewText(data.bullet);
+        } catch {
+            setError(t('ats_modal_error'));
+        } finally {
+            setIsGenerating(false);
+        }
+    }, [userInput, isGenerating, selectedStationIdx, stations, keyword, locale, t]);
+
+    // Step 2: User confirms (possibly edited) text → add to CV
+    const handleAdd = useCallback(() => {
+        const finalText = previewText?.trim();
+        if (!finalText) return;
+
+        const station = stations[selectedStationIdx];
+        if (!station) return;
+
+        const newChange: CvChange = {
+            id: `ats-bullet-${keyword}-${Date.now()}`,
+            target: {
+                section: 'experience',
+                entityId: station.id,
+                field: 'description',
+            },
+            type: 'add',
+            after: finalText,
+            reason: `ATS Keyword: ${keyword}`,
+        };
+
+        onBulletGenerated(newChange, station.id);
+        setSuccess(true);
+        autoCloseRef.current = setTimeout(() => onClose(), 1200);
+    }, [previewText, selectedStationIdx, stations, keyword, onBulletGenerated, onClose]);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
+            <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-white rounded-xl border border-gray-200 shadow-xl w-full max-w-md p-5 mx-4"
+            >
+                {success ? (
+                    <div className="text-center py-6">
+                        <div className="w-10 h-10 rounded-full bg-[#012e7a]/10 flex items-center justify-center mx-auto mb-3">
+                            <Check className="w-5 h-5 text-[#012e7a]" />
+                        </div>
+                        <p className="text-sm font-medium text-gray-900">{t('ats_modal_added')}</p>
+                    </div>
+                ) : hasNoStations ? (
+                    <div className="text-center py-6">
+                        <p className="text-sm text-gray-500">{t('ats_modal_error')}</p>
+                        <button onClick={onClose} className="mt-3 text-xs text-[#012e7a] underline">
+                            {t('ats_modal_cancel')}
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <h3 className="text-base font-semibold text-gray-900 mb-4">
+                            {t('ats_modal_title', { keyword })}
+                        </h3>
+
+                        {/* Station selector */}
+                        <label className="text-xs font-medium text-gray-600 mb-1.5 block">
+                            {t('ats_modal_station_label')}
+                        </label>
+                        <select
+                            value={selectedStationIdx}
+                            onChange={(e) => {
+                                setSelectedStationIdx(Number(e.target.value));
+                                setPreviewText(null); // reset preview if station changes
+                            }}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 mb-4 focus:outline-none focus:ring-1 focus:ring-[#012e7a]/30 focus:border-[#012e7a]/50"
+                        >
+                            {stations.map((s, i) => (
+                                <option key={s.id} value={i}>
+                                    {s.company} — {s.role}
+                                    {recommendedIndices.includes(i) ? ` (${t('ats_modal_recommended')})` : ''}
+                                </option>
+                            ))}
+                        </select>
+
+                        {/* ── Step 1: User experience input ── */}
+                        <label className="text-xs font-medium text-gray-600 mb-1.5 block">
+                            {t('ats_modal_input_label')}
+                        </label>
+                        <textarea
+                            value={userInput}
+                            onChange={(e) => {
+                                setUserInput(e.target.value.slice(0, 200));
+                                // Editing input invalidates the preview — user must re-generate
+                                if (previewText !== null) setPreviewText(null);
+                            }}
+                            placeholder={t('ats_modal_input_placeholder')}
+                            rows={3}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 resize-none focus:outline-none focus:ring-1 focus:ring-[#012e7a]/30 focus:border-[#012e7a]/50"
+                        />
+                        <p className="text-[10px] text-gray-400 text-right mt-0.5 mb-3">
+                            {t('ats_modal_char_limit', { n: userInput.length })}
+                        </p>
+
+                        {/* ── Step 2: Editable preview (appears after generation) ── */}
+                        <AnimatePresence initial={false}>
+                            {previewText !== null && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="overflow-hidden mb-3"
+                                >
+                                    <div className="border border-[#012e7a]/20 rounded-lg bg-[#012e7a]/[0.02] p-3">
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className="text-xs font-semibold text-[#012e7a]">
+                                                {t('ats_modal_preview_label')}
+                                            </label>
+                                            <span className="text-[10px] text-gray-400 italic">
+                                                {t('ats_modal_edit_hint')}
+                                            </span>
+                                        </div>
+                                        <textarea
+                                            value={previewText}
+                                            onChange={(e) => setPreviewText(e.target.value)}
+                                            rows={3}
+                                            className="w-full bg-transparent text-sm text-[#37352F] leading-relaxed resize-none focus:outline-none"
+                                        />
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {error && (
+                            <p className="text-xs text-red-600 mb-3">{error}</p>
+                        )}
+
+                        {/* Actions: switch between Generate and Add button */}
+                        <div className="flex gap-2 justify-end">
+                            <button
+                                onClick={onClose}
+                                className="px-3 py-2 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                {t('ats_modal_cancel')}
+                            </button>
+
+                            {previewText === null ? (
+                                // Phase 1: Generate button
+                                <button
+                                    onClick={handleGenerate}
+                                    disabled={!userInput.trim() || isGenerating}
+                                    className={cn(
+                                        "px-4 py-2 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5",
+                                        userInput.trim() && !isGenerating
+                                            ? "bg-[#012e7a] text-white hover:bg-[#01246b]"
+                                            : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                    )}
+                                >
+                                    {isGenerating ? (
+                                        <><Loader2 className="w-3 h-3 animate-spin" /> {t('ats_modal_generating')}</>
+                                    ) : (
+                                        t('ats_modal_generate_btn')
+                                    )}
+                                </button>
+                            ) : (
+                                // Phase 2: Add to CV button (uses edited previewText)
+                                <button
+                                    onClick={handleAdd}
+                                    disabled={!previewText.trim()}
+                                    className={cn(
+                                        "px-4 py-2 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5",
+                                        previewText.trim()
+                                            ? "bg-[#012e7a] text-white hover:bg-[#01246b]"
+                                            : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                    )}
+                                >
+                                    <Check className="w-3 h-3" />
+                                    {t('ats_modal_add_btn')}
+                                </button>
+                            )}
+                        </div>
+                    </>
+                )}
+            </motion.div>
+        </motion.div>
+    );
+}
+
 // ── Main DiffReview ────────────────────────────────────────────────────────
 
-export function DiffReview({ originalCv, proposal, atsKeywords, onSave, onCancel }: DiffReviewProps) {
+export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, onCancel }: DiffReviewProps) {
     const t = useTranslations('diff_review');
-    const [decisions, setDecisions] = useState<Record<string, 'accepted' | 'rejected'>>({});
+    const locale = useLocale();
+
+    // ── sessionStorage persistence ────────────────────────────────────────
+    // Key is scoped to the job so multiple jobs don't collide.
+    // Survives tab navigation (component unmount/remount in job-row.tsx).
+    const SESSION_KEY = `diff-review-state-${jobId}`;
+
+    function loadPersistedState(): { localProposal: CvOptimizationProposal; decisions: Record<string, 'accepted' | 'rejected'> } | null {
+        try {
+            const raw = sessionStorage.getItem(SESSION_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            // Validate: persisted proposal must have at least as many changes as the incoming prop
+            // (new AI optimization would produce a different proposal object)
+            if (parsed?.localProposal?.changes?.length >= proposal.changes.length) {
+                return parsed;
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    }
+
+    const persisted = loadPersistedState();
+
+    const [decisions, setDecisions] = useState<Record<string, 'accepted' | 'rejected'>>(
+        persisted?.decisions ?? {}
+    );
     const [showConfirmPopup, setShowConfirmPopup] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
+    const [activeKeyword, setActiveKeyword] = useState<string | null>(null);
+    // Local mutable copy of proposal — restored from sessionStorage if available
+    const [localProposal, setLocalProposal] = useState<CvOptimizationProposal>(
+        persisted?.localProposal ?? proposal
+    );
 
     const handleDecide = (id: string, d: 'accepted' | 'rejected') => {
         setDecisions(prev => {
@@ -439,9 +744,28 @@ export function DiffReview({ originalCv, proposal, atsKeywords, onSave, onCancel
         });
     };
 
+    // ── Persist state to sessionStorage on every relevant change ─────────
+    useEffect(() => {
+        try {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify({ localProposal, decisions }));
+        } catch {
+            // sessionStorage may be full or unavailable in some browsers — silently ignore
+        }
+    }, [localProposal, decisions, SESSION_KEY]);
+
+    // Handler for injecting AI-generated bullet from AtsKeywordModal
+    const handleBulletGenerated = useCallback((newChange: CvChange, _stationId: string) => {
+        setLocalProposal(prev => ({
+            ...prev,
+            changes: [...prev.changes, newChange],
+        }));
+        // Auto-accept the new change
+        setDecisions(prev => ({ ...prev, [newChange.id]: 'accepted' }));
+    }, []);
+
     // Station-based grouping with ATS keyword impact scoring
     const stationGroups = useMemo(() => {
-        const groups = groupChangesByStation(proposal.changes, originalCv);
+        const groups = groupChangesByStation(localProposal.changes, originalCv);
 
         // Compute keyword hits for each group (delta-impact)
         for (const group of groups) {
@@ -460,7 +784,7 @@ export function DiffReview({ originalCv, proposal, atsKeywords, onSave, onCancel
         });
 
         return groups;
-    }, [proposal.changes, originalCv, atsKeywords]);
+    }, [localProposal.changes, originalCv, atsKeywords]);
 
     // First group ID (highest impact) for default-open
     const firstGroupId = stationGroups[0]?.id || '';
@@ -471,7 +795,7 @@ export function DiffReview({ originalCv, proposal, atsKeywords, onSave, onCancel
         if (!atsKeywords?.length) return { covered: 0, set: new Set<string>() };
 
         const coveredSet = new Set<string>();
-        const activeChanges = proposal.changes.filter(c => decisions[c.id] !== 'rejected');
+        const activeChanges = localProposal.changes.filter(c => decisions[c.id] !== 'rejected');
         // Collect all active after-texts into one corpus for efficient matching
         const corpus = activeChanges
             .map(c => c.after?.toLowerCase() ?? '')
@@ -486,17 +810,17 @@ export function DiffReview({ originalCv, proposal, atsKeywords, onSave, onCancel
                 continue;
             }
             // Multi-word: count how many tokens appear in the corpus
-            const matchedTokens = tokens.filter(t => corpus.includes(t));
+            const matchedTokens = tokens.filter(tok => corpus.includes(tok));
             const threshold = Math.ceil(tokens.length * 2 / 3);
             if (matchedTokens.length >= threshold) coveredSet.add(kwLower);
         }
 
         return { covered: coveredSet.size, set: coveredSet };
-    }, [atsKeywords, proposal.changes, decisions]);
+    }, [atsKeywords, localProposal.changes, decisions]);
 
-    const totalCount = proposal.changes.length;
-    const acceptedCount = proposal.changes.filter(c => decisions[c.id] === 'accepted').length;
-    const rejectedCount = proposal.changes.filter(c => decisions[c.id] === 'rejected').length;
+    const totalCount = localProposal.changes.length;
+    const acceptedCount = localProposal.changes.filter(c => decisions[c.id] === 'accepted').length;
+    const rejectedCount = localProposal.changes.filter(c => decisions[c.id] === 'rejected').length;
     const pendingCount = totalCount - acceptedCount - rejectedCount;
 
     /**
@@ -512,27 +836,37 @@ export function DiffReview({ originalCv, proposal, atsKeywords, onSave, onCancel
             return;
         }
         // Undecided changes are accepted by default
-        const accepted = proposal.changes.filter(c => decisions[c.id] !== 'rejected');
+        const accepted = localProposal.changes.filter(c => decisions[c.id] !== 'rejected');
         const choices: Record<string, 'accepted'> = {};
         accepted.forEach(c => { choices[c.id] = 'accepted'; });
-        const baseCv = proposal.translated ?? originalCv;
+        const baseCv = localProposal.translated ?? originalCv;
         const finalCv = applyOptimizations(baseCv, { choices, appliedChanges: accepted });
+        // Clear persisted state on successful save — user is done
+        try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
         onSave(finalCv, accepted);
+    };
+
+    const handleCancel = () => {
+        // Clear persisted state on cancel — user explicitly resets
+        try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+        onCancel();
     };
 
     const handleConfirmAcceptAll = () => {
         setShowConfirmPopup(false);
-        handleBulkDecide(proposal.changes.map(c => c.id), 'accepted');
-        const accepted = proposal.changes;
+        handleBulkDecide(localProposal.changes.map(c => c.id), 'accepted');
+        const accepted = localProposal.changes;
         const choices: Record<string, 'accepted'> = {};
         accepted.forEach(c => { choices[c.id] = 'accepted'; });
-        const baseCv = proposal.translated ?? originalCv;
+        const baseCv = localProposal.translated ?? originalCv;
         const finalCv = applyOptimizations(baseCv, { choices, appliedChanges: accepted });
+        // Clear persisted state — user accepted all and is done
+        try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
         onSave(finalCv, accepted);
     };
 
-    const handleAcceptAll = () => handleBulkDecide(proposal.changes.map(c => c.id), 'accepted');
-    const handleRejectAll = () => handleBulkDecide(proposal.changes.map(c => c.id), 'rejected');
+    const handleAcceptAll = () => handleBulkDecide(localProposal.changes.map(c => c.id), 'accepted');
+    const handleRejectAll = () => handleBulkDecide(localProposal.changes.map(c => c.id), 'rejected');
 
     return (
         <div className="w-full max-w-5xl mx-auto flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -579,13 +913,51 @@ export function DiffReview({ originalCv, proposal, atsKeywords, onSave, onCancel
                 </div>
             )}
 
-            {/* Main content: Station groups + ATS sidebar */}
+            {/* ATS Keyword Chip Banner — horizontal, interactive */}
+            {atsKeywords.length > 0 && (
+                <div className="px-6 py-3 border-b border-gray-100">
+                    <div className="flex items-center gap-2 mb-2">
+                        <p className="text-xs font-semibold text-gray-900">{t('ats_sidebar_title')}</p>
+                        <span className="text-[10px] text-[#73726E]">
+                            {keywordCoverage.covered}/{atsKeywords.length} {t('ats_chip_covered_label')}
+                        </span>
+                        {/* Coverage progress bar — inline */}
+                        <div className="flex-1 max-w-[120px] h-1 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-[#012e7a] rounded-full transition-all duration-300"
+                                style={{ width: `${(keywordCoverage.covered / atsKeywords.length) * 100}%` }}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {atsKeywords.map(kw => {
+                            const isCovered = keywordCoverage.set.has(kw.toLowerCase());
+                            return isCovered ? (
+                                <span
+                                    key={kw}
+                                    className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-[#012e7a]/10 text-[#012e7a] font-medium"
+                                >
+                                    <Check className="w-3 h-3" />
+                                    {kw}
+                                </span>
+                            ) : (
+                                <button
+                                    key={kw}
+                                    onClick={() => setActiveKeyword(kw)}
+                                    className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border border-[#012e7a]/20 text-[#012e7a] font-medium hover:bg-[#012e7a]/5 hover:border-[#012e7a]/40 transition-colors cursor-pointer"
+                                >
+                                    <Plus className="w-3 h-3" />
+                                    {kw}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Main content: Station groups (full width, no sidebar) */}
             <div className="flex-1 overflow-y-auto max-h-[60vh]">
-                <div className={cn(
-                    "grid gap-4 px-6 py-4",
-                    atsKeywords.length > 0 ? "grid-cols-[1fr_200px]" : "grid-cols-1"
-                )}>
-                    {/* Station-grouped tree */}
+                <div className="px-6 py-4">
                     <div className="space-y-1 min-w-0">
                         {stationGroups.map((group) => (
                             <StationGroupComponent
@@ -599,53 +971,22 @@ export function DiffReview({ originalCv, proposal, atsKeywords, onSave, onCancel
                             />
                         ))}
                     </div>
-
-                    {/* ATS Keywords sidebar — sticky, only shown when keywords exist */}
-                    {atsKeywords.length > 0 && (
-                        <div className="sticky top-0 self-start">
-                            <div className="border border-gray-100 rounded-lg bg-gray-50/50 p-3">
-                                <p className="text-xs font-semibold text-gray-900 mb-0.5">
-                                    {t('ats_sidebar_title')}
-                                </p>
-                                <p className="text-[10px] text-[#73726E] mb-3">
-                                    {keywordCoverage.covered}/{atsKeywords.length} {t('ats_sidebar_covered')}
-                                </p>
-                                {/* Coverage progress bar */}
-                                <div className="w-full h-1 bg-gray-200 rounded-full mb-3 overflow-hidden">
-                                    <div
-                                        className="h-full bg-[#012e7a] rounded-full transition-all duration-300"
-                                        style={{ width: `${atsKeywords.length > 0 ? (keywordCoverage.covered / atsKeywords.length) * 100 : 0}%` }}
-                                    />
-                                </div>
-                                <ul className="space-y-1.5">
-                                    {atsKeywords.map(kw => {
-                                        const isCovered = keywordCoverage.set.has(kw.toLowerCase());
-                                        return (
-                                            <li key={kw} className="flex items-center gap-1.5 text-xs">
-                                                {isCovered ? (
-                                                    <span className="w-4 h-4 rounded-full bg-[#012e7a]/10 flex items-center justify-center shrink-0">
-                                                        <Check className="w-2.5 h-2.5 text-[#012e7a]" />
-                                                    </span>
-                                                ) : (
-                                                    <span className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                                                        <span className="w-1.5 h-0.5 bg-gray-300 rounded-full" />
-                                                    </span>
-                                                )}
-                                                <span className={cn(
-                                                    "leading-tight",
-                                                    isCovered ? "text-[#37352F] font-medium" : "text-[#73726E]"
-                                                )}>
-                                                    {kw}
-                                                </span>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
+
+            {/* ATS Keyword Modal */}
+            <AnimatePresence>
+                {activeKeyword && (
+                    <AtsKeywordModal
+                        keyword={activeKeyword}
+                        cv={originalCv}
+                        onClose={() => setActiveKeyword(null)}
+                        onBulletGenerated={handleBulletGenerated}
+                        t={t}
+                        locale={locale}
+                    />
+                )}
+            </AnimatePresence>
 
             {/* Confirm popup — shown when user clicks Preview without reviewing any change */}
             {showConfirmPopup && (
@@ -673,7 +1014,7 @@ export function DiffReview({ originalCv, proposal, atsKeywords, onSave, onCancel
             {/* Footer */}
             <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
                 <button
-                    onClick={onCancel}
+                    onClick={handleCancel}
                     className="px-4 py-2 text-sm text-gray-500 hover:text-gray-800 font-medium transition-colors"
                 >
                     {t('footer_cancel')}

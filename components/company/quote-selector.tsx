@@ -1,9 +1,20 @@
 "use client"
 
 import { useState } from "react"
-import type { QuoteSuggestion } from "@/lib/services/quote-matcher"
 import { Quote, Check, PenTool, BarChart3 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+
+// Local type (decoupled from deprecated quote-matcher.ts)
+interface QuoteSuggestion {
+    quote: string;
+    author: string;
+    source?: string;
+    relevance_score: number;
+    match_score?: number;
+    matched_value: string;
+    value_connection: string;
+    language: 'en' | 'de';
+}
 
 interface QuoteSelectorProps {
     quotes: QuoteSuggestion[]
@@ -27,21 +38,6 @@ export function QuoteSelector({
         onQuoteSelect(quotes[index])
     }
 
-    const handleCustomQuoteSubmit = () => {
-        if (!customQuoteText.trim()) return
-
-        // Create a temporary QuoteSuggestion object for the custom quote
-        const customQuote: QuoteSuggestion = {
-            quote: customQuoteText,
-            author: "Custom",
-            relevance_score: 1, // User defined, so high relevance
-            value_connection: "User custom input",
-            matched_value: "Custom",
-            language: "en"
-        }
-
-        onQuoteSelect(customQuote)
-    }
 
     const getScoreColor = (score: number) => {
         if (score >= 0.8) return "bg-green-100 text-green-700"
@@ -141,7 +137,7 @@ export function QuoteSelector({
                                         {isSelected && <Check className="w-4 h-4 text-blue-600 ml-auto" />}
                                     </div>
 
-                                    <p className="text-sm text-[#37352F] italic mb-2">"{suggestion.quote}"</p>
+                                    <p className="text-sm text-[#37352F] italic mb-2">{suggestion.quote}</p>
                                     <p className="text-xs text-[#73726E] font-medium">— {suggestion.author} {suggestion.source ? `(${suggestion.source})` : ''}</p>
 
                                     {suggestion.value_connection && (

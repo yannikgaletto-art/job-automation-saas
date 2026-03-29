@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { suggestRelevantQuotes } from '@/lib/services/quote-matcher';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { findRelevantQuotes, type QuoteContext } from '@/lib/services/quote-service';
 
-// Allow up to 60s — Claude One-Shot typically completes in ~3–8s
-export const maxDuration = 60;
-
-// validateUrl removed for Batch 7 — Quotes use text-based sources (books, speeches), not live URLs.
-
-const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-);
+// DB-query typical <200ms. AI fallback (Claude Haiku) can take 3-5s on niche jobs.
+export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
     try {
@@ -20,7 +12,7 @@ export async function POST(req: NextRequest) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { jobId, companyName, companyValues, companyVision, jobTitle, jobField, language } = await req.json();
+        const { jobId, companyName, companyValues, companyVision, jobTitle, language } = await req.json();
         if (!jobId || !companyName) {
             return NextResponse.json({ error: 'Missing jobId or companyName' }, { status: 400 });
         }
@@ -31,44 +23,63 @@ export async function POST(req: NextRequest) {
             values.push(companyName);
         }
 
-        console.log(`🔍 [Quotes] Fetching quotes for ${companyName} with ${values.length} values`);
+        // ── Fetch industry_segment from Perplexity cache ──────────────────
+        // Targeted lookup — we only read the intel_data JSONB key we need.
+        // Falls back gracefully to undefined (job-title keyword matching takes over).
+        let industrySegment: string | undefined;
+        try {
+            const serviceClient = createServiceClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.SUPABASE_SERVICE_ROLE_KEY!
+            );
+            const { data: researchRow } = await serviceClient
+                .from('company_research')
+                .select('intel_data')
+                .eq('company_name', companyName)
+                .gt('expires_at', new Date().toISOString())
+                .order('researched_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
 
-        // Claude One-Shot: generates thinkers + quotes in a single call
-        // language flag ensures correct ä/ö/ü handling for German cover letters
-        const quotes = await suggestRelevantQuotes(
-            companyName,
-            values,
-            companyVision || '',
-            jobTitle || '',
-            jobField || '',
-            (language === 'en' ? 'en' : 'de') as 'de' | 'en'
-        );
+            if (researchRow?.intel_data?.industry_segment) {
+                industrySegment = String(researchRow.intel_data.industry_segment);
+                console.log(`🏭 [Quotes] Industry segment from DB: "${industrySegment}"`);
+            } else {
+                console.log(`ℹ️ [Quotes] No industry_segment in DB for "${companyName}" — using job-title category inference`);
+            }
+        } catch (err) {
+            // Non-fatal: quote-service falls back to job-title keywords
+            console.warn(`⚠️ [Quotes] Failed to fetch industry_segment:`, err);
+        }
 
-        // ✅ Map quotes to standard shape first
-        const mapped = quotes.slice(0, 3).map((q) => ({
+        console.log(`🔍 [Quotes] Search for "${companyName}" | title="${jobTitle}" | industry="${industrySegment || 'unknown'}" | ${values.length} values`);
+
+        const ctx: QuoteContext = {
+            jobTitle: jobTitle || companyName,
+            companyValues: values,
+            companyVision: companyVision || undefined,
+            industrySegment,
+            language: (language === 'en' ? 'en' : 'de') as 'de' | 'en',
+        };
+
+        const quotes = await findRelevantQuotes(ctx, 3);
+
+        // Map to the existing frontend contract (QuoteSuggestion shape from quote-selector.tsx)
+        const mapped = quotes.map(q => ({
             quote: q.quote,
             author: q.author,
             source: q.source || '',
-            matchedValue: q.matched_value,
-            relevanceScore: q.match_score ?? q.relevance_score ?? 0,
+            matchedValue: q.matchedValue,
+            relevanceScore: q.relevanceScore,
+            relevance_score: q.relevanceScore,  // Frontend uses both (legacy compat)
+            match_score: q.relevanceScore,       // Frontend uses both (legacy compat)
+            matched_value: q.matchedValue,       // Frontend uses snake_case
+            value_connection: q.theme,           // "Why" block in QuoteSelector uses this
+            language: ctx.language,              // Pass through for UI display
         }));
 
-        // ✅ Persist generated quotes to DB so they survive page reloads
-        if (mapped.length > 0) {
-            const { error: dbError } = await supabaseAdmin
-                .from('company_research')
-                .update({ suggested_quotes: quotes.slice(0, 3) })
-                .eq('company_name', companyName.trim());
-
-            if (dbError) {
-                console.error('⚠️ [Quotes] Failed to persist quotes to DB:', dbError.message);
-            } else {
-                console.log(`💾 [Quotes] Persisted ${mapped.length} quotes for "${companyName}"`);
-            }
-        }
-
-        // ✅ Batch 7: validateUrl removed. LLM handles source attribution as text.
-        console.log(`✅ [Quotes] Returned ${mapped.length} quotes for ${companyName}`);
+        const source = mapped.length > 0 ? (quotes[0].relevanceScore >= 0.8 ? 'DB' : 'AI') : 'none';
+        console.log(`✅ [Quotes] Returned ${mapped.length} quotes for "${companyName}" (source: ${source})`);
         return NextResponse.json({ success: true, quotes: mapped });
 
     } catch (error: unknown) {
@@ -77,4 +88,3 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: msg }, { status: 500 });
     }
 }
-

@@ -49,7 +49,9 @@ export default function DownloadButton({ data, templateId, qrBase64 }: DownloadB
             window.document.body.appendChild(a);
             a.click();
             window.document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            // Delay revoke so Chrome has time to initiate the download
+            // before the blob URL is freed (synchronous revoke causes empty downloads)
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
         } catch (err) {
             console.error(err);
         } finally {

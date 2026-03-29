@@ -139,6 +139,17 @@ cv_match, cv_parse, analyze_skill_gaps                  → Claude Haiku 4.5 (st
 document_extraction (PRIMARY)                           → Azure Document Intelligence (EU)
 ```
 
+**CRITICAL MODEL RULE:** 
+ALLE neuen AI-Calls MÜSSEN zwingend die 4.5er Modelle nutzen (`claude-sonnet-4-5-20250929` oder `claude-haiku-4-5-20251001`). Die Verwendung von alten Modellen wie `claude-3-5-...` oder `claude-3-haiku-20240307` ist **STRENG VERBOTEN**.
+
+### AI Content Generation (Writing Rules)
+Wenn Prompts für Textgenerierungen (wie Cover Letter, CV-Bulletpoints oder Critiques) erstellt werden, MÜSSEN folgende Constraints standardmäßig integriert sein:
+1. **Satzlänge:** Maximal 30 Wörter pro Satz. Ideal sind 20–25 Wörter.
+2. **Satzstruktur:** Keine langen Schachtelsätze oder komplexe Nebensätze. Gedanken müssen in zwei kurze Sätze geteilt werden.
+3. **Anrede-Integrität:** Wenn ein Ansprechpartner definiert ist, darf Claude niemals auf generische Phrasen wie "Dear Hiring Manager" zurückfallen.
+
+
+
 
 
 ## 🎯 RULE #0: REDUCE COMPLEXITY

@@ -210,7 +210,9 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             <div className="space-y-3">
                 <div>
                     <h3 className="text-sm font-semibold text-[#37352F]">{t('tone_title')}</h3>
-                    <p className="text-xs text-[#73726E] mt-0.5">{setupData.styleAnalysisSummary}</p>
+                    {setupData.styleAnalysisSummary && (
+                        <p className="text-xs text-[#73726E] mt-0.5">{setupData.styleAnalysisSummary}</p>
+                    )}
                 </div>
 
                 {/* Language Toggle — left-aligned for visibility */}

@@ -128,6 +128,11 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     const [qrLoading, setQrLoading] = useState(false);
     const [showQrDialog, setShowQrDialog] = useState(false);
 
+    // ATS warning for Tech template
+    const [showTechAtsWarning, setShowTechAtsWarning] = useState(false);
+    const [techAtsWarnDismiss, setTechAtsWarnDismiss] = useState(false);
+    const [pendingTechSwitch, setPendingTechSwitch] = useState<(() => void) | null>(null);
+
     useEffect(() => {
         let isMounted = true;
         const fetchData = async () => {
@@ -344,7 +349,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     };
 
     // -- Step 2: Template Switcher --
-    const handleTemplateSwitchInPreview = async (newId: string) => {
+    const applyTemplateSwitch = async (newId: string) => {
         setTemplateId(newId);
         if (userId) {
             try {
@@ -357,6 +362,35 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                 console.error("Failed to persist template preference:", err);
             }
         }
+    };
+
+    const handleTemplateSwitchInPreview = (newId: string) => {
+        if (newId === 'tech') {
+            const alreadyDismissed = typeof window !== 'undefined'
+                && localStorage.getItem('pathly_tech_ats_warning_dismissed') === 'true';
+            if (!alreadyDismissed) {
+                // Intercept: show warning, remember what to do if user proceeds
+                setTechAtsWarnDismiss(false);
+                setPendingTechSwitch(() => () => applyTemplateSwitch(newId));
+                setShowTechAtsWarning(true);
+                return;
+            }
+        }
+        applyTemplateSwitch(newId);
+    };
+
+    const handleTechAtsWarningProceed = () => {
+        if (techAtsWarnDismiss) {
+            localStorage.setItem('pathly_tech_ats_warning_dismissed', 'true');
+        }
+        setShowTechAtsWarning(false);
+        pendingTechSwitch?.();
+        setPendingTechSwitch(null);
+    };
+
+    const handleTechAtsWarningStay = () => {
+        setShowTechAtsWarning(false);
+        setPendingTechSwitch(null);
     };
 
     // -- QR-Video: Button opens dialog or toggles off --
@@ -704,6 +738,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                     <div className="flex items-center justify-center py-8">
                         <div className="w-full">
                             <DiffReview
+                                jobId={jobId}
                                 originalCv={cvData}
                                 proposal={proposal}
                                 atsKeywords={
@@ -720,7 +755,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
 
                 {/* ===== STEP 2: PREVIEW ===== */}
                 {step === 2 && activePdfData && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 px-4">
                         {/* Template Switcher + Bearbeiten */}
                         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-3">
                             <div className="text-sm font-medium text-gray-700">{t('template_label')}</div>
@@ -782,19 +817,21 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                             <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} />
                         )}
 
-                        <div className="flex justify-between items-center py-4 border-t border-gray-100 mt-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-center py-4 border-t border-gray-100 mt-6 mb-8 gap-4 pb-4">
                             <button
                                 onClick={() => { setStep(1); setIsEditing(false); }}
-                                className="px-5 py-2 text-gray-600 hover:text-gray-900 font-medium rounded-lg hover:bg-gray-50 flex items-center transition"
+                                className="px-5 py-2 text-gray-600 hover:text-gray-900 font-medium rounded-lg hover:bg-gray-50 flex items-center transition w-full sm:w-auto justify-center"
                             >
                                 {t('back_to_optimizer')}
                             </button>
 
-                        <div className="flex items-center gap-3">
-                                <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} />
+                            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                                <div className="w-full sm:w-auto">
+                                    <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} />
+                                </div>
                                 <button
                                     onClick={() => onGoToCoverLetter?.()}
-                                    className="px-5 py-2.5 bg-white border border-[#012e7a] text-[#012e7a] hover:bg-[#012e7a]/5 font-medium rounded-lg flex items-center gap-2 transition-colors"
+                                    className="px-5 py-2.5 bg-white border border-[#012e7a] text-[#012e7a] hover:bg-[#012e7a]/5 font-medium rounded-lg flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                                     {t('cover_letter')}
@@ -852,6 +889,55 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                         >
                             <Video size={15} />
                             {t('qr_agree')}
+                        </button>
+                    </div>
+                </div>
+            </CustomDialog>
+
+            {/* ATS Warning Dialog – Tech Template */}
+            <CustomDialog isOpen={showTechAtsWarning} onClose={handleTechAtsWarningStay} title={t('tech_ats_warning_title')}>
+                <div className="p-6 space-y-5">
+                    
+                    {/* Amber Alert Banner */}
+                    <div className="flex items-start gap-3 bg-amber-50 border border-amber-200/60 rounded-lg p-4">
+                        <div className="mt-0.5 flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-amber-600">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg>
+                        </div>
+                        <p className="text-sm text-amber-800 leading-relaxed">
+                            {t('tech_ats_warning_body')}
+                        </p>
+                    </div>
+
+                    {/* Dismiss checkbox */}
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none group w-max">
+                        <input
+                            type="checkbox"
+                            checked={techAtsWarnDismiss}
+                            onChange={e => setTechAtsWarnDismiss(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-300 text-[#012e7a] focus:ring-[#012e7a] cursor-pointer"
+                        />
+                        <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                            {t('tech_ats_warning_dismiss')}
+                        </span>
+                    </label>
+
+                    {/* Actions */}
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                        <button
+                            onClick={handleTechAtsWarningProceed}
+                            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition"
+                        >
+                            {t('tech_ats_warning_proceed')}
+                        </button>
+                        <button
+                            onClick={handleTechAtsWarningStay}
+                            className="px-4 py-2 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white text-sm font-medium rounded-lg transition"
+                        >
+                            {t('tech_ats_warning_stay')}
                         </button>
                     </div>
                 </div>

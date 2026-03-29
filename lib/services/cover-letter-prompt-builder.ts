@@ -32,7 +32,7 @@ interface JobData {
     };
     company_research?: Array<{
         intel_data?: CompanyResearchData;
-        suggested_quotes?: Array<{ text?: string; author?: string; match_score?: number }>;
+        // suggested_quotes removed — quotes now served on-demand via /api/cover-letter/quotes (DB-backed quote-service.ts)
     }>;
     [key: string]: unknown;
 }
@@ -533,7 +533,8 @@ OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
             : '280–380 Wörter, 4–5 Absätze'
         }
 - Absätze getrennt durch eine Leerzeile
-- Beginne direkt mit der Anrede: ${contactPersonGreeting}
+- ${t('SATZBAU (ABSOLUTES LIMIT): Maximal 30 Wörter pro Satz. Ideal: 20–25 Wörter. Lange Schachtel­sätze mit Nebensätzen sind STRENG VERBOTEN. Wenn ein Gedanke länger wäre, TEILE IHN in zwei kurze Sätze auf.', 'SENTENCE LENGTH (ABSOLUTE LIMIT): Maximum 30 words per sentence. Ideal: 20–25 words. Long, nested sentences with sub-clauses are STRICTLY FORBIDDEN. If a thought would be longer, SPLIT IT into two short sentences.')}
+- Beginne direkt mit der Anrede: ${contactPersonGreeting}${ctx?.tone.contactPerson ? ` — ZWINGEND: Nutze EXAKT diese Anrede. NIEMALS auf generische Alternativen wie "Dear Hiring Manager", "Sehr geehrte Damen und Herren" etc. ausweichen. Der Name des Ansprechpartners ist gesetzt.` : ''}
 - Anrede-Form: ${isDuForm ? 'DU-FORM (du/dein/euch/dir). Wende diese Du-Form STRIKT auf das GESAMTE Anschreiben an. Kein "Sie" oder "Ihnen" — NIEMALS.' : 'SIE-FORM (Sie/Ihr/Ihnen). Wende diese Sie-Form STRIKT auf das GESAMTE Anschreiben an.'}
 
 === SEKTION 2: TONALITÄT & STIL (HÖCHSTE PRIORITÄT) ===
