@@ -194,8 +194,7 @@ function ATSKeywords({ buzzwords }: { buzzwords: string[] }) {
         'y', 'o', 'varios', 'general', 'bueno', 'otros',
     ];
     const filtered = buzzwords
-        .filter(bw => !LOW_SIGNAL.includes(bw.toLowerCase()))
-        .slice(0, 10);
+        .filter(bw => !LOW_SIGNAL.includes(bw.toLowerCase()));
 
     if (filtered.length === 0) return null;
 
@@ -232,6 +231,7 @@ function BenefitsGrid({ benefits }: { benefits: string[] }) {
 
 export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onConfirm, onDelete, isOptimizing }: JobRowProps) {
     const t = useTranslations('job_queue');
+    const tCvMatch = useTranslations('cv_match');
     const [activeTab, setActiveTab] = useState<number | null>(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [liveMatchResult, setLiveMatchResult] = useState<any | null>(null);
@@ -345,6 +345,23 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                             {formatLevel(job.seniority)}
                                         </span>
                                     )}
+
+                                    {/* CV Match Fit Label — shows when analysis exists */}
+                                    {(() => {
+                                        const cvScore = (job.metadata as any)?.cv_match?.overallScore;
+                                        if (typeof cvScore !== 'number') return null;
+                                        const fitKey = cvScore >= 70 ? 'fit_strong' : cvScore >= 50 ? 'fit_partial' : 'fit_weak';
+                                        const fitColor = cvScore >= 70
+                                            ? 'bg-green-50 text-green-700 border-green-200'
+                                            : cvScore >= 50
+                                                ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                                : 'bg-red-50 text-red-700 border-red-200';
+                                        return (
+                                            <span className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-medium ${fitColor}`}>
+                                                {tCvMatch(fitKey)}
+                                            </span>
+                                        );
+                                    })()}
 
                                     {/* Link to job posting (scraped) or company website (manual) */}
                                     {(() => {

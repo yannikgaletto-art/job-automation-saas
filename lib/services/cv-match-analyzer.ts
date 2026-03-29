@@ -53,18 +53,26 @@ export interface RequirementRow {
     status: 'met' | 'partial' | 'missing';
     currentState: string;  // Spalte 2: CV Ist-Zustand
     suggestion: string;    // Spalte 3: Ethisch korrekte Veränderungsempfehlung
+    category?: string;     // Short keyword: "Education", "Experience", "Communication" etc.
     corrected?: boolean;
 }
 
+export type ScoreLevel = 'strong' | 'solid' | 'gap';
+
+export interface ScoreCategory {
+    level: ScoreLevel;
+    reasons: string[];
+}
+
 export interface CVMatchResult {
-    overallScore: number; // 0–100
+    overallScore: number; // 0–100 (used for color signal only, not displayed as %)
     realismScore?: number;
     scoreBreakdown: {
-        technicalSkills: { score: number; reasons: string[] } | number;
-        softSkills: { score: number; reasons: string[] } | number;
-        experienceLevel: { score: number; reasons: string[] } | number;
-        domainKnowledge: { score: number; reasons: string[] } | number;
-        languageMatch: { score: number; reasons: string[] } | number;
+        technicalSkills: ScoreCategory;
+        softSkills: ScoreCategory;
+        experienceLevel: ScoreCategory;
+        domainKnowledge: ScoreCategory;
+        languageMatch: ScoreCategory;
     };
     requirementRows: RequirementRow[];  // → Renders as Notion 3-column table
     strengths: string[];
@@ -82,7 +90,8 @@ const CV_MATCH_PROMPT = (req: CVMatchRequest) => {
 You are an experienced HR consultant and ATS expert with a high standard for realism.
 You are known for being honest — neither too harsh nor too lenient.
 CRITICAL RULE: Always address the user with "${addressForm}" (second person, never third person).
-CRITICAL RULE: ALL output text fields (currentState, suggestion, strengths, gaps, etc.) MUST be written in ${lang}. This is non-negotiable.
+CRITICAL RULE: ALL output text fields (currentState, suggestion, strengths, gaps, potentialHighlights, overallRecommendation, reasons) MUST be written in ${lang}. This is non-negotiable.
+CRITICAL RULE: Even though these instructions are in English, your ENTIRE output MUST be in ${lang}. Do NOT output any English text when ${lang} is not English.
 
 **CANDIDATE CV:**
 ${req.cvText}
@@ -107,6 +116,7 @@ ${req.atsKeywords.join(', ')}
 Consolidate the requirements list to 5–8 core competencies.
 Merge semantically identical requirements into one row.
 Each row = one distinct competency dimension.
+Each row MUST include a "category" field with a short keyword (e.g. "Education", "Experience", "Communication", "Domain Knowledge", "Language", "Technical", "Leadership").
 
 ***
 
@@ -117,18 +127,19 @@ For each requirement, create a 3-column row:
 COLUMN 1 — Requirement:
 The consolidated requirement formulation.
 
-COLUMN 2 — Current CV State (REALISTIC, not flattering):
-- Name CONCRETELY what is present (e.g., "${addressForm} worked as Co-Founder and Product Owner at...").
-- Address the candidate with "${addressForm}"!
-- Name HONESTLY what is missing or only peripherally present.
-- No marketing. No sugarcoating.
+COLUMN 2 — Current CV State (CONCISE — max 2 sentences):
+Structure: Thesis + Example.
+- Sentence 1 (THESIS): One clear verdict sentence addressing "${addressForm}". Example: "${addressForm === 'Du' ? 'Du kannst die geforderten 7 Jahre nicht nachweisen.' : addressForm === 'you' ? 'You cannot demonstrate the required 7 years.' : 'Usted no puede demostrar los 7 años requeridos.'}"
+- Sentence 2 (EXAMPLE): One concrete evidence sentence from the CV. Example: "${addressForm === 'Du' ? 'Du hast ca. 2 Jahre Erfahrung als Co-Founder bei Xorder Menues.' : addressForm === 'you' ? 'You have approx. 2 years of experience as Co-Founder at Xorder Menues.' : 'Usted tiene aprox. 2 años de experiencia como Co-Founder en Xorder Menues.'}"
+- NO long enumerations of all positions. Pick the ONE most relevant example.
+- Address with "${addressForm}"!
 
-COLUMN 3 — Improvement Suggestion (ethically sound):
-- Based only on real CV facts.
-- Address the candidate with "${addressForm}" (e.g., "Highlight these experiences and provide 1-2 examples...").
-- Concrete reformulation suggestions for experiences that are present but weakly described.
-- For gaps: honest note + what can be done.
-- NO inventions.
+COLUMN 3 — Improvement Suggestion (CONCISE — max 2 sentences):
+Structure: Action + How.
+- Sentence 1 (ACTION): What to do. Example: "Highlight your Co-Founder role to frame partnership experience."
+- Sentence 2 (HOW): Concrete tip. Example: "Describe investor relations and acquisition channels from Xorder Menues."
+- Based ONLY on real CV facts. NO inventions.
+- Address with "${addressForm}"!
 
 STATUS ASSIGNMENT (strict):
 - "met": Direct experience, verifiable, >6 months or clear demonstrated success
@@ -140,17 +151,22 @@ STATUS ASSIGNMENT (strict):
 **STEP 3 — SCORE:**
 Calculate a realistic overall score (0–100).
 Be honest: a "partial" on a MANDATORY requirement significantly lowers the score.
-For each of the 5 sub-categories (technicalSkills, softSkills, experienceLevel, domainKnowledge, languageMatch), generate the score AND 2-3 concrete, brief bullet points explaining why that score was given (directed at the user with "${addressForm}", e.g., "${addressForm === 'Du' ? 'Du bringst' : addressForm === 'you' ? 'You bring' : 'Usted aporta'} 3 years of experience in...").
+For each of the 5 sub-categories (technicalSkills, softSkills, experienceLevel, domainKnowledge, languageMatch), assign a LEVEL and provide 1-2 brief bullet points explaining why:
+- "strong": Direct experience, verifiable in CV, >6 months or clear project success
+- "solid": Related experience, brief touchpoints, or only tangentially relevant
+- "gap": No evidence in CV, or only marginally present
+Address the user with "${addressForm}" in each reason (e.g., "${addressForm === 'Du' ? 'Du bringst' : addressForm === 'you' ? 'You bring' : 'Usted aporta'} 3 years of experience in...").
 
 ***
 
 **STEP 4 — ATS KEYWORDS:**
-Reduce recognized and missing ATS keywords to the most important 5-6 terms total.
+Classify EVERY provided ATS keyword as either "found" (present in CV) or "missing" (not present in CV).
+Every keyword from the input list MUST appear in either keywordsFound or keywordsMissing. Do NOT omit any keywords.
 
 ***
 
 **RULES:**
-- OUTPUT LANGUAGE: ${lang} — Write ALL output text in ${lang}. This is the highest priority rule.
+- OUTPUT LANGUAGE: ${lang} — Write ALL output text in ${lang}. This is the highest priority rule. Even though instructions are in English, EVERY string value in your JSON output MUST be in ${lang}.
 - Address form: always "${addressForm}"
 - No vague formulations
 - Be specific: what exactly, where, how long
@@ -164,15 +180,16 @@ Reduce recognized and missing ATS keywords to the most important 5-6 terms total
 {
   "overallScore": <0-100>,
   "scoreBreakdown": {
-    "technicalSkills": { "score": <0-100>, "reasons": ["<reason 1>", "<reason 2>"] },
-    "softSkills": { "score": <0-100>, "reasons": ["<reason 1>", "<reason 2>"] },
-    "experienceLevel": { "score": <0-100>, "reasons": ["<reason 1>", "<reason 2>"] },
-    "domainKnowledge": { "score": <0-100>, "reasons": ["<reason 1>", "<reason 2>"] },
-    "languageMatch": { "score": <0-100>, "reasons": ["<reason 1>", "<reason 2>"] }
+    "technicalSkills": { "level": "strong|solid|gap", "reasons": ["<reason 1>", "<reason 2>"] },
+    "softSkills": { "level": "strong|solid|gap", "reasons": ["<reason 1>", "<reason 2>"] },
+    "experienceLevel": { "level": "strong|solid|gap", "reasons": ["<reason 1>", "<reason 2>"] },
+    "domainKnowledge": { "level": "strong|solid|gap", "reasons": ["<reason 1>", "<reason 2>"] },
+    "languageMatch": { "level": "strong|solid|gap", "reasons": ["<reason 1>", "<reason 2>"] }
   },
   "requirementRows": [
     {
       "requirement": "<consolidated requirement>",
+      "category": "<Education|Experience|Communication|Domain Knowledge|Language|Technical|Leadership>",
       "status": "met|partial|missing",
       "currentState": "<concrete current state — honest, ${addressForm}-form, with evidence>",
       "suggestion": "<ethically sound improvement suggestion, ${addressForm}-form>"
@@ -219,23 +236,32 @@ ${JSON.stringify(firstResult.requirementRows, null, 2)}
    - "partial" when: related but not direct, or only brief touchpoints
    - "missing" when: no evidence in CV
 
-2. CURRENT STATE CHECK: Is column 2 concrete and honest?
-   - Does it contain project names, employers, time periods?
-   - Does it clearly state what IS present AND what is NOT?
-   - No vague formulations like "has experience in..."?
+2. CURRENT STATE CHECK: Is column 2 concise (max 2 sentences)?
+   - Structure: Thesis sentence + Example sentence.
+   - NO long enumerations of all positions. Pick the ONE most relevant example.
+   - If currentState is more than 2 sentences, SHORTEN it.
 
 3. SCORE CHECK: Is the overall score realistic?
    Check especially for "positive bias" — is it rated too favorably?
 
 4. CONSOLIDATION CHECK: Are similar requirements merged?
    Max. 8 rows. If more: merge semantically identical requirements.
+   Each row MUST have a "category" field (e.g. "Education", "Experience", "Communication").
 
-**OUTPUT:** Corrected version of the analysis in exactly the same JSON format.
+**OUTPUT:** Corrected version of the analysis.
+Each requirementRow must have: requirement, category, status, currentState, suggestion.
 Only change what genuinely needs correction.
 Add a "corrected: true" flag to each changed row.
 Set "realismScore" to 0-100 (how realistic was the first analysis?).
 
-**OUTPUT LANGUAGE:** ${lang}. Write ALL text fields in ${lang}.
+**OUTPUT FORMAT:**
+{
+  "requirementRows": [{ "requirement": "...", "category": "...", "status": "met|partial|missing", "currentState": "...", "suggestion": "...", "corrected": true }],
+  "overallScore": <0-100>,
+  "realismScore": <0-100>
+}
+
+**OUTPUT LANGUAGE:** ${lang}. Write ALL text fields in ${lang}. Even though these instructions are in English, your ENTIRE output MUST be in ${lang}.
   `;
 
     const checkResult = await complete({

@@ -178,12 +178,12 @@
       "manual_jobtitle_placeholder": "p. ej. Software Engineer",
       "manual_website_label": "Sitio web de la empresa",
       "manual_website_placeholder": "https://www.ejemplo.com",
-      "manual_website_hint": "Obligatorio \u2014 para un análisis preciso de la empresa",
+      "manual_website_hint": "Obligatorio — para un análisis preciso de la empresa",
       "manual_desc_label": "Descripción del puesto",
       "manual_chars_label": "caracteres",
       "manual_desc_placeholder": "Pega aquí la descripción completa del puesto...",
       "manual_error_generic": "Error al añadir el empleo",
-      "manual_error_network": "Error de red \u2014 por favor, inténtalo de nuevo",
+      "manual_error_network": "Error de red — por favor, inténtalo de nuevo",
       "manual_success_title": "Empleo añadido",
       "manual_success_link": "en",
       "manual_success_verb": "está siendo analizado.",
@@ -196,7 +196,7 @@
       "queue_full_title": "La cola de empleos está llena",
       "queue_full_body": "Ya tienes 5 empleos activos en tu cola. Cierra o elimina empleos existentes antes de añadir nuevos.",
       "queue_full_close": "Cerrar",
-      "add_btn_adding": "Creando perfil\u2026",
+      "add_btn_adding": "Creando perfil…",
       "add_btn_label": "Añadir",
       "add_btn_added": "Añadido",
       "add_btn_in_queue": "En cola",
@@ -330,7 +330,7 @@
       "steckbrief_empty": "No hay perfil disponible.",
       "recommendations_title": "Recomendaciones de tus entrevistas",
       "recommendations_empty": "Completa una entrevista para recibir recomendaciones.",
-      "certificate_section": "Formaci\u00f3n y certificaci\u00f3n",
+      "certificate_section": "Formación y certificación",
       "start_interview": "Iniciar entrevista",
       "category_role": "Para el puesto",
       "category_technique": "Técnica de entrevista",
@@ -486,69 +486,66 @@
   "settings": {
     "page": {
       "title": "Tu perfil profesional",
-      "subtitle": "Cuanto m\u00e1s sepa Pathly sobre ti, mejores ser\u00e1n tus solicitudes."
+      "subtitle": "Cuanto más sepa Pathly sobre ti, mejores serán tus solicitudes."
     },
     "profile": {
       "title": "Contexto personal",
-      "description": "Esta informaci\u00f3n ayuda a la IA a personalizar tus solicitudes."
+      "description": "Esta información ayuda a la IA a personalizar tus solicitudes."
     },
     "documents": {
       "title": "Mis documentos",
-      "description": "Tu CV y cartas de presentaci\u00f3n \u2014 utilizados para el match de CV, optimizaci\u00f3n y creaci\u00f3n de solicitudes."
+      "description": "Tu CV y cartas de presentación — utilizados para el match de CV, optimización y creación de solicitudes."
     },
     "language": {
       "title": "Idioma",
       "description": "Elige tu idioma preferido para la interfaz.",
       "de": "Deutsch",
       "en": "English",
-      "es": "Espa\u00f1ol",
+      "es": "Español",
       "saved": "Idioma guardado"
     }
   },
   "legal": {
     "ai_processing": {
-      "title": "Pol\u00edtica de procesamiento de IA",
-      "version": "Versi\u00f3n 1.0 | \u00daltima actualizaci\u00f3n: febrero 2026",
+      "title": "Política de procesamiento de IA",
+      "version": "Versión 1.0 | Última actualización: febrero 2026",
       "s1_title": "1. Modelos de IA",
-      "s1_body": "Utilizamos los modelos Claude de Anthropic para analizar tu CV y generar cartas de presentaci\u00f3n. Este procesamiento es esencial para la funcionalidad principal de Pathly.",
-      "s2_title": "2. Compartici\u00f3n de datos",
-      "s2_body": "Los datos de texto de tu CV y las descripciones de puestos se env\u00edan a la API de Anthropic para su procesamiento. Anthropic no entrena sus modelos con tus datos (acuerdo Enterprise/API).",
+      "s1_body": "Utilizamos los modelos Claude de Anthropic para analizar tu CV y generar cartas de presentación. Este procesamiento es esencial para la funcionalidad principal de Pathly.",
+      "s2_title": "2. Compartición de datos",
+      "s2_body": "Los datos de texto de tu CV y las descripciones de puestos se envían a la API de Anthropic para su procesamiento. Anthropic no entrena sus modelos con tus datos (acuerdo Enterprise/API).",
       "s3_title": "3. Toma de decisiones automatizada",
-      "s3_body": "La IA proporciona \u00fanicamente <strong>sugerencias</strong>. T\u00fa siempre tienes la revisi\u00f3n final antes de que se env\u00ede cualquier solicitud."
+      "s3_body": "La IA proporciona únicamente <strong>sugerencias</strong>. Tú siempre tienes la revisión final antes de que se envíe cualquier solicitud."
     },
     "cookie_policy": {
-      "title": "Pol\u00edtica de cookies",
-      "version": "Versi\u00f3n 1.0 | \u00daltima actualizaci\u00f3n: febrero 2026",
+      "title": "Política de cookies",
+      "version": "Versión 1.0 | Última actualización: febrero 2026",
       "s1_title": "1. Cookies esenciales",
-      "s1_body": "Solo utilizamos cookies esenciales necesarias para la autenticaci\u00f3n y la seguridad (Supabase Auth). No se pueden desactivar.",
-      "s2_title": "2. An\u00e1lisis",
-      "s2_body": "En esta versi\u00f3n de Pathly, <strong>no</strong> utilizamos cookies de seguimiento de terceros (como Google Analytics)."
+      "s1_body": "Solo utilizamos cookies esenciales necesarias para la autenticación y la seguridad (Supabase Auth). No se pueden desactivar.",
+      "s2_title": "2. Análisis",
+      "s2_body": "En esta versión de Pathly, <strong>no</strong> utilizamos cookies de seguimiento de terceros (como Google Analytics)."
     },
     "terms": {
-      "title": "T\u00e9rminos de servicio",
-      "version": "Versi\u00f3n 1.0 | \u00daltima actualizaci\u00f3n: febrero 2026",
-      "s1_title": "1. Descripci\u00f3n del servicio",
-      "s1_body": "Pathly es un asistente automatizado de solicitud de empleo. Proporcionamos herramientas para ayudarte a gestionar y acelerar tu b\u00fasqueda de empleo.",
+      "title": "Términos de servicio",
+      "version": "Versión 1.0 | Última actualización: febrero 2026",
+      "s1_title": "1. Descripción del servicio",
+      "s1_body": "Pathly es un asistente automatizado de solicitud de empleo. Proporcionamos herramientas para ayudarte a gestionar y acelerar tu búsqueda de empleo.",
       "s2_title": "2. Obligaciones del usuario",
-      "s2_body": "Te comprometes a proporcionar informaci\u00f3n precisa y a no usar el servicio para spam o actividades ilegales.",
+      "s2_body": "Te comprometes a proporcionar información precisa y a no usar el servicio para spam o actividades ilegales.",
       "s3_title": "3. Responsabilidad",
-      "s3_body": "Pathly ofrece sugerencias y automatizaci\u00f3n pero no garantiza ofertas de empleo. No somos responsables del resultado de tus solicitudes."
+      "s3_body": "Pathly ofrece sugerencias y automatización pero no garantiza ofertas de empleo. No somos responsables del resultado de tus solicitudes."
     },
     "privacy": {
       "title": "Política de Privacidad",
       "version": "Versión 1.1 | Última actualización: marzo 2026",
       "last_updated": "Última actualización: marzo 2026 | Versión 1.1",
-
       "tldr_title": "De un vistazo",
       "tldr_1": "Solo almacenamos datos necesarios para crear tus solicitudes de empleo.",
       "tldr_2": "Tus datos se almacenan cifrados en la UE (Frankfurt). Las llamadas a la IA van a proveedores en EE.UU. — cubiertas por Zero Data Retention.",
       "tldr_3": "No vendemos tus datos. No los usamos para entrenar la IA.",
       "tldr_4": "Puedes exportar o eliminar tus datos en cualquier momento.",
       "tldr_5": "Los textos generados por IA se identifican como tales — tú revisas antes de enviar.",
-
       "s1_title": "1. Responsable (Controller)",
       "s1_intro": "Responsable del tratamiento de datos según el RGPD:",
-
       "s2_title": "2. Qué datos recopilamos",
       "s2_intro": "Solo recopilamos datos necesarios para el funcionamiento de Pathly:",
       "s2_col_category": "Categoría",
@@ -569,7 +566,6 @@
       "s2_r5_cat": "Datos de empleo",
       "s2_r5_ex": "Búsquedas de empleo, historial de solicitudes",
       "s2_r5_purpose": "Job matching, seguimiento de solicitudes",
-
       "s3_title": "3. Base legal del tratamiento",
       "s3_b_label": "Art. 6(1)(b) RGPD (Contrato):",
       "s3_b_text": "Tratamiento de tus datos para prestar los servicios de Pathly (generación de documentos, job matching).",
@@ -577,7 +573,6 @@
       "s3_a_text": "Proporcionas consentimiento explícito para el procesamiento por IA durante el onboarding.",
       "s3_f_label": "Art. 6(1)(f) RGPD (Interés legítimo):",
       "s3_f_text": "Para medidas de seguridad (logging, prevención de fraude).",
-
       "s4_title": "4. Divulgación a terceros y subprocesadores",
       "s4_intro": "Solo compartimos tus datos con los siguientes proveedores de servicios, obligados contractualmente al cumplimiento del RGPD:",
       "s4_col_provider": "Proveedor",
@@ -603,7 +598,6 @@
       "s4_jina_purpose": "Web scraping de ofertas de empleo (primario)",
       "s4_jina_data": "URLs públicas (sin PII)",
       "s4_scc_note": "Para proveedores en EE.UU., las Cláusulas Contractuales Tipo de la UE (SCC) sirven como base legal para la transferencia de datos. Anthropic y OpenAI operan bajo Zero Data Retention (ZDR) — tus datos no se almacenan ni se usan para entrenamiento. Los identificadores directos (nombres, emails, teléfonos) se pseudonimizan técnicamente antes de la transmisión a servicios en EE.UU. La extracción de documentos (Azure) se realiza exclusivamente en la UE — sin transferencia a terceros países.",
-
       "s5_title": "5. Procesamiento por IA y transparencia (EU AI Act)",
       "s5_notice_title": "Aviso de transparencia según EU AI Act",
       "s5_notice_body": "Pathly utiliza Inteligencia Artificial para generar cartas de presentación y analizar CVs. Todos los textos generados por IA se identifican como tales.",
@@ -615,7 +609,6 @@
       "s5_docs_text": "Los CVs se extraen mediante Azure Document Intelligence (UE, West Europe) — sin transferencia a EE.UU. para este paso. El contenido del CV se pseudonimiza antes de enviarse a Claude para optimización; los datos de contacto personales se reemplazan con marcadores.",
       "s5_coaching_label": "Pseudonimización en coaching:",
       "s5_coaching_text": "En el coaching por IA, tus mensajes se pseudonimizan antes de enviarse al modelo de lenguaje. Los nombres, direcciones de email y números de teléfono se reemplazan con marcadores. El historial de chat original solo se almacena en tu sesión.",
-
       "s6_title": "6. Retención y eliminación",
       "s6_account_label": "Datos de cuenta:",
       "s6_account_text": "Mientras tu cuenta exista.",
@@ -629,7 +622,6 @@
       "s6_coaching_text": "El historial de chat se anonimiza después de 90 días. La sesión se elimina completamente después de 180 días.",
       "s6_consent_label": "Historial de consentimiento:",
       "s6_consent_text": "Se conserva por razones legales (RGPD Art. 7) durante 3 años, incluso después de la eliminación de la cuenta.",
-
       "s7_title": "7. Seguridad de datos",
       "s7_encryption_label": "Cifrado:",
       "s7_encryption_text": "Todos los datos se cifran en reposo con AES-256. La transmisión utiliza exclusivamente TLS 1.3.",
@@ -639,7 +631,6 @@
       "s7_location_text": "Todos los datos primarios se almacenan en la UE (AWS Frankfurt, eu-central-1). Las llamadas API a Anthropic y OpenAI van a servidores en EE.UU., pero con Zero Data Retention — sin almacenamiento, sin entrenamiento.",
       "s7_pii_label": "Pseudonimización de PII:",
       "s7_pii_text": "Antes de cada llamada a la IA, los identificadores directos (nombre, email, teléfono, dirección) se reemplazan con marcadores. La IA nunca ve tus datos personales reales.",
-
       "s8_title": "8. Tus derechos (RGPD Art. 12–22)",
       "s8_intro": "Tienes los siguientes derechos respecto a tus datos personales:",
       "s8_r15_label": "Derecho de acceso (Art. 15):",
@@ -657,13 +648,10 @@
       "s8_r7_label": "Derecho a retirar el consentimiento (Art. 7(3)):",
       "s8_r7_text": "Puedes retirar tu consentimiento para el procesamiento por IA en cualquier momento.",
       "s8_contact": "Para ejercer tus derechos, contáctanos en: kontakt@pathly.app",
-
       "s9_title": "9. Derecho a reclamar ante la autoridad de control",
       "s9_body": "Tienes derecho a presentar una reclamación ante una autoridad de protección de datos si consideras que el tratamiento de tus datos personales infringe el RGPD. La autoridad competente depende de tu lugar de residencia o la sede del responsable.",
-
       "s10_title": "10. Cookies",
       "s10_body": "Pathly utiliza exclusivamente cookies técnicamente necesarias para la autenticación y la gestión de sesiones. No se utilizan cookies de seguimiento, análisis ni publicidad. Por lo tanto, no se requiere un banner de cookies.",
-
       "s11_title": "11. Cambios en esta política de privacidad",
       "s11_body": "Para cambios materiales en esta política de privacidad, serás notificado por correo electrónico o notificación en la aplicación y se te podrá solicitar un nuevo consentimiento. La versión actual siempre está disponible en /legal/privacy-policy."
     }
@@ -738,7 +726,7 @@
     "t2_name": "Marco K.",
     "t2_role": "Acompañante lingüístico",
     "t2_org": "Willkommen e.V.",
-    "t2_text": "Cuando un niño pronuncia su primera frase completa y sonríe \u2014 ese es un momento que nunca se olvida.",
+    "t2_text": "Cuando un niño pronuncia su primera frase completa y sonríe — ese es un momento que nunca se olvida.",
     "t3_name": "Lena W.",
     "t3_role": "Diseño pro bono",
     "t3_org": "Gute-Tat Berlin",
@@ -746,7 +734,7 @@
     "t4_name": "Jonas B.",
     "t4_role": "Cuidado de animales",
     "t4_org": "Tierheim Berlin",
-    "t4_text": "En el refugio aprendí a asumir responsabilidad de nuevo. Los animales no juzgan \u2014 simplemente te necesitan."
+    "t4_text": "En el refugio aprendí a asumir responsabilidad de nuevo. Los animales no juzgan — simplemente te necesitan."
   },
   "add_job_dialog": {
     "title": "Añadir empleo",
@@ -759,7 +747,7 @@
     "website_label": "Sitio web de la empresa",
     "website_placeholder": "https://www.ejemplo.com",
     "website_invalid": "Introduce una URL válida (https://...)",
-    "website_hint": "Obligatorio \u2014 para un análisis preciso de la empresa",
+    "website_hint": "Obligatorio — para un análisis preciso de la empresa",
     "desc_label": "Descripción del puesto",
     "desc_chars": "{n} / 7.000 caracteres",
     "desc_placeholder": "Pega aquí la descripción completa del puesto...",
@@ -767,7 +755,6 @@
     "submit": "Añadir a la cola",
     "submitting": "Añadiendo..."
   },
-
   "cv_optimizer": {
     "pdf_loading": "Cargando PDF...",
     "cancel": "Cancelar",
@@ -804,7 +791,6 @@
     "metrics_desc": "Los CVs con métricas logran puntuaciones ATS significativamente mejores. Asigna números directamente a tus posiciones — la IA los integrará en las viñetas correspondientes.",
     "metrics_placeholder": "p. ej. 30% aumento de ingresos, equipo de 12...",
     "metrics_ok": "Números guardados",
-
     "start_button": "Iniciar optimización",
     "template_label": "Elegir plantilla:",
     "edit_done": "Listo",
@@ -827,7 +813,6 @@
     "step_optimize": "Optimizar",
     "step_preview": "Vista previa"
   },
-
   "diff_review": {
     "section_experience": "Experiencia",
     "section_education": "Formación",
@@ -874,9 +859,7 @@
     "ats_sidebar_title": "ATS Keywords",
     "ats_sidebar_covered": "cubiertos",
     "change_limit_info": "Nos enfocamos en los cambios más impactantes (máx. 12) para que tu CV quepa en 2 páginas. Las estaciones sin sugerencias ya están bien posicionadas."
-
   },
-
   "command_palette": {
     "placeholder": "¿Qué quieres hacer?",
     "empty": "No se encontraron resultados.",
@@ -928,11 +911,9 @@
     "loading_title": "Analizando CV Match…",
     "loading_duration": "Esto tarda unos 30–75 segundos",
     "loading_progress": "Leyendo CV...",
-    "step_1": "Cargando CV y resultados de coincidencia",
-    "step_2": "Analizando puntos débiles",
-    "step_3": "Identificando potencial de optimización",
-    "step_4": "Recopilando recomendaciones",
-    "step_5": "Preparando resultados",
+    "step_1": "Cargando CV y puesto",
+    "step_2": "Comparando requisitos",
+    "step_3": "Analizando fortalezas y brechas",
     "score_title": "Match Score",
     "score_match": "Coincidencia",
     "strengths": "Fortalezas",
@@ -975,7 +956,20 @@
     "show_more": "Más detalles",
     "show_less": "Mostrar menos",
     "show_more_count": "+{n} más",
-    "notify_match_done": "CV Match completado"
+    "notify_match_done": "CV Match completado",
+    "level_strong": "Fuerte",
+    "level_solid": "Sólido",
+    "level_gap": "Brecha",
+    "fit_strong": "Buen Ajuste",
+    "fit_partial": "Ajuste Parcial",
+    "fit_weak": "Bajo Ajuste",
+    "toggle_requirements": "Verificación de Requisitos",
+    "toggle_ats_keywords": "Palabras Clave ATS",
+    "breakdown_language": "Idioma",
+    "breakdown_summary": "Resumen",
+    "orbit_loading": "determinando…",
+    "step_4": "Derivando recomendaciones",
+    "step_5": "Preparando resultados"
   },
   "documents_required": {
     "cv_title": "CV necesario",

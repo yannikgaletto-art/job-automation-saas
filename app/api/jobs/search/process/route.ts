@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // ─── §12.5 Step 2: GPT-4o-mini Harvester ────────────────────
+        // ─── §12.5 Step 2: Claude Haiku Harvester ────────────────────
         // SerpAPI = Ground Truth, Jina = Enrichment
         const primaryDescription = serpApiFullDesc || serpApiJob.description;
         const harvested = await harvestJobData(

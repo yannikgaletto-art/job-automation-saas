@@ -152,6 +152,32 @@ export const analyzeCVMatch = inngest.createFunction(
             // Normalize matchResult — restore §7 compliance: validate before flagging done
             const missingFields: string[] = [];
 
+            // Defensive: convert legacy score:number to level-based format
+            function normalizeScoreCategory(val: any): { level: string; reasons: string[] } {
+                if (val && typeof val === 'object' && typeof val.level === 'string') {
+                    return { level: val.level, reasons: Array.isArray(val.reasons) ? val.reasons : [] };
+                }
+                if (val && typeof val === 'object' && typeof val.score === 'number') {
+                    const level = val.score >= 70 ? 'strong' : val.score >= 40 ? 'solid' : 'gap';
+                    return { level, reasons: Array.isArray(val.reasons) ? val.reasons : [] };
+                }
+                if (typeof val === 'number') {
+                    return { level: val >= 70 ? 'strong' : val >= 40 ? 'solid' : 'gap', reasons: [] };
+                }
+                return { level: 'solid', reasons: [] }; // safe default
+            }
+
+            const rawBreakdown = (matchResult.scoreBreakdown && typeof matchResult.scoreBreakdown === 'object')
+                ? matchResult.scoreBreakdown as Record<string, any> : {};
+
+            const normalizedBreakdown = {
+                technicalSkills: normalizeScoreCategory(rawBreakdown.technicalSkills),
+                softSkills: normalizeScoreCategory(rawBreakdown.softSkills),
+                experienceLevel: normalizeScoreCategory(rawBreakdown.experienceLevel),
+                domainKnowledge: normalizeScoreCategory(rawBreakdown.domainKnowledge),
+                languageMatch: normalizeScoreCategory(rawBreakdown.languageMatch),
+            };
+
             const safeResult = {
                 ...matchResult,
                 requirementRows: Array.isArray(matchResult.requirementRows)
@@ -166,8 +192,7 @@ export const analyzeCVMatch = inngest.createFunction(
                     ? matchResult.keywordsFound : (missingFields.push('keywordsFound'), []),
                 keywordsMissing: Array.isArray(matchResult.keywordsMissing)
                     ? matchResult.keywordsMissing : (missingFields.push('keywordsMissing'), []),
-                scoreBreakdown: (matchResult.scoreBreakdown && typeof matchResult.scoreBreakdown === 'object')
-                    ? matchResult.scoreBreakdown : {},
+                scoreBreakdown: normalizedBreakdown,
                 _normalized: missingFields.length > 0,
             };
 

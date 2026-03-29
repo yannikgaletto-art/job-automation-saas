@@ -14,9 +14,10 @@ import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CVMatchResult } from '@/lib/services/cv-match-analyzer';
+import { MatchOrbit } from './MatchOrbit';
 import { Button } from '@/components/motion/button';
 import {
-    Loader2, CheckCircle2, AlertCircle, Sparkles, Zap, ChevronDown
+    Loader2, CheckCircle2, AlertCircle, Zap, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CVSelectDialog, type CVOption } from '@/components/dashboard/cv-select-dialog';
@@ -47,94 +48,57 @@ function StatusBadge({ status, t }: { status: 'met' | 'partial' | 'missing'; t: 
     );
 }
 
-// --- Expandable bullet list for reasons ---
-function ReasonsList({ reasons, t }: { reasons: string[]; t: ReturnType<typeof useTranslations> }) {
-    const [expanded, setExpanded] = useState(false);
-    if (reasons.length === 0) return null;
-
-    /** Bold the KEY TERM at start of each bullet */
-    const boldStart = (text: string): React.ReactNode => {
-        const match = text.match(/^([^:,\-–]+)[:\-–,]\s*(.*)/);
-        if (match) return <><strong className="font-semibold text-[#37352F]">{match[1]}:</strong> {match[2]}</>;
-        return text;
-    };
-
-    return (
-        <div className="pl-[140px] pr-8 mt-0.5">
-            <ul className="space-y-0.5">
-                <li className="text-xs text-slate-500 list-disc ml-4 leading-snug">{boldStart(reasons[0])}</li>
-            </ul>
-
-            <AnimatePresence>
-                {expanded && reasons.length > 1 && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.25, ease: 'easeOut' }}
-                        className="overflow-hidden"
-                    >
-                        <ul className="space-y-0.5 mt-0.5">
-                            {reasons.slice(1).map((r, idx) => (
-                                <li key={idx} className="text-xs text-slate-500 list-disc ml-4 leading-snug">{boldStart(r)}</li>
-                            ))}
-                        </ul>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {reasons.length > 1 && (
-                <button
-                    onClick={() => setExpanded(!expanded)}
-                    className="mt-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
-                >
-                    <ChevronDown
-                        size={12}
-                        className={cn("transition-transform duration-200", expanded && "rotate-180")}
-                    />
-                    {expanded ? t('show_less') : t('show_more')}
-                </button>
-            )}
-        </div>
-    );
-}
-
-/** Insights list for Match Score card — all items + toggle, text-xs to match Score Breakdown */
-function InsightsList({ items, t }: { items: string[]; t: ReturnType<typeof useTranslations> }) {
-    const [expanded, setExpanded] = useState(false);
-    if (items.length === 0) return <p className="text-xs text-slate-400 italic">–</p>;
-    const shown = expanded ? items : items.slice(0, 1);
-    return (
-        <div>
-            <ul className="list-disc list-inside space-y-0.5">
-                {shown.map((item, i) => (
-                    <li key={i} className="text-xs text-slate-700 leading-snug">{item}</li>
-                ))}
-            </ul>
-            {items.length > 1 && (
-                <button
-                    onClick={() => setExpanded(!expanded)}
-                    className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors"
-                >
-                    <ChevronDown size={12} className={cn("transition-transform duration-200", expanded && "rotate-180")} />
-                    {expanded ? t('show_less') : t('show_more_count', { n: items.length - 1 })}
-                </button>
-            )}
-        </div>
-    );
-}
 
 /** Expandable table cell for Anforderungs-Check rows */
-function ExpandableCell({ text, boldFn, t }: { text: string; boldFn: (s: string) => React.ReactNode; t: ReturnType<typeof useTranslations> }) {
+/**
+ * Split text into sentences for structured rendering.
+ * Handles common abbreviations (e.g., "ca.", "z.B.", "1.3") to avoid false splits.
+ */
+function splitSentences(text: string): string[] {
+    // Protect known abbreviations from sentence splitting
+    const protected_ = text
+        .replace(/\bca\./g, 'ca\u0000')
+        .replace(/\bz\.B\./g, 'z\u0000B\u0000')
+        .replace(/\bbzw\./g, 'bzw\u0000')
+        .replace(/\bd\.h\./g, 'd\u0000h\u0000')
+        .replace(/\bu\.a\./g, 'u\u0000a\u0000')
+        .replace(/\bi\.e\./g, 'i\u0000e\u0000')
+        .replace(/\be\.g\./g, 'e\u0000g\u0000')
+        .replace(/(\d)\./g, '$1\u0000'); // protect "1.3", "2025."
+
+    const raw = protected_.split(/(?<=[.!?])\s+/);
+    return raw
+        .map(s => s.replace(/\u0000/g, '.').trim())
+        .filter(s => s.length > 0);
+}
+
+function ExpandableCell({ text, t }: { text: string; t: ReturnType<typeof useTranslations> }) {
     const [expanded, setExpanded] = useState(false);
-    const SHORT_LIMIT = 80;
-    const isLong = text.length > SHORT_LIMIT;
+    const sentences = splitSentences(text);
+    const isLong = sentences.length > 1 || text.length > 100;
+
     return (
         <div>
             {expanded ? (
-                <p className="text-xs text-slate-600 leading-snug">{text}</p>
+                <div className="space-y-1.5">
+                    {sentences.map((sentence, i) => (
+                        <p key={i} className={cn(
+                            'text-xs leading-relaxed',
+                            i === 0
+                                ? 'font-semibold text-[#37352F]'
+                                : 'text-slate-600'
+                        )}>
+                            {sentence}
+                        </p>
+                    ))}
+                </div>
             ) : (
-                <p className="text-xs text-slate-600 leading-snug">{boldFn(text)}</p>
+                <p className="text-xs leading-relaxed">
+                    <span className="font-semibold text-[#37352F]">{sentences[0]}</span>
+                    {sentences.length > 1 && (
+                        <span className="text-slate-500">{' '}{sentences[1]}</span>
+                    )}
+                </p>
             )}
             {isLong && (
                 <button
@@ -181,8 +145,11 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     const notify = useNotification();
     const [matchData, setMatchData] = useState<CVMatchResult | null>(null);
     const [loadingStep, setLoadingStep] = useState(0);
+    const [requirementsOpen, setRequirementsOpen] = useState(false);
+    const [atsOpen, setAtsOpen] = useState(false);
+    const [isMatchFromCache, setIsMatchFromCache] = useState(true);
 
-    // Steps shown during loading — computed from translations
+    // Steps shown during loading — 5 steps for progressive disclosure
     const CV_STEPS = useMemo(() => [
         t('step_1'),
         t('step_2'),
@@ -201,6 +168,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 if (cancelled) return;
                 if (data.success && data.cached && data.cached.analyzed_at) {
                     setMatchData(data.cached as CVMatchResult);
+                    setIsMatchFromCache(true);
                     setState('complete');
                 } else if (data.cvMatchStatus === 'processing' && data.cvMatchStartedAt) {
                     const elapsed = Date.now() - new Date(data.cvMatchStartedAt).getTime();
@@ -275,12 +243,18 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
         setState('loading');
         setErrorMessage(null);
         setLoadingStep(1);
+        setIsMatchFromCache(false);
         setShowCVSelect(false);
         onMatchStart?.();
 
         try {
             await new Promise(r => setTimeout(r, 800));
             setLoadingStep(2);
+
+            // Progressive step simulation during the polling wait
+            const step3Timer = setTimeout(() => setLoadingStep(3), 10000);
+            const step4Timer = setTimeout(() => setLoadingStep(4), 25000);
+            const step5Timer = setTimeout(() => setLoadingStep(5), 45000);
 
             // POST triggers the Inngest pipeline — returns immediately
             const res = await fetch('/api/cv/match', {
@@ -327,7 +301,9 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         // Result arrived!
                         if (pollingRef.current) clearInterval(pollingRef.current);
                         pollingRef.current = null;
-                        setLoadingStep(3);
+                        clearTimeout(step3Timer);
+                        clearTimeout(step4Timer);
+                        clearTimeout(step5Timer);
                         setMatchData(pollData.cached);
                         setState('complete');
                         notify(t('notify_match_done'));
@@ -563,167 +539,152 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
         const totalCount = rows.length;
         const metPercent = totalCount > 0 ? Math.round((metCount / totalCount) * 100) : 0;
 
-        const scoreColor = matchData.overallScore >= 70 ? '#22c55e' : matchData.overallScore >= 50 ? '#f59e0b' : '#ef4444';
         const score = typeof matchData.overallScore === 'number' ? matchData.overallScore : parseInt(String(matchData.overallScore ?? 0), 10);
 
-        // Arrays sourced directly from matchData
-        /** Truncate to word boundary at ~60 chars */
-        const trunc = (s: string, n = 60) =>
-            s.length > n ? s.slice(0, s.lastIndexOf(' ', n)) + '…' : s;
-
-        /** Extract boldable first term (noun/verb before first , : - em-dash) */
-        const boldFirst = (text: string): React.ReactNode => {
-            const m = text.match(/^([^:,\-–]+)[:\-–,]\s*(.*)/);
-            if (m) return <><strong className="font-semibold text-slate-900">{m[1].trim()}</strong>{' — '}{trunc(m[2])}</>;
-            return trunc(text);
-        };
-
         return (
-            <div className="p-5 bg-[#FAFAF9] rounded-b-xl border-t border-slate-200 space-y-4">
+            <div className="p-5 bg-[#FAFAF9] rounded-b-xl border-t border-slate-200 space-y-4" style={{ minHeight: 600 }}>
 
-                {/* ── Match Score & Score Breakdown — identical card shells, same height ── */}
-                <div className="grid grid-cols-2 gap-4 items-stretch">
-                    {/* Match Score Card */}
-                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col">
-                        <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">
-                            {t('score_title')}
-                        </h3>
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-semibold text-slate-700">{t('score_match')}</span>
-                            <span className="text-sm font-bold text-slate-900">{score}%</span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-slate-100 mb-5">
-                            <div
-                                className="h-2 rounded-full transition-all duration-700 ease-out"
-                                style={{ width: `${score}%`, backgroundColor: scoreColor }}
-                            />
-                        </div>
-                        <div className="space-y-3 flex-1">
-                            {[
-                                { label: t('strengths'), items: strengths.length > 0 ? strengths : [t('no_strengths')] },
-                                { label: t('gaps'), items: gaps.length > 0 ? gaps : [t('no_gaps')] },
-                                { label: t('potential'), items: potentialHighlights.length > 0 ? potentialHighlights : [t('no_potential')] },
-                            ].map(({ label, items }) => (
-                                <div key={label}>
-                                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
-                                    <InsightsList items={items} t={t} />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                {/* ── MatchOrbit + Detail Card ── */}
+                <MatchOrbit
+                    overallScore={score}
+                    breakdown={matchData.scoreBreakdown}
+                    summaryData={{ strengths, gaps, potentialHighlights }}
+                    onCenterClick={() => setRequirementsOpen(true)}
+                    isFromCache={isMatchFromCache}
+                />
 
-                    {/* Score Breakdown */}
-                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col overflow-y-auto max-h-[400px] custom-scrollbar">
-                        <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">{t('breakdown_title')}</h4>
-                        <div className="space-y-3 flex-1">
-                            {[
-                                { label: t('breakdown_technical'), value: matchData.scoreBreakdown.technicalSkills },
-                                { label: t('breakdown_soft'), value: matchData.scoreBreakdown.softSkills },
-                                { label: t('breakdown_experience'), value: matchData.scoreBreakdown.experienceLevel },
-                                { label: t('breakdown_domain'), value: matchData.scoreBreakdown.domainKnowledge },
-                            ].map((item, i) => {
-                                const sc = typeof item.value === 'number' ? item.value : item.value?.score || 0;
-                                const reasons = typeof item.value === 'number' ? [] : item.value?.reasons || [];
-                                return (
-                                    <div key={i} className="mb-2 last:mb-0">
-                                        <div className="flex items-center text-sm mb-1">
-                                            <div className="w-32 text-slate-500 font-medium text-xs"><strong>{item.label}</strong></div>
-                                            <div className="flex-1 h-1.5 bg-[#E7E7E5] rounded-full overflow-hidden mx-2">
-                                                <motion.div
-                                                    initial={{ width: 0 }}
-                                                    animate={{ width: sc + '%' }}
-                                                    transition={{ duration: 1, delay: i * 0.1 }}
-                                                    className="h-full bg-gradient-to-r from-[#002e7a] to-[#3B82F6]"
-                                                />
-                                            </div>
-                                            <div className="w-8 text-right font-medium text-xs text-[#37352F]">{sc}%</div>
-                                        </div>
-                                        <ReasonsList reasons={reasons} t={t} />
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── Requirements Check ── */}
+                {/* ── Requirements Check (Toggle) ── */}
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                        <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">{t('requirements_title')}</h3>
+                    <button
+                        onClick={() => setRequirementsOpen(!requirementsOpen)}
+                        className="w-full px-4 py-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors"
+                    >
+                        <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                            {t('toggle_requirements')}
+                        </h3>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-400">{metCount}/{totalCount}</span>
                             <div className="w-20 h-1 bg-slate-100 rounded overflow-hidden">
                                 <div className="h-1 bg-green-500 rounded" style={{ width: `${metPercent}%` }} />
                             </div>
+                            <ChevronDown
+                                size={14}
+                                className={cn("text-slate-400 transition-transform duration-200", requirementsOpen && "rotate-180")}
+                            />
                         </div>
-                    </div>
+                    </button>
 
-                    <table className="w-full table-fixed">
-                        <colgroup>
-                            <col className="w-[22%]" />
-                            <col className="w-[36%]" />
-                            <col className="w-[42%]" />
-                        </colgroup>
-                        <thead>
-                            <tr className="bg-slate-50 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                                <th className="px-4 py-2 text-left font-semibold">{t('req_col_requirement')}</th>
-                                <th className="px-4 py-2 text-left font-semibold">{t('req_col_current')}</th>
-                                <th className="px-4 py-2 text-left font-semibold">{t('req_col_suggestion')}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {rows.map((row, i) => (
-                                <motion.tr
-                                    key={i}
-                                    initial={{ opacity: 0, y: 5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.04 }}
-                                    className="group hover:bg-slate-50 transition-colors"
-                                >
-                                    {/* Requirement */}
-                                    <td className="py-3 px-4 align-top">
-                                        <StatusBadge status={row.status} t={t} />
-                                        <p className="text-xs text-slate-700 mt-1.5 leading-snug">{row.requirement}</p>
-                                    </td>
+                    <AnimatePresence>
+                        {requirementsOpen && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                className="overflow-hidden"
+                            >
+                                <table className="w-full table-fixed">
+                                    <colgroup>
+                                        <col className="w-[22%]" />
+                                        <col className="w-[36%]" />
+                                        <col className="w-[42%]" />
+                                    </colgroup>
+                                    <thead>
+                                        <tr className="bg-slate-50 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                                            <th className="px-4 py-2 text-left font-semibold">{t('req_col_requirement')}</th>
+                                            <th className="px-4 py-2 text-left font-semibold">{t('req_col_current')}</th>
+                                            <th className="px-4 py-2 text-left font-semibold">{t('req_col_suggestion')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {rows.map((row, i) => (
+                                            <motion.tr
+                                                key={i}
+                                                initial={{ opacity: 0, y: 5 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: i * 0.04 }}
+                                                className="group hover:bg-slate-50 transition-colors"
+                                            >
+                                                {/* Requirement — with bold category label */}
+                                                <td className="py-3 px-4 align-top">
+                                                    <StatusBadge status={row.status} t={t} />
+                                                    {row.category && (
+                                                        <p className="text-[10px] font-bold text-[#002e7a] mt-1.5 uppercase tracking-wider">{row.category}</p>
+                                                    )}
+                                                    <p className="text-xs text-slate-700 mt-0.5 leading-snug">{row.requirement}</p>
+                                                </td>
 
-                                    {/* Current State — expandable teaser */}
-                                    <td className="py-3 px-4 align-top border-l border-slate-100">
-                                        <ExpandableCell text={row.currentState} boldFn={boldFirst} t={t} />
-                                    </td>
+                                                {/* Current State — expandable teaser */}
+                                                <td className="py-3 px-4 align-top border-l border-slate-100">
+                                                    <ExpandableCell text={row.currentState} t={t} />
+                                                </td>
 
-                                    {/* Recommendation — expandable teaser */}
-                                    <td className="py-3 px-4 align-top border-l border-slate-100">
-                                        <ExpandableCell text={row.suggestion || ''} boldFn={boldFirst} t={t} />
-                                    </td>
-                                </motion.tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                                {/* Recommendation — expandable teaser */}
+                                                <td className="py-3 px-4 align-top border-l border-slate-100">
+                                                    <ExpandableCell text={row.suggestion || ''} t={t} />
+                                                </td>
+                                            </motion.tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
-                {/* ── ATS Keywords ── */}
-                <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
-                    <h4 className="text-xs font-semibold text-[#37352F] mb-2">
-                        {t('ats_title')} <span className="text-[10px] text-slate-400 font-normal ml-1">{t('ats_subtitle')}</span>
-                    </h4>
-                    <p className="text-xs text-slate-500 leading-relaxed mb-3"
-                       dangerouslySetInnerHTML={{ __html: String(t.raw('ats_desc')) }}
-                    />
-                    <div className="flex flex-wrap gap-1.5">
-                        {keywordsFound.map(kw => (
-                            <span key={kw} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
-                                <CheckCircle2 size={10} /> {kw}
+                {/* ── ATS Keywords (Toggle) ── */}
+                <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+                    <button
+                        onClick={() => setAtsOpen(!atsOpen)}
+                        className="w-full px-4 py-3 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
+                    >
+                        <h4 className="text-xs font-semibold text-[#37352F] flex items-center gap-1.5">
+                            {t('toggle_ats_keywords')}
+                            <span className="text-[10px] text-slate-400 font-normal">{t('ats_subtitle')}</span>
+                        </h4>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-400">
+                                {keywordsFound.length} ✓ / {keywordsMissing.length} ✗
                             </span>
-                        ))}
-                        {keywordsMissing.map(kw => (
-                            <span key={kw} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-red-50 text-red-700 border border-red-100 opacity-75">
-                                <AlertCircle size={10} /> {kw}
-                            </span>
-                        ))}
-                        {keywordsFound.length === 0 && keywordsMissing.length === 0 && (
-                            <span className="text-xs text-slate-400 italic">{t('ats_empty')}</span>
+                            <ChevronDown
+                                size={14}
+                                className={cn("text-slate-400 transition-transform duration-200", atsOpen && "rotate-180")}
+                            />
+                        </div>
+                    </button>
+
+                    <AnimatePresence>
+                        {atsOpen && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.25, ease: 'easeInOut' }}
+                                className="overflow-hidden"
+                            >
+                                <div className="px-4 pb-4 pt-1">
+                                    <p className="text-xs text-slate-500 leading-relaxed mb-3"
+                                       dangerouslySetInnerHTML={{ __html: String(t.raw('ats_desc')) }}
+                                    />
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {keywordsFound.map(kw => (
+                                            <span key={kw} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
+                                                <CheckCircle2 size={10} /> {kw}
+                                            </span>
+                                        ))}
+                                        {keywordsMissing.map(kw => (
+                                            <span key={kw} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-red-50 text-red-700 border border-red-100 opacity-75">
+                                                <AlertCircle size={10} /> {kw}
+                                            </span>
+                                        ))}
+                                        {keywordsFound.length === 0 && keywordsMissing.length === 0 && (
+                                            <span className="text-xs text-slate-400 italic">{t('ats_empty')}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </motion.div>
                         )}
-                    </div>
+                    </AnimatePresence>
                 </div>
 
                 {/* ── Next Step ── */}

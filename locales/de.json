@@ -178,12 +178,12 @@
       "manual_jobtitle_placeholder": "z.B. Software Engineer",
       "manual_website_label": "Unternehmens-Website",
       "manual_website_placeholder": "https://www.beispiel.de",
-      "manual_website_hint": "Pflichtfeld \u2014 für präzise Unternehmensanalyse",
+      "manual_website_hint": "Pflichtfeld — für präzise Unternehmensanalyse",
       "manual_desc_label": "Stellenbeschreibung",
       "manual_chars_label": "Zeichen",
       "manual_desc_placeholder": "Vollständige Stellenbeschreibung hier einfügen...",
       "manual_error_generic": "Fehler beim Hinzufügen",
-      "manual_error_network": "Netzwerkfehler \u2014 bitte erneut versuchen",
+      "manual_error_network": "Netzwerkfehler — bitte erneut versuchen",
       "manual_success_title": "Job hinzugefügt",
       "manual_success_link": "bei",
       "manual_success_verb": "wird jetzt analysiert.",
@@ -196,7 +196,7 @@
       "queue_full_title": "Job Queue ist voll",
       "queue_full_body": "Du hast bereits 5 aktive Jobs in deiner Job Queue. Schließe bestehende Jobs ab oder lösche sie, bevor du neue hinzufügst.",
       "queue_full_close": "Schließen",
-      "add_btn_adding": "Steckbrief wird erstellt\u2026",
+      "add_btn_adding": "Steckbrief wird erstellt…",
       "add_btn_label": "Hinzufügen",
       "add_btn_added": "Hinzugefügt",
       "add_btn_in_queue": "In der Queue",
@@ -205,8 +205,8 @@
       "preview_hint": "Prüfe den Steckbrief und ergänze fehlende Punkte per Copy & Paste von der Stellenanzeige.",
       "preview_tasks_label": "Aufgaben",
       "preview_reqs_label": "Qualifikationen",
-      "preview_add_task_ph": "Aufgabe ergänzen\u2026",
-      "preview_add_req_ph": "Qualifikation ergänzen\u2026",
+      "preview_add_task_ph": "Aufgabe ergänzen…",
+      "preview_add_req_ph": "Qualifikation ergänzen…",
       "preview_add_btn": "Ergänzen",
       "preview_cancel": "Abbrechen",
       "preview_confirm": "Steckbrief bestätigen",
@@ -329,7 +329,7 @@
       "steckbrief_original": "Originalanzeige",
       "steckbrief_empty": "Kein Steckbrief vorhanden.",
       "recommendations_title": "Empfehlungen aus deinen Interviews",
-      "recommendations_empty": "Schlie\u00dfe ein Interview ab, um Empfehlungen zu erhalten.",
+      "recommendations_empty": "Schließe ein Interview ab, um Empfehlungen zu erhalten.",
       "certificate_section": "Weiterbildung & Zertifizierung",
       "start_interview": "Interview beginnen",
       "category_role": "Für die Rolle",
@@ -347,9 +347,9 @@
         "role_cases": "Cases im Alltag",
         "role_methods": "Arbeitsweisen und Methodik",
         "role_loading": "Wird analysiert…",
-        "role_empty": "Klicke \u201EAnalysieren\u201C um Infos zur Rolle zu laden.",
+        "role_empty": "Klicke „Analysieren“ um Infos zur Rolle zu laden.",
         "story_loading": "Wird analysiert…",
-        "story_empty": "Klicke \u201EAnalysieren\u201C um deine Geschichte zu generieren.",
+        "story_empty": "Klicke „Analysieren“ um deine Geschichte zu generieren.",
         "analysis_step_1": "Interview-Antworten werden ausgewertet",
         "analysis_step_2": "Stärken und Schwächen analysieren",
         "analysis_step_3": "Verbesserungsvorschläge erstellen",
@@ -538,17 +538,14 @@
       "title": "Datenschutzerklärung / Privacy Policy",
       "version": "Version 1.1 | Stand: März 2026",
       "last_updated": "Letzte Aktualisierung: März 2026 | Version 1.1",
-
       "tldr_title": "Auf einen Blick",
       "tldr_1": "Wir speichern nur Daten, die für die Bewerbungserstellung notwendig sind.",
       "tldr_2": "Deine Daten werden verschlüsselt in der EU (Frankfurt) gespeichert. KI-Calls gehen an US-Anbieter — abgedeckt durch Zero Data Retention.",
       "tldr_3": "Wir verkaufen deine Daten nicht. Wir nutzen sie nicht zum KI-Training.",
       "tldr_4": "Du kannst jederzeit deine Daten exportieren oder löschen lassen.",
       "tldr_5": "KI-generierte Texte werden als solche gekennzeichnet — du prüfst vor dem Absenden.",
-
       "s1_title": "1. Verantwortliche Stelle (Controller)",
       "s1_intro": "Verantwortlich für die Datenverarbeitung im Sinne der DSGVO:",
-
       "s2_title": "2. Welche Daten wir erheben",
       "s2_intro": "Wir erheben ausschließlich Daten, die für den Betrieb von Pathly erforderlich sind:",
       "s2_col_category": "Datenkategorie",
@@ -569,7 +566,6 @@
       "s2_r5_cat": "Job-Daten",
       "s2_r5_ex": "Gesuchte Stellen, Bewerbungs-Historie",
       "s2_r5_purpose": "Job-Matching, Bewerbungsverfolgung",
-
       "s3_title": "3. Rechtsgrundlage der Verarbeitung",
       "s3_b_label": "Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung):",
       "s3_b_text": "Verarbeitung deiner Daten zur Erbringung der Pathly-Dienste (Dokumentgenerierung, Job-Matching).",
@@ -577,7 +573,6 @@
       "s3_a_text": "Für die KI-Verarbeitung deiner Daten holst du beim Onboarding eine ausdrückliche Einwilligung.",
       "s3_f_label": "Art. 6 Abs. 1 lit. f DSGVO (Berechtigtes Interesse):",
       "s3_f_text": "Für Sicherheitsmaßnahmen (Logging, Betrugsschutz).",
-
       "s4_title": "4. Weitergabe an Dritte & Auftragsverarbeiter",
       "s4_intro": "Wir übermitteln deine Daten ausschließlich an folgende Dienstleister, die vertraglich zur Einhaltung der DSGVO verpflichtet sind:",
       "s4_col_provider": "Anbieter",
@@ -603,7 +598,6 @@
       "s4_jina_purpose": "Web-Scraping von Stellenanzeigen (Primär)",
       "s4_jina_data": "Öffentliche URLs (keine PII)",
       "s4_scc_note": "Für US-basierte Anbieter bestehen EU-Standardvertragsklauseln (SCC) als Rechtsgrundlage für den Datentransfer. Anthropic und OpenAI werden mit Zero Data Retention (ZDR) betrieben — deine Daten werden nicht gespeichert und nicht zum Training verwendet. Direkte Identifikatoren (Namen, E-Mail-Adressen, Telefonnummern) werden vor der Übermittlung an US-Dienste technisch pseudonymisiert. Die Dokumentenextraktion (Azure) findet ausschließlich in der EU statt — kein Drittlandtransfer.",
-
       "s5_title": "5. KI-Verarbeitung & Transparenz (EU AI Act)",
       "s5_notice_title": "Transparenzhinweis gemäß EU AI Act",
       "s5_notice_body": "Pathly nutzt Künstliche Intelligenz zur Generierung von Bewerbungsschreiben und zur Analyse von Lebensläufen. Alle KI-generierten Texte werden als solche gekennzeichnet.",
@@ -615,7 +609,6 @@
       "s5_docs_text": "CVs werden durch Azure Document Intelligence (EU, West Europe) extrahiert — kein US-Transfer für diesen Schritt. Der Inhalt des Lebenslaufs wird für die KI-Optimierung pseudonymisiert an Claude übermittelt; persönliche Kontaktdaten werden vor der Übermittlung durch Platzhalter ersetzt.",
       "s5_coaching_label": "Coaching-Pseudonymisierung:",
       "s5_coaching_text": "Im KI-Coaching werden deine Nachrichten vor der Übermittlung an das Sprachmodell pseudonymisiert. Namen, E-Mail-Adressen und Telefonnummern werden durch Platzhalter ersetzt. Der originale Chatverlauf bleibt nur in deiner Session gespeichert.",
-
       "s6_title": "6. Speicherdauer & Löschung",
       "s6_account_label": "Account-Daten:",
       "s6_account_text": "Solange dein Account existiert.",
@@ -629,7 +622,6 @@
       "s6_coaching_text": "Nach 90 Tagen wird der Chatverlauf anonymisiert. Nach 180 Tagen wird die Session vollständig gelöscht.",
       "s6_consent_label": "Consent-Historie:",
       "s6_consent_text": "Wird aus rechtlichen Gründen (DSGVO Art. 7) auch nach Account-Löschung für 3 Jahre aufbewahrt.",
-
       "s7_title": "7. Datensicherheit",
       "s7_encryption_label": "Verschlüsselung:",
       "s7_encryption_text": "Alle Daten werden im Ruhezustand mit AES-256 verschlüsselt. Die Übertragung erfolgt ausschließlich über TLS 1.3.",
@@ -639,7 +631,6 @@
       "s7_location_text": "Alle primären Daten werden in der EU (AWS Frankfurt, eu-central-1) gespeichert. KI-API-Calls an Anthropic und OpenAI gehen an US-Server, jedoch mit Zero Data Retention — keine Speicherung, kein Training.",
       "s7_pii_label": "PII-Pseudonymisierung:",
       "s7_pii_text": "Vor jedem KI-Call werden direkte Identifikatoren (Name, E-Mail, Telefon, Adresse) durch Platzhalter ersetzt. Die KI sieht niemals deine echten personenbezogenen Daten.",
-
       "s8_title": "8. Deine Rechte (DSGVO Art. 12–22)",
       "s8_intro": "Du hast folgende Rechte bezüglich deiner personenbezogenen Daten:",
       "s8_r15_label": "Auskunftsrecht (Art. 15):",
@@ -657,13 +648,10 @@
       "s8_r7_label": "Recht auf Widerruf der Einwilligung (Art. 7 Abs. 3):",
       "s8_r7_text": "Du kannst deine Einwilligung zur KI-Verarbeitung jederzeit widerrufen.",
       "s8_contact": "Zur Ausübung deiner Rechte kontaktiere uns unter: kontakt@pathly.app",
-
       "s9_title": "9. Beschwerderecht bei der Aufsichtsbehörde",
       "s9_body": "Du hast das Recht, dich bei einer Datenschutzaufsichtsbehörde zu beschweren, wenn du der Meinung bist, dass die Verarbeitung deiner personenbezogenen Daten gegen die DSGVO verstößt. Die zuständige Aufsichtsbehörde richtet sich nach deinem Wohnort bzw. dem Sitz des Verantwortlichen.",
-
       "s10_title": "10. Cookies",
       "s10_body": "Pathly verwendet ausschließlich technisch notwendige Cookies für die Authentifizierung und Session-Verwaltung. Es werden keine Tracking-Cookies, Analyse-Cookies oder Werbe-Cookies eingesetzt. Ein Cookie-Banner ist daher nicht erforderlich.",
-
       "s11_title": "11. Änderungen dieser Datenschutzerklärung",
       "s11_body": "Bei wesentlichen Änderungen an dieser Datenschutzerklärung wirst du per E-Mail oder per In-App-Benachrichtigung informiert und ggf. um erneute Einwilligung gebeten. Die aktuelle Version ist immer unter /legal/privacy-policy einsehbar."
     }
@@ -738,7 +726,7 @@
     "t2_name": "Marco K.",
     "t2_role": "Sprachbegleiter",
     "t2_org": "Willkommen e.V.",
-    "t2_text": "Wenn ein Kind zum ersten Mal einen ganzen Satz auf Deutsch sagt und dabei strahlt \u2014 das ist ein Moment, den vergisst man nicht mehr.",
+    "t2_text": "Wenn ein Kind zum ersten Mal einen ganzen Satz auf Deutsch sagt und dabei strahlt — das ist ein Moment, den vergisst man nicht mehr.",
     "t3_name": "Lena W.",
     "t3_role": "Pro-Bono Design",
     "t3_org": "Gute-Tat Berlin",
@@ -746,7 +734,7 @@
     "t4_name": "Jonas B.",
     "t4_role": "Tierpflege",
     "t4_org": "Tierheim Berlin",
-    "t4_text": "Im Tierheim habe ich gelernt, wieder Verantwortung zu übernehmen. Die Tiere urteilen nicht \u2014 sie brauchen dich einfach."
+    "t4_text": "Im Tierheim habe ich gelernt, wieder Verantwortung zu übernehmen. Die Tiere urteilen nicht — sie brauchen dich einfach."
   },
   "add_job_dialog": {
     "title": "Job hinzufügen",
@@ -759,7 +747,7 @@
     "website_label": "Unternehmens-Website",
     "website_placeholder": "https://www.beispiel.de",
     "website_invalid": "Bitte gib eine gültige URL ein (https://...)",
-    "website_hint": "Pflichtfeld \u2014 für präzise Unternehmensanalyse",
+    "website_hint": "Pflichtfeld — für präzise Unternehmensanalyse",
     "desc_label": "Stellenbeschreibung",
     "desc_chars": "{n} / 7.000 Zeichen",
     "desc_placeholder": "Vollständige Stellenbeschreibung hier einfügen...",
@@ -767,7 +755,6 @@
     "submit": "Zur Queue hinzufügen",
     "submitting": "Wird hinzugefügt..."
   },
-
   "cv_optimizer": {
     "pdf_loading": "PDF wird geladen...",
     "cancel": "Abbrechen",
@@ -804,7 +791,6 @@
     "metrics_desc": "CVs mit Metriken erzielen deutlich bessere ATS-Scores. Ordne Zahlen direkt deinen Stationen zu — die KI integriert sie gezielt in die passenden Bullet-Points.",
     "metrics_placeholder": "z.B. 30% Umsatzsteigerung, Team von 12...",
     "metrics_ok": "Zahlen gespeichert",
-
     "start_button": "Optimierung starten",
     "template_label": "Template wählen:",
     "edit_done": "Fertig",
@@ -817,7 +803,7 @@
     "qr_benefit_1_title": "Der beste erste Eindruck",
     "qr_benefit_1_desc": "Ein kurzes Video gibt Recruitern ein authentischeres Bild von dir als reiner Text. Du zeigst, wer du bist.",
     "qr_benefit_2_title": "Deine Chancen steigen",
-    "qr_benefit_2_desc": "Du stichst sofort aus der Masse heraus. Erfahrungswerte zeigen, dass persönliche Videobotschaften die Chance auf ein Vorstellungsgespräch um bis zu 40\u00a0% erhöhen können.",
+    "qr_benefit_2_desc": "Du stichst sofort aus der Masse heraus. Erfahrungswerte zeigen, dass persönliche Videobotschaften die Chance auf ein Vorstellungsgespräch um bis zu 40 % erhöhen können.",
     "qr_benefit_3_title": "Volle Kontrolle (Kein Download)",
     "qr_benefit_3_desc": "Dein Video wird sicher auf EU-Servern gehostet (AWS Frankfurt). Recruiter können das Video ausschließlich ansehen (Stream) – ein Herunterladen oder Speichern ist technisch blockiert.",
     "qr_benefit_4_title": "Automatische Löschung",
@@ -827,7 +813,6 @@
     "step_optimize": "Optimize",
     "step_preview": "Preview"
   },
-
   "diff_review": {
     "section_experience": "Erfahrung",
     "section_education": "Ausbildung",
@@ -874,9 +859,7 @@
     "ats_sidebar_title": "ATS Keywords",
     "ats_sidebar_covered": "abgedeckt",
     "change_limit_info": "Wir fokussieren auf die wirkungsvollsten Änderungen (max. 12), damit dein CV auf 2 Seiten passt. Stationen ohne Vorschlag sind bereits gut aufgestellt."
-
   },
-
   "command_palette": {
     "placeholder": "Was möchtest du tun?",
     "empty": "Kein Ergebnis gefunden.",
@@ -928,11 +911,9 @@
     "loading_title": "CV Match wird analysiert…",
     "loading_duration": "Das dauert etwa 30–75 Sekunden",
     "loading_progress": "Lebenslauf wird eingelesen...",
-    "step_1": "Lebenslauf & Match-Ergebnisse werden geladen",
-    "step_2": "Schwachstellen werden analysiert",
-    "step_3": "Optimierungspotenziale werden identifiziert",
-    "step_4": "Empfehlungen werden zusammengestellt",
-    "step_5": "Ergebnisse werden aufbereitet",
+    "step_1": "CV & Stelle werden geladen",
+    "step_2": "Anforderungen abgleichen",
+    "step_3": "Stärken & Lücken analysieren",
     "score_title": "Match Score",
     "score_match": "Übereinstimmung",
     "strengths": "Stärken",
@@ -975,7 +956,20 @@
     "show_more": "Mehr Details",
     "show_less": "Weniger anzeigen",
     "show_more_count": "+{n} mehr",
-    "notify_match_done": "CV Match erstellt"
+    "notify_match_done": "CV Match erstellt",
+    "level_strong": "Stark",
+    "level_solid": "Solide",
+    "level_gap": "Lücke",
+    "fit_strong": "Gute Passung",
+    "fit_partial": "Teilweise passend",
+    "fit_weak": "Wenig passend",
+    "toggle_requirements": "Anforderungs-Check",
+    "toggle_ats_keywords": "ATS Keywords",
+    "breakdown_language": "Sprache",
+    "breakdown_summary": "Zusammenfassung",
+    "orbit_loading": "wird ermittelt…",
+    "step_4": "Empfehlungen ableiten",
+    "step_5": "Ergebnisse aufbereiten"
   },
   "documents_required": {
     "cv_title": "Lebenslauf benötigt",

@@ -156,7 +156,7 @@ RETURN ONLY THE REVISED TEXT! No introductions, no markdown, no comments.`
             });
         }
 
-        // ── Step 2+3: Multi-Agent Pipeline (GPT-4o + Perplexity) ─────
+        // ── Step 2+3: Multi-Agent Pipeline (Claude Sonnet + Perplexity) ─────
         if (currentText.length > 0) {
             currentText = await step.run('multi-agent-pipeline', async () => {
                 try {

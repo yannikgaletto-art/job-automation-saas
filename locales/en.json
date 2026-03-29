@@ -178,12 +178,12 @@
       "manual_jobtitle_placeholder": "e.g. Software Engineer",
       "manual_website_label": "Company Website",
       "manual_website_placeholder": "https://www.example.com",
-      "manual_website_hint": "Required \u2014 for precise company analysis",
+      "manual_website_hint": "Required — for precise company analysis",
       "manual_desc_label": "Job Description",
       "manual_chars_label": "characters",
       "manual_desc_placeholder": "Paste the full job description here...",
       "manual_error_generic": "Error adding job",
-      "manual_error_network": "Network error \u2014 please try again",
+      "manual_error_network": "Network error — please try again",
       "manual_success_title": "Job added",
       "manual_success_link": "at",
       "manual_success_verb": "is now being analysed.",
@@ -196,7 +196,7 @@
       "queue_full_title": "Job queue is full",
       "queue_full_body": "You already have 5 active jobs in your queue. Complete or delete existing jobs before adding new ones.",
       "queue_full_close": "Close",
-      "add_btn_adding": "Creating profile\u2026",
+      "add_btn_adding": "Creating profile…",
       "add_btn_label": "Add",
       "add_btn_added": "Added",
       "add_btn_in_queue": "In queue",
@@ -260,16 +260,16 @@
       "heatmap_subtitle": "When are you at your sharpest?",
       "golden_hours": "Golden Hours",
       "energy": "Energy Resonance",
-      "energy_subtitle": "Your energy level \u00d7 session completion rate",
+      "energy_subtitle": "Your energy level × session completion rate",
       "momentum": "Application Momentum",
       "next_step_label": "Next Step",
       "nba_review": "You have {n} cover letters waiting for your review.",
       "nba_apply_single": "You have {n} application ready to send.",
       "nba_apply_plural": "You have {n} applications ready to send.",
-      "nba_coaching": "Practice an interview for your top job \u2014 preparation is half the battle.",
+      "nba_coaching": "Practice an interview for your top job — preparation is half the battle.",
       "nba_session_streak": "Start a focus session to keep your {streak}-day streak going.",
       "nba_session_start": "Start a focus session to kick off your day productively.",
-      "nba_done": "All done \u2014 enjoy the rest of your day.",
+      "nba_done": "All done — enjoy the rest of your day.",
       "nba_cta_queue": "Go to Job Queue",
       "nba_cta_coaching": "Go to Coaching",
       "nba_cta_session": "Start session",
@@ -282,7 +282,7 @@
       "coaching_based_on": "Based on {n} completed interview sessions",
       "coaching_empty_title": "No interview sessions yet",
       "coaching_empty_desc": "Complete your first coaching interview to see your progress here.",
-      "coaching_empty_link": "Go to Interview Coaching \u2192"
+      "coaching_empty_link": "Go to Interview Coaching →"
     },
     "coaching": {
       "title": "Interview Coaching",
@@ -298,7 +298,7 @@
       "empty_add_first": "Add jobs to your queue first.",
       "empty_start_search": "Start job search",
       "modal_creating_title": "Preparing interview…",
-      "modal_creating_time": "This takes about 15\u201320 seconds",
+      "modal_creating_time": "This takes about 15–20 seconds",
       "modal_cv_title": "Choose CV",
       "modal_cv_which": "Which CV would you like to use?",
       "modal_cv_uploaded": "Uploaded on {date}",
@@ -494,14 +494,14 @@
     },
     "documents": {
       "title": "My Documents",
-      "description": "Your CV and cover letters \u2014 used for CV matching, optimization and application creation."
+      "description": "Your CV and cover letters — used for CV matching, optimization and application creation."
     },
     "language": {
       "title": "Language",
       "description": "Choose your preferred language for the interface.",
       "de": "Deutsch",
       "en": "English",
-      "es": "Espa\u00f1ol",
+      "es": "Español",
       "saved": "Language saved"
     }
   },
@@ -538,17 +538,14 @@
       "title": "Privacy Policy",
       "version": "Version 1.1 | Last Updated: March 2026",
       "last_updated": "Last Updated: March 2026 | Version 1.1",
-
       "tldr_title": "At a Glance",
       "tldr_1": "We only store data necessary for creating your job applications.",
       "tldr_2": "Your data is stored encrypted in the EU (Frankfurt). AI calls go to US providers — covered by Zero Data Retention.",
       "tldr_3": "We don't sell your data. We don't use it for AI training.",
       "tldr_4": "You can export or delete your data at any time.",
       "tldr_5": "AI-generated texts are labelled as such — you review before submitting.",
-
       "s1_title": "1. Controller",
       "s1_intro": "Responsible for data processing under the GDPR:",
-
       "s2_title": "2. What Data We Collect",
       "s2_intro": "We only collect data necessary to operate Pathly:",
       "s2_col_category": "Category",
@@ -569,7 +566,6 @@
       "s2_r5_cat": "Job Data",
       "s2_r5_ex": "Job searches, application history",
       "s2_r5_purpose": "Job matching, application tracking",
-
       "s3_title": "3. Legal Basis for Processing",
       "s3_b_label": "Art. 6(1)(b) GDPR (Contract):",
       "s3_b_text": "Processing your data to provide Pathly services (document generation, job matching).",
@@ -577,7 +573,6 @@
       "s3_a_text": "You provide explicit consent for AI processing of your data during onboarding.",
       "s3_f_label": "Art. 6(1)(f) GDPR (Legitimate Interest):",
       "s3_f_text": "For security measures (logging, fraud prevention).",
-
       "s4_title": "4. Third-Party Disclosures & Sub-Processors",
       "s4_intro": "We only share your data with the following service providers, contractually bound to GDPR compliance:",
       "s4_col_provider": "Provider",
@@ -603,7 +598,6 @@
       "s4_jina_purpose": "Web scraping of job postings (primary)",
       "s4_jina_data": "Public URLs (no PII)",
       "s4_scc_note": "For US-based providers, EU Standard Contractual Clauses (SCC) serve as the legal basis for data transfer. Anthropic and OpenAI operate under Zero Data Retention (ZDR) — your data is not stored and not used for training. Direct identifiers (names, emails, phone numbers) are technically pseudonymized before transmission to US services. Document extraction (Azure) takes place exclusively in the EU — no third-country transfer.",
-
       "s5_title": "5. AI Processing & Transparency (EU AI Act)",
       "s5_notice_title": "Transparency Notice per EU AI Act",
       "s5_notice_body": "Pathly uses Artificial Intelligence to generate cover letters and analyze CVs. All AI-generated texts are labelled as such.",
@@ -615,7 +609,6 @@
       "s5_docs_text": "CVs are extracted by Azure Document Intelligence (EU, West Europe) — no US transfer for this step. CV content is pseudonymized before being sent to Claude for optimization; personal contact details are replaced with placeholders.",
       "s5_coaching_label": "Coaching Pseudonymization:",
       "s5_coaching_text": "In AI coaching, your messages are pseudonymized before being sent to the language model. Names, email addresses, and phone numbers are replaced with placeholders. The original chat history is stored only in your session.",
-
       "s6_title": "6. Retention & Deletion",
       "s6_account_label": "Account Data:",
       "s6_account_text": "As long as your account exists.",
@@ -629,7 +622,6 @@
       "s6_coaching_text": "Chat history is anonymized after 90 days. The session is fully deleted after 180 days.",
       "s6_consent_label": "Consent History:",
       "s6_consent_text": "Retained for legal reasons (GDPR Art. 7) for 3 years, even after account deletion.",
-
       "s7_title": "7. Data Security",
       "s7_encryption_label": "Encryption:",
       "s7_encryption_text": "All data is encrypted at rest with AES-256. Transmission uses TLS 1.3 exclusively.",
@@ -639,7 +631,6 @@
       "s7_location_text": "All primary data is stored in the EU (AWS Frankfurt, eu-central-1). AI API calls to Anthropic and OpenAI go to US servers, but with Zero Data Retention — no storage, no training.",
       "s7_pii_label": "PII Pseudonymization:",
       "s7_pii_text": "Before every AI call, direct identifiers (name, email, phone, address) are replaced with placeholders. The AI never sees your real personal data.",
-
       "s8_title": "8. Your Rights (GDPR Art. 12–22)",
       "s8_intro": "You have the following rights regarding your personal data:",
       "s8_r15_label": "Right of Access (Art. 15):",
@@ -657,13 +648,10 @@
       "s8_r7_label": "Right to Withdraw Consent (Art. 7(3)):",
       "s8_r7_text": "You can withdraw your consent for AI processing at any time.",
       "s8_contact": "To exercise your rights, contact us at: kontakt@pathly.app",
-
       "s9_title": "9. Right to Complain to a Supervisory Authority",
       "s9_body": "You have the right to lodge a complaint with a data protection supervisory authority if you believe that the processing of your personal data violates the GDPR. The competent authority depends on your place of residence or the seat of the controller.",
-
       "s10_title": "10. Cookies",
       "s10_body": "Pathly uses only technically necessary cookies for authentication and session management. No tracking cookies, analytics cookies, or advertising cookies are used. Therefore, no cookie banner is required.",
-
       "s11_title": "11. Changes to This Privacy Policy",
       "s11_body": "For material changes to this privacy policy, you will be notified by email or in-app notification and may be asked for renewed consent. The current version is always available at /legal/privacy-policy."
     }
@@ -738,7 +726,7 @@
     "t2_name": "Marco K.",
     "t2_role": "Language companion",
     "t2_org": "Willkommen e.V.",
-    "t2_text": "When a child speaks their first full sentence and beams with joy \u2014 that is a moment you never forget.",
+    "t2_text": "When a child speaks their first full sentence and beams with joy — that is a moment you never forget.",
     "t3_name": "Lena W.",
     "t3_role": "Pro-bono design",
     "t3_org": "Gute-Tat Berlin",
@@ -746,7 +734,7 @@
     "t4_name": "Jonas B.",
     "t4_role": "Animal care",
     "t4_org": "Tierheim Berlin",
-    "t4_text": "At the animal shelter I learned to take responsibility again. Animals don\u2019t judge \u2014 they simply need you."
+    "t4_text": "At the animal shelter I learned to take responsibility again. Animals don’t judge — they simply need you."
   },
   "add_job_dialog": {
     "title": "Add Job",
@@ -759,7 +747,7 @@
     "website_label": "Company Website",
     "website_placeholder": "https://www.example.com",
     "website_invalid": "Please enter a valid URL (https://...)",
-    "website_hint": "Required \u2014 for precise company analysis",
+    "website_hint": "Required — for precise company analysis",
     "desc_label": "Job Description",
     "desc_chars": "{n} / 7,000 characters",
     "desc_placeholder": "Paste the full job description here...",
@@ -767,7 +755,6 @@
     "submit": "Add to queue",
     "submitting": "Adding..."
   },
-
   "cv_optimizer": {
     "pdf_loading": "Loading PDF...",
     "cancel": "Cancel",
@@ -804,7 +791,6 @@
     "metrics_desc": "CVs with metrics achieve significantly better ATS scores. Assign numbers directly to your positions — the AI will integrate them into the matching bullet points.",
     "metrics_placeholder": "e.g. 30% revenue increase, team of 12...",
     "metrics_ok": "Numbers Saved",
-
     "start_button": "Start optimization",
     "template_label": "Choose template:",
     "edit_done": "Done",
@@ -827,7 +813,6 @@
     "step_optimize": "Optimize",
     "step_preview": "Preview"
   },
-
   "diff_review": {
     "section_experience": "Experience",
     "section_education": "Education",
@@ -874,9 +859,7 @@
     "ats_sidebar_title": "ATS Keywords",
     "ats_sidebar_covered": "covered",
     "change_limit_info": "We focus on the most impactful changes (max. 12) to keep your CV at 2 pages. Stations without suggestions are already well positioned."
-
   },
-
   "command_palette": {
     "placeholder": "What would you like to do?",
     "empty": "No results found.",
@@ -928,11 +911,9 @@
     "loading_title": "Analyzing CV Match…",
     "loading_duration": "This takes about 30–75 seconds",
     "loading_progress": "Reading CV...",
-    "step_1": "Loading CV & match results",
-    "step_2": "Analyzing weaknesses",
-    "step_3": "Identifying optimization potential",
-    "step_4": "Compiling recommendations",
-    "step_5": "Preparing results",
+    "step_1": "Loading CV & job posting",
+    "step_2": "Matching requirements",
+    "step_3": "Analyzing strengths & gaps",
     "score_title": "Match Score",
     "score_match": "Match",
     "strengths": "Strengths",
@@ -975,7 +956,20 @@
     "show_more": "More details",
     "show_less": "Show less",
     "show_more_count": "+{n} more",
-    "notify_match_done": "CV Match completed"
+    "notify_match_done": "CV Match completed",
+    "level_strong": "Strong",
+    "level_solid": "Solid",
+    "level_gap": "Gap",
+    "fit_strong": "Strong Fit",
+    "fit_partial": "Partial Fit",
+    "fit_weak": "Weak Fit",
+    "toggle_requirements": "Requirements Check",
+    "toggle_ats_keywords": "ATS Keywords",
+    "breakdown_language": "Language",
+    "breakdown_summary": "Summary",
+    "orbit_loading": "determining…",
+    "step_4": "Deriving recommendations",
+    "step_5": "Preparing results"
   },
   "documents_required": {
     "cv_title": "CV Required",

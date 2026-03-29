@@ -57,7 +57,9 @@ export type TaskType =
     | 'kill_fluff'
     // Certificate pipeline
     | 'analyze_skill_gaps'
-    | 'synthesize_certificates';
+    | 'synthesize_certificates'
+    // Cover letter wizard
+    | 'classify_station_relevance';
 
 // ============================================================================
 // ROUTING LOGIC
@@ -86,6 +88,8 @@ export function selectModel(taskType: TaskType) {
         // Certificate pipeline
         analyze_skill_gaps: 'CLAUDE_HAIKU',
         synthesize_certificates: 'CLAUDE_HAIKU',
+        // Cover letter wizard
+        classify_station_relevance: 'CLAUDE_HAIKU',
     };
 
     return MODELS[routingMap[taskType]];

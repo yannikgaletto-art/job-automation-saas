@@ -1,8 +1,8 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 5.2  
-**Last Updated:** 2026-03-24  
+**Version:** 5.3  
+**Last Updated:** 2026-03-29  
 **Status:** Active  
 
 ---
@@ -56,11 +56,12 @@ See `lib/ai/model-router.ts` — single source of truth.
 
 | Task Type | Model |
 |-----------|-------|
-| `parse_html`, `extract_job_fields` | Claude Haiku 4.5 |
-| `summarize`, `detect_ats_system` | GPT-4o-mini |
-| `write_cover_letter`, `optimize_cv` | Claude Sonnet 4.5 |
-| `cv_match`, `cv_parse` | Claude Haiku 4.5 |
+| `parse_html`, `extract_job_fields`, `classify_station_relevance` | Claude Haiku 4.5 |
+| `summarize_job_description`, `detect_ats_system`, `briefing_generate` | Claude Haiku 4.5 |
+| `cv_match`, `cv_parse`, `translate_cv` | Claude Haiku 4.5 |
+| `write_cover_letter`, `optimize_cv`, `language_judge`, `kill_fluff` | Claude Sonnet 4.5 |
 | `document_extraction` (PRIMARY) | Azure Document Intelligence (EU) |
+| `transcribe` (Coaching) | OpenAI Whisper |
 
 ---
 
