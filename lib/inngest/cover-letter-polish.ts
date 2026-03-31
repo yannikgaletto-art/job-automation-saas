@@ -4,9 +4,10 @@
  *
  * Steps:
  *   1. Anti-Fluff Re-Gen (if fluff found during sync scan)
- *   2. Claude Sonnet Language Judge + Claim Extraction (if ANTHROPIC_API_KEY available)
- *   3. Perplexity Fact Check on extracted claims (if PERPLEXITY_API_KEY available)
- *   4. JSONB Merge-Update on documents.metadata
+ *   2. Claude Haiku Language Judge (if ANTHROPIC_API_KEY available)
+ *   3. JSONB Merge-Update on documents.metadata
+ *
+ * Perplexity Fact Check removed (2026-03-30 Phase 2).
  *
  * Reference: Implementation Plan Phase 2.2
  * Contract: §ARCHITECTURE 3.1 (Inngest Resilience)
@@ -156,7 +157,7 @@ RETURN ONLY THE REVISED TEXT! No introductions, no markdown, no comments.`
             });
         }
 
-        // ── Step 2+3: Multi-Agent Pipeline (Claude Sonnet + Perplexity) ─────
+        // ── Step 2: Multi-Agent Pipeline (Claude Haiku Language Judge) ─────
         if (currentText.length > 0) {
             currentText = await step.run('multi-agent-pipeline', async () => {
                 try {

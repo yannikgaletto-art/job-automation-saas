@@ -12,6 +12,8 @@ import {
 import type { SerpApiJob } from '@/lib/services/job-search-pipeline';
 import { useJobQueueCount } from '@/store/use-job-queue-count';
 import JobSwipeView from '@/components/job-search/JobSwipeView';
+import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
+import { useDashboardTour, type TourStep } from '../hooks/useDashboardTour';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -61,6 +63,7 @@ function getScoreBar(score: number): { color: string; label: string | null } {
 
 export default function JobSearchPage() {
     const t = useTranslations('dashboard.job_search');
+    const tTour = useTranslations('tour');
     const [starredUrls, setStarredUrls] = useState<Set<string>>(new Set());
 
     useEffect(() => {
@@ -134,6 +137,61 @@ export default function JobSearchPage() {
     const [loadingSearches, setLoadingSearches] = useState(true);
     const [viewMode, setViewMode] = useState<'list' | 'swipe'>('list');
 
+    // ─── Tour Setup (two-branch: empty vs. full) ──────────────────────
+    const [tourReady, setTourReady] = useState(false);
+
+    const EMPTY_STEPS: TourStep[] = [
+        {
+            targetSelector: '[data-tour="job-search-bar"]',
+            position: 'bottom',
+            titleKey: 'job_search.empty_step1_title',
+            bodyKey: 'job_search.empty_step1_body',
+        },
+    ];
+
+    const FULL_STEPS: TourStep[] = [
+        {
+            targetSelector: '[data-tour="job-search-bar"]',
+            position: 'bottom',
+            titleKey: 'job_search.step1_title',
+            bodyKey: 'job_search.step1_body',
+        },
+        {
+            targetSelector: '[data-tour="job-search-first-row"]',
+            position: 'top',
+            titleKey: 'job_search.step2_title',
+            bodyKey: 'job_search.step2_body',
+        },
+    ];
+
+    const tourSteps = !tourReady ? [] : (savedSearches.length === 0 ? EMPTY_STEPS : FULL_STEPS);
+
+    const tour = useDashboardTour('job-search', tourSteps, {
+        delayMs: 2000,
+        enabled: tourReady,
+    });
+
+    const handleTourNext = useCallback(() => tour.nextStep(), [tour]);
+    const handleTourSkip = useCallback(() => tour.skipTour(), [tour]);
+
+    // ─── Tour: Programmatic UI control per step ──────────────────────
+    // Step 0: Show filters expanded so user sees the full search UI
+    // Step 1: Switch to swipe view + ensure first accordion is expanded
+    useEffect(() => {
+        if (!tour.isActive) return;
+
+        if (tour.currentStep === 0) {
+            // Auto-open filters so the user sees the full search bar capability
+            setShowFilters(true);
+        } else if (tour.currentStep === 1) {
+            // Switch to swipe view and ensure first search is expanded
+            setViewMode('swipe');
+            if (savedSearches.length > 0) {
+                setExpandedSearchId(savedSearches[0].id);
+            }
+        }
+    }, [tour.isActive, tour.currentStep, savedSearches]);
+
     // Suggested titles
     const [suggestedTitles, setSuggestedTitles] = useState<string[]>([]);
     const [loadingTitles, setLoadingTitles] = useState(true);
@@ -160,6 +218,7 @@ export default function JobSearchPage() {
             // Silently handle
         } finally {
             setLoadingSearches(false);
+            setTourReady(true);
         }
     };
 
@@ -297,6 +356,7 @@ export default function JobSearchPage() {
 
             {/* Search Bar */}
             <motion.div
+                data-tour="job-search-bar"
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white border border-[#E7E7E5] rounded-xl p-5 shadow-sm"
@@ -519,7 +579,7 @@ export default function JobSearchPage() {
 
             {/* Saved Searches (Notion-style Table) */}
             {!isSearching && hasSearches && (
-                <div className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden shadow-sm">
+                <div data-tour="job-search-accordion" className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden shadow-sm">
                     {/* Table Header */}
                     <div className="grid grid-cols-[1fr_100px_160px_80px] items-center px-5 py-2 border-b border-[#E7E7E5] bg-[#FAFAF9]">
                         <span className="flex items-center gap-1.5 text-xs font-medium text-[#A8A29E] uppercase tracking-wider">
@@ -537,10 +597,11 @@ export default function JobSearchPage() {
                         <span />
                     </div>
                     {/* Table Rows */}
-                    {savedSearches.map(search => (
+                    {savedSearches.map((search, index) => (
                         <SearchAccordion
                             key={search.id}
                             search={search}
+                            isFirst={index === 0}
                             isExpanded={expandedSearchId === search.id}
                             onToggle={() => setExpandedSearchId(
                                 expandedSearchId === search.id ? null : search.id
@@ -581,6 +642,17 @@ export default function JobSearchPage() {
                     </div>
                 )
             }
+
+            {/* Job Search Guided Tour */}
+            {tour.isActive && tour.step && (
+                <GuidedTourOverlay
+                    step={tour.step}
+                    currentStep={tour.currentStep}
+                    totalSteps={tour.totalSteps}
+                    onNext={handleTourNext}
+                    onSkip={handleTourSkip}
+                />
+            )}
         </div >
     );
 }
@@ -589,6 +661,7 @@ export default function JobSearchPage() {
 
 function SearchAccordion({
     search,
+    isFirst,
     isExpanded,
     onToggle,
     onDelete,
@@ -601,6 +674,7 @@ function SearchAccordion({
     onViewModeChange,
 }: {
     search: SavedSearch;
+    isFirst?: boolean;
     isExpanded: boolean;
     onToggle: () => void;
     onDelete: (e: React.MouseEvent) => void;
@@ -614,7 +688,7 @@ function SearchAccordion({
 }) {
     const t = useTranslations('dashboard.job_search');
     return (
-        <div className="border-b border-[#E7E7E5] last:border-b-0">
+        <div data-tour={isFirst ? 'job-search-first-row' : undefined} className="border-b border-[#E7E7E5] last:border-b-0">
             {/* Table Row */}
             <div
                 onClick={onToggle}

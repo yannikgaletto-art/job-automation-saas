@@ -111,6 +111,7 @@ export interface SetupDataResponse {
         role: string;
         period: string;
         bullets: string[];
+        hint?: string;     // Server-generated hint based on CV Match analysis
     }>;
     jobRequirements: string[];      // Top 3 aus job_queue.requirements
 

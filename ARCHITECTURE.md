@@ -63,6 +63,7 @@ Last Updated: 2026-03-09
 #### Jobs & Pipeline
 - `/api/jobs/list` (GET — alle Jobs des Users)
 - `/api/jobs/ingest` (POST — manuelles Hinzufügen eines Jobs)
+- `/api/jobs/import` (POST — Browser Extension Job-Import, Bearer Auth, source: 'extension')
 - `/api/jobs/extract` (POST → Inngest `job/extract`)
 - `/api/jobs/enrich` (POST — Company Research Trigger)
 - `/api/jobs/confirm` (POST — Steckbrief bestätigen)

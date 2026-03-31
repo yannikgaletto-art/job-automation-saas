@@ -182,6 +182,88 @@ export async function GET(req: NextRequest) {
 
             cvData = parsedCv?.experience || [];
         }
+
+        // ─── Map raw CV experience → SetupDataResponse.cvStations format ──────
+        // cv_structured_data.experience uses: dateRangeText, description: [{id, text}]
+        // SetupDataResponse.cvStations expects: period, bullets: string[], hint?: string
+        
+        // Read CV Match result (if completed) for hint generation
+        const cvMatch = job.metadata?.cv_match;
+        const requirementRows: any[] = cvMatch?.requirementRows || [];
+        
+        // Detect UI locale from Accept-Language or job language
+        const acceptLang = req.headers.get('accept-language') || '';
+        const uiLocale = acceptLang.startsWith('de') ? 'de' 
+            : acceptLang.startsWith('es') ? 'es' : 'en';
+
+        const mappedCvStations = cvData
+            .filter((exp: any) => exp?.role && exp?.company) // Only complete stations
+            .map((exp: any) => {
+                const stationRole = exp.role || '';
+                const stationBullets = Array.isArray(exp.description)
+                    ? exp.description.map((d: any) =>
+                        typeof d === 'string' ? d : (d?.text || '')
+                    ).filter(Boolean)
+                    : [];
+
+                // ─── Hint generation from CV Match ──────────────────────
+                let hint: string | undefined;
+                
+                if (requirementRows.length > 0 && stationBullets.length > 0) {
+                    // Find role words for matching
+                    const roleWords = stationRole.toLowerCase().split(/[\s|,]+/).filter((w: string) => w.length > 3);
+                    const bulletText = stationBullets.join(' ').toLowerCase();
+                    
+                    // Find best matching requirement row
+                    let bestRow: any = null;
+                    let bestOverlap = 0;
+                    
+                    for (const row of requirementRows) {
+                        const reqTitle = (row.title || '').toLowerCase();
+                        const reqChips = (row.relevantChips || []).map((c: string) => c.toLowerCase());
+                        const allReqTerms = [...reqTitle.split(/\s+/), ...reqChips].filter((w: string) => w.length > 3);
+                        
+                        // Score: keyword overlap between requirement and station's bullets
+                        const overlap = allReqTerms.filter((term: string) => 
+                            bulletText.includes(term) || roleWords.some((rw: string) => term.includes(rw) || rw.includes(term))
+                        ).length;
+                        
+                        if (overlap > bestOverlap) {
+                            bestOverlap = overlap;
+                            bestRow = row;
+                        }
+                    }
+                    
+                    if (bestRow && bestOverlap > 0) {
+                        const reqTitle = bestRow.title || '';
+                        const isStrong = bestRow.level === 'strong' || bestRow.level === 'solid';
+                        
+                        if (isStrong) {
+                            // Case 1: Station HAS relevant experience
+                            hint = uiLocale === 'de'
+                                ? `Nutze deine „${stationRole}"-Erfahrung für: ${reqTitle}.`
+                                : uiLocale === 'es'
+                                ? `Usa tu experiencia como "${stationRole}" para: ${reqTitle}.`
+                                : `Use your "${stationRole}" experience to demonstrate: ${reqTitle}.`;
+                        } else {
+                            // Case 2: Station DOESN'T have direct experience
+                            hint = uiLocale === 'de'
+                                ? `Du hast keine direkte Erfahrung in „${reqTitle}", aber deine „${stationRole}"-Skills können helfen.`
+                                : uiLocale === 'es'
+                                ? `No tienes experiencia directa en "${reqTitle}", pero tus habilidades como "${stationRole}" pueden ayudar.`
+                                : `You don't have direct "${reqTitle}" experience, but your "${stationRole}" skills can help bridge this.`;
+                        }
+                    }
+                }
+
+                return {
+                    company: exp.company || '',
+                    role: stationRole,
+                    period: exp.dateRangeText || exp.period || '',
+                    bullets: stationBullets,
+                    ...(hint ? { hint } : {}),
+                };
+            });
         const requirements: string[] = (job.requirements || []).slice(0, 3).map((r: any) =>
             typeof r === 'string' ? r : r?.text || r?.description || JSON.stringify(r)
         );
@@ -212,7 +294,7 @@ export async function GET(req: NextRequest) {
             hasPerplexityData: hooks.some((h) => h.type !== 'manual'),
             companyWebsite: job.company_website ?? null,
             jobTitle: job.metadata?.job_title ?? null,
-            cvStations: cvData,
+            cvStations: mappedCvStations,
             jobRequirements: requirements,
             hasStyleSample,
             styleAnalysisSummary,
@@ -220,7 +302,7 @@ export async function GET(req: NextRequest) {
             availableStyleDocs,
         };
 
-        console.log(`✅ [SetupData] Built for job ${jobId}: ${hooks.length} hooks, ${cvData.length} stations`);
+        console.log(`✅ [SetupData] Built for job ${jobId}: ${hooks.length} hooks, ${mappedCvStations.length} stations (from ${cvData.length} raw)`);
         return NextResponse.json(response);
 
     } catch (err) {

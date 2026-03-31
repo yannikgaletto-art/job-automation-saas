@@ -1,11 +1,19 @@
 /**
- * Hiring Manager Resolver — Perplexity Sonar
+ * Hiring Manager Resolver — Claude Haiku via Model Router
  *
  * Batch 3.2: Resolves likely hiring managers from job descriptions
  * and derives personality personas for tone-matching.
  *
+ * COST OPTIMIZATION (2026-03-30 Phase 2):
+ * - Switched from Perplexity Sonar → Claude Haiku via model-router
+ * - Perplexity added no value here: without a contactPerson name it returned
+ *   generic archetypes. Haiku produces identical archetypes from job text alone.
+ * - DSGVO bonus: No PII (person names) sent to external search engine anymore.
+ *
  * Graceful Degradation: Missing API key or errors → default persona.
  */
+
+import { complete } from '@/lib/ai/model-router';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface HiringPersona {
@@ -30,14 +38,8 @@ export async function resolveHiringPersona(
     companyName: string,
     contactPerson?: string,
 ): Promise<HiringPersona[]> {
-    const apiKey = process.env.PERPLEXITY_API_KEY;
-    if (!apiKey) {
-        console.warn('⚠️ [HiringResolver] PERPLEXITY_API_KEY missing — returning default persona');
-        return [DEFAULT_PERSONA];
-    }
-
     const contactHint = contactPerson
-        ? `\nBekannter Ansprechpartner: "${contactPerson}". Suche öffentliche Informationen zu dieser Person.`
+        ? `\nBekannter Ansprechpartner: "${contactPerson}". Leite mögliche Eigenschaften aus dem Kontext der Stelle ab.`
         : '';
 
     const prompt = `Analysiere diese Stellenanzeige für "${companyName}":
@@ -47,7 +49,7 @@ ${jobDescription.substring(0, 2000)}
 ${contactHint}
 
 Aufgabe:
-1. Identifiziere den/die wahrscheinlichsten Hiring Manager (aus Anzeige, Impressum oder öffentlichen Profilen)
+1. Identifiziere den/die wahrscheinlichsten Hiring Manager aus der Stellenanzeige
 2. Leite für jede Person ab: Werte, Hintergrund, vermutliche Prioritäten
 3. Wenn keine Person identifizierbar: Erstelle 2 Archetypen basierend auf der Rolle (z.B. "People Lead" vs. "CTO")
 
@@ -67,29 +69,15 @@ Output als JSON:
 Maximal 3 Personas. confidence = 0.0 wenn Archetyp, > 0.5 wenn reale Person identifiziert.`;
 
     try {
-        const response = await fetch('https://api.perplexity.ai/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-                model: 'sonar',
-                messages: [{ role: 'user', content: prompt }],
-                max_tokens: 800,
-            }),
+        const response = await complete({
+            taskType: 'summarize_job_description',
+            prompt,
+            temperature: 0.3,
+            maxTokens: 800,
         });
 
-        if (!response.ok) {
-            throw new Error(`Perplexity API error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (!content) throw new Error('Empty Perplexity response');
-
-        // Perplexity may return markdown-wrapped JSON
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        // Robust JSON parsing — Haiku may wrap in markdown
+        const jsonMatch = response.text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
             console.warn('[HiringResolver] Could not parse JSON — returning default');
             return [DEFAULT_PERSONA];

@@ -6,20 +6,20 @@ interface CVStationCardProps {
     company: string;
     role: string;
     period: string;
-    bullets: string[];
-    selectedIndex: number | null;  // 1-3 wenn ausgewählt, null wenn nicht
+    selectedIndex: number | null;
     isDisabled: boolean;
     onToggle: () => void;
+    hint?: string;  // Server-generated hint from CV Match analysis
 }
 
 export function CVStationCard({
     company,
     role,
     period,
-    bullets,
     selectedIndex,
     isDisabled,
     onToggle,
+    hint,
 }: CVStationCardProps) {
     const isSelected = selectedIndex !== null;
 
@@ -44,8 +44,10 @@ export function CVStationCard({
                         <span className="text-[13px] font-medium text-[#73726E]">{company}</span>
                     </div>
                     <p className="text-[11px] text-[#A8A29E] mt-0.5">{period}</p>
-                    {bullets && bullets.length > 0 && bullets[0] && (
-                        <p className="text-[12px] text-[#73726E] mt-2 line-clamp-2">· {bullets[0]}</p>
+
+                    {/* CV Match hint — clean, one-liner */}
+                    {hint && (
+                        <p className="text-[11px] text-[#002e7a] mt-1.5 line-clamp-2">{hint}</p>
                     )}
                 </div>
 

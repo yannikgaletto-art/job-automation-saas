@@ -1,8 +1,9 @@
 import { ActiveCVCard } from "./active-cv-card"
 import { LanguageToggleCard } from "./language-toggle-card"
 import { CheckinSettingsCard } from "./checkin-settings-card"
+import { TourResetCard } from "./tour-reset-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Sparkles, Globe } from "lucide-react"
+import { FileText, Sparkles, Globe, GraduationCap } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { getTranslations } from "next-intl/server"
@@ -55,6 +56,22 @@ export default async function SettingsPage() {
             <div className="mb-6">
                 <CheckinSettingsCard />
             </div>
+
+            {/* Tour Reset — replay any tab tour */}
+            <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">
+                <CardHeader className="pb-4">
+                    <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
+                        <GraduationCap className="h-5 w-5 text-[#012e7a]" />
+                        {t('tours.section_title')}
+                    </CardTitle>
+                    <CardDescription className="text-[#73726E]">
+                        {t('tours.section_description')}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <TourResetCard />
+                </CardContent>
+            </Card>
 
             {/* Document Management Section */}
             <Card className="bg-white border-[#E7E7E5] shadow-sm">

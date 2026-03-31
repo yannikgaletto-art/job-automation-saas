@@ -27,7 +27,7 @@ function BulletsView({ blocks, isOverlay }: { blocks: ScriptBlock[]; isOverlay: 
     const t = useTranslations('video_letter');
     const visibleBlocks = blocks.filter(b => b.content.trim());
     return (
-        <div className={`space-y-2 ${isOverlay ? 'p-3' : 'p-4'}`}>
+        <div className={`${isOverlay ? 'max-h-48 p-3' : 'max-h-64 p-4'} overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-gray-300`}>
             <AnimatePresence mode="popLayout">
                 {visibleBlocks.map((block, i) => (
                     <motion.div

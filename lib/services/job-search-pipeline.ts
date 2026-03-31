@@ -409,44 +409,9 @@ async function scrapeWithJina(url: string): Promise<string | null> {
     }
 }
 
-async function scrapeWithFirecrawl(url: string): Promise<string | null> {
-    const apiKey = process.env.FIRECRAWL_API_KEY;
-    if (!apiKey) {
-        console.warn('⚠️ [Pipeline] FIRECRAWL_API_KEY not set, skipping Firecrawl');
-        return null;
-    }
+// scrapeWithFirecrawl removed (2026-03-30): Dead code — replaced by scrapeWithJina.
+// Firecrawl import/env var can be fully removed from project if FIRECRAWL_API_KEY is unused elsewhere.
 
-    try {
-        console.log(`🔄 [Pipeline] Firecrawl scraping: ${url}`);
-        const response = await withRetry(async () => {
-            const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`,
-                },
-                body: JSON.stringify({
-                    url,
-                    formats: ['markdown'],
-                    onlyMainContent: true,
-                    waitFor: 2000,
-                    timeout: 30000,
-                }),
-            });
-            if (!res.ok) throw new Error(`Firecrawl error: ${res.status}`);
-            return res.json();
-        }, 2, 2000);
-
-        const markdown = response.data?.markdown || null;
-        if (markdown) {
-            console.log(`✅ [Pipeline] Firecrawl: ${markdown.length} chars extracted`);
-        }
-        return markdown;
-    } catch (error) {
-        console.error('❌ [Pipeline] Firecrawl failed:', error);
-        return null;
-    }
-}
 
 // ─── Step 3a: Claude Haiku Harvester ─────────────────────────────
 
@@ -634,7 +599,7 @@ Bewerte nach diesen Kriterien und gib ein JSON zurück:
         console.log('✅ [Pipeline] Claude Judge scoring...');
         const message = await withRetry(async () =>
             anthropic.messages.create({
-                model: 'claude-sonnet-4-5-20250929',
+                model: 'claude-haiku-4-5-20251001', // Cost-optimized (2026-03-30): JSON scoring = classification task
                 max_tokens: 1000,
                 temperature: 0.1,
                 system: systemPrompt,

@@ -66,6 +66,7 @@
       "community": "Comunidad",
       "volunteering": "Voluntariado",
       "data_security": "Seguridad de datos",
+      "feedback_voice": "Feedback",
       "settings": "Ajustes",
       "admin": "Admin"
     },
@@ -503,6 +504,14 @@
       "en": "English",
       "es": "Español",
       "saved": "Idioma guardado"
+    },
+    "tours": {
+      "section_title": "Tours guiados",
+      "section_description": "Repite cualquier tour de pestaña para redescubrir funciones.",
+      "title": "Restablecer tours",
+      "description": "Restablece todos los tours completados para que aparezcan de nuevo en tu próxima visita.",
+      "reset_btn": "Restablecer todos los tours",
+      "reset_done": "Restablecido"
     }
   },
   "legal": {
@@ -647,7 +656,7 @@
       "s8_r21_text": "Puedes oponerte al tratamiento de tus datos en cualquier momento.",
       "s8_r7_label": "Derecho a retirar el consentimiento (Art. 7(3)):",
       "s8_r7_text": "Puedes retirar tu consentimiento para el procesamiento por IA en cualquier momento.",
-      "s8_contact": "Para ejercer tus derechos, contáctanos en: kontakt@pathly.app",
+      "s8_contact": "Para ejercer tus derechos, contáctanos en: contact@path-ly.eu",
       "s9_title": "9. Derecho a reclamar ante la autoridad de control",
       "s9_body": "Tienes derecho a presentar una reclamación ante una autoridad de protección de datos si consideras que el tratamiento de tus datos personales infringe el RGPD. La autoridad competente depende de tu lugar de residencia o la sede del responsable.",
       "s10_title": "10. Cookies",
@@ -795,7 +804,7 @@
     "template_label": "Elegir plantilla:",
     "edit_done": "Listo",
     "edit_start": "Editar",
-    "qr_video": "QR Vídeo",
+    "qr_video": "QR Video Letter",
     "back_to_optimizer": "Volver al Optimizador",
     "cover_letter": "Carta de presentación",
     "qr_dialog_title": "Código QR en el CV",
@@ -923,7 +932,8 @@
     "cta_generate_cover_letter": "Generar Cover Letter",
     "cta_finalize_application": "Finalizar solicitud",
     "cta_open": "Abrir",
-    "badge_in_queue": "En Cola"
+    "badge_in_queue": "En Cola",
+    "tab_video_locked": "Activa primero el código QR en el CV Optimizer"
   },
   "cv_match": {
     "title": "CV Match y Optimización",
@@ -1257,7 +1267,27 @@
     "error_unknown": "Ha ocurrido un error desconocido.",
     "error_retry": "Reintentar",
     "error_load_failed": "Carga fallida",
-    "error_generate_failed": "Generación fallida"
+    "error_generate_failed": "Generación fallida",
+    "upload_privacy_title": "Info de privacidad",
+    "upload_privacy_body": "Tu video será cifrado y almacenado en servidores EU (Supabase, Frankfurt). NO se usará para entrenar IA. Después de 14 días, el archivo se elimina automática e irreversiblemente.",
+    "upload_privacy_confirm": "Aceptar y subir",
+    "upload_privacy_cancel": "Cancelar"
+  },
+  "feedback_voice": {
+    "title": "Dime qué piensas.",
+    "subtitle": "¡Tu opinión sobre Pathly! Aquí hay algunas preguntas que me interesan:",
+    "placeholder": "Tu respuesta…",
+    "name_placeholder": "Tu nombre (opcional)",
+    "submit_button": "Enviar →",
+    "submitting": "Enviando…",
+    "success_message": "Gracias. Esto significa mucho para mí. — Yannik",
+    "question_1": "¿Qué es lo que más te gusta de Pathly?",
+    "question_2": "¿Qué te frustra o qué sientes que falta?",
+    "question_3": "¿Tienes un consejo que debería aplicar de inmediato?",
+    "question_4": "¿Recomendarías Pathly y si es así a quién?",
+    "question_5": "¿Cuál fue tu primera impresión cuando viste Pathly por primera vez?",
+    "error_rate_limit": "Has enviado varias veces recientemente. Espera unos minutos.",
+    "error_generic": "Algo salió mal. Por favor, inténtalo de nuevo."
   },
   "mood": {
     "checkin_label": "CHECK-IN RÁPIDO",
@@ -1294,5 +1324,46 @@
     "cv_hint_bad_example": "\"Fraunhofer IGD — UX Researcher\" sin más detalles",
     "cv_hint_continue": "Entendido — subir CV",
     "cv_hint_dismiss": "Ya lo leí — no mostrar de nuevo"
+  },
+  "tour": {
+    "step1_title": "Tus objetivos del día",
+    "step1_body": "Un estudio de la Dra. Gail Matthews muestra: Quienes <b>escriben sus objetivos</b> y comparten su progreso los alcanzan un 33 a 42 por ciento más. Pathly te invita a establecer tus objetivos de hoy. Escríbelos directamente o usa arrastrar y soltar.",
+    "step2_title": "Misión — Arrastrar y Soltar",
+    "step2_body": "Crea tus propias tareas o usa las <b>recomendaciones de Pathly</b> de tu cola de empleo. Las recomendaciones de coaching aparecen automáticamente cuando identificamos áreas de aprendizaje después de una entrevista. <b>Simplemente arrastra las tareas al calendario.</b>",
+    "step3_title": "Técnica Pomodoro",
+    "step3_body": "En Pathly nos encanta trabajar con la <b>Técnica Pomodoro</b>. Bloques de trabajo enfocado con pausas cortas. Es la forma más rápida de avanzar. ¿Listo para empezar?",
+    "button_next": "Siguiente",
+    "button_start": "¡Vamos!",
+    "step_indicator": "Paso {current} de {total}",
+    "job_queue": {
+      "empty_step1_title": "Tu centro de candidaturas",
+      "empty_step1_body": "Aquí gestionas todos los puestos que quieres seguir. Pathly analiza cada puesto automáticamente. <b>Puedes trabajar con hasta 5 empleos activos a la vez.</b> Haz clic en el botón para empezar.",
+      "step1_title": "Tu centro de candidaturas",
+      "step1_body": "Aquí ves todos los puestos en los que estás trabajando. Cada puesto sigue el mismo proceso desde el análisis hasta la carta terminada. <b>Tú decides cada paso</b> y mantienes el control en todo momento.",
+      "step2_title": "¿Qué hay detrás del puesto?",
+      "step2_body": "El perfil te muestra todo lo que Pathly encontró sobre el puesto. Lo más importante son las <b>palabras clave ATS</b>. Estos términos son escaneados por los sistemas y determinan si recibes una invitación.",
+      "step3_title": "¿Encaja el puesto contigo?",
+      "step3_body": "Pathly compara tu perfil con los requisitos y te muestra tus puntos fuertes y lagunas. Usamos este análisis para <b>adaptar tu CV y carta de presentación con exactitud</b>.",
+      "step4_title": "CV y Video Letter",
+      "step4_body": "Aquí puedes <b>añadir palabras clave ATS faltantes con el botón de más</b>. Pathly las integra de forma natural. También generas aquí tu <b>QR Video Letter</b>. Se imprime directamente en tu CV y aumenta las tasas de respuesta entre un 20 y un 38 por ciento.",
+      "step5_title": "No genérico. Realmente tú.",
+      "step5_body": "La carta se redacta a partir de tus optimizaciones y <b>tu estilo personal de escritura</b>. Pathly analiza la empresa en tiempo real. Antes de enviar Pathly simula la crítica de un <b>Hiring Manager</b> real."
+    },
+    "job_search": {
+      "empty_step1_title": "Busca puestos o misiones",
+      "empty_step1_body": "Introduce un título, una palabra clave o filtra por <b>sostenibilidad</b>. Pathly busca en el mercado por ti y guarda los resultados.",
+      "step1_title": "Busca puestos o misiones",
+      "step1_body": "Introduce un título, una palabra clave o filtra por <b>sostenibilidad</b>. Pathly busca en el mercado por ti y guarda los resultados.",
+      "step2_title": "Primero revisa, luego a la cola",
+      "step2_body": "Si te gusta un puesto, añádelo a la cola. Pathly te muestra primero una <b>vista previa</b>: tareas y cualificaciones que puedes ajustar antes de que el puesto entre en análisis. <b>Con tu ayuda obtenemos los datos óptimos.</b>"
+    },
+    "coaching": {
+      "empty_step1_title": "Sin objetivo, sin coaching",
+      "empty_step1_body": "El coaching analiza tu CV contra un puesto real: tareas, brechas, preguntas. <b>Añade primero un empleo a la cola</b> y luego vuelve.",
+      "step1_title": "Reps = Confianza",
+      "step1_body": "Haz clic aquí para iniciar una <b>sesión de práctica</b>. Primero elige la ronda: Presentación, Deep Dive o Case Study. Luego el número de preguntas. La IA asume el rol de reclutador y analiza tus respuestas en vivo.",
+      "step2_title": "Nuestras recomendaciones",
+      "step2_body": "Haz clic en una fila: verás el <b>perfil</b> del puesto, tus rondas anteriores y recomendaciones concretas sobre tus lagunas de conocimiento. Ejemplo: para <b>Zeb Consulting</b> faltan Java, SQL y OpenStack. Estas se añaden como sugerencias directamente a tus <b>objetivos diarios</b>."
+    }
   }
 }

@@ -27,7 +27,7 @@ export default async function PrivacyPolicyPage() {
                     <div className="bg-[#F5F5F4] rounded-lg p-4 text-sm">
                         <p className="font-medium">Pathly</p>
                         <p className="text-[#73726E]">Yannik Galetto</p>
-                        <p className="text-[#73726E]">E-Mail: kontakt@pathly.app</p>
+                        <p className="text-[#73726E]">E-Mail: contact@path-ly.eu</p>
                     </div>
                 </section>
 

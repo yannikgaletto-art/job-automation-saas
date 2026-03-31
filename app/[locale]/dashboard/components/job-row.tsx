@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, FileText, Check, Sparkles, Mail, Video, Info, Trash2, ChevronDown } from 'lucide-react';
@@ -236,6 +236,27 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [liveMatchResult, setLiveMatchResult] = useState<any | null>(null);
     const [optimisticStep, setOptimisticStep] = useState<number | null>(null);
+    const [videoUnlocked, setVideoUnlocked] = useState(false);
+
+    // Gate-Check: Video Letter Tab only unlocked when QR-Token exists
+    useEffect(() => {
+        if (!expanded) return;
+        const checkVideoStatus = async () => {
+            try {
+                const res = await fetch(`/api/video/status?jobId=${job.id}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                // Unlocked if a video_approaches row exists for this job (any status)
+                // OR the user has already started scripting (video_scripts row exists)
+                const isUnlocked = data.status !== null && data.status !== undefined;
+                const hasStarted = data.hasScript === true;
+                if (isUnlocked || hasStarted) {
+                    setVideoUnlocked(true);
+                }
+            } catch { /* silent fail — tab stays locked */ }
+        };
+        checkVideoStatus();
+    }, [expanded, job.id]);
 
 
     const displayTab = activeTab ?? 0;
@@ -250,9 +271,10 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
     const nextAction = getNextAction(job.dbStatus, onToggle, setActiveTab, t);
 
     return (
-        <motion.div className="border-b border-[#d6d6d6] last:border-b-0">
+        <motion.div className="border-b border-[#d6d6d6] last:border-b-0" data-tour="job-row-container">
             {/* Compact Row */}
             <div
+                data-tour="job-compact-row"
                 className="flex items-center gap-2 px-6 py-4 cursor-pointer hover:bg-[#d4e3fe] transition-colors"
                 onClick={(e) => {
                     if ((e.target as HTMLElement).closest('button')) return;
@@ -312,32 +334,43 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                         {/* Tab bar — no Review tab, no emojis */}
                         <div className="flex items-center gap-1 px-6 pt-4 pb-0 border-b border-[#d6d6d6]">
                             {[
-                                { index: 0, label: t('tab_profile'), icon: <FileText className="w-3.5 h-3.5" /> },
-                                { index: 1, label: t('tab_cv_match'), icon: <Check className="w-3.5 h-3.5" /> },
-                                { index: 2, label: t('tab_cv_opt'), icon: <Sparkles className="w-3.5 h-3.5" /> },
-                                { index: 3, label: t('tab_cover_letter'), icon: <Mail className="w-3.5 h-3.5" /> },
-                                { index: 4, label: t('tab_video_letter'), icon: <Video className="w-3.5 h-3.5" /> },
+                                { index: 0, label: t('tab_profile'), icon: <FileText className="w-3.5 h-3.5" />, tourId: 'tab-steckbrief' },
+                                { index: 1, label: t('tab_cv_match'), icon: <Check className="w-3.5 h-3.5" />, tourId: 'tab-cv-match' },
+                                { index: 2, label: t('tab_cv_opt'), icon: <Sparkles className="w-3.5 h-3.5" />, tourId: 'tab-cv-opt' },
+                                { index: 3, label: t('tab_cover_letter'), icon: <Mail className="w-3.5 h-3.5" />, tourId: 'tab-cover-letter' },
+                                { index: 4, label: t('tab_video_letter'), icon: <Video className="w-3.5 h-3.5" />, locked: !videoUnlocked, tourId: 'tab-video-letter' },
 
-                            ].map((tab) => (
+                            ].map((tab) => {
+                                const isLocked = 'locked' in tab && tab.locked;
+                                return (
                                 <button
                                     key={tab.index}
-                                    onClick={() => setActiveTab(tab.index)}
+                                    onClick={() => !isLocked && setActiveTab(tab.index)}
+                                    disabled={isLocked}
+                                    title={isLocked ? t('tab_video_locked') : undefined}
+                                    data-tour={'tourId' in tab ? tab.tourId : undefined}
                                     className={cn(
                                         "flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-md transition-colors",
-                                        displayTab === tab.index
-                                            ? "bg-white text-[#002e7a] border-t border-x border-[#d6d6d6] -mb-px"
-                                            : "text-slate-500 hover:text-[#37352F] hover:bg-white/50"
+                                        isLocked
+                                            ? "text-slate-300 cursor-not-allowed"
+                                            : displayTab === tab.index
+                                                ? "bg-white text-[#002e7a] border-t border-x border-[#d6d6d6] -mb-px"
+                                                : "text-slate-500 hover:text-[#37352F] hover:bg-white/50"
                                     )}
                                 >
                                     {tab.icon}
                                     {tab.label}
+                                    {isLocked && (
+                                        <svg className="w-3 h-3 ml-0.5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                    )}
                                 </button>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         {/* ===== TAB 0: STECKBRIEF (2-column layout) ===== */}
                         {displayTab === 0 && (
-                            <div className="px-5 py-3 space-y-3">
+                            <div data-tour="content-steckbrief" className="px-5 py-3 space-y-3">
                                 {/* Seniority + Source URL — inline with spacing */}
                                 <div className="flex items-center gap-3">
                                     {formatLevel(job.seniority) && (
@@ -476,6 +509,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
 
                         {/* ===== TAB 1: CV MATCH ===== */}
                         {displayTab === 1 && (
+                            <div data-tour="content-cv-match">
                             <CVMatchTab
                                 jobId={job.id}
                                 cachedMatch={liveMatchResult ?? job.metadata?.cv_match}
@@ -486,11 +520,12 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                 }}
                                 onNextStep={() => setActiveTab(2)}
                             />
+                            </div>
                         )}
 
                         {/* ===== TAB 2: CV OPTIMIZER ===== */}
                         {displayTab === 2 && (
-                            <div className="bg-white border-t border-[#d6d6d6]">
+                            <div data-tour="content-cv-opt" className="bg-white border-t border-[#d6d6d6]">
                                 <OptimizerWizard
                                     jobId={job.id}
                                     liveMatchResult={liveMatchResult ?? job.metadata?.cv_match ?? null}
@@ -504,6 +539,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
 
                         {/* ===== TAB 3: COVER LETTER ===== */}
                         {displayTab === 3 && (
+                            <div data-tour="content-cover-letter">
                             <Step4CoverLetter
                                 jobId={job.id}
                                 companyName={job.company}
@@ -512,6 +548,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                     setOptimisticStep(prev => Math.max(prev ?? job.workflowStep, 100));
                                 }}
                             />
+                            </div>
                         )}
 
                         {/* ===== TAB 4: VIDEO ===== */}

@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
                     summary: `string — 2-3 sentence summary of the role in ${languageName}`,
                     responsibilities: `string[] — responsibilities as bullet points (max 8), in ${languageName}`,
                     qualifications: `string[] — qualifications (max 8), in ${languageName}`,
-                    benefits: `string[] — benefits (max 5, can be empty), in ${languageName}`,
+                    benefits: `string[] — TOP 6 most important benefits, max 3 words each (e.g. "30 Tage Urlaub", "Remote Work", "Betriebliche Altersvorsorge"). No full sentences. No copy-paste.`,
                     seniority: "'junior' | 'mid' | 'senior' | 'lead' | 'unknown'",
                     buzzwords: "string[] — ATS/Robot-Keywords: tools, methods, frameworks (max 12)"
                 };
@@ -155,10 +155,14 @@ export async function POST(request: NextRequest) {
                     taskType: 'extract_job_fields',
                     systemPrompt: `Extract the following information from the job description as JSON. All text fields (summary, responsibilities, qualifications, benefits) MUST be written in ${languageName}. If a field is not identifiable, use null or empty array. Return ONLY valid JSON, no markdown.
 
-IMPORTANT for lists (responsibilities, qualifications, benefits):
+IMPORTANT for lists (responsibilities, qualifications):
 - Write condensed, complete sentences — approximately 20% shorter than the original.
 - Preserve the core message of each point. No abbreviating to mere keywords.
 - NO copy-paste of the original, but an informed condensation.
+
+IMPORTANT for benefits:
+- Extract ONLY the 6 most standout benefits, max 3 words each.
+- Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
 Schema: ${JSON.stringify(extractionSchema)}`,
                     prompt: enrichedDescription,
@@ -262,8 +266,25 @@ Schema: ${JSON.stringify(extractionSchema)}`,
         // ================================================================
         // STEP 4.5: Trigger strong extraction pipeline (Lazy Extraction)
         // Non-blocking: Haiku data is already saved as fallback
+        // OPTIMIZATION: Set sync_extracted_at flag BEFORE triggering Inngest
+        // so the background job can reliably skip its redundant LLM call.
         // ================================================================
         try {
+            // Only set the flag if we actually ran sync extraction successfully
+            const hasSyncData = extractedData && Object.keys(extractedData).length > 0 && extractedData.summary;
+            if (hasSyncData) {
+                await supabaseAdmin
+                    .from('job_queue')
+                    .update({
+                        metadata: {
+                            sync_extracted_at: new Date().toISOString(),
+                        },
+                    })
+                    .eq('id', job.id)
+                    .eq('user_id', userId);
+                console.log(`[${requestId}] route=jobs/ingest step=set_sync_flag job_id=${job.id}`);
+            }
+
             await inngest.send({
                 name: 'job/extract',
                 data: { jobId: job.id, userId, locale },

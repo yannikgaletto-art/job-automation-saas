@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, PlusCircle } from 'lucide-react';
@@ -14,6 +14,8 @@ import { CVComparison } from '@/components/cv/cv-comparison';
 import type { CVOptimizationResult } from '@/lib/services/cv-optimizer';
 import { useNotification } from '@/hooks/use-notification';
 import { ApplicationHistory } from '@/app/[locale]/dashboard/components/application-history';
+import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
+import { useDashboardTour, type TourStep } from '../hooks/useDashboardTour';
 
 // ─── Toggle Section (Notion-style accordion) ───────────────────────────
 function ToggleSection({ title, count, defaultOpen = false, children }: {
@@ -65,6 +67,107 @@ export default function JobQueuePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isAddJobOpen, setIsAddJobOpen] = useState(false);
 
+    // ─── State-Lifted from JobQueueTable (for tour auto-expand) ──────
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const handleToggle = useCallback((jobId: string) => {
+        setExpandedId((prev) => (prev === jobId ? null : jobId));
+    }, []);
+
+    // ─── Tour Setup (two-branch: empty vs. full) ──────────────────────
+    const [tourReady, setTourReady] = useState(false);
+
+    const EMPTY_STEPS: TourStep[] = [
+        {
+            targetSelector: '[data-tour="job-queue-add-btn"]',
+            position: 'bottom',
+            titleKey: 'job_queue.empty_step1_title',
+            bodyKey: 'job_queue.empty_step1_body',
+        },
+    ];
+
+    // Full branch: Step 1 = compact row, Steps 2-5 = tab CONTENT panels
+    // Each step programmatically switches to the correct tab (via useEffect below)
+    const FULL_STEPS: TourStep[] = [
+        {
+            targetSelector: '[data-tour="job-compact-row"]',
+            position: 'bottom',
+            titleKey: 'job_queue.step1_title',
+            bodyKey: 'job_queue.step1_body',
+        },
+        {
+            targetSelector: '[data-tour="content-steckbrief"]',
+            position: 'right',
+            titleKey: 'job_queue.step2_title',
+            bodyKey: 'job_queue.step2_body',
+        },
+        {
+            targetSelector: '[data-tour="content-cv-match"]',
+            position: 'right',
+            titleKey: 'job_queue.step3_title',
+            bodyKey: 'job_queue.step3_body',
+        },
+        {
+            targetSelector: '[data-tour="content-cv-opt"]',
+            position: 'right',
+            titleKey: 'job_queue.step4_title',
+            bodyKey: 'job_queue.step4_body',
+        },
+        {
+            targetSelector: '[data-tour="content-cover-letter"]',
+            position: 'right',
+            titleKey: 'job_queue.step5_title',
+            bodyKey: 'job_queue.step5_body',
+        },
+    ];
+
+    const tourSteps = !tourReady ? [] : (jobs.length === 0 ? EMPTY_STEPS : FULL_STEPS);
+
+    const tour = useDashboardTour('job-queue', tourSteps, {
+        delayMs: 2000,
+        enabled: tourReady,
+    });
+
+    const handleTourNext = useCallback(() => tour.nextStep(), [tour]);
+    const handleTourSkip = useCallback(() => tour.skipTour(), [tour]);
+
+    // ─── Tour: Auto-expand first job + programmatic tab switching ─────
+    // Mirrors the Tagesziele pattern (layout.tsx) where each step controls
+    // the UI state before the overlay tries to find its target element.
+    //
+    // Step 0 (compact row overview) → row collapsed, clean spotlight
+    // Steps 1-4 → row expanded, tab switched to matching content panel
+    useEffect(() => {
+        if (!tour.isActive) return;
+        if (jobs.length === 0) return;
+
+        // Step 0: Show compact row — DO NOT expand
+        if (tour.currentStep === 0) {
+            setExpandedId(null);
+            return;
+        }
+
+        // Steps 1-4: Expand first job + click correct tab
+        setExpandedId(jobs[0].id);
+
+        // Map tour step → tab button to click
+        const TAB_MAP: Record<number, string> = {
+            1: '[data-tour="tab-steckbrief"]',    // Step 2 → Steckbrief
+            2: '[data-tour="tab-cv-match"]',      // Step 3 → CV Match
+            3: '[data-tour="tab-cv-opt"]',         // Step 4 → CV Opt
+            4: '[data-tour="tab-cover-letter"]',   // Step 5 → Cover Letter
+        };
+
+        const selector = TAB_MAP[tour.currentStep];
+        if (selector) {
+            // RAF to ensure the expanded row has rendered its tab bar
+            const raf = requestAnimationFrame(() => {
+                const btn = document.querySelector(selector) as HTMLElement;
+                btn?.click();
+            });
+            return () => cancelAnimationFrame(raf);
+        }
+    }, [tour.isActive, tour.currentStep, jobs]);
+
     // Optimization State
     const notify = useNotification();
     const t = useTranslations('dashboard.job_queue');
@@ -79,8 +182,8 @@ export default function JobQueuePage() {
             case 'pending': return 'NEW';
             case 'processing': return 'JOB_REVIEWED';
             case 'steckbrief_confirmed': return 'JOB_REVIEWED';
-            case 'cv_matched':       // ← von Inngest Pipeline gesetzt
-            case 'cv_match_done': return 'CV_CHECKED';  // ← beide → CV_CHECKED
+            case 'cv_matched':
+            case 'cv_match_done': return 'CV_CHECKED';
             case 'cv_optimized': return 'CV_OPTIMIZED';
             case 'cover_letter_done': return 'CL_GENERATED';
             case 'ready_for_review': return 'CL_GENERATED';
@@ -97,7 +200,7 @@ export default function JobQueuePage() {
             case 'pending': return 0;
             case 'processing': return 10;
             case 'steckbrief_confirmed': return 30;
-            case 'cv_matched':       // ← von Inngest Pipeline gesetzt
+            case 'cv_matched':
             case 'cv_match_done': return 30;
             case 'cv_optimized': return 60;
             case 'cover_letter_done': return 100;
@@ -128,9 +231,8 @@ export default function JobQueuePage() {
                     buzzwords: (j.buzzwords as string[]) || null,
                     matchScore: (j.match_score as number) || ((j.status !== 'pending' || (j.responsibilities && (j.responsibilities as string[]).length > 0)) ? 10 : 0),
                     workflowStep: mapDbStatusToStep(j.status as string),
-                    dbStatus: (j.status as string) || 'pending', // Raw DB status for getNextAction
+                    dbStatus: (j.status as string) || 'pending',
                     status: mapDbStatusToUi(j.status as string),
-                    // ✅ Pass through metadata so cv_match cache is available in CVMatchTab
                     metadata: (j.metadata as Record<string, unknown>) || null,
                     source_url: (j.source_url as string) || null,
                     source: (j.source as string) || null,
@@ -146,7 +248,10 @@ export default function JobQueuePage() {
     };
 
     useEffect(() => {
-        fetchJobs().finally(() => setIsLoading(false));
+        fetchJobs().finally(() => {
+            setIsLoading(false);
+            setTourReady(true);
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -160,9 +265,8 @@ export default function JobQueuePage() {
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
 
-            // Poll for results (Inngest processes in background)
             let attempts = 0;
-            const maxAttempts = 20; // 20 × 3s = 60s max
+            const maxAttempts = 20;
             const pollInterval = setInterval(async () => {
                 attempts++;
                 try {
@@ -260,6 +364,7 @@ export default function JobQueuePage() {
                         onClick={() => setIsAddJobOpen(true)}
                         className="rounded-xl px-5 py-2.5 font-medium"
                         disabled={jobs.length >= 5}
+                        data-tour="job-queue-add-btn"
                     >
                         <PlusCircle className="w-4 h-4 mr-2" />
                         {t('add_job')}
@@ -288,6 +393,8 @@ export default function JobQueuePage() {
                         onDelete={handleDelete}
                         loading={isLoading}
                         optimizingJobId={isOptimizing ? currentJobId : null}
+                        expandedId={expandedId}
+                        onToggle={handleToggle}
                     />
                 </div>
             </ToggleSection>
@@ -335,6 +442,17 @@ export default function JobQueuePage() {
                     )}
                 </div>
             </CustomDialog>
+
+            {/* Job Queue Guided Tour */}
+            {tour.isActive && tour.step && (
+                <GuidedTourOverlay
+                    step={tour.step}
+                    currentStep={tour.currentStep}
+                    totalSteps={tour.totalSteps}
+                    onNext={handleTourNext}
+                    onSkip={handleTourSkip}
+                />
+            )}
         </div>
     );
 }

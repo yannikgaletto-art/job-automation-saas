@@ -66,6 +66,7 @@
       "community": "Community",
       "volunteering": "Volunteering",
       "data_security": "Data Security",
+      "feedback_voice": "Feedback",
       "settings": "Settings",
       "admin": "Admin"
     },
@@ -503,6 +504,14 @@
       "en": "English",
       "es": "Español",
       "saved": "Language saved"
+    },
+    "tours": {
+      "section_title": "Guided Tours",
+      "section_description": "Replay any tab tour to rediscover features.",
+      "title": "Reset tours",
+      "description": "Reset all completed tours so they appear again on your next visit.",
+      "reset_btn": "Reset all tours",
+      "reset_done": "Reset done"
     }
   },
   "legal": {
@@ -647,7 +656,7 @@
       "s8_r21_text": "You can object to the processing of your data at any time.",
       "s8_r7_label": "Right to Withdraw Consent (Art. 7(3)):",
       "s8_r7_text": "You can withdraw your consent for AI processing at any time.",
-      "s8_contact": "To exercise your rights, contact us at: kontakt@pathly.app",
+      "s8_contact": "To exercise your rights, contact us at: contact@path-ly.eu",
       "s9_title": "9. Right to Complain to a Supervisory Authority",
       "s9_body": "You have the right to lodge a complaint with a data protection supervisory authority if you believe that the processing of your personal data violates the GDPR. The competent authority depends on your place of residence or the seat of the controller.",
       "s10_title": "10. Cookies",
@@ -795,7 +804,7 @@
     "template_label": "Choose template:",
     "edit_done": "Done",
     "edit_start": "Edit",
-    "qr_video": "QR Video",
+    "qr_video": "QR Video Letter",
     "back_to_optimizer": "Back to Optimizer",
     "cover_letter": "Cover Letter",
     "qr_dialog_title": "QR code on the CV",
@@ -923,7 +932,8 @@
     "cta_generate_cover_letter": "Generate Cover Letter",
     "cta_finalize_application": "Finalize Application",
     "cta_open": "Open",
-    "badge_in_queue": "In Queue"
+    "badge_in_queue": "In Queue",
+    "tab_video_locked": "Activate the QR code in CV Optimizer first"
   },
   "cv_match": {
     "title": "CV Match & Optimization",
@@ -1257,7 +1267,27 @@
     "error_unknown": "An unknown error occurred.",
     "error_retry": "Try again",
     "error_load_failed": "Loading failed",
-    "error_generate_failed": "Generation failed"
+    "error_generate_failed": "Generation failed",
+    "upload_privacy_title": "Privacy Info",
+    "upload_privacy_body": "Your video will be encrypted and stored on EU servers (Supabase, Frankfurt). It will NOT be used for AI training. After 14 days, the file is automatically and irreversibly deleted.",
+    "upload_privacy_confirm": "Agree & Upload",
+    "upload_privacy_cancel": "Cancel"
+  },
+  "feedback_voice": {
+    "title": "Tell me what you think.",
+    "subtitle": "Your feedback on Pathly! Here are some questions I am curious about:",
+    "placeholder": "Your answer…",
+    "name_placeholder": "Your name (optional)",
+    "submit_button": "Send feedback →",
+    "submitting": "Sending…",
+    "success_message": "Thank you. This means a lot to me. — Yannik",
+    "question_1": "What do you like most about Pathly?",
+    "question_2": "What frustrates you or what is still missing?",
+    "question_3": "Do you have a tip I should act on immediately?",
+    "question_4": "Would you recommend Pathly and if so to whom?",
+    "question_5": "What was your first impression when you first saw Pathly?",
+    "error_rate_limit": "You've sent multiple feedbacks recently. Please wait a few minutes.",
+    "error_generic": "Something went wrong. Please try again."
   },
   "mood": {
     "checkin_label": "QUICK CHECK-IN",
@@ -1294,5 +1324,46 @@
     "cv_hint_bad_example": "\"Fraunhofer IGD — UX Researcher\" without further details",
     "cv_hint_continue": "Got it — upload CV",
     "cv_hint_dismiss": "I've read this — don't show again"
+  },
+  "tour": {
+    "step1_title": "Your Daily Goals",
+    "step1_body": "A study by Dr. Gail Matthews shows: People who <b>write down their goals</b> and share progress achieve them 33 to 42 percent more often. Pathly invites you to set your goals for today. Type directly or use drag and drop.",
+    "step2_title": "Mission — Drag & Drop",
+    "step2_body": "Create your own tasks or use <b>Pathly recommendations</b> from your job queue. Coaching recommendations appear automatically when we identify learning areas after an interview. <b>Simply drag tasks into the calendar.</b>",
+    "step3_title": "Pomodoro Technique",
+    "step3_body": "At Pathly we love working with the <b>Pomodoro Technique</b>. Focused work blocks with short breaks. It is the fastest way to make progress. Ready to start?",
+    "button_next": "Next",
+    "button_start": "Let's go!",
+    "step_indicator": "Step {current} of {total}",
+    "job_queue": {
+      "empty_step1_title": "Your application hub",
+      "empty_step1_body": "Here you manage all roles you want to track. Pathly analyses each role automatically. <b>You can work on up to 5 active jobs at a time.</b> Click the button to get started.",
+      "step1_title": "Your application hub",
+      "step1_body": "Here you see all the roles you are currently working on. Every role follows the same process from analysis to the finished cover letter. <b>You decide every step yourself</b> and stay in full control at all times.",
+      "step2_title": "What's behind the role?",
+      "step2_body": "The profile shows you everything Pathly found out about the role. Most important are the <b>ATS keywords</b>. These terms are scanned by applicant systems and often determine whether you get invited.",
+      "step3_title": "Does this role fit you?",
+      "step3_body": "Pathly compares your profile against the requirements and shows your strengths and gaps. We use this match to <b>tailor your CV and cover letter precisely to the role</b>.",
+      "step4_title": "CV and Video Letter",
+      "step4_body": "Here you can <b>add missing ATS keywords using the plus button</b>. Pathly weaves them in naturally. You also generate your <b>QR Video Letter</b> here. It gets printed onto your CV and increases callback rates by 20 to 38 percent.",
+      "step5_title": "Not generic. Really you.",
+      "step5_body": "The cover letter is written based on your optimizations and <b>your personal writing style</b>. Pathly analyses the company in real time. Before sending Pathly simulates the critique of a real <b>Hiring Manager</b>."
+    },
+    "job_search": {
+      "empty_step1_title": "Search for roles or for missions",
+      "empty_step1_body": "Enter a job title, a keyword or filter by <b>sustainability</b>. Pathly searches the market for you and saves the results.",
+      "step1_title": "Search for roles or for missions",
+      "step1_body": "Enter a job title, a keyword or filter by <b>sustainability</b>. Pathly searches the market for you and saves the results.",
+      "step2_title": "Review first, then add to queue",
+      "step2_body": "If you like a role, add it to the queue. Pathly shows you a <b>preview</b> first: tasks and qualifications you can adjust before the job enters analysis. <b>With your input we get the optimal data.</b>"
+    },
+    "coaching": {
+      "empty_step1_title": "No target, no coaching",
+      "empty_step1_body": "Coaching analyzes your CV against a real role: tasks, gaps, questions. <b>Add a job to the queue first</b>, then come back.",
+      "step1_title": "Reps = Confidence",
+      "step1_body": "Click here to start a <b>mock session</b>. First choose the round: Introduction, Deep Dive or Case Study. Then the number of questions. The AI takes the recruiter role and analyzes your answers live.",
+      "step2_title": "Our recommendations",
+      "step2_body": "Click a row: you see the <b>profile card</b> of the role, your past rounds and concrete recommendations for your knowledge gaps. Example: for <b>Zeb Consulting</b>, Java, SQL and OpenStack are missing. These get added as suggestions directly to your <b>daily goals</b>."
+    }
   }
 }

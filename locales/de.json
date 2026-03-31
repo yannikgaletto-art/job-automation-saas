@@ -66,6 +66,7 @@
       "community": "Community",
       "volunteering": "Ehrenamt",
       "data_security": "Datensicherheit",
+      "feedback_voice": "Feedback",
       "settings": "Einstellungen",
       "admin": "Admin"
     },
@@ -503,6 +504,14 @@
       "en": "English",
       "es": "Español",
       "saved": "Sprache gespeichert"
+    },
+    "tours": {
+      "section_title": "Geführte Touren",
+      "section_description": "Wiederhole jede Tab-Tour, um Features neu zu entdecken.",
+      "title": "Touren zurücksetzen",
+      "description": "Setze alle abgeschlossenen Touren zurück, damit sie beim nächsten Besuch erneut erscheinen.",
+      "reset_btn": "Alle Touren zurücksetzen",
+      "reset_done": "Zurückgesetzt"
     }
   },
   "legal": {
@@ -647,7 +656,7 @@
       "s8_r21_text": "Du kannst der Verarbeitung deiner Daten jederzeit widersprechen.",
       "s8_r7_label": "Recht auf Widerruf der Einwilligung (Art. 7 Abs. 3):",
       "s8_r7_text": "Du kannst deine Einwilligung zur KI-Verarbeitung jederzeit widerrufen.",
-      "s8_contact": "Zur Ausübung deiner Rechte kontaktiere uns unter: kontakt@pathly.app",
+      "s8_contact": "Zur Ausübung deiner Rechte kontaktiere uns unter: contact@path-ly.eu",
       "s9_title": "9. Beschwerderecht bei der Aufsichtsbehörde",
       "s9_body": "Du hast das Recht, dich bei einer Datenschutzaufsichtsbehörde zu beschweren, wenn du der Meinung bist, dass die Verarbeitung deiner personenbezogenen Daten gegen die DSGVO verstößt. Die zuständige Aufsichtsbehörde richtet sich nach deinem Wohnort bzw. dem Sitz des Verantwortlichen.",
       "s10_title": "10. Cookies",
@@ -795,7 +804,7 @@
     "template_label": "Template wählen:",
     "edit_done": "Fertig",
     "edit_start": "Bearbeiten",
-    "qr_video": "QR-Video",
+    "qr_video": "QR-Video-Letter",
     "back_to_optimizer": "Zurueck zum Optimizer",
     "cover_letter": "Cover Letter",
     "qr_dialog_title": "QR-Code auf dem Lebenslauf",
@@ -923,7 +932,8 @@
     "cta_generate_cover_letter": "Cover Letter generieren",
     "cta_finalize_application": "Bewerbung abschließen",
     "cta_open": "Öffnen",
-    "badge_in_queue": "In Queue"
+    "badge_in_queue": "In Queue",
+    "tab_video_locked": "Aktiviere zuerst den QR-Code im CV Optimizer"
   },
   "cv_match": {
     "title": "CV Match & Optimierung",
@@ -1257,7 +1267,27 @@
     "error_unknown": "Ein unbekannter Fehler ist aufgetreten.",
     "error_retry": "Erneut versuchen",
     "error_load_failed": "Laden fehlgeschlagen",
-    "error_generate_failed": "Generierung fehlgeschlagen"
+    "error_generate_failed": "Generierung fehlgeschlagen",
+    "upload_privacy_title": "Datenschutz-Info",
+    "upload_privacy_body": "Dein Video wird verschlüsselt auf EU-Servern (Supabase, Frankfurt) gespeichert. Es wird NICHT für KI-Training verwendet. Nach 14 Tagen wird die Datei automatisch und unwiderruflich gelöscht.",
+    "upload_privacy_confirm": "Zustimmen & Hochladen",
+    "upload_privacy_cancel": "Abbrechen"
+  },
+  "feedback_voice": {
+    "title": "Sag mir, was du denkst.",
+    "subtitle": "Dein Feedback zu Pathly! Hier sind einige Fragen, die mich interessieren:",
+    "placeholder": "Deine Antwort…",
+    "name_placeholder": "Dein Name (optional)",
+    "submit_button": "Abschicken →",
+    "submitting": "Wird gesendet…",
+    "success_message": "Danke. Das bedeutet mir wirklich etwas. — Yannik",
+    "question_1": "Was gefällt dir an Pathly am besten?",
+    "question_2": "Was frustriert dich oder was fehlt dir noch?",
+    "question_3": "Hast du einen Tipp, den ich sofort umsetzen sollte?",
+    "question_4": "Würdest du Pathly weiterempfehlen und wenn ja, wem?",
+    "question_5": "Was war dein erster Gedanke, als du Pathly zum ersten Mal gesehen hast?",
+    "error_rate_limit": "Du hast gerade mehrmals Feedback gesendet. Bitte warte ein paar Minuten.",
+    "error_generic": "Leider ist ein Fehler aufgetreten. Bitte versuche es erneut."
   },
   "mood": {
     "checkin_label": "KURZER CHECK-IN",
@@ -1294,5 +1324,46 @@
     "cv_hint_bad_example": "\"Fraunhofer IGD — UX Researcher\" ohne weitere Details",
     "cv_hint_continue": "Verstanden — Lebenslauf hochladen",
     "cv_hint_dismiss": "Habe ich gelesen — nicht mehr anzeigen"
+  },
+  "tour": {
+    "step1_title": "Deine Tagesziele",
+    "step1_body": "Eine Studie von Dr. Gail Matthews zeigt: Wer sich <b>Ziele schriftlich setzt</b> und Fortschritte teilt, erreicht diese um 33 bis 42 Prozent häufiger. Pathly lädt dich ein deine Ziele für heute zu setzen. Tippe direkt rein oder nutze Drag and Drop.",
+    "step2_title": "Mission — Drag & Drop",
+    "step2_body": "Erstelle eigene Tasks oder nutze <b>Pathly-Empfehlungen</b> aus deiner Job Queue. Coaching-Empfehlungen erscheinen automatisch wenn wir nach einem Interview Lernfelder erkennen. <b>Ziehe Tasks einfach in den Kalender.</b>",
+    "step3_title": "Pomodoro Technik",
+    "step3_body": "Bei Pathly arbeiten wir am liebsten mit der <b>Pomodoro Technik</b>. Fokussierte Arbeitsblöcke mit kurzen Pausen. So kommst du am schnellsten voran. Bereit zu starten?",
+    "button_next": "Weiter",
+    "button_start": "Los geht's!",
+    "step_indicator": "Schritt {current} von {total}",
+    "job_queue": {
+      "empty_step1_title": "Deine Bewerbungsablage",
+      "empty_step1_body": "Hier verwaltest du alle Stellen die du im Blick behalten willst. Pathly analysiert jede Stelle automatisch. <b>Du kannst bis zu 5 aktive Jobs gleichzeitig bearbeiten.</b> Klicke auf den Button um loszulegen.",
+      "step1_title": "Deine Bewerbungszentrale",
+      "step1_body": "Hier siehst du alle Stellen an denen du gerade arbeitest. Jede Stelle durchläuft denselben Prozess von der Analyse bis zum fertigen Anschreiben. <b>Du entscheidest jeden Schritt selbst</b> und behältst immer die volle Kontrolle.",
+      "step2_title": "Was steckt hinter der Stelle?",
+      "step2_body": "Im Steckbrief findest du alles was Pathly über die Stelle herausgefunden hat. Besonders wichtig sind die <b>ATS-Keywords</b>. Diese Begriffe werden von Bewerbersystemen gescannt und entscheiden oft über eine Einladung zum Gespräch.",
+      "step3_title": "Passt die Stelle zu dir?",
+      "step3_body": "Pathly vergleicht dein Profil mit den Anforderungen und zeigt dir Stärken und Lücken. Dieses Match nutzen wir direkt um <b>deinen Lebenslauf und das Anschreiben passgenau zu optimieren</b>.",
+      "step4_title": "Lebenslauf und Video Letter",
+      "step4_body": "Hier kannst du <b>fehlende ATS-Keywords über das Plus-Symbol ergänzen</b>. Pathly webt diese natürlich ein. Hier generierst du auch deinen <b>QR Video Letter</b>. Er wird direkt auf den Lebenslauf gedruckt und erhöht die Rückmeldequote um 20 bis 38 Prozent.",
+      "step5_title": "Nicht generisch. Wirklich du.",
+      "step5_body": "Das Anschreiben wird auf Basis deiner Optimierungen in <b>deinem persönlichen Schreibstil</b> verfasst. Pathly analysiert das Unternehmen in Echtzeit. Vor dem Absenden simuliert Pathly die Kritik eines echten <b>Hiring Managers</b>."
+    },
+    "job_search": {
+      "empty_step1_title": "Suche nach Stellen oder nach Missionen",
+      "empty_step1_body": "Gib einen Jobtitel, ein Keyword oder filtere nach <b>Nachhaltigkeit</b>. Pathly durchsucht den Markt für dich und speichert die Ergebnisse.",
+      "step1_title": "Suche nach Stellen oder nach Missionen",
+      "step1_body": "Gib einen Jobtitel, ein Keyword oder filtere nach <b>Nachhaltigkeit</b>. Pathly durchsucht den Markt für dich und speichert die Ergebnisse.",
+      "step2_title": "Erst prüfen, dann in die Queue",
+      "step2_body": "Wenn dir eine Stelle gefällt, füge sie zur Queue hinzu. Pathly zeigt dir zuerst eine <b>Vorschau</b>: Aufgaben und Qualifikationen, die du anpassen kannst, bevor der Job in die Analyse geht. <b>Mit dir erhalten wir die optimalen Daten.</b>"
+    },
+    "coaching": {
+      "empty_step1_title": "Kein Ziel, kein Coaching",
+      "empty_step1_body": "Das Coaching analysiert dein CV gegen eine echte Stelle: Aufgaben, Lücken, Fragen. <b>Füge zuerst einen Job in die Queue hinzu</b>, dann komm zurück.",
+      "step1_title": "Reps = Confidence",
+      "step1_body": "Klicke hier, um eine <b>Mock-Session</b> zu starten. Du wählst zuerst die Runde: Kennenlernen, Deep Dive oder Case Study. Dann die Anzahl der Fragen. Die AI übernimmt die Recruiter-Rolle und analysiert deine Antworten live.",
+      "step2_title": "Unsere Empfehlungen",
+      "step2_body": "Klicke auf eine Zeile: du siehst den <b>Steckbrief</b> der Stelle, deine bisherigen Runden und konkrete Empfehlungen zu deinen Wissenslücken. Beispiel: Bei <b>Zeb Consulting</b> fehlen Java, SQL und OpenStack. Diese werden als Vorschlag direkt in deine <b>Tagesziele</b> übernommen."
+    }
   }
 }

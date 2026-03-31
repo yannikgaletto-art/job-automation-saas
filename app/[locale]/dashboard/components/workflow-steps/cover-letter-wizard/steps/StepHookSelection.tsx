@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { HookCard } from '../cards/HookCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse, SelectedHook, SelectedQuote } from '@/types/cover-letter-setup';
@@ -22,6 +22,9 @@ interface Props {
 
 export function StepHookSelection({ jobId, companyName, setupData, onNext, onReloadData }: Props) {
     const t = useTranslations('cover_letter');
+    // Locale-based quote language: 'de' → German quotes, 'en'/'es' → English quotes
+    const locale = useLocale();
+    const quoteLanguage: 'de' | 'en' = locale === 'de' ? 'de' : 'en';
     const { selectedHook, selectedQuote, fetchedQuotes, introFocus, optInModules, setHook, setQuote, setFetchedQuotes, setIntroFocus, setOptInModule, setStep } = useCoverLetterSetupStore();
     const [manualText, setManualText] = useState('');
     const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -150,7 +153,9 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     companyValues,
                     companyVision,
                     jobTitle: setupData.jobTitle ?? undefined,
-                    language: setupData.detectedJobLanguage || 'de',
+                    // Quote language follows UI locale, NOT job language.
+                    // de → German quotes, en/es → English quotes (per product spec 2026-03-30)
+                    language: quoteLanguage,
                 })
             });
             if (!res.ok) throw new Error('Quote search failed');

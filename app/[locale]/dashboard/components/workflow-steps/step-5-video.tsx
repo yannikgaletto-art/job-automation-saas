@@ -24,6 +24,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
     const [state, setState] = useState<VideoState>('loading');
     const [expiresAt, setExpiresAt] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [showPrivacyConsent, setShowPrivacyConsent] = useState(false);
 
     // Script data for overlay during recording
     const [scriptBlocks, setScriptBlocks] = useState<{ id: string; title: string; content: string; durationSeconds: number; isRequired: boolean; templateId: string | null; sortOrder: number }[]>([]);
@@ -56,7 +57,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                     setExpiresAt(data.expiresAt);
                     setState('done');
                 } else if (data.status === 'prompts_ready' || data.hasScript) {
-                    // Fix 9: Has video_approaches prompts OR video_scripts entry → skip consent
+                    // QR token created or script already exists — skip consent, go straight to script studio
                     setState('script-studio');
                 } else {
                     // No entry — show consent then script studio
@@ -89,9 +90,8 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
         setState('script-studio');
     };
 
-    // handleGenerate removed — generation is now handled by VideoScriptStudio
 
-    // Fix 2: Synchronous callback — no extra API call, data comes via props
+    // Synchronous callback — data comes via VideoScriptStudio props, no extra API call needed
     const handleScriptReady = useCallback((scriptData: { blocks: { id: string; title: string; content: string; durationSeconds: number; isRequired: boolean; templateId: string | null; sortOrder: number }[]; mode: string; wpmSpeed: number }) => {
         setScriptBlocks(scriptData.blocks);
         setScriptMode(scriptData.mode as 'teleprompter' | 'bullets');
@@ -393,6 +393,53 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                     />
                 </div>
 
+                {/* Privacy consent inline card */}
+                {showPrivacyConsent && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3"
+                    >
+                        <h4 className="text-sm font-semibold text-[#012e7a] flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                            {t('upload_privacy_title')}
+                        </h4>
+                        <p className="text-xs text-gray-600 leading-relaxed">{t('upload_privacy_body')}</p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={async () => {
+                                    setShowPrivacyConsent(false);
+                                    // Log upload consent to consent_history (DSGVO Art. 7)
+                                    try {
+                                        const supabase = createClient();
+                                        const { data: { user } } = await supabase.auth.getUser();
+                                        if (user) {
+                                            await supabase.from('consent_history').insert({
+                                                user_id: user.id,
+                                                document_type: 'ai_processing',
+                                                document_version: 'video_upload_v1',
+                                                consent_given: true,
+                                            });
+                                        }
+                                    } catch (err) {
+                                        console.error('[Step5Video] Upload consent logging failed:', err);
+                                    }
+                                    handleUpload();
+                                }}
+                                className="px-4 py-2 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white text-sm font-medium rounded-lg transition flex items-center gap-1.5"
+                            >
+                                <Upload className="w-3.5 h-3.5" /> {t('upload_privacy_confirm')}
+                            </button>
+                            <button
+                                onClick={() => setShowPrivacyConsent(false)}
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition"
+                            >
+                                {t('upload_privacy_cancel')}
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+
                 <div className="flex justify-center gap-4">
                     <button
                         onClick={handleReRecord}
@@ -401,7 +448,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                         <RefreshCw className="w-4 h-4" /> {t('preview_re_record')}
                     </button>
                     <button
-                        onClick={handleUpload}
+                        onClick={() => setShowPrivacyConsent(true)}
                         className="px-5 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white font-medium rounded-lg transition flex items-center gap-2"
                     >
                         <Upload className="w-4 h-4" /> {t('preview_upload')}

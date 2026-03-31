@@ -13,131 +13,50 @@ interface Props {
     onNext: () => void;
 }
 
-/**
- * Generate a recommendation for WHY a station matches a job requirement.
- * Uses keyword overlap between bullet points and requirements.
- */
-function generateRecommendation(
-    bullets: string[] | undefined,
-    role: string,
-    company: string,
-    requirements: string[],
-    matchFallbackText: string
-): { requirement: string; reasoning: string; _score: number } | null {
-    if (requirements.length === 0) return null;
-
-    // Fallback if no bullets available
-    if (!bullets || bullets.length === 0) {
-        return {
-            requirement: requirements[0],
-            reasoning: matchFallbackText,
-            _score: 0
-        };
-    }
-
-    // Find best matching requirement via keyword overlap
-    let bestReq = '';
-    let bestScore = 0;
-    let bestBullet = '';
-
-    for (const req of requirements) {
-        const reqWords = req.toLowerCase().split(/\s+/).filter(w => w.length > 4);
-        for (const bullet of bullets) {
-            const bulletWords = bullet.toLowerCase().split(/\s+/);
-            const overlap = reqWords.filter(rw => bulletWords.some(bw => bw.includes(rw) || rw.includes(bw))).length;
-            if (overlap > bestScore) {
-                bestScore = overlap;
-                bestReq = req;
-                bestBullet = bullet;
-            }
-        }
-    }
-
-    if (bestScore === 0) {
-        // Fallback: just use the first requirement
-        return {
-            requirement: requirements[0],
-            reasoning: matchFallbackText,
-            _score: 0
-        };
-    }
-
-    // Truncate bullet to ~80 chars for display
-    const shortBullet = bestBullet.length > 80 ? bestBullet.slice(0, 77) + '...' : bestBullet;
-
-    return {
-        requirement: bestReq,
-        reasoning: `${company} zeigt, dass du "${shortBullet}" kannst — das belegt die Anforderung.`,
-        _score: bestScore
-    };
-}
-
 export function StepStationMapping({ setupData, onBack, onNext }: Props) {
     const t = useTranslations('cover_letter');
     const { cvStations, toggleStation, isStepComplete } = useCoverLetterSetupStore();
     const canProceed = isStepComplete(2);
     const autoSelectDone = useRef(false);
 
-    // Upgrade 1: Daten-Hygiene — nur vollständige Stationen anzeigen
+    // Only show stations with both role AND company
     const validStations = useMemo(
         () => setupData.cvStations.filter(s => s.role && s.company),
         [setupData.cvStations]
     );
 
-    // Precalculate recommendations for all VALID stations and find the top matches
-    const { recs, top3Set } = useMemo(() => {
-        const computed = validStations.map((station, idx) => {
-            const safeBullets = station.bullets || [];
-            return {
-                idx,
-                rec: generateRecommendation(safeBullets, station.role, station.company, setupData.jobRequirements, t('recommendation_match'))
-            };
-        });
-        const sortedIndices = [...computed].sort((a, b) => (b.rec?._score || 0) - (a.rec?._score || 0)).map(r => r.idx);
-        return {
-            recs: computed,
-            top3Set: new Set(sortedIndices.slice(0, 3)),
-        };
-    }, [validStations, setupData.jobRequirements]);
-
-    // Upgrade 2: Auto-Select — Top 2 beim ersten Betreten vorauswählen
+    // Auto-Select: pick the first 2 stations on first visit
     useEffect(() => {
         if (autoSelectDone.current) return;
-        if (cvStations.length > 0) return; // User hat bereits manuell gewählt oder Store hat Daten
-        if (recs.length === 0) return;
+        if (cvStations.length > 0) return; // User already has selections
+        if (validStations.length === 0) return;
 
         autoSelectDone.current = true;
 
-        const sorted = [...recs].sort((a, b) => (b.rec?._score || 0) - (a.rec?._score || 0));
-        const top2 = sorted.slice(0, 2);
-
-        for (const entry of top2) {
-            const station = validStations[entry.idx];
-            if (!station) continue;
+        const top2 = validStations.slice(0, 2);
+        for (const station of top2) {
             const safeBullets = station.bullets || [];
-            const rec = entry.rec;
             toggleStation({
                 company: station.company,
                 role: station.role,
                 period: station.period,
                 keyBullet: safeBullets[0] || '',
-                matchedRequirement: rec?.requirement || setupData.jobRequirements[0] || '',
-                intent: `${t('intent_prefix')}: ${rec?.requirement || t('intent_experience_fallback')}`,
+                matchedRequirement: setupData.jobRequirements[0] || '',
+                intent: `${t('intent_prefix')}: ${setupData.jobRequirements[0] || t('intent_experience_fallback')}`,
                 bullets: safeBullets,
             });
         }
-    }, [recs, validStations, cvStations.length, toggleStation, setupData.jobRequirements]);
+    }, [validStations, cvStations.length, toggleStation, setupData.jobRequirements]);
 
-    const handleToggle = (stationIndex: number, station: SetupDataResponse['cvStations'][number]) => {
+    const handleToggle = (station: SetupDataResponse['cvStations'][number]) => {
         const safeBullets = station.bullets || [];
-        const rec = recs[stationIndex]?.rec;
         toggleStation({
             company: station.company,
             role: station.role,
             period: station.period,
             keyBullet: safeBullets[0] || '',
-            matchedRequirement: rec?.requirement || setupData.jobRequirements[0] || '',
-            intent: `Beweis für: ${rec?.requirement || 'Berufserfahrung'}`,
+            matchedRequirement: setupData.jobRequirements[0] || '',
+            intent: `${t('intent_prefix')}: ${setupData.jobRequirements[0] || t('intent_experience_fallback')}`,
             bullets: safeBullets,
         });
     };
@@ -189,7 +108,7 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                 )}
             </div>
 
-            {/* Upgrade 3: Single-column layout — no more split-view */}
+            {/* Station cards */}
             <div className="space-y-2">
                 {validStations.map((station, idx) => {
                     const selected = cvStations.find(
@@ -202,10 +121,10 @@ export function StepStationMapping({ setupData, onBack, onNext }: Props) {
                             company={station.company}
                             role={station.role}
                             period={station.period}
-                            bullets={station.bullets}
                             selectedIndex={selected?.stationIndex ?? null}
                             isDisabled={!selected && cvStations.length >= 3}
-                            onToggle={() => handleToggle(idx, station)}
+                            onToggle={() => handleToggle(station)}
+                            hint={station.hint}
                         />
                     );
                 })}

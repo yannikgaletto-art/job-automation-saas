@@ -1,29 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
-// quote-matcher import removed — quotes now served by lib/services/quote-service.ts (DB-backed)
+// Upstash ratelimit removed (2026-03-30 Phase 2) — was only used for Perplexity API
 import { recordCacheHit, recordCacheMiss } from './cache-monitor';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-// Initialize Rate Limiter (if Redis env vars are present)
-const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-    ? new Redis({
-        url: process.env.UPSTASH_REDIS_REST_URL,
-        token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    })
-    : null;
-
-const ratelimit = redis
-    ? new Ratelimit({
-        redis: redis,
-        limiter: Ratelimit.slidingWindow(10, '60 s'), // 10 requests per minute
-        analytics: true,
-    })
-    : null;
 
 interface EnrichmentResult {
     id: string;
@@ -55,10 +37,6 @@ export interface EnrichmentContext {
     description?: string;    // brief company description, used for text-match
 }
 
-/** Helper: strip protocol and www, e.g. "https://www.myty.com/page" → "myty.com" */
-function extractDomain(url: string): string {
-    return url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0].toLowerCase();
-}
 
 /** Empty result for Unsicherheits-Gate — confidence 0, UI shows request-context prompt */
 function getEmptyEnrichmentResult(companyName: string, needsContext: boolean): Partial<EnrichmentResult> & { needs_company_context: boolean } {
@@ -121,254 +99,14 @@ async function checkCache(
     return null;
 }
 
-/**
- * STEP 2: Fetch from Perplexity (if cache miss)
- *
- * Zero-Fake-Data Architecture (Batch 7):
- *   Stufe 0/1: EnrichmentContext injected into prompt for precise targeting
- *   Stufe 2/3: Citation validation + Confidence Score calculated below
- *
- * CRITICAL: We ONLY fetch public company data, NO personal data!
- */
-async function fetchCompanyIntel(
-    companyName: string,
-    context?: EnrichmentContext
-): Promise<Partial<EnrichmentResult> & { needs_company_context: boolean }> {
-    // 1. Rate Limiting Check
-    if (ratelimit) {
-        const { success } = await ratelimit.limit('perplexity_enrichment');
-        if (!success) {
-            console.warn('Perplexity rate limit reached. Returning empty enrichment.');
-            return getEmptyEnrichmentResult(companyName, !context?.website);
-        }
-    }
-
-    // Build context-enriched prompt (Stufe 0 & 1)
-    const contextHints: string[] = [];
-    if (context?.website) contextHints.push(`Domain: ${context.website}`);
-    if (context?.industry) contextHints.push(`Industry: ${context.industry}`);
-    if (context?.description) contextHints.push(`Context: ${context.description}`);
-
-    const contextString = contextHints.length > 0
-        ? `\n\nCRITICAL CONTEXT TO MATCH:\n${contextHints.join('\n')}\nOnly return sources that STRICTLY match this exact company entity. Reject any sources from other companies.`
-        : '';
-
-    const MAX_RETRIES = 2;
-    let attempt = 0;
-
-    while (attempt <= MAX_RETRIES) {
-        attempt++;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-        try {
-            console.log(`🔍 Perplexity Research: ${companyName} (Attempt ${attempt}${context?.website ? ` | ctx:${context.website}` : ''})`);
-
-            const response = await fetch('https://api.perplexity.ai/chat/completions', {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: 'sonar-pro',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: `You are a specialized company researcher.
-                            Determine the company's primary region.
-                            If DACH (Germany, Austria, Switzerland), output content in German.
-                            Otherwise, output in English.`
-                        },
-                        {
-                                                content: `Find PUBLIC information about ${companyName}.${contextString}
-                                                         Required information:
-                             1. Recent news (last 3 months) - specifically look for recent funding, valuation, seed rounds, or major growth.
-                             2. Company Vision & Mission (what is their ultimate goal?).
-                             3. Key Projects or Core Products.
-                             4. Company values (from official website).
-                             5. Last 5-7 LinkedIn posts from ${companyName} official page.
-                             6. Current strategic challenges: What is ${companyName} visibly struggling with or actively trying to solve right now? Examples: scaling issues, team building, entering new markets, technical debt, competition pressure. STRICT FORMAT: Exactly 2 bullet points, maximum 15 words each.
-                             7. Roadmap signals: Any public hints about ${companyName}'s direction in the next 6-12 months (expansion plans, product launches, hiring patterns, public announcements). STRICT FORMAT: Exactly 2 bullet points, maximum 15 words each.
-                             8. Industry segment: Classify ${companyName} into ONE concise industry tag in English. Examples: "HealthTech", "SaaS", "E-Commerce", "Fintech", "EdTech", "MediaTech", "CleanTech", "Consulting", "Manufacturing", "Retail", "Logistics". Use well-known industry taxonomy.
-                             
-                             For LinkedIn posts, extract:
-                             - Post content (first 200 chars)
-                             - Theme/Category (e.g., "Team Culture", "Product Launch")
-                             - Engagement (likes + comments approx)
-                             - Date posted (approx)
-                                                         Output as JSON:
-                             {
-                               "recent_news": ["headline1", "headline2"],
-                               "vision_and_mission": "...",
-                               "key_projects": ["project1", "project2"],
-                               "funding_status": "...",
-                               "company_values": ["value1", "value2"],
-                               "industry_segment": "HealthTech",
-                               "current_challenges": ["challenge1 (max 15 words)", "challenge2 (max 15 words)"],
-                               "roadmap_signals": ["signal1 (max 15 words)", "signal2 (max 15 words)"],
-                               "linkedin_activity": [
-                                 {
-                                   "content": "...",
-                                   "theme": "...",
-                                   "engagement": "100+",
-                                   "date": "2023-10-01"
-                                 }
-                               ]
-                             }
-                            
-                            CRITICAL: Do NOT include employee names or personal data. Company-level data only.`,
-                        },
-                    ],
-                    temperature: 0,
-                    return_citations: true
-                }),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                if (response.status === 429) {
-                    console.warn('Perplexity 429 Too Many Requests');
-                    break;
-                }
-                throw new Error(`Perplexity API error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            const content = data.choices[0]?.message?.content || '';
-            const citations: string[] = data.citations || [];
-
-            let parsed;
-            try {
-                try {
-                    parsed = JSON.parse(content);
-                } catch {
-                    const jsonMatch = content.match(/```json?\s*([\s\S]*?)```/);
-                    if (jsonMatch) {
-                        parsed = JSON.parse(jsonMatch[1]);
-                    } else {
-                        const firstOpen = content.indexOf('{');
-                        const lastClose = content.lastIndexOf('}');
-                        if (firstOpen !== -1 && lastClose !== -1) {
-                            parsed = JSON.parse(content.substring(firstOpen, lastClose + 1));
-                        } else {
-                            throw new Error('No JSON found');
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn('Failed to parse Perplexity JSON. Raw content:', content.substring(0, 200) + '...');
-                return getEmptyEnrichmentResult(companyName, !context?.website);
-            }
-
-            // ─── Zero-Fake-Data Validation (Batch 7) ───────────────────────
-            // Stufe 1: Domain/Name Filter on Citations
-            const contextDomain = context?.website ? extractDomain(context.website) : null;
-            const namePart = companyName.toLowerCase().replace(/\s+/g, '');
-
-            const validSources = citations.filter(url => {
-                const urlLower = url.toLowerCase();
-                const domainMatch = contextDomain ? urlLower.includes(contextDomain) : false;
-                const nameMatch = urlLower.includes(namePart);
-                return domainMatch || nameMatch;
-            });
-
-            // Stufe 2: Unsicherheits-Gate
-            // If no context was provided AND we found < 2 matching sources → block
-            if (!context?.website && !context?.description && validSources.length < 2) {
-                console.warn(
-                    `⚠️ Unsicherheits-Gate for "${companyName}": ${validSources.length} valid citations, no context.`
-                );
-                return getEmptyEnrichmentResult(companyName, true); // needs_company_context = true
-            }
-
-            // Stufe 3: Explicit Confidence Score Schema (Batch 7, approved 2026-02-27)
-            let confidence = 0.0;
-            const responseTextLower = content.toLowerCase();
-            const companyNameLower = companyName.toLowerCase();
-
-            // +0.4 wenn Domain-Match in mindestens 1 Citation
-            if (contextDomain && validSources.some(url => url.toLowerCase().includes(contextDomain))) {
-                confidence += 0.4;
-            } else if (!contextDomain && validSources.length > 0) {
-                // Wenn kein Context-Domain, aber Name matched: partial score
-                confidence += 0.2;
-            }
-
-            // +0.3 wenn companyName im Response-Text erwähnt wird (case-insensitive)
-            if (responseTextLower.includes(companyNameLower)) {
-                confidence += 0.3;
-            }
-
-            // +0.2 wenn mindestens 2 valide Citations vorhanden
-            if (validSources.length >= 2) {
-                confidence += 0.2;
-            }
-
-            // +0.1 wenn industry/description aus Steckbrief im Response-Text vorkommt
-            if (context?.industry && responseTextLower.includes(context.industry.toLowerCase())) {
-                confidence += 0.1;
-            }
-
-            // +0.1 wenn description/job context vorkommt (z.B. Position: Content & Inbound Marketing)
-            if (context?.description) {
-                // Check if any meaningful word from the description appears in the response
-                const descWords = context.description.toLowerCase().split(/[\s:,]+/).filter(w => w.length > 4);
-                if (descWords.some(w => responseTextLower.includes(w))) {
-                    confidence += 0.1;
-                }
-            }
-
-            console.log(`📊 [Enrichment] Confidence for "${companyName}": ${confidence.toFixed(2)} (valid citations: ${validSources.length}/${citations.length})`);
-
-            // Threshold: context-dependent
-            // With website: require 0.9 (domain-match(0.4) + name-in-text(0.3) + 2-citations(0.2) = 0.9)
-            // Without website but with description: accept 0.7 (name-match(0.2) + name-in-text(0.3) + 2-citations(0.2) = 0.7)
-            // Without any context: require 0.9 (stricter — no way to verify correctness)
-            const requiredConfidence = (!context?.website && context?.description) ? 0.7 : 0.9;
-            if (confidence < requiredConfidence) {
-                console.warn(`⚠️ Confidence ${confidence.toFixed(2)} < ${requiredConfidence} for "${companyName}". Returning empty state.`);
-                return getEmptyEnrichmentResult(companyName, !context?.website);
-            }
-
-            console.log(`✅ Enrichment Success (Confidence: ${confidence.toFixed(2)})`);
-
-            return {
-                recent_news: parsed.recent_news || [],
-                company_values: parsed.company_values || [],
-                tech_stack: [],
-                linkedin_activity: parsed.linkedin_activity || [],
-                suggested_quotes: [],
-                perplexity_citations: validSources, // Only verified citations stored
-                confidence_score: confidence,
-                vision_and_mission: parsed.vision_and_mission || "",
-                key_projects: parsed.key_projects || [],
-                funding_status: parsed.funding_status || "",
-                industry_segment: parsed.industry_segment || "", // e.g. "HealthTech" — drives quote category routing
-                // First 90 Days data — strictly capped by Perplexity prompt
-                current_challenges: (parsed.current_challenges || []).slice(0, 2),
-                roadmap_signals: (parsed.roadmap_signals || []).slice(0, 2),
-                needs_company_context: false,
-            } as any;
-
-        } catch (error: any) {
-            clearTimeout(timeoutId);
-            console.error(`Fetch Company Intel Error (Attempt ${attempt}):`, error.name, error.message);
-
-            if (attempt > MAX_RETRIES) {
-                console.warn('Max retries reached. Returning empty enrichment.');
-                return getEmptyEnrichmentResult(companyName, !context?.website);
-            }
-
-            const delay = Math.pow(2, attempt) * 1000;
-            await new Promise(resolve => setTimeout(resolve, delay));
-        }
-    }
-
-    return getEmptyEnrichmentResult(companyName, !context?.website);
-}
+// fetchCompanyIntel() REMOVED (2026-03-30 Phase 2):
+// Perplexity Sonar API was the fallback when no company website was provided.
+// Decision: We now require a website URL for enrichment. Without URL → empty result.
+// This eliminates the most expensive external API call in the pipeline.
+// The Jina+Claude primary path (fetchViaJinaAndClaude) handles all enrichment.
+//
+// If Perplexity is needed again in the future, restore from git history:
+//   git log --all -p -- lib/services/company-enrichment.ts
 
 /**
  * STEP 3: Save to cache
@@ -391,7 +129,7 @@ async function saveToCache(
             // First 90 Days fields — persisted in intel_data JSONB (no migration needed)
             current_challenges: (intel as any).current_challenges || [],
             roadmap_signals: (intel as any).roadmap_signals || [],
-            source: 'perplexity'
+            source: 'jina_claude' // Updated from 'perplexity' (2026-03-30 Phase 2)
         },
         perplexity_citations: intel.perplexity_citations || [],
         researched_at: new Date().toISOString(),
@@ -413,13 +151,13 @@ async function saveToCache(
 }
 
 /**
- * STEP 2b: Jina AI Reader + Claude Haiku Fallback Chain
+ * STEP 2: Jina AI Reader + Claude Haiku — PRIMARY enrichment path
  *
- * When Perplexity returns empty (confidence < 0.9) AND we have a company_website:
+ * When we have a company_website:
  *   1. Jina AI reader (r.jina.ai) scrapes the company website — FREE, no API key needed
  *   2. Claude Haiku extracts structured intel_data from the scraped text
  *
- * Much more reliable than Firecrawl+OpenAI: Jina is free and always available,
+ * Much more reliable than Perplexity: Jina is free and always available,
  * Claude Haiku is already used throughout the app.
  */
 async function fetchViaJinaAndClaude(
@@ -543,11 +281,12 @@ Wenn eine Information nicht verfügbar ist, verwende ein leeres Array oder leere
 /**
  * MAIN: Enrich company (with cache + graceful degradation)
  *
- * Enrichment Chain:
+ * Enrichment Chain (post-Phase 2):
  *   1. Cache (7-day TTL)
  *   2. Jina+Claude (PRIMARY — when website is provided)
- *   3. Perplexity (FALLBACK — only if no website)
- *   4. Empty state (needs_company_context=true if no website)
+ *   3. Empty state (needs_company_context=true if no website)
+ *
+ * Perplexity fallback removed 2026-03-30 Phase 2.
  *
  * @param companySlug  Kept for caller compatibility (unused)
  * @param companyName  Canonical name used as cache key
@@ -588,9 +327,9 @@ export async function enrichCompany(
             intel = getEmptyEnrichmentResult(companyName, false);
         }
     } else {
-        // Step 2 FALLBACK: Perplexity (only when NO website — legacy path)
-        console.log(`🔍 [Enrichment] No website for "${companyName}" — trying Perplexity fallback`);
-        intel = await fetchCompanyIntel(companyName, context);
+        // No website provided → return empty result (Perplexity removed 2026-03-30 Phase 2)
+        console.log(`⚠️ [Enrichment] No website for "${companyName}" — returning empty (needs_company_context=true)`);
+        intel = getEmptyEnrichmentResult(companyName, true);
     }
 
     // If still empty after all attempts, return empty state

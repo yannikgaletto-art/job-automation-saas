@@ -1,8 +1,8 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 5.3  
-**Last Updated:** 2026-03-29  
+**Version:** 5.4  
+**Last Updated:** 2026-04-01  
 **Status:** Active  
 
 ---
@@ -30,6 +30,7 @@
 | **QR Code** | Consent dialog → CV templates | QR generated client-side with consent, embedded in PDF templates |
 | **Avatar Picker** | `components/motion/sidebar.tsx` | Animal avatar stored in `user_profiles.avatar_animal`, Pathly brand colors |
 | **Mood Check-in V2** | `app/[locale]/dashboard/hooks/useMoodCheckIn.tsx` + `app/api/mood/checkin/route.ts` | Adaptive Tag/Nacht-Symbole, Progressive Reduction (5× Skip → auto-hide), `MoodCheckinContext`, `CheckinSettingsCard` in Settings, i18n (de/en/es), `lib/mood/mood-symbols.ts` |
+| **Guided Tours** | `components/dashboard/guided-tour-overlay.tsx` | Onboarding tooltips, `useDashboardTour` hook, target-rect syncing, auto-clamp viewports, localStorage state |
 
 ---
 

@@ -336,10 +336,10 @@ export default function SecurityPage() {
               <div className="bg-[#F5F5F4] rounded-lg p-4 mb-4">
                 <p className="text-sm font-medium text-[#37352F]">Kontakt:</p>
                 <a
-                  href="mailto:kontakt@pathly.app?subject=Account%20Deletion%20Request"
+                  href="mailto:contact@path-ly.eu?subject=Account%20Deletion%20Request"
                   className="text-sm text-[#012e7a] hover:underline"
                 >
-                  kontakt@pathly.app
+                  contact@path-ly.eu
                 </a>
               </div>
               <Button

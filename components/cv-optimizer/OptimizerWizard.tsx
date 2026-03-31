@@ -111,7 +111,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
 
     const [cvData, setCvData] = useState<CvStructuredData | null>(null);
     const [jobData, setJobData] = useState<any>(null);
-    const [templateId, setTemplateId] = useState<string>("clean");
+    const [templateId, setTemplateId] = useState<string>("valley");
 
     // CVOptSettings — client-side only, not persisted to DB
     const [cvOptSettings, setCvOptSettings] = useState<CVOptSettings>(DEFAULT_CV_OPT_SETTINGS);

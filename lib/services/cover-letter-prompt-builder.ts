@@ -285,6 +285,10 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
 Gewähltes Zitat: "${ctx!.selectedQuote!.quote}"
 (Autor: ${ctx!.selectedQuote!.author})
 
+⚠️ ANTI-GHOST-TRANSLATION (ABSOLUTES VERBOT): Das Zitat oben DARF NICHT übersetzt werden.
+Es muss BUCHSTÄBLICH und WORTWÖRTLICH in der Sprache übernommen werden, in der es angegeben ist.
+Egal ob das Anschreiben auf Deutsch oder einer anderen Sprache verfasst wird — das Zitat bleibt unverändert.
+
 FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
 - Leite das Zitat mit einer menschlichen Beobachtung ein.
 - Das Zitat MUSS auf einer EIGENEN Zeile stehen, in Anführungszeichen.
@@ -325,8 +329,12 @@ LIMITS:
 - Dieser Block zählt NICHT als eigener der 4-5 Absätze des Anschreibens` : ''}` : '';
 
     const quoteBodyBlock = hasQuote ? `[REGEL: ZITAT IM HAUPTTEIL — STATION-1-EINLEITUNG]:
-Das folgende Zitat MUSS WORTWÖRTLICH im Text stehen. Lass es NICHT weg!
+Das folgende Zitat MUSS WORTWORTLICH im Text stehen. Lass es NICHT weg!
 Zitat: "${ctx!.selectedQuote!.quote}" (${ctx!.selectedQuote!.author})
+
+⚠️ ANTI-GHOST-TRANSLATION (ABSOLUTES VERBOT): Das Zitat oben DARF NICHT übersetzt werden.
+Es muss BUCHSTÄBLICH in der Sprache übernommen werden, in der es oben angegeben ist.
+Egal ob das Anschreiben auf Deutsch oder einer anderen Sprache geschrieben wird — das Zitat bleibt unverändert.
 
 PFLICHT-FORMAT:
 "${ctx!.selectedQuote!.quote}"

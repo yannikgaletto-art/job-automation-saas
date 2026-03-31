@@ -1,0 +1,375 @@
+"use client";
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
+import { motion, AnimatePresence } from 'framer-motion';
+import { createClient } from '@/lib/supabase/client';
+import { Mic, MicOff, Send, Check, Loader2 } from 'lucide-react';
+
+type FormState = 'idle' | 'submitting' | 'done' | 'error';
+type RecordingState = 'idle' | 'recording' | 'transcribing';
+
+// Organic drift for the pills (horizontal only, no checkmarks)
+const DRIFT = [0, 28, 8, 36, 14];
+const ROT   = [-0.8, 1.5, -1.2, 0.8, -1.5];
+
+// Max recording duration: 5 minutes (300 000 ms)
+const MAX_RECORDING_MS = 5 * 60 * 1000;
+
+export function FeedbackVoiceClient() {
+    const t = useTranslations('feedback_voice');
+    const locale = useLocale();
+
+    const [formState, setFormState]         = useState<FormState>('idle');
+    const [feedback, setFeedback]           = useState('');
+    const [userName, setUserName]           = useState('');
+    const [errorMsg, setErrorMsg]           = useState('');
+    const [recordingState, setRecordingState] = useState<RecordingState>('idle');
+
+    const mediaRecorderRef  = useRef<MediaRecorder | null>(null);
+    const audioChunksRef    = useRef<Blob[]>([]);
+    const inputRef          = useRef<HTMLInputElement>(null);
+    const autoStopTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Capture handleSubmit in a ref so the auto-stop timer closure always sees
+    // the latest feedback value without needing it in the dependency array.
+    const handleSubmitRef = useRef<(() => void) | null>(null);
+
+    const isValid = feedback.trim().length > 10;
+
+    // Pre-fill name silently from auth session
+    useEffect(() => {
+        const supabase = createClient();
+        supabase.auth.getUser().then(({ data }) => {
+            const n = data?.user?.user_metadata?.full_name || data?.user?.email?.split('@')[0] || '';
+            setUserName(n);
+        });
+    }, []);
+
+    const questions = [
+        t('question_1'),
+        t('question_2'),
+        t('question_3'),
+        t('question_4'),
+        t('question_5'),
+    ];
+
+    // ── Submit ───────────────────────────────────────────────────────────────
+    const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (formState === 'submitting') return;
+        // Allow submit even if text came from voice (might be exactly 10 chars)
+        if (feedback.trim().length < 5) return;
+
+        setFormState('submitting');
+        setErrorMsg('');
+
+        try {
+            const res = await fetch('/api/feedback/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    feedback: feedback.trim(),
+                    name: userName.trim() || null,
+                    locale,
+                }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                setErrorMsg(res.status === 429 ? t('error_rate_limit') : (data.error || t('error_generic')));
+                setFormState('error');
+                return;
+            }
+
+            // 🎉 Confetti
+            import('canvas-confetti').then(({ default: confetti }) => {
+                confetti({ particleCount: 70, angle: 60,  spread: 55, origin: { x: 0, y: 0.8 }, colors: ['#012e7a', '#A8C4E6', '#00B870'] });
+                setTimeout(() => confetti({ particleCount: 70, angle: 120, spread: 55, origin: { x: 1, y: 0.8 }, colors: ['#012e7a', '#A8C4E6', '#00B870'] }), 250);
+            });
+
+            setTimeout(() => setFormState('done'), 1000);
+
+        } catch {
+            setErrorMsg(t('error_generic'));
+            setFormState('error');
+        }
+    }, [feedback, userName, locale, formState, t]);
+
+    // Keep the ref current so the auto-stop timer always sees the latest version
+    useEffect(() => {
+        handleSubmitRef.current = () => handleSubmit();
+    }, [handleSubmit]);
+
+    // ── Voice Recording ─────────────────────────────────────────────────────
+    const stopRecording = useCallback(() => {
+        if (autoStopTimerRef.current) {
+            clearTimeout(autoStopTimerRef.current);
+            autoStopTimerRef.current = null;
+        }
+        mediaRecorderRef.current?.stop();
+    }, []);
+
+    const handleMicClick = useCallback(async () => {
+        if (recordingState === 'recording') {
+            stopRecording();
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus'
+                : 'audio/webm';
+
+            const recorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorderRef.current = recorder;
+            audioChunksRef.current   = [];
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data);
+            };
+
+            recorder.onstop = async () => {
+                stream.getTracks().forEach(t => t.stop());
+                setRecordingState('transcribing');
+
+                try {
+                    const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+                    const formData  = new FormData();
+                    formData.append('file', audioBlob, 'audio.webm');
+                    formData.append('model', 'whisper-1');
+                    const lang = locale === 'de' ? 'de' : locale === 'es' ? 'es' : 'en';
+                    formData.append('language', lang);
+
+                    const res = await fetch('/api/feedback/transcribe', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (res.ok) {
+                        const { text } = await res.json();
+                        if (text?.trim()) {
+                            setFeedback(prev => prev ? `${prev} ${text.trim()}` : text.trim());
+                            inputRef.current?.focus();
+                            // Auto-submit after 5-min max recording
+                            // (the timer already fired, so submit right after transcription)
+                            if (autoStopTimerRef.current === null) {
+                                // Timer was already cleared → this was an auto-stop → submit now
+                                setTimeout(() => handleSubmitRef.current?.(), 400);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('[voice] Transcription failed:', err);
+                } finally {
+                    setRecordingState('idle');
+                }
+            };
+
+            recorder.start();
+            setRecordingState('recording');
+
+            // Auto-stop after MAX_RECORDING_MS (5 min)
+            autoStopTimerRef.current = setTimeout(() => {
+                autoStopTimerRef.current = null; // signal: timer-triggered stop
+                mediaRecorderRef.current?.stop();
+            }, MAX_RECORDING_MS);
+
+        } catch (err) {
+            console.error('[voice] Mic access denied:', err);
+            setRecordingState('idle');
+        }
+    }, [recordingState, locale, stopRecording]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit();
+        }
+    };
+
+    // Cleanup timer on unmount
+    useEffect(() => () => {
+        if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
+    }, []);
+
+    // ── Success ──────────────────────────────────────────────────────────────
+    if (formState === 'done') {
+        return (
+            <div className="min-h-[calc(100vh-4rem)] bg-[#FAFAF8] flex items-center justify-center p-6">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: 12 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+                    className="text-center"
+                >
+                    <div className="w-16 h-16 bg-[#00B870]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Check className="w-8 h-8 text-[#00B870]" strokeWidth={3} />
+                    </div>
+                    <p className="text-[1.5rem] font-semibold text-[#1C1917] max-w-[36ch] leading-snug">
+                        {t('success_message')}
+                    </p>
+                </motion.div>
+            </div>
+        );
+    }
+
+    // ── Main ─────────────────────────────────────────────────────────────────
+    return (
+        <div className="min-h-[calc(100vh-4rem)] bg-[#FAFAF8] flex justify-center pt-12 md:pt-20 px-6">
+            <div className="max-w-2xl w-full flex flex-col">
+
+                {/* ── Header ── */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                    className="mb-10"
+                >
+                    <h1 className="text-[2.1rem] md:text-[2.6rem] font-bold text-[#1C1917] tracking-tight leading-tight mb-3">
+                        {t('title')}
+                    </h1>
+                    {/* Subtitle — fully translated via i18n (Feedback 3) */}
+                    <p className="text-[1rem] text-[#9A9086] max-w-xl leading-relaxed">
+                        {t('subtitle')}
+                    </p>
+                </motion.div>
+
+                {/* ── Falling Pills — Bild 1 style, no checkmarks (Feedback 1) ── */}
+                <div
+                    className="flex flex-col gap-[14px] pb-10 overflow-x-visible relative"
+                    style={{
+                        WebkitMaskImage: 'linear-gradient(to right, black 60%, transparent 100%)',
+                        maskImage: 'linear-gradient(to right, black 60%, transparent 100%)',
+                    }}
+                >
+                    {questions.map((q, i) => (
+                        <motion.div
+                            key={`${locale}-${i}`}
+                            initial={{ opacity: 0, y: -70, rotate: ROT[i] - 4 }}
+                            animate={{ opacity: 1, y: 0, rotate: ROT[i] }}
+                            transition={{
+                                type: 'spring',
+                                stiffness: 320,
+                                damping: 26,
+                                mass: 0.75,
+                                delay: i * 0.11,
+                            }}
+                            className="self-start flex items-center bg-white rounded-full px-5 py-3 border border-[#E7E7E5]"
+                            style={{
+                                marginLeft: `${DRIFT[i]}px`,
+                                boxShadow: '0 3px 12px -2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.02)',
+                            }}
+                        >
+                            {/* No icon, no dash — clean pill (Feedback 1 + 4) */}
+                            <span className="text-[14.5px] font-semibold text-[#37352F] whitespace-nowrap tracking-tight">
+                                {q}
+                            </span>
+                        </motion.div>
+                    ))}
+                </div>
+
+                {/* ── Trennstrich ── */}
+                <motion.div
+                    initial={{ scaleX: 0, opacity: 0 }}
+                    animate={{ scaleX: 1, opacity: 1 }}
+                    transition={{ duration: 0.9, delay: 0.65, ease: 'easeOut' }}
+                    className="w-full h-px bg-[#E0DDD8] origin-left"
+                />
+
+                {/* ── Input Row — Bild 2 ── */}
+                <motion.form
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.85, ease: 'easeOut' }}
+                    onSubmit={handleSubmit}
+                    className="flex items-center gap-3 w-full pt-7 pb-10"
+                >
+                    {/* Text Input — empty placeholder (Feedback 2) */}
+                    <div className={`flex-1 rounded-full px-6 py-[17px] flex items-center border transition-all ${
+                        formState === 'error'
+                            ? 'border-[#E8490F]/30 bg-[#FFF9F7]'
+                            : 'border-[#E7E7E5] bg-[#F3F4F6] focus-within:bg-white focus-within:border-[#C8C4BF]'
+                    }`}>
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={feedback}
+                            onChange={(e) => {
+                                setFeedback(e.target.value);
+                                if (formState === 'error') setFormState('idle');
+                            }}
+                            onKeyDown={handleKeyDown}
+                            placeholder={t('placeholder')}
+                            className="w-full bg-transparent outline-none text-[15px] text-[#1C1917] placeholder:text-[#B0A99E]"
+                            disabled={formState === 'submitting'}
+                            autoComplete="off"
+                        />
+                    </div>
+
+                    {/* Mic Button — Pathly dark blue when recording (Feedback 5) */}
+                    <button
+                        type="button"
+                        onClick={handleMicClick}
+                        disabled={formState === 'submitting'}
+                        className={`w-[56px] h-[56px] rounded-full flex items-center justify-center shrink-0 border transition-all duration-200 focus:outline-none ${
+                            recordingState === 'recording'
+                                ? 'bg-[#012e7a] border-[#012e7a]'   // Pathly dark blue, no pulse
+                                : recordingState === 'transcribing'
+                                    ? 'bg-[#F3F4F6] border-[#E7E7E5] cursor-wait'
+                                    : 'bg-[#F3F4F6] border-[#E7E7E5] hover:bg-[#E8E8E8] hover:border-[#D1D5DB]'
+                        }`}
+                        title={recordingState === 'recording' ? 'Aufnahme stoppen' : 'Sprachnotiz aufnehmen'}
+                    >
+                        {recordingState === 'transcribing' ? (
+                            <Loader2 className="w-5 h-5 text-[#73726E] animate-spin" />
+                        ) : recordingState === 'recording' ? (
+                            <MicOff className="w-5 h-5 text-white" />
+                        ) : (
+                            <Mic className="w-5 h-5 text-[#73726E]" />
+                        )}
+                    </button>
+
+                    {/* Send Button */}
+                    <button
+                        type="submit"
+                        disabled={!isValid || formState === 'submitting'}
+                        className={`w-[56px] h-[56px] rounded-full flex items-center justify-center shrink-0 transition-all duration-300 focus:outline-none ${
+                            isValid
+                                ? 'bg-[#A8C4E6] hover:bg-[#93B5DC] shadow-sm cursor-pointer'
+                                : 'bg-[#E5E7EB] cursor-not-allowed'
+                        }`}
+                    >
+                        {formState === 'submitting' ? (
+                            <Loader2 className="w-5 h-5 text-white animate-spin" />
+                        ) : (
+                            <Send
+                                className={`w-5 h-5 ${isValid ? 'text-white' : 'text-[#A8A29E]'}`}
+                                style={{
+                                    transform: isValid ? 'translate(1px, -1px)' : 'none',
+                                    transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                }}
+                            />
+                        )}
+                    </button>
+                </motion.form>
+
+                {/* Error Banner */}
+                <AnimatePresence>
+                    {formState === 'error' && errorMsg && (
+                        <motion.p
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="text-[#E8490F] text-[13px] text-center font-medium pb-4"
+                        >
+                            {errorMsg}
+                        </motion.p>
+                    )}
+                </AnimatePresence>
+
+            </div>
+        </div>
+    );
+}

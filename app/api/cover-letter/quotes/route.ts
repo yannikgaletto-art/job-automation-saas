@@ -59,7 +59,9 @@ export async function POST(req: NextRequest) {
             companyValues: values,
             companyVision: companyVision || undefined,
             industrySegment,
-            language: (language === 'en' ? 'en' : 'de') as 'de' | 'en',
+            // Defensive mapping: only 'de' yields German. 'en', 'es', or any other locale → 'en'.
+            // Prevents 'es' from silently falling back to 'de' (old === 'en' check had this bug).
+            language: (language === 'de' ? 'de' : 'en') as 'de' | 'en',
         };
 
         const quotes = await findRelevantQuotes(ctx, 3);

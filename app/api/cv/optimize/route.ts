@@ -8,6 +8,7 @@ import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
 import { logger } from '@/lib/logging';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { translateCvIfNeeded } from '@/lib/services/cv-translator';
+import { pruneForOptimizer } from '@/lib/utils/cv-payload-pruner';
 
 // Rate limit: 3 CV optimize requests per minute per user
 const cvOptimizeLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
@@ -290,7 +291,7 @@ SUMMARY FORMATTING:
 **INPUT DATA:**
 
 1. CV SSoT (CURRENT CV):
-${JSON.stringify(translatedCv, null, 2)}
+${JSON.stringify(pruneForOptimizer(translatedCv, cv_match_result?.buzzwords), null, 2)}
 
 2. CV MATCH RESULT (ANALYSIS & GAPS):
 ${JSON.stringify(requirementRows, null, 2)}
@@ -333,7 +334,7 @@ Must conform to the following Zod schema:
                 taskType: 'optimize_cv',
                 prompt,
                 temperature: 0,
-                maxTokens: 16384,
+                maxTokens: 5000, // Cost-capped (2026-03-30): diffs need ~1500-3000 tokens max
             });
         } catch (aiErr: any) {
             const aiMsg = aiErr?.message || String(aiErr);

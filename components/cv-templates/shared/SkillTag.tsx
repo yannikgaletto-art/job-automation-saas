@@ -23,12 +23,16 @@ export function SkillTag({ text }: { text: string }) {
     return <Text style={s.tag}>{text}</Text>;
 }
 
+/**
+ * ATS-safe skill rendering: comma-separated plaintext.
+ * Replaced pill-based rendering (2026-03-30) for Valley Template ATS compliance.
+ * Old pill rendering: each skill in its own styled <Text> box with background/border-radius.
+ * New: all skills as "Python, Make, Bubble" in a single <Text> element.
+ */
 export function SkillTagGroup({ items }: { items: string[] }) {
     return (
-        <View style={s.container}>
-            {items.map((item, i) => (
-                <SkillTag key={i} text={item} />
-            ))}
-        </View>
+        <Text style={{ fontSize: 9, color: '#0F172A', lineHeight: 1.5 }}>
+            {items.join(', ')}
+        </Text>
     );
 }

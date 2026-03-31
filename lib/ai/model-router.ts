@@ -2,11 +2,19 @@
  * AI Model Router - Cost Optimization Layer
  *
  * Routes tasks to cost-effective models while preserving quality.
- * Expected savings: 84% on parsing, 0% on creative (intentional)
+ *
+ * Provider hierarchy:
+ *   - Claude Sonnet 4.5: Creative writing (Cover Letter, CV Optimizer)
+ *   - Claude Haiku 4.5: Semantic analysis (CV Match, Language Judge, Coaching)
+ *   - Mistral Small 4: Classification & extraction (Parse HTML, Detect ATS, etc.)
+ *
+ * COST OPTIMIZATION HISTORY:
+ *   2026-03-30: GPT_4O_MINI removed (dead code)
+ *   2026-03-30: Language Judge downgraded Sonnet → Haiku
+ *   2026-03-30 Phase 2: Mistral Small 4 added for Stufe 1 tasks (~5× cheaper than Haiku)
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import OpenAI from 'openai';
 
 // ============================================================================
 // MODEL DEFINITIONS
@@ -19,17 +27,20 @@ export const MODELS = {
         cost_per_1m_tokens: 3.0,
         strengths: ['creative_writing', 'complex_reasoning'],
     },
-    GPT_4O_MINI: {
-        id: 'gpt-4o-mini',
-        provider: 'openai' as const,
-        cost_per_1m_tokens: 0.15,
-        strengths: ['parsing', 'classification', 'summarization'],
-    },
     CLAUDE_HAIKU: {
         id: 'claude-haiku-4-5-20251001',
         provider: 'anthropic' as const,
         cost_per_1m_tokens: 0.25,
         strengths: ['parsing', 'classification', 'fast_execution'],
+    },
+    // Mistral Small 4 — EU-native (Paris), DSGVO-compliant by default
+    // OpenAI-compatible API: https://api.mistral.ai/v1/chat/completions
+    // Input: $0.15/1M | Output: $0.60/1M (~5× cheaper than Haiku)
+    MISTRAL_SMALL: {
+        id: 'mistral-small-2503',
+        provider: 'mistral' as const,
+        cost_per_1m_tokens: 0.15,
+        strengths: ['classification', 'extraction', 'fast_execution', 'eu_native'],
     },
 } as const;
 
@@ -38,28 +49,27 @@ export const MODELS = {
 // ============================================================================
 
 export type TaskType =
-    // Cheap tier (Claude Haiku)
+    // Mistral Small tier (cheapest — pure classification/extraction)
     | 'parse_html'
     | 'extract_job_fields'
     | 'detect_ats_system'
     | 'classify_job_board'
     | 'summarize_job_description'
+    | 'classify_station_relevance'
+    // Haiku tier (semantic understanding, structured analysis)
     | 'briefing_generate'
-    // Premium tier (Claude Sonnet)
-    | 'write_cover_letter'
-    | 'personalize_intro'
-    | 'generate_motivation_text'
-    | 'optimize_cv'
     | 'cv_match'
     | 'cv_parse'
     | 'translate_cv'
     | 'language_judge'
     | 'kill_fluff'
-    // Certificate pipeline
     | 'analyze_skill_gaps'
     | 'synthesize_certificates'
-    // Cover letter wizard
-    | 'classify_station_relevance';
+    // Premium tier (Claude Sonnet — creative writing only)
+    | 'write_cover_letter'
+    | 'personalize_intro'
+    | 'generate_motivation_text'
+    | 'optimize_cv';
 
 // ============================================================================
 // ROUTING LOGIC
@@ -67,29 +77,28 @@ export type TaskType =
 
 export function selectModel(taskType: TaskType) {
     const routingMap: Record<TaskType, keyof typeof MODELS> = {
-        // Cheap tasks (Claude 4.5 Haiku — $0.25/1M tokens)
-        parse_html: 'CLAUDE_HAIKU',
-        extract_job_fields: 'CLAUDE_HAIKU',
-        detect_ats_system: 'CLAUDE_HAIKU',
-        classify_job_board: 'CLAUDE_HAIKU',
-        summarize_job_description: 'CLAUDE_HAIKU',
+        // Mistral Small 4: Classification & extraction (Stufe 1 — 2026-03-30 Phase 2)
+        // Pure data extraction, no creative writing, no complex JSON schemas
+        parse_html: 'MISTRAL_SMALL',
+        extract_job_fields: 'MISTRAL_SMALL',
+        detect_ats_system: 'MISTRAL_SMALL',
+        classify_job_board: 'MISTRAL_SMALL',
+        summarize_job_description: 'MISTRAL_SMALL',
+        classify_station_relevance: 'MISTRAL_SMALL',
+        // Claude Haiku: Semantic analysis (needs deep understanding + reliable JSON)
         briefing_generate: 'CLAUDE_HAIKU',
-        // Premium tasks (Claude 4.5 Sonnet — creative writing, language quality)
+        language_judge: 'CLAUDE_HAIKU',
+        kill_fluff: 'CLAUDE_HAIKU',
+        cv_match: 'CLAUDE_HAIKU',
+        cv_parse: 'CLAUDE_HAIKU',
+        translate_cv: 'CLAUDE_HAIKU',
+        analyze_skill_gaps: 'CLAUDE_HAIKU',
+        synthesize_certificates: 'CLAUDE_HAIKU',
+        // Claude Sonnet: Creative writing (quality-critical)
         write_cover_letter: 'CLAUDE_SONNET',
         personalize_intro: 'CLAUDE_SONNET',
         generate_motivation_text: 'CLAUDE_SONNET',
         optimize_cv: 'CLAUDE_SONNET',
-        language_judge: 'CLAUDE_SONNET',
-        kill_fluff: 'CLAUDE_SONNET',
-        // Structured analysis (Haiku: fast + cheap, no creative writing needed)
-        cv_match: 'CLAUDE_HAIKU',
-        cv_parse: 'CLAUDE_HAIKU',
-        translate_cv: 'CLAUDE_HAIKU',
-        // Certificate pipeline
-        analyze_skill_gaps: 'CLAUDE_HAIKU',
-        synthesize_certificates: 'CLAUDE_HAIKU',
-        // Cover letter wizard
-        classify_station_relevance: 'CLAUDE_HAIKU',
     };
 
     return MODELS[routingMap[taskType]];
@@ -116,7 +125,6 @@ export interface CompletionResponse {
 }
 
 let anthropicClient: Anthropic | null = null;
-let openaiClient: OpenAI | null = null;
 
 function getAnthropicClient() {
     if (!anthropicClient) {
@@ -127,13 +135,50 @@ function getAnthropicClient() {
     return anthropicClient;
 }
 
-function getOpenAIClient() {
-    if (!openaiClient) {
-        openaiClient = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY!,
-        });
+/**
+ * Mistral API call — OpenAI-compatible REST endpoint
+ * No SDK needed, uses standard fetch.
+ * Endpoint: https://api.mistral.ai/v1/chat/completions
+ */
+async function completeMistral(
+    request: CompletionRequest,
+    modelId: string,
+): Promise<{ text: string; tokensUsed: number }> {
+    const apiKey = process.env.MISTRAL_API_KEY;
+    if (!apiKey) {
+        throw new Error('MISTRAL_API_KEY is not set. Required for Mistral Small tasks.');
     }
-    return openaiClient;
+
+    const messages: Array<{ role: string; content: string }> = [];
+    if (request.systemPrompt) {
+        messages.push({ role: 'system', content: request.systemPrompt });
+    }
+    messages.push({ role: 'user', content: request.prompt });
+
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+            model: modelId,
+            messages,
+            max_tokens: request.maxTokens ?? 4096,
+            temperature: request.temperature ?? 0,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text().catch(() => 'unknown');
+        throw new Error(`Mistral API error ${response.status}: ${errorBody}`);
+    }
+
+    const data = await response.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    const tokensUsed = (data.usage?.prompt_tokens || 0) + (data.usage?.completion_tokens || 0);
+
+    return { text, tokensUsed };
 }
 
 export async function complete(
@@ -163,26 +208,10 @@ export async function complete(
             text,
             tokensUsed: response.usage.input_tokens + response.usage.output_tokens,
         };
+    } else if (model.provider === 'mistral') {
+        result = await completeMistral(request, model.id);
     } else {
-        const client = getOpenAIClient();
-        const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
-
-        if (request.systemPrompt) {
-            messages.push({ role: 'system', content: request.systemPrompt });
-        }
-        messages.push({ role: 'user', content: request.prompt });
-
-        const response = await client.chat.completions.create({
-            model: model.id,
-            messages,
-            temperature: request.temperature ?? 0,
-            max_tokens: request.maxTokens ?? 4096,
-        });
-
-        result = {
-            text: response.choices[0]?.message?.content ?? '',
-            tokensUsed: response.usage?.total_tokens ?? 0,
-        };
+        throw new Error(`Unsupported provider: ${(model as any).provider}. Supported: anthropic, mistral.`);
     }
 
     const latencyMs = Date.now() - startTime;

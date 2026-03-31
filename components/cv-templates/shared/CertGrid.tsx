@@ -52,7 +52,7 @@ interface CertEntry {
 function CertItem({ cert }: { cert: CertEntry }) {
     return (
         <View style={s.item}>
-            <Text style={s.name}>{truncate(cert.name || '', 45)}</Text>
+            <Text style={s.name}>{truncate(cert.name || '', 80)}</Text>
             <Text style={s.detail}>
                 {[cert.issuer, cert.dateText].filter(Boolean).join(' · ')}
             </Text>

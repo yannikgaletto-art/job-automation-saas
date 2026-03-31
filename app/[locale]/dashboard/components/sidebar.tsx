@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Home, Inbox, BarChart3, Shield, Settings, User, MessageSquare, Search, Heart } from 'lucide-react'
+import { Home, Inbox, BarChart3, Shield, Settings, User, MessageSquare, Search, Heart, Mic } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -31,6 +31,7 @@ const navItems = [
     title: 'Tools',
     items: [
       { icon: Shield, label: 'Data Security', href: '/dashboard/security', badge: null },
+      { icon: Mic, label: 'Feedback Voice', href: '/dashboard/feedback', badge: null },
       { icon: Settings, label: 'Settings', href: '/dashboard/settings', badge: null },
     ],
   },

@@ -1,20 +1,25 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "@/i18n/navigation"
+import { useState, Suspense } from "react"
+import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/motion/button"
 import { Input } from "@/components/ui/input"
 import { Link } from "@/i18n/navigation"
 
-export default function LoginPage() {
+/**
+ * LoginForm — requires Suspense boundary due to useSearchParams
+ */
+function LoginForm() {
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
     const router = useRouter()
+    const searchParams = useSearchParams()
     const supabase = createClient()
     const t = useTranslations('auth.login')
 
@@ -32,8 +37,17 @@ export default function LoginPage() {
             if (error) throw error
 
             console.log("✅ Login successful")
-            router.push("/dashboard")
-            router.refresh()
+
+            // Respect returnTo — critical for extension PKCE auth flow
+            // Use window.location.href (not router.push) to ensure full page
+            // reload so Supabase session cookie is picked up by the callback page
+            const returnTo = searchParams.get('returnTo')
+            if (returnTo) {
+                window.location.href = decodeURIComponent(returnTo)
+            } else {
+                router.push("/dashboard")
+                router.refresh()
+            }
 
         } catch (err: any) {
             console.error("❌ Login failed:", err.message)
@@ -101,5 +115,20 @@ export default function LoginPage() {
                 </p>
             </div>
         </div>
+    )
+}
+
+/**
+ * LoginPage — Suspense boundary required for useSearchParams in Next.js App Router
+ */
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
+                <div className="w-8 h-8 border-2 border-[#012e7a] border-t-transparent rounded-full animate-spin" />
+            </div>
+        }>
+            <LoginForm />
+        </Suspense>
     )
 }

@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Clock, Loader2, Building2, BriefcaseBusiness, PlayCircle, ExternalLink, FileText, BookOpen, GraduationCap, Trash2, CheckCircle2 } from 'lucide-react';
 import { DocumentsRequiredDialog } from '@/components/shared/documents-required-dialog';
 import { CertificateCompactList } from '@/components/certificates/certificate-compact-list';
+import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
+import { useDashboardTour, type TourStep } from '../hooks/useDashboardTour';
 
 const BLUE = '#2B5EA7';
 const BLUE_LIGHT = '#E8EFF8';
@@ -111,6 +113,57 @@ export default function CoachingPage() {
     const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
     const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>({});
 
+    // ─── Tour Setup (two-branch: empty vs. full) ──────────────────────
+    const [tourReady, setTourReady] = useState(false);
+
+    const EMPTY_STEPS: TourStep[] = [
+        {
+            targetSelector: '[data-tour="coaching-empty-btn"]',
+            position: 'bottom',
+            titleKey: 'coaching.empty_step1_title',
+            bodyKey: 'coaching.empty_step1_body',
+        },
+    ];
+
+    const FULL_STEPS: TourStep[] = [
+        {
+            targetSelector: '[data-tour="coaching-start-btn"]',
+            position: 'left',
+            titleKey: 'coaching.step1_title',
+            bodyKey: 'coaching.step1_body',
+        },
+        {
+            targetSelector: '[data-tour="coaching-expanded-row"]',
+            position: 'top',
+            titleKey: 'coaching.step2_title',
+            bodyKey: 'coaching.step2_body',
+        },
+    ];
+
+    const tourSteps = !tourReady ? [] : (jobs.length === 0 ? EMPTY_STEPS : FULL_STEPS);
+
+    const tour = useDashboardTour('coaching', tourSteps, {
+        delayMs: 2000,
+        enabled: tourReady,
+    });
+
+    const handleTourNext = useCallback(() => tour.nextStep(), [tour]);
+    const handleTourSkip = useCallback(() => tour.skipTour(), [tour]);
+
+    // Tour: auto-expand first job when reaching step 2 (expanded row)
+    useEffect(() => {
+        if (!tour.isActive) return;
+        if (jobs.length === 0) return;
+
+        if (tour.currentStep === 0) {
+            // Step 1: highlight start-btn, keep rows collapsed
+            setExpandedJobId(null);
+        } else if (tour.currentStep === 1) {
+            // Step 2: expand first job to show steckbrief + recommendations
+            setExpandedJobId(jobs[0].id);
+        }
+    }, [tour.isActive, tour.currentStep, jobs]);
+
     // Delete coaching sessions + job permanently (optimistic)
     const handleDeleteJob = async (jobId: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -171,6 +224,7 @@ export default function CoachingPage() {
             console.error('[Coaching] Failed to load data:', err);
         } finally {
             setLoading(false);
+            setTourReady(true);
         }
     }
 
@@ -335,6 +389,7 @@ export default function CoachingPage() {
                         {t('empty_add_first')}
                     </p>
                     <motion.button
+                        data-tour="coaching-empty-btn"
                         whileTap={{ scale: 0.97 }}
                         onClick={() => router.push('/dashboard/job-search')}
                         className="mt-4 px-4 py-2 rounded-lg text-xs font-semibold transition-all border-2 hover:text-white"
@@ -666,6 +721,7 @@ export default function CoachingPage() {
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                         <motion.button
+                                            data-tour={job.id === jobs[0]?.id ? 'coaching-start-btn' : undefined}
                                             whileTap={{ scale: 0.97 }}
                                             onClick={() => openModal(job)}
                                             className="px-4 py-2 rounded-lg text-xs font-semibold transition-all border-2 hover:text-white"
@@ -707,6 +763,7 @@ export default function CoachingPage() {
 
                                         return (
                                             <motion.div
+                                                data-tour={job.id === jobs[0]?.id ? 'coaching-expanded-row' : undefined}
                                                 initial={{ height: 0, opacity: 0 }}
                                                 animate={{ height: 'auto', opacity: 1 }}
                                                 exit={{ height: 0, opacity: 0 }}
@@ -866,6 +923,17 @@ export default function CoachingPage() {
                         );
                     })}
                 </div>
+            )}
+
+            {/* Coaching Guided Tour */}
+            {tour.isActive && tour.step && (
+                <GuidedTourOverlay
+                    step={tour.step}
+                    currentStep={tour.currentStep}
+                    totalSteps={tour.totalSteps}
+                    onNext={handleTourNext}
+                    onSkip={handleTourSkip}
+                />
             )}
         </div>
     );

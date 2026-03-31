@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from 'react';
 import { JobRow, Job } from './job-row';
 import { cn } from '@/lib/utils';
 
@@ -16,15 +15,16 @@ interface JobQueueTableProps {
     onDelete?: (jobId: string) => void;
     loading?: boolean;
     optimizingJobId?: string | null;
+    /** Controlled expand state — lifted from parent */
+    expandedId: string | null;
+    /** Toggle callback — lifted from parent */
+    onToggle: (jobId: string) => void;
 }
 
-export function JobQueueTable({ jobs, className, onOptimize, onReanalyze, onConfirm, onDelete, loading, optimizingJobId }: JobQueueTableProps) {
-    const [expandedId, setExpandedId] = useState<string | null>(null);
-
-    const handleToggle = (jobId: string) => {
-        setExpandedId(expandedId === jobId ? null : jobId);
-    };
-
+export function JobQueueTable({
+    jobs, className, onOptimize, onReanalyze, onConfirm, onDelete,
+    loading, optimizingJobId, expandedId, onToggle,
+}: JobQueueTableProps) {
     if (loading) {
         return <TableSkeleton rows={5} columns={5} />;
     }
@@ -39,15 +39,13 @@ export function JobQueueTable({ jobs, className, onOptimize, onReanalyze, onConf
 
     return (
         <div className={cn("bg-white rounded-lg border border-[#d6d6d6] overflow-hidden", className)}>
-            {/* Table Header */}
-            {/* ... */}
             <div>
                 {jobs.map((job) => (
                     <JobRow
                         key={job.id}
                         job={job}
                         expanded={expandedId === job.id}
-                        onToggle={() => handleToggle(job.id)}
+                        onToggle={() => onToggle(job.id)}
                         onOptimize={onOptimize}
                         onReanalyze={onReanalyze}
                         onConfirm={onConfirm}

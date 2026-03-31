@@ -112,7 +112,7 @@ async function searchCertificates(keyword: string, location: string = 'Deutschla
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'sonar-pro',
+                model: 'sonar', // Cost-optimized (2026-03-30): sonar-pro → sonar ($1/M vs $5/M)
                 messages: [
                     {
                         role: 'system',

@@ -2,15 +2,15 @@ import React from 'react';
 import { Document, Page, View, Text, Link, Image, StyleSheet } from '@react-pdf/renderer';
 import { CvStructuredData } from '@/types/cv';
 import { SkillTagGroup } from './shared/SkillTag';
-import { ProficiencyDots } from './shared/ProficiencyDots';
+// ProficiencyDots removed from Valley (2026-03-30 ATS fix) — still used by TechTemplate
 import { CertGrid } from './shared/CertGrid';
 import { RenderMarkdownText } from './shared/RenderMarkdownText';
-import { truncateDescription, inferLanguageLevel, normalizeDateRangeText } from '@/lib/utils/cv-template-helpers';
+import { truncateDescription, normalizeDateRangeText } from '@/lib/utils/cv-template-helpers';
 import { CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 
 /**
  * ValleyTemplate — FAANG-optimized, single-column, black & white CV.
- * V2: Skill-Tags, Language Dots, 2-column CertGrid, Education truncation, Orphan prevention.
+ * V3: ATS-safe plaintext skills/languages, single-column flow, internal multi-col grids.
  */
 
 const DARK = '#000000';
@@ -64,15 +64,10 @@ const s = StyleSheet.create({
     eduSubLabel: { fontSize: 8.5, fontWeight: 700, color: DARK },
     eduSubText: { fontSize: 8.5, color: MUTED, flex: 1, lineHeight: 1.4 },
     eduSubItem: { fontSize: 8.5, color: MUTED, lineHeight: 1.4, paddingLeft: 8 },
-    skillGroupBlock: { marginBottom: 6 },
-    skillCategoryLabel: { fontSize: 9, fontWeight: 700, color: DARK, marginBottom: 3 },
-    langRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-    langLeft: { flexDirection: 'row', alignItems: 'center' },
-    langName: { fontSize: 9, fontWeight: 700, color: DARK, marginRight: 8 },
-    langLevel: { fontSize: 8, color: MUTED },
-    dualColumn: { flexDirection: 'row', marginBottom: 16 },
-    dualColumnLeft: { flex: 1, paddingRight: 12 },
-    dualColumnRight: { flex: 1, paddingLeft: 12 },
+    skillCategoryLabel: {
+        fontSize: 8.5, fontWeight: 700, color: DARK, textTransform: 'uppercase',
+        letterSpacing: 1.5, marginBottom: 2,
+    },
 });
 
 const RenderBullet = ({ text }: { text: string }) => {
@@ -88,31 +83,43 @@ const RenderBullet = ({ text }: { text: string }) => {
     return <Text style={s.bulletText}>{text}</Text>;
 };
 
+/**
+ * V3 Skills: Full-width section with internal multi-column grid.
+ * Each skill category (Programming, Adobe CC, etc.) gets equal flex space.
+ * ATS reads linearly: "SKILLS" heading → then each category block in sequence.
+ */
 const SkillsSection = ({ skills, label }: { skills: CvStructuredData['skills']; label: string }) => (
-    <>
+    <View style={s.sectionContainer}>
         <Text style={s.sectionTitle}>{label}</Text>
-        {skills.map((g) => (
-            <View key={g.id} style={s.skillGroupBlock}>
-                {g.category && <Text style={s.skillCategoryLabel}>{g.category}</Text>}
-                <SkillTagGroup items={g.items} />
-            </View>
-        ))}
-    </>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {skills.map((g) => (
+                <View key={g.id} style={{ width: skills.length >= 3 ? '33.33%' : '50%', paddingRight: 10, marginBottom: 6 }}>
+                    {g.category && <Text style={s.skillCategoryLabel}>{g.category}</Text>}
+                    <SkillTagGroup items={g.items} />
+                </View>
+            ))}
+        </View>
+    </View>
 );
 
+/**
+ * V3 Languages: Full-width section with 2-column grid.
+ * ATS-safe plaintext: "German – Native Speaker".
+ */
 const LanguagesSection = ({ languages, label }: { languages: CvStructuredData['languages']; label: string }) => (
-    <>
+    <View style={s.sectionContainer}>
         <Text style={s.sectionTitle}>{label}</Text>
-        {languages.map((l) => (
-            <View key={l.id} style={s.langRow}>
-                <View style={s.langLeft}>
-                    <Text style={s.langName}>{l.language || ''}</Text>
-                    <ProficiencyDots level={l.level ?? inferLanguageLevel(l.proficiency)} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {languages.map((l) => (
+                <View key={l.id} style={{ width: '50%', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 9, color: DARK, lineHeight: 1.4 }}>
+                        <Text style={{ fontWeight: 700 }}>{l.language || ''}</Text>
+                        {l.proficiency ? ` \u2013 ${l.proficiency}` : ''}
+                    </Text>
                 </View>
-                <Text style={s.langLevel}>{l.proficiency || ''}</Text>
-            </View>
-        ))}
-    </>
+            ))}
+        </View>
+    </View>
 );
 
 export function ValleyTemplate({ data, qrBase64, labels }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels }) {
@@ -228,24 +235,17 @@ export function ValleyTemplate({ data, qrBase64, labels }: { data: CvStructuredD
                     </View>
                 )}
 
-                {/* ===== SKILLS + LANGUAGES + CERTIFICATES (dual-column layout) ===== */}
-                {/* Left column: Skills — Right column: Languages + Certificates underneath */}
-                {(hasSkills || hasLanguages || hasCerts) && (
-                    <View style={s.dualColumn} minPresenceAhead={40}>
-                        {/* Left column: Skills */}
-                        <View style={s.dualColumnLeft}>
-                            {hasSkills && <SkillsSection skills={data.skills} label={labels.skills} />}
-                        </View>
-                        {/* Right column: Languages + Certificates */}
-                        <View style={s.dualColumnRight}>
-                            {hasLanguages && <LanguagesSection languages={data.languages} label={labels.languages} />}
-                            {hasCerts && (
-                                <View style={{ marginTop: hasLanguages ? 12 : 0 }}>
-                                    <Text style={s.sectionTitle}>{labels.certificates}</Text>
-                                    <CertGrid certs={data.certifications!} />
-                                </View>
-                            )}
-                        </View>
+                {/* ===== SKILLS (full-width, internal multi-col grid) ===== */}
+                {hasSkills && <SkillsSection skills={data.skills} label={labels.skills} />}
+
+                {/* ===== LANGUAGES (full-width, internal 2-col grid) ===== */}
+                {hasLanguages && <LanguagesSection languages={data.languages} label={labels.languages} />}
+
+                {/* ===== CERTIFICATES (full-width, CertGrid 2-col) ===== */}
+                {hasCerts && (
+                    <View style={s.sectionContainer}>
+                        <Text style={s.sectionTitle}>{labels.certificates}</Text>
+                        <CertGrid certs={data.certifications!} maxColumns={2} />
                     </View>
                 )}
 

@@ -140,26 +140,77 @@ export async function POST(request: NextRequest) {
         ];
         const uniqueKeywords = [...new Set(allKeywords.map((k: string) => k.trim()).filter(Boolean))];
 
-        // Fetch latest cover letter for context (optional)
-        const { data: clDraft } = await supabaseAdmin
+        // --- 3-Tier Applicant Context Fallback ---
+        // Tier 1: Cover Letter for THIS specific job
+        let applicantContext = '';
+        let contextSource: 'cover_letter' | 'cv_data' | 'none' = 'none';
+
+        const { data: jobCl } = await supabaseAdmin
             .from('documents')
             .select('metadata')
             .eq('user_id', userId)
             .eq('document_type', 'cover_letter')
+            .filter('metadata->>job_id', 'eq', jobId)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-        const coverLetterContext = clDraft?.metadata?.generated_content
-            ? (clDraft.metadata.generated_content as string).substring(0, 500)
-            : '';
+        if (jobCl?.metadata?.generated_content) {
+            applicantContext = (jobCl.metadata.generated_content as string).substring(0, 2000);
+            contextSource = 'cover_letter';
+        }
+
+        // Tier 2: CV Structured Data from user_profiles
+        if (!applicantContext) {
+            const { data: profile } = await supabaseAdmin
+                .from('user_profiles')
+                .select('cv_structured_data')
+                .eq('id', userId)
+                .maybeSingle();
+
+            if (profile?.cv_structured_data) {
+                let cvData: Record<string, unknown> | null = null;
+                try {
+                    cvData = typeof profile.cv_structured_data === 'string'
+                        ? JSON.parse(profile.cv_structured_data)
+                        : profile.cv_structured_data as Record<string, unknown>;
+                } catch {
+                    log.error('Failed to parse cv_structured_data JSON — Tier 2 skipped');
+                }
+
+                const experienceLines: string[] = [];
+                if (Array.isArray(cvData?.experience)) {
+                    for (const exp of cvData.experience.slice(0, 5)) {
+                        const company = exp.company || exp.organization || '';
+                        const role = exp.role || exp.title || exp.position || '';
+                        const bullets = Array.isArray(exp.description)
+                            ? exp.description.map((d: { text?: string }) => d.text || d).join('; ')
+                            : '';
+                        if (company || role) {
+                            experienceLines.push(`${role} @ ${company}${bullets ? ': ' + bullets.substring(0, 150) : ''}`);
+                        }
+                    }
+                }
+                if (Array.isArray(cvData?.skills) && cvData.skills.length > 0) {
+                    experienceLines.push(`Skills: ${cvData.skills.slice(0, 15).join(', ')}`);
+                }
+                if (experienceLines.length > 0) {
+                    applicantContext = experienceLines.join('\n');
+                    contextSource = 'cv_data';
+                }
+            }
+        }
+
+        // Tier 3: No context available — prompt will enforce placeholders
+        log.info('Applicant context resolved', { contextSource, contextLength: applicantContext.length });
 
         // --- Locale-aware prompt generation ---
         const { prompt: aiPrompt, titleMap } = getPromptByLocale(
             locale!,
             job,
             uniqueKeywords,
-            coverLetterContext,
+            applicantContext,
+            contextSource,
             applicant_archetype,
             tone_mode,
             templates || [],
@@ -284,7 +335,8 @@ function getPromptByLocale(
     locale: string,
     job: { company_name: string; job_title: string; description?: string | unknown },
     uniqueKeywords: string[],
-    coverLetterContext: string,
+    applicantContext: string,
+    contextSource: 'cover_letter' | 'cv_data' | 'none',
     applicantArchetype: string | undefined,
     toneMode: 'standard' | 'direct' | 'initiative' | undefined,
     templates: { name: string; default_duration_seconds: number }[],
@@ -368,7 +420,12 @@ Company: ${job.company_name}
 Position: ${job.job_title}
 Keywords from the job: ${uniqueKeywords.join(', ')}
 ${descSnippet ? `\nJob description (for context only — do NOT copy verbatim):\n${descSnippet}` : ''}
-${coverLetterContext ? `\nApplicant background (inspiration only — do NOT copy this text verbatim):\n${coverLetterContext}` : ''}
+${applicantContext ? `\nApplicant background (source: ${contextSource}):\n${applicantContext}` : ''}
+
+═══ FACTS RULE — CRITICAL ═══
+You may ONLY mention experience, technologies, and companies that appear in the "Applicant background" section above.
+DO NOT invent technologies, companies, or projects.
+${!applicantContext ? 'No background was provided. Use the station names from the job and write generic talking points the applicant can personalize later.' : 'Match the applicant\'s stations to the job requirements. Stay factual.'}
 ${archetypeHint ? `\n${archetypeHint}` : ''}
 
 ${toneCalibration}
@@ -429,7 +486,12 @@ Empresa: ${job.company_name}
 Puesto: ${job.job_title}
 Palabras clave del puesto: ${uniqueKeywords.join(', ')}
 ${descSnippet ? `\nDescripción del puesto (solo contexto — NO copiar literalmente):\n${descSnippet}` : ''}
-${coverLetterContext ? `\nPerfil del candidato (inspiración — NO copiar este texto literalmente):\n${coverLetterContext}` : ''}
+${applicantContext ? `\nPerfil del candidato (fuente: ${contextSource}):\n${applicantContext}` : ''}
+
+═══ REGLA DE HECHOS — CRÍTICO ═══
+Solo puedes mencionar experiencia, tecnologías y empresas que aparezcan en el "Perfil del candidato" de arriba.
+NO inventes tecnologías, empresas ni proyectos.
+${!applicantContext ? 'No se proporcionó perfil. Usa los nombres de las estaciones del puesto y escribe puntos genéricos que el candidato pueda personalizar.' : 'Conecta las estaciones del candidato con los requisitos del puesto. Mantente factual.'}
 ${archetypeHint ? `\n${archetypeHint}` : ''}
 
 ${toneCalibration}
@@ -489,7 +551,12 @@ Firma: ${job.company_name}
 Position: ${job.job_title}
 Keywords aus der Stelle: ${uniqueKeywords.join(', ')}
 ${descSnippet ? `\nStellenbeschreibung (nur Kontext — NICHT wörtlich übernehmen):\n${descSnippet}` : ''}
-${coverLetterContext ? `\nBewerber-Hintergrund (Inspiration — NICHT diesen Text wörtlich übernehmen):\n${coverLetterContext}` : ''}
+${applicantContext ? `\nBewerber-Hintergrund (Quelle: ${contextSource}):\n${applicantContext}` : ''}
+
+═══ FAKTEN-REGEL — KRITISCH ═══
+Du DARFST ausschließlich Erfahrungen, Technologien und Firmen nennen, die im "Bewerber-Hintergrund" stehen.
+ERFINDE KEINE Technologien, Firmen oder Projekte.
+${!applicantContext ? 'Es wurde kein Hintergrund übermittelt. Nutze die Stationsnamen aus der Stelle und schreibe generische Stichpunkte, die der Bewerber personalisieren kann.' : 'Matche die Stationen des Bewerbers mit den Job-Anforderungen. Bleibe faktisch.'}
 ${archetypeHint ? `\n${archetypeHint}` : ''}
 
 ${toneCalibration}

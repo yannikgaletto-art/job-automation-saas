@@ -26,6 +26,7 @@ export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
     const [showNewForm, setShowNewForm] = useState(false);
     const [newBlockTitle, setNewBlockTitle] = useState('');
     const [newBlockDuration, setNewBlockDuration] = useState(15);
+    const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
 
     // Validation: check that all required blocks are present
     const missingRequired = blocks.some(b => b.isRequired) && blocks.filter(b => b.isRequired).length < 2;
@@ -94,6 +95,7 @@ export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
                     <Reorder.Item
                         key={block.id}
                         value={block}
+                        layout
                         className="bg-white border border-gray-200 rounded-lg p-4 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-shadow"
                     >
                         <div className="flex items-start gap-3">
@@ -126,15 +128,17 @@ export function BlockEditor({ blocks, onChange, mode }: BlockEditorProps) {
                                     </div>
                                 </div>
 
-                                {/* Content Input */}
+                                {/* Content Input — expandable on focus */}
                                 <textarea
                                     value={block.content}
                                     onChange={(e) => handleBlockChange(block.id, 'content', e.target.value)}
+                                    onFocus={() => setFocusedBlockId(block.id)}
+                                    onBlur={() => setFocusedBlockId(null)}
                                     placeholder={mode === 'teleprompter'
                                         ? t('editor_placeholder_teleprompter')
                                         : t('editor_placeholder_bullets')}
-                                    rows={mode === 'teleprompter' ? 3 : 2}
-                                    className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] placeholder:text-gray-400"
+                                    rows={focusedBlockId === block.id ? 8 : (mode === 'teleprompter' ? 3 : 2)}
+                                    className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20 focus:border-[#012e7a] placeholder:text-gray-400 transition-[rows] duration-200"
                                 />
                             </div>
                         </div>

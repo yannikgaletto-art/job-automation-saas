@@ -89,8 +89,11 @@ export function NavItem({ icon: Icon, label, href, badge, isActive: isActiveProp
 
   // Auto-detect active state if not explicitly provided, but only after mount
   // (prevents SSR/client hydration mismatch)
+  // FIX: usePathname() from next-intl strips locale prefix (→ "/dashboard/job-search")
+  // but href contains it (→ "/de/dashboard/job-search"). Strip locale prefix from href.
+  const hrefWithoutLocale = href.replace(/^\/[a-z]{2}(?=\/)/, '')
   const isActive = mounted
-    ? (isActiveProp !== undefined ? isActiveProp : pathname === href || pathname.startsWith(href + '/'))
+    ? (isActiveProp !== undefined ? isActiveProp : pathname === hrefWithoutLocale || pathname.startsWith(hrefWithoutLocale + '/'))
     : false
 
   return (

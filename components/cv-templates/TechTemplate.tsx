@@ -2,7 +2,6 @@ import React from 'react';
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
 import { CvStructuredData } from '@/types/cv';
-import { ProficiencyDots } from './shared/ProficiencyDots';
 import { CertGrid } from './shared/CertGrid';
 import { RenderMarkdownText } from './shared/RenderMarkdownText';
 import { inferLanguageLevel, normalizeDateRangeText } from '@/lib/utils/cv-template-helpers';
@@ -151,22 +150,7 @@ const s = StyleSheet.create({
         color: GRAY,
         lineHeight: 1.4,
     },
-    skillTagContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginTop: 4,
-    },
-    skillTag: {
-        backgroundColor: LIGHT,
-        color: DARK,
-        fontSize: 7.5,
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 4,
-        fontWeight: 600,
-        marginRight: 4,
-        marginBottom: 4,
-    },
+
     // Language dots row
     langRow: {
         flexDirection: 'row',
@@ -269,11 +253,7 @@ export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredDat
                                 {data.skills.map(group => (
                                     <View key={group.id} style={s.sideBlock}>
                                         <Text style={s.sideLabel}>{group.category || 'Core'}</Text>
-                                        <View style={s.skillTagContainer}>
-                                            {group.items.map((item, i) => (
-                                                <Text key={i} style={s.skillTag}>{item}</Text>
-                                            ))}
-                                        </View>
+                                        <Text style={s.sideText}>{group.items.join(', ')}</Text>
                                     </View>
                                 ))}
                             </View>
@@ -309,9 +289,8 @@ export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredDat
                                     <View key={lang.id} style={s.langRow} wrap={false}>
                                         <View style={s.langLeft}>
                                             <Text style={[s.sideLabel, { marginBottom: 0, marginRight: 6 }]}>{lang.language || ''}</Text>
-                                            <ProficiencyDots level={lang.level ?? inferLanguageLevel(lang.proficiency)} />
+                                            {lang.proficiency ? <Text style={s.sideText}>– {lang.proficiency}</Text> : null}
                                         </View>
-                                        <Text style={s.sideText}>{lang.proficiency || ''}</Text>
                                     </View>
                                 ))}
                             </View>

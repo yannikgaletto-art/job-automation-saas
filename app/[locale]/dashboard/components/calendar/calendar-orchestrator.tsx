@@ -223,15 +223,17 @@ export function CalendarOrchestrator() {
                     Both panels always share available space proportionally. */}
                 <div className="flex gap-6 items-start">
                     {/* Calendar — 55 parts of available space */}
-                    <div className="min-w-0" style={{ flex: '55 1 0%' }}>
+                    <div className="min-w-0" style={{ flex: '55 1 0%' }} data-tour="timeline-grid">
                         <TimelineGrid />
                     </div>
 
                     {/* Tasks — 45 parts */}
-                    <div className="min-w-0" style={{ flex: '45 1 0%' }}>
+                    <div className="min-w-0" style={{ flex: '45 1 0%' }} data-tour="mission-panel">
                         <AnimatePresence mode="wait">
                             {resolvedContextMode === 'focus' && focusedTaskId ? (
-                                <FocusPanel key="focus" />
+                                <div data-tour="focus-panel">
+                                    <FocusPanel key="focus" />
+                                </div>
                             ) : (
                                 <TaskInbox key="inbox" />
                             )}

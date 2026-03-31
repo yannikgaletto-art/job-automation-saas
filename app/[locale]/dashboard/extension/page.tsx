@@ -1,62 +1,32 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+/**
+ * @deprecated ZOMBIE CODE — DO NOT USE
+ *
+ * Diese Page nutzte window.postMessage('*') zum Token-Transfer.
+ * Das ist eine SICHERHEITSLÜCKE (beliebige Scripts empfangen den JWT).
+ *
+ * Ersetzt durch: /auth/extension/callback (PKCE Tab-Callback)
+ * Datum: 2026-03-31
+ *
+ * TODO: Nach Bestätigung, dass keine Extension-Version mehr diese
+ * URL nutzt → komplette Datei löschen.
+ */
 
-export default function ExtensionSyncPage() {
-    const [synced, setSynced] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        async function syncToken() {
-            try {
-                const supabase = createClient(
-                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-                );
-                const { data: { session } } = await supabase.auth.getSession();
-
-                if (session?.access_token) {
-                    window.postMessage({
-                        type: 'PATHLY_SET_TOKEN',
-                        token: session.access_token,
-                        expiresAt: session.expires_at
-                    }, '*');
-
-                    setSynced(true);
-                } else {
-                    setError('Kein aktiver Login gefunden. Bitte einloggen.');
-                }
-            } catch (err) {
-                setError('Fehler beim Synchronisieren.');
-            }
-        }
-
-        syncToken();
-    }, []);
-
+export default function ExtensionSyncPageDeprecated() {
     return (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 max-w-md w-full text-center">
-                <h1 className="text-2xl font-bold text-white mb-6">🔗 Chrome Extension Sync</h1>
-
-                {error ? (
-                    <div className="text-red-400 bg-red-900/20 rounded-lg p-4">
-                        <p>❌ {error}</p>
-                    </div>
-                ) : synced ? (
-                    <div className="text-green-400 bg-green-900/20 rounded-lg p-4">
-                        <p className="text-xl mb-2">✅ Extension synchronisiert!</p>
-                        <p className="text-slate-400 text-sm">
-                            Du kannst dieses Tab jetzt schließen.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="text-yellow-400 bg-yellow-900/20 rounded-lg p-4">
-                        <p className="text-xl">⏳ Synchronisiere...</p>
-                    </div>
-                )}
+            <div className="bg-red-900/20 backdrop-blur-sm rounded-2xl p-8 border border-red-700 max-w-md w-full text-center">
+                <h1 className="text-2xl font-bold text-red-400 mb-4">
+                    ⚠️ Veraltete Seite
+                </h1>
+                <p className="text-slate-300 text-sm mb-4">
+                    Diese Seite wird nicht mehr verwendet.
+                </p>
+                <p className="text-slate-400 text-xs">
+                    Bitte nutze die aktuelle Pathly Browser Extension.
+                </p>
             </div>
         </div>
-    );
+    )
 }
