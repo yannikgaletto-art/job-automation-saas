@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 3.5
-**Last Updated:** 2026-03-19
+**Version:** 3.6
+**Last Updated:** 2026-04-01
 
 ---
 
@@ -77,6 +77,10 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | Onboarding Store | @/store/use-onboarding-store |
 | Company Card | @/components/company/company-intel-card |
 | Mood Symbols (Tag/Nacht) | @/lib/mood/mood-symbols |
+| Supabase Admin (Service) | @/lib/supabase/admin |
+| Credit Service | @/lib/services/credit-service |
+| Credit Gate Middleware | @/lib/middleware/credit-gate |
+| Stripe Service | @/lib/services/stripe-service |
 
 ---
 
@@ -109,6 +113,7 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **CL Style Anti-Generic (2026-03-25)** | **Extended `StyleAnalysis` with 3 structural fields (`max_commas_per_sentence`, `uses_em_dash`, `rhetorical_contrast_pattern`). Haiku uses 1000 tokens for 9 fields. Prompt builder injects locale-aware structural constraints (blocking em-dashes, "nicht X, sondern Y", enforcing comma budget) natively in `customStyleBlock`.** |
 | **CV Match Pipeline (2026-03-26)** | **Local dev fix: `inngest dev` server must be running to process `cv-match/analyze` events. Frontend stale detection aligned with Backend (4min threshold) to prevent dead-zone where frontend looped but API rejected retries.** |
 | **CV Optimizer Reload Bug (2026-03-26)** | **Added missing `onComplete` callback in `OptimizerWizard` and bound it to `optimisticStep` in `UnifiedJobRow`. The Job Queue now instantly advances to "Cover Letter" visually after "Save" without requiring a page reload.** |
+| **Stripe Monetization V1 (2026-04-01)** | **Credit-basiertes System: Free(6)/Starter(€9,90/20)/Durchstarter(€19,90/50). Atomic `debit_credits()` RPC mit FOR UPDATE Lock. `withCreditGate()` API-Wrapper. Stripe Checkout/Webhook/Portal. Idempotent webhook via `processed_stripe_events`. Centralized `lib/supabase/admin.ts` singleton. `getUserCreditsForClient()` strips `stripeCustomerId`. Billing i18n (de/en/es, 45+ Keys). Feature-Silo §9 in FEATURE_COMPAT_MATRIX.md.** |
 
 ---
 

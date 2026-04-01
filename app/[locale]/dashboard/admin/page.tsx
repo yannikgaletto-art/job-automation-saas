@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { isAdmin } from '@/lib/admin';
-import { Users, Trash2, RotateCcw, CheckCircle, XCircle, Shield, Loader2, Mail, Clock } from 'lucide-react';
+import { Users, Trash2, RotateCcw, CheckCircle, XCircle, Shield, Loader2, Mail, Clock, Briefcase, FileText } from 'lucide-react';
 
 type AdminUser = {
     id: string;
@@ -14,6 +14,8 @@ type AdminUser = {
     email_confirmed_at: string | null;
     last_sign_in_at: string | null;
     onboarding_completed: boolean;
+    active_jobs: number;
+    applications: number;
 };
 
 function formatDate(d: string | null) {
@@ -143,7 +145,7 @@ export default function AdminPage() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
                 <div className="bg-white border border-[#E7E7E5] rounded-xl p-4">
                     <div className="flex items-center gap-2 text-[#73726E] text-xs font-medium mb-1">
                         <Users className="w-3.5 h-3.5" />
@@ -167,6 +169,24 @@ export default function AdminPage() {
                     </div>
                     <p className="text-2xl font-bold text-amber-600">
                         {users.filter(u => u.email_confirmed_at).length}
+                    </p>
+                </div>
+                <div className="bg-white border border-[#E7E7E5] rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-[#73726E] text-xs font-medium mb-1">
+                        <Briefcase className="w-3.5 h-3.5 text-blue-500" />
+                        Aktive Jobs
+                    </div>
+                    <p className="text-2xl font-bold text-blue-600">
+                        {users.reduce((sum, u) => sum + u.active_jobs, 0)}
+                    </p>
+                </div>
+                <div className="bg-white border border-[#E7E7E5] rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-[#73726E] text-xs font-medium mb-1">
+                        <FileText className="w-3.5 h-3.5 text-purple-500" />
+                        Bewerbungen
+                    </div>
+                    <p className="text-2xl font-bold text-purple-600">
+                        {users.reduce((sum, u) => sum + u.applications, 0)}
                     </p>
                 </div>
             </div>
@@ -195,6 +215,8 @@ export default function AdminPage() {
                             <tr className="border-b border-[#E7E7E5] text-[#73726E]">
                                 <th className="px-5 py-3 text-left font-medium">User</th>
                                 <th className="px-5 py-3 text-left font-medium">Status</th>
+                                <th className="px-5 py-3 text-center font-medium">Jobs</th>
+                                <th className="px-5 py-3 text-center font-medium">Bewerbungen</th>
                                 <th className="px-5 py-3 text-left font-medium">Registriert</th>
                                 <th className="px-5 py-3 text-left font-medium">Letzter Login</th>
                                 <th className="px-5 py-3 text-right font-medium">Aktionen</th>
@@ -231,6 +253,24 @@ export default function AdminPage() {
                                                 </span>
                                             )}
                                         </div>
+                                    </td>
+                                    <td className="px-5 py-3 text-center">
+                                        {u.active_jobs > 0 ? (
+                                            <span className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                                {u.active_jobs}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-[#B4B4B0]">0</span>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-3 text-center">
+                                        {u.applications > 0 ? (
+                                            <span className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                                                {u.applications}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-[#B4B4B0]">0</span>
+                                        )}
                                     </td>
                                     <td className="px-5 py-3 text-[#73726E] text-xs">
                                         {formatDate(u.created_at)}

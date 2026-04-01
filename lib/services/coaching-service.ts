@@ -206,7 +206,9 @@ export async function sendCoachingMessage(
         .join('\n');
 
     const tokensUsed = response.usage.input_tokens + response.usage.output_tokens;
-    const costCents = Math.ceil((tokensUsed / 1_000_000) * 3.0 * 100);
+    const inputCost = (response.usage.input_tokens / 1_000_000) * 3.0;
+    const outputCost = (response.usage.output_tokens / 1_000_000) * 15.0;
+    const costCents = Math.ceil((inputCost + outputCost) * 100);
 
     // 8. Add AI response to history
     const aiMsg: ChatMessage = {
@@ -342,7 +344,9 @@ export async function getInitialCoachingMessage(
         .join('\n');
 
     const tokensUsed = response.usage.input_tokens + response.usage.output_tokens;
-    const costCents = Math.ceil((tokensUsed / 1_000_000) * 3.0 * 100);
+    const inputCost = (response.usage.input_tokens / 1_000_000) * 3.0;
+    const outputCost = (response.usage.output_tokens / 1_000_000) * 15.0;
+    const costCents = Math.ceil((inputCost + outputCost) * 100);
 
     // Save initial message to conversation history
     const initialHistory: ChatMessage[] = [

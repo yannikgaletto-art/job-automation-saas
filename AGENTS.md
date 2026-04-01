@@ -1,7 +1,7 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 5.4  
+**Version:** 5.5  
 **Last Updated:** 2026-04-01  
 **Status:** Active  
 
@@ -31,6 +31,7 @@
 | **Avatar Picker** | `components/motion/sidebar.tsx` | Animal avatar stored in `user_profiles.avatar_animal`, Pathly brand colors |
 | **Mood Check-in V2** | `app/[locale]/dashboard/hooks/useMoodCheckIn.tsx` + `app/api/mood/checkin/route.ts` | Adaptive Tag/Nacht-Symbole, Progressive Reduction (5× Skip → auto-hide), `MoodCheckinContext`, `CheckinSettingsCard` in Settings, i18n (de/en/es), `lib/mood/mood-symbols.ts` |
 | **Guided Tours** | `components/dashboard/guided-tour-overlay.tsx` | Onboarding tooltips, `useDashboardTour` hook, target-rect syncing, auto-clamp viewports, localStorage state |
+| **Stripe Billing** | `app/api/stripe/webhook/route.ts` | Credit system (Free/Starter/Durchstarter), atomic `debit_credits()` RPC, `withCreditGate()` middleware, Stripe Checkout/Portal, idempotent webhook, `lib/supabase/admin.ts` singleton |
 
 ---
 
@@ -48,6 +49,9 @@ Authoritative source: **`supabase/migrations/`** (not `database/schema.sql` — 
 | `script_block_templates` | System + user-defined script block templates |
 | `generation_logs` | AI audit trail (tokens, cost, model) |
 | `user_profiles` | Profile, writing style, avatar, target role |
+| `user_credits` | Credit balances, plan type, Stripe IDs, billing period |
+| `credit_events` | Audit trail: debits, refunds, topups, resets (DSGVO Art. 15) |
+| `processed_stripe_events` | Webhook idempotency (Stripe event dedup) |
 
 ---
 

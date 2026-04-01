@@ -125,6 +125,11 @@ export default function OnboardingPage() {
                 return;
             }
 
+            // Signal to dashboard that user just finished onboarding → trigger guided tour
+            if (typeof window !== 'undefined') {
+                sessionStorage.setItem('pathly_show_post_onboarding_tour', '1');
+            }
+
             router.push('/dashboard');
         } catch (err) {
             console.error('[Onboarding] Network error:', err);

@@ -44,6 +44,26 @@ export async function GET() {
         (settings || []).map(s => [s.user_id, s.onboarding_completed])
     );
 
+    // Fetch active job counts per user (DSGVO-compliant: only counts, no job data)
+    const { data: jobCounts } = await adminClient
+        .from('job_queue')
+        .select('user_id');
+
+    const jobCountMap = new Map<string, number>();
+    for (const row of jobCounts || []) {
+        jobCountMap.set(row.user_id, (jobCountMap.get(row.user_id) || 0) + 1);
+    }
+
+    // Fetch application history counts per user (DSGVO-compliant: only counts)
+    const { data: appCounts } = await adminClient
+        .from('application_history')
+        .select('user_id');
+
+    const appCountMap = new Map<string, number>();
+    for (const row of appCounts || []) {
+        appCountMap.set(row.user_id, (appCountMap.get(row.user_id) || 0) + 1);
+    }
+
     const users = data.users.map(u => ({
         id: u.id,
         email: u.email,
@@ -52,6 +72,8 @@ export async function GET() {
         email_confirmed_at: u.email_confirmed_at,
         last_sign_in_at: u.last_sign_in_at,
         onboarding_completed: settingsMap.get(u.id) ?? false,
+        active_jobs: jobCountMap.get(u.id) || 0,
+        applications: appCountMap.get(u.id) || 0,
     }));
 
     // Sort by created_at descending (newest first)

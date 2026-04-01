@@ -370,3 +370,51 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via Migration
 | Context Provider | `MoodCheckinProvider` in `dashboard/layout.tsx` |
 | RLS | `user_profiles` Policy deckt `checkin_skip_streak` + `show_checkin` ab |
 
+---
+
+## 9. Feature-Silo: Billing / Stripe Credits
+
+> **Added:** 2026-04-01 | **Owner:** `credit-service.ts` + `stripe-service.ts` + webhook handler
+
+### 9.1 Erlaubte Dateien (Scope)
+
+| Datei | Rolle |
+|---|---|
+| `lib/services/credit-service.ts` | Backend — Debit, Refund, Quota checks |
+| `lib/services/credit-types.ts` | Types — PlanConfig, CreditCosts, Error classes |
+| `lib/services/stripe-service.ts` | Backend — Stripe Client, Checkout/Portal helpers |
+| `lib/middleware/credit-gate.ts` | Backend — `withCreditGate()` API-Wrapper |
+| `lib/supabase/admin.ts` | Backend — Centralized admin client singleton |
+| `app/api/stripe/checkout/route.ts` | API — Stripe Checkout Session |
+| `app/api/stripe/webhook/route.ts` | API — Stripe Webhook Handler (idempotent) |
+| `app/api/stripe/portal/route.ts` | API — Stripe Customer Portal |
+| `app/api/credits/route.ts` | API — Credit Info für Frontend |
+| `components/dashboard/credit-dashboard.tsx` | Frontend — Sidebar Credit Widget |
+| `components/dashboard/paywall-modal.tsx` | Frontend — Paywall bei Credit-Erschöpfung |
+| `app/[locale]/dashboard/upgrade/page.tsx` | Frontend — In-App Pricing Page |
+| `supabase/migrations/20260401_stripe_credits.sql` | DB Schema — `user_credits`, `credit_events`, RPCs |
+
+### 9.2 Verbotene Dateien (Sperrzone)
+
+| Datei | Grund |
+|---|---|
+| `lib/ai/model-router.ts` | SHARED — Cost-Tracking geändert mit Freigabe, locked |
+| `lib/inngest/cv-match-pipeline.ts` | Fremdes Feature |
+| `lib/inngest/cover-letter-*.ts` | Fremdes Feature |
+| `lib/inngest/certificates-pipeline.ts` | Fremdes Feature |
+| `middleware.ts` | System-Level |
+
+### 9.3 Bekannte Patterns
+
+| Pattern | Details |
+|---|---|
+| Atomic Credits | `debit_credits()` + `refund_credits()` RPCs mit `FOR UPDATE` Lock |
+| Credit-Gate | `withCreditGate()` Wrapper auf API-Route-Ebene — Feature-Services unberührt |
+| Refund-on-Error | `credit-gate.ts` gibt Credits bei AI-Fehler automatisch zurück |
+| Webhook Idempotency | `processed_stripe_events` Tabelle — kein Double-Processing |
+| Topup-Limit | Max 2 Topups/Monat via `credit_events` Count |
+| Plan Downgrade | `subscription.deleted` → Free-Tier mit `PLAN_CONFIG.free.credits` |
+| Admin Singleton | Alle Server-RPCs über `lib/supabase/admin.ts` — kein lokaler `createClient` |
+| Security | `stripeCustomerId` nur server-side; `getUserCreditsForClient()` für Frontend |
+| i18n | Komplett: `billing` Namespace in de/en/es (45+ Keys) |
+

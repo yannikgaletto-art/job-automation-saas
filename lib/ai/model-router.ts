@@ -24,13 +24,15 @@ export const MODELS = {
     CLAUDE_SONNET: {
         id: 'claude-sonnet-4-5-20250929',
         provider: 'anthropic' as const,
-        cost_per_1m_tokens: 3.0,
+        cost_input_per_1m: 3.0,
+        cost_output_per_1m: 15.0,
         strengths: ['creative_writing', 'complex_reasoning'],
     },
     CLAUDE_HAIKU: {
         id: 'claude-haiku-4-5-20251001',
         provider: 'anthropic' as const,
-        cost_per_1m_tokens: 0.25,
+        cost_input_per_1m: 1.0,
+        cost_output_per_1m: 5.0,
         strengths: ['parsing', 'classification', 'fast_execution'],
     },
     // Mistral Small 4 — EU-native (Paris), DSGVO-compliant by default
@@ -39,7 +41,8 @@ export const MODELS = {
     MISTRAL_SMALL: {
         id: 'mistral-small-2503',
         provider: 'mistral' as const,
-        cost_per_1m_tokens: 0.15,
+        cost_input_per_1m: 0.15,
+        cost_output_per_1m: 0.60,
         strengths: ['classification', 'extraction', 'fast_execution', 'eu_native'],
     },
 } as const;
@@ -143,7 +146,7 @@ function getAnthropicClient() {
 async function completeMistral(
     request: CompletionRequest,
     modelId: string,
-): Promise<{ text: string; tokensUsed: number }> {
+): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
     const apiKey = process.env.MISTRAL_API_KEY;
     if (!apiKey) {
         throw new Error('MISTRAL_API_KEY is not set. Required for Mistral Small tasks.');
@@ -176,9 +179,10 @@ async function completeMistral(
 
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content || '';
-    const tokensUsed = (data.usage?.prompt_tokens || 0) + (data.usage?.completion_tokens || 0);
+    const inputTokens = data.usage?.prompt_tokens || 0;
+    const outputTokens = data.usage?.completion_tokens || 0;
 
-    return { text, tokensUsed };
+    return { text, inputTokens, outputTokens };
 }
 
 export async function complete(
@@ -187,7 +191,7 @@ export async function complete(
     const startTime = Date.now();
     const model = selectModel(request.taskType);
 
-    let result: { text: string; tokensUsed: number };
+    let result: { text: string; inputTokens: number; outputTokens: number };
 
     if (model.provider === 'anthropic') {
         const client = getAnthropicClient();
@@ -206,7 +210,8 @@ export async function complete(
 
         result = {
             text,
-            tokensUsed: response.usage.input_tokens + response.usage.output_tokens,
+            inputTokens: response.usage.input_tokens,
+            outputTokens: response.usage.output_tokens,
         };
     } else if (model.provider === 'mistral') {
         result = await completeMistral(request, model.id);
@@ -215,8 +220,10 @@ export async function complete(
     }
 
     const latencyMs = Date.now() - startTime;
+    const tokensUsed = result.inputTokens + result.outputTokens;
     const costCents = Math.ceil(
-        (result.tokensUsed / 1_000_000) * model.cost_per_1m_tokens * 100
+        ((result.inputTokens / 1_000_000) * model.cost_input_per_1m +
+         (result.outputTokens / 1_000_000) * model.cost_output_per_1m) * 100
     );
 
     // Track costs in memory (dev convenience — resets on serverless cold starts!)
@@ -236,7 +243,9 @@ export async function complete(
         task: request.taskType,
         model: model.id,
         provider: model.provider,
-        tokens: result.tokensUsed,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        tokens: tokensUsed,
         costCents,
         costEur: +(costCents / 100).toFixed(4),
         latencyMs,
@@ -245,7 +254,7 @@ export async function complete(
     return {
         text: result.text,
         model: model.id,
-        tokensUsed: result.tokensUsed,
+        tokensUsed,
         costCents,
         latencyMs,
     };

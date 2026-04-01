@@ -109,6 +109,7 @@ function DashboardLayoutInner({
     const tour = useDashboardTour('goals', GOALS_TOUR_STEPS, {
         delayMs: 3500, // After confetti animation
         enabled: isOnGoalsTab && !showMoodOverlay,
+        requireOnboardingFlag: true, // Only trigger after fresh onboarding completion
     });
 
     // Step 3 — Create demo task & enter focus mode when reaching the Pomodoro step

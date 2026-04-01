@@ -57,13 +57,14 @@ function markTourCompleted(tabId: string): void {
  * @param steps - Array of TourStep configurations
  * @param options.delayMs - Delay before showing tour (default: 3500ms — after confetti)
  * @param options.enabled - External gate (e.g., wait for other overlays to close)
+ * @param options.requireOnboardingFlag - If true, tour only starts if user just completed onboarding (sessionStorage flag)
  */
 export function useDashboardTour(
     tabId: string,
     steps: TourStep[],
-    options: { delayMs?: number; enabled?: boolean } = {}
+    options: { delayMs?: number; enabled?: boolean; requireOnboardingFlag?: boolean } = {}
 ): UseDashboardTourReturn {
-    const { delayMs = 3500, enabled = true } = options;
+    const { delayMs = 3500, enabled = true, requireOnboardingFlag = false } = options;
     const [isActive, setIsActive] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
     const hasTriggered = useRef(false);
@@ -75,6 +76,15 @@ export function useDashboardTour(
         if (isTourCompleted(tabId)) return;
         if (steps.length === 0) return;
 
+        // When requireOnboardingFlag is true, only show tour if user just completed onboarding
+        if (requireOnboardingFlag) {
+            if (typeof window === 'undefined') return;
+            const flag = sessionStorage.getItem('pathly_show_post_onboarding_tour');
+            if (flag !== '1') return;
+            // Consume the flag so tour doesn't re-trigger on page refresh
+            sessionStorage.removeItem('pathly_show_post_onboarding_tour');
+        }
+
         hasTriggered.current = true;
 
         const timer = setTimeout(() => {
@@ -83,7 +93,7 @@ export function useDashboardTour(
         }, delayMs);
 
         return () => clearTimeout(timer);
-    }, [tabId, steps.length, delayMs, enabled]);
+    }, [tabId, steps.length, delayMs, enabled, requireOnboardingFlag]);
 
     const completeTour = useCallback(() => {
         markTourCompleted(tabId);
