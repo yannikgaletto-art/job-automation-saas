@@ -91,17 +91,21 @@ export function CreditDashboard() {
                 </div>
             </div>
 
-            {/* Quotas (only for paid plans) */}
-            {credits.planType !== 'free' && (
+            {/* Quotas — shown for all plans (free users have beta quotas too) */}
+            {(credits.coachingSessionsTotal > 0 || credits.jobSearchesTotal > 0) && (
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                        <span>🎯</span>
-                        <span>{credits.coachingSessionsUsed}/{credits.coachingSessionsTotal} {t('coaching_label')}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                        <span>🔍</span>
-                        <span>{credits.jobSearchesUsed}/{credits.jobSearchesTotal} {t('searches_label')}</span>
-                    </div>
+                    {credits.coachingSessionsTotal > 0 && (
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                            <span>🎯</span>
+                            <span>{credits.coachingSessionsUsed}/{credits.coachingSessionsTotal} {t('coaching_label')}</span>
+                        </div>
+                    )}
+                    {credits.jobSearchesTotal > 0 && (
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                            <span>🔍</span>
+                            <span>{credits.jobSearchesUsed}/{credits.jobSearchesTotal} {t('searches_label')}</span>
+                        </div>
+                    )}
                 </div>
             )}
 

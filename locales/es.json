@@ -262,6 +262,8 @@
       "contact_label": "Contacto",
       "contact_placeholder": "p.ej. Sarah, RRHH",
       "followup_label": "Fecha de seguimiento",
+      "followup_today": "Hoy",
+      "followup_tomorrow": "Mañana",
       "notes_label": "Notas",
       "notes_placeholder": "¿Cuál fue tu impresión?",
       "learnings_label": "¿Qué aprendí?",

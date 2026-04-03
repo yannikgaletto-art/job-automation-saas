@@ -262,6 +262,8 @@
       "contact_label": "Contact",
       "contact_placeholder": "e.g. Sarah, Recruiting",
       "followup_label": "Follow-up Date",
+      "followup_today": "Today",
+      "followup_tomorrow": "Tomorrow",
       "notes_label": "Notes",
       "notes_placeholder": "What was your impression?",
       "learnings_label": "What did I learn?",

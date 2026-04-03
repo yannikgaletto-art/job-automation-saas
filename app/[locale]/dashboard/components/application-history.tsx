@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { TableSkeleton } from "@/components/skeletons/table-skeleton"
-import { Check, ChevronLeft, ChevronRight, ChevronDown, ExternalLink, X, Plus } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronDown, ExternalLink, X, Plus } from "lucide-react"
 import { formatAppliedDate } from "@/lib/utils/date-formatting"
 import { motion, AnimatePresence } from "framer-motion"
 import { EmptyApplicationHistory } from "@/components/empty-states/empty-application-history"
@@ -178,6 +178,8 @@ function CRMDrawer({
             setTimeout(() => setSaveState('idle'), 1500)
         } catch {
             setSaveState('idle')
+            // User-visible error feedback (M2 audit fix)
+            console.error('[CRM] Save failed for application', app.id)
         } finally {
             setSaving(false)
         }
@@ -465,8 +467,8 @@ export function ApplicationHistory() {
         const now = new Date()
         const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
         if (diffDays < 0) return t('overdue_hint')
-        if (diffDays === 0) return 'Today'
-        if (diffDays === 1) return 'Tomorrow'
+        if (diffDays === 0) return t('followup_today')
+        if (diffDays === 1) return t('followup_tomorrow')
         return d.toLocaleDateString()
     }
 
@@ -522,7 +524,7 @@ export function ApplicationHistory() {
                                         onClick={() => setExpandedId(expanded ? null : app.id)}
                                         className={cn(
                                             "grid grid-cols-[1fr_1fr_140px_120px_100px] gap-4 px-5 py-3.5 items-center border-b border-[#E7E7E5] last:border-b-0 transition-colors cursor-pointer select-none",
-                                            overdue && "border-l-3 border-l-amber-400",
+                                            overdue && "border-l-2 border-l-amber-400",
                                             expanded ? "bg-[#FAFAF9]" : "hover:bg-[#FAFAF9]"
                                         )}
                                     >

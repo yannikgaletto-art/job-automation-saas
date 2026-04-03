@@ -19,9 +19,10 @@ interface PaywallModalProps {
     onOpenChange: (open: boolean) => void;
     reason: PaywallReason;
     remaining?: number;
+    quotaTotal?: number; // actual user limit (not plan default)
 }
 
-export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: PaywallModalProps) {
+export function PaywallModal({ open, onOpenChange, reason, remaining = 0, quotaTotal }: PaywallModalProps) {
     const t = useTranslations('billing');
 
     const title =
@@ -29,9 +30,13 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
         reason === 'search' ? t('search_limit') :
         t('paywall_title');
 
+    // Use the user's actual quota total if provided, otherwise fall back to planConfig
+    const coachingTotal = quotaTotal ?? PLAN_CONFIG.starter.coachingSessions;
+    const searchTotal = quotaTotal ?? PLAN_CONFIG.starter.jobSearches;
+
     const subtitle =
-        reason === 'coaching' ? t('coaching_limit_desc', { total: String(PLAN_CONFIG.starter.coachingSessions) }) :
-        reason === 'search' ? t('search_limit_desc', { total: String(PLAN_CONFIG.starter.jobSearches) }) :
+        reason === 'coaching' ? t('coaching_limit_desc', { total: String(coachingTotal) }) :
+        reason === 'search' ? t('search_limit_desc', { total: String(searchTotal) }) :
         t('paywall_subtitle', { total: String(remaining) });
 
     return (

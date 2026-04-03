@@ -164,7 +164,8 @@ export async function checkDuplicateApplication(
 
 /**
  * Tracks a new job application in the history.
- * company_slug is GENERATED ALWAYS AS in DB — do NOT pass it explicitly.
+ * company_slug is a plain TEXT column (not GENERATED) — omit from INSERT.
+ * It gets populated by the prevent_double_apply trigger or remains NULL.
  */
 export async function trackApplication(
     params: TrackApplicationParams
@@ -176,7 +177,7 @@ export async function trackApplication(
 
         const supabase = getSupabaseAdmin()
 
-        // company_slug is GENERATED ALWAYS from company_name — omit it from INSERT
+        // company_slug is omitted — it's a plain TEXT column, not GENERATED
         const { error } = await supabase
             .from("application_history")
             .insert({

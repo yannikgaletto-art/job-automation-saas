@@ -23,102 +23,9 @@ const supabaseAdmin = createAdminClient(
     { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
-// ─── Self-healing: Ensure table exists ───────────────────────────────
-let tableVerified = false;
-
-async function ensureCoachingTable(): Promise<void> {
-    if (tableVerified) return;
-
-    const { error } = await supabaseAdmin.from('coaching_sessions').select('id').limit(1);
-    if (!error) {
-        tableVerified = true;
-        return;
-    }
-
-    // Table doesn't exist — create it via raw SQL using supabase-js workaround
-    // We create the table via an insert attempt pattern (the table DDL must be applied manually)
-    console.warn('⚠️ [Coaching] coaching_sessions table not found. Attempting auto-creation...');
-
-    // Use the Supabase Management API's SQL endpoint
-    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace('https://', '').replace('.supabase.co', '');
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-    const migrationSQL = `
-        CREATE TABLE IF NOT EXISTS coaching_sessions (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-            job_id UUID NOT NULL REFERENCES job_queue(id) ON DELETE CASCADE,
-            session_status TEXT DEFAULT 'active' CHECK (session_status IN ('active', 'completed', 'abandoned')),
-            conversation_history JSONB DEFAULT '[]'::jsonb,
-            coaching_dossier JSONB,
-            feedback_report TEXT,
-            coaching_score INTEGER CHECK (coaching_score BETWEEN 1 AND 10),
-            turn_count INTEGER DEFAULT 0,
-            duration_seconds INTEGER,
-            tokens_used INTEGER DEFAULT 0,
-            cost_cents INTEGER DEFAULT 0,
-            prompt_version TEXT DEFAULT 'v1',
-            created_at TIMESTAMPTZ DEFAULT now(),
-            completed_at TIMESTAMPTZ
-        );
-        CREATE INDEX IF NOT EXISTS idx_coaching_sessions_user ON coaching_sessions(user_id, created_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_coaching_sessions_job ON coaching_sessions(job_id);
-        ALTER TABLE coaching_sessions ENABLE ROW LEVEL SECURITY;
-        DO $$ BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM pg_policies WHERE tablename = 'coaching_sessions' AND policyname = 'Users own coaching sessions'
-            ) THEN
-                CREATE POLICY "Users own coaching sessions" ON coaching_sessions FOR ALL USING (auth.uid() = user_id);
-            END IF;
-        END $$;
-    `;
-
-    try {
-        // Try the /pg endpoint (available on Supabase hosted)
-        const pgRes = await fetch(`https://${projectRef}.supabase.co/pg/query`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${serviceKey}`,
-            },
-            body: JSON.stringify({ query: migrationSQL }),
-        });
-
-        if (pgRes.ok) {
-            console.log('✅ [Coaching] Table auto-created successfully');
-            tableVerified = true;
-            return;
-        }
-
-        // Fallback: try the REST SQL endpoint
-        const sqlRes = await fetch(`https://${projectRef}.supabase.co/rest/v1/rpc/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': serviceKey,
-                'Authorization': `Bearer ${serviceKey}`,
-            },
-            body: JSON.stringify({ query: migrationSQL }),
-        });
-
-        if (sqlRes.ok) {
-            console.log('✅ [Coaching] Table auto-created via REST');
-            tableVerified = true;
-        } else {
-            console.error('❌ [Coaching] Auto-creation failed. Please apply migration manually:');
-            console.error(`   https://supabase.com/dashboard/project/${projectRef}/sql/new`);
-            console.error('   File: supabase/migrations/20260304_coaching_sessions.sql');
-        }
-    } catch (err) {
-        console.error('❌ [Coaching] Migration error:', err);
-    }
-}
-
 // ─── POST: Create Session ─────────────────────────────────────────────
 export async function POST(request: Request) {
     try {
-        // Self-healing: ensure table exists (graceful migration)
-        await ensureCoachingTable();
         const supabase = await createClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) {
@@ -270,8 +177,6 @@ export async function POST(request: Request) {
 // ─── GET: Load Session ────────────────────────────────────────────────
 export async function GET(request: Request) {
     try {
-        // Self-healing
-        await ensureCoachingTable();
         const supabase = await createClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) {
