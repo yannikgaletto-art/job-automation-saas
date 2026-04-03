@@ -211,6 +211,9 @@ Zwei separate Terminal-Prozesse sind **IMMER** erforderlich:
 - `video_approaches` (Video-Token, Upload-Status, Expiry)
 - `video_scripts` (Script Studio: Blocks, Mode, Keywords)
 - `script_block_templates` (System- und Custom-Blockvorlagen)
+- `user_credits` (Credit-System: Plan, Credits, Coaching/Search Quotas, Stripe IDs — Beta-Defaults: 15/5/10)
+- `credit_events` (Audit Trail: Debits, Refunds, Topups, Resets — DSGVO Art. 15)
+- `processed_stripe_events` (Webhook-Idempotenz: Stripe Event-Dedup)
 - `schema_version` (Interne Versionierung)
 
 ---

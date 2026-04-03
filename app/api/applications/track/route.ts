@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     try {
         // 2. Parse request body
         const body = await request.json()
-        const { jobUrl, companyName, companySlug, jobTitle, applicationMethod, generatedDocuments } = body
+        const { jobUrl, companyName, jobTitle, applicationMethod, generatedDocuments } = body
 
         // 3. Validate required fields
         if (!jobUrl || !companyName || !jobTitle) {
@@ -26,7 +26,6 @@ export async function POST(request: Request) {
             userId: user.id,
             jobUrl,
             companyName,
-            companySlug,
             jobTitle,
             applicationMethod: applicationMethod || 'manual',
             generatedDocuments

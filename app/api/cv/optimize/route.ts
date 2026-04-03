@@ -9,6 +9,8 @@ import { logger } from '@/lib/logging';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { translateCvIfNeeded } from '@/lib/services/cv-translator';
 import { pruneForOptimizer } from '@/lib/utils/cv-payload-pruner';
+import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
+import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
 // Rate limit: 3 CV optimize requests per minute per user
 const cvOptimizeLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
@@ -328,15 +330,25 @@ Must conform to the following Zod schema:
 }
 `;
 
+        // §BILLING: Credit Gate — debit 0.5 credits, auto-refund on AI failure
         let response;
         try {
-            response = await complete({
-                taskType: 'optimize_cv',
-                prompt,
-                temperature: 0,
-                maxTokens: 5000, // Cost-capped (2026-03-30): diffs need ~1500-3000 tokens max
-            });
+            response = await withCreditGate(
+                user.id,
+                CREDIT_COSTS.cv_optimize,
+                'cv_optimize',
+                () => complete({
+                    taskType: 'optimize_cv',
+                    prompt,
+                    temperature: 0,
+                    maxTokens: 5000,
+                }),
+                job_id
+            );
         } catch (aiErr: any) {
+            const billingResponse = handleBillingError(aiErr);
+            if (billingResponse) return billingResponse;
+
             const aiMsg = aiErr?.message || String(aiErr);
             log.error('AI call failed', { error: aiMsg });
             return NextResponse.json(

@@ -9,7 +9,11 @@ const ERR_MISSING_KEY = 'ENCRYPTION_KEY must be set in environment variables and
 function getKey(): Buffer {
     const key = process.env.ENCRYPTION_KEY;
     if (!key) {
-        // Fallback for DEV ONLY - generates a warning
+        // PRODUCTION: Hard-fail — no fallback key allowed
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('FATAL: ENCRYPTION_KEY must be set in production environment variables. Cannot start without it.');
+        }
+        // DEV ONLY: Fallback for local development
         console.warn('⚠️ WARNING: Using fallback encryption key. SET ENCRYPTION_KEY IN PRODUCTION!');
         return crypto.scryptSync('development-fallback-secret', 'salt', 32);
     }

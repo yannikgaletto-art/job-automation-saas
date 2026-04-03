@@ -1,8 +1,10 @@
 export const dynamic = 'force-dynamic';
 
-import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { complete } from '@/lib/ai/model-router';
+import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
+import { CREDIT_COSTS } from '@/lib/services/credit-types';
 import type { HiringManagerCritique } from '@/types/cover-letter-setup';
 
 /**
@@ -50,8 +52,6 @@ export async function POST(request: NextRequest) {
             console.warn('⚠️ [Critique] No ANTHROPIC_API_KEY — returning null');
             return NextResponse.json({ success: true, critique: null });
         }
-
-        const anthropic = new Anthropic({ apiKey });
 
 
 
@@ -131,18 +131,26 @@ Responde SOLO como JSON válido:
 
         const prompt = prompts[locale] ?? prompts['de'];
 
-        console.log('🎭 [Critique] Generating hiring manager critique via Haiku...');
+        console.log('🎭 [Critique] Generating hiring manager critique via model-router...');
 
-        const message = await anthropic.messages.create({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 450,
-            temperature: 0.3,
-            system: 'You are a hiring manager simulator. Respond only with valid JSON.',
-            messages: [{ role: 'user', content: prompt }]
-        });
+        // §BILLING: Credit Gate — debit 0.5 credits, auto-refund on AI failure
+        const critiqueResult = await withCreditGate(
+            user.id,
+            CREDIT_COSTS.cover_letter,
+            'cover_letter',
+            async () => {
+                const message = await complete({
+                    taskType: 'language_judge',
+                    systemPrompt: 'You are a hiring manager simulator. Respond only with valid JSON.',
+                    prompt,
+                    temperature: 0.3,
+                    maxTokens: 450,
+                });
+                return message.text;
+            }
+        );
 
-
-        const content = message.content[0].type === 'text' ? message.content[0].text : '';
+        const content = critiqueResult;
 
         let parsed: HiringManagerCritique;
         try {
@@ -154,7 +162,6 @@ Responde SOLO como JSON válido:
             return NextResponse.json({ success: true, critique: null });
         }
 
-        // Validate required fields
         if (!parsed.persona || !parsed.critique || !parsed.fixSuggestion) {
             console.warn('⚠️ [Critique] Incomplete response — returning null');
             return NextResponse.json({ success: true, critique: null });
@@ -173,6 +180,10 @@ Responde SOLO como JSON válido:
         });
 
     } catch (error: unknown) {
+        // §BILLING: Return proper 402 for credit exhaustion
+        const billingResponse = handleBillingError(error);
+        if (billingResponse) return billingResponse;
+
         const errMsg = error instanceof Error ? error.message : String(error);
         console.error('❌ [Critique] Error:', errMsg);
         return NextResponse.json(

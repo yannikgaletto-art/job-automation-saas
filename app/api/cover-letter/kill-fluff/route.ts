@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { BLACKLIST_PATTERNS, scanForFluff } from '@/lib/services/anti-fluff-blacklist';
 import { complete } from '@/lib/ai/model-router';
+import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
+import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
 /**
  * POST /api/cover-letter/kill-fluff
@@ -66,9 +68,15 @@ export async function POST(request: NextRequest) {
             try {
                 const blacklistSection = BLACKLIST_PATTERNS.map(p => `- "${p.pattern}" (${p.reason})`).join('\n');
 
-                const response = await complete({
-                    taskType: 'kill_fluff',
-                    systemPrompt: `Du bist ein Fluff-Killer für Anschreiben. Ersetze alle generischen KI-Phrasen durch konkrete, authentische Formulierungen.
+                // §BILLING: Credit Gate — debit 0.5 credits, auto-refund on AI failure
+                const cleanedText = await withCreditGate(
+                    user.id,
+                    CREDIT_COSTS.cover_letter,
+                    'cover_letter',
+                    async () => {
+                        const response = await complete({
+                            taskType: 'kill_fluff',
+                            systemPrompt: `Du bist ein Fluff-Killer für Anschreiben. Ersetze alle generischen KI-Phrasen durch konkrete, authentische Formulierungen.
 
 BLACKLIST (MUSS entfernt/ersetzt werden):
 ${blacklistSection}
@@ -82,19 +90,25 @@ REGELN:
 - Behalte Struktur, Länge und Fakten bei
 - Ersetze Fluff durch konkrete, belegbare Aussagen
 - Gib NUR den bereinigten Text zurück, kein JSON, kein Markdown`,
-                    prompt: coverLetterText,
-                    temperature: 0.3,
-                    maxTokens: 2500,
-                });
+                            prompt: coverLetterText,
+                            temperature: 0.3,
+                            maxTokens: 2500,
+                        });
+                        return response.text.trim();
+                    },
+                    jobId
+                );
 
                 return NextResponse.json({
                     success: true,
-                    cleanedText: response.text.trim(),
+                    cleanedText,
                     removedPhrases,
                     changeCount: removedPhrases.length,
                 });
-            } catch (claudeError) {
-                console.error('❌ [KillFluff] Claude Sonnet failed, falling back to local scan:', claudeError);
+            } catch (error) {
+                const billingResponse = handleBillingError(error);
+                if (billingResponse) return billingResponse;
+                console.error('❌ [KillFluff] Claude Sonnet failed, falling back to local scan:', error);
             }
         }
 

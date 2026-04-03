@@ -8,6 +8,8 @@ import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
 import { logger } from '@/lib/logging';
 import { inngest } from '@/lib/inngest/client';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
+import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
+import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
 export const maxDuration = 120; // Vercel timeout — frontend client waits 180s, server allows 120s
 
@@ -64,7 +66,14 @@ export async function POST(request: NextRequest) {
             warnings.push('Kein Setup-Kontext — generische Qualität.');
         }
 
-        const result = await generateCoverLetterWithQuality(jobId, userId, setupContext, fixMode, targetFix, currentLetter);
+        // §BILLING: Credit Gate — debit 0.5 credits, auto-refund on AI failure
+        const result = await withCreditGate(
+            userId,
+            CREDIT_COSTS.cover_letter,
+            'cover_letter',
+            () => generateCoverLetterWithQuality(jobId, userId, setupContext, fixMode, targetFix, currentLetter),
+            jobId
+        );
 
         // Merge generator-level warnings (orphan-guard, style-fallback) into the route warnings array
         if (result.generationWarnings?.length) {
@@ -170,6 +179,10 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (error: unknown) {
+        // §BILLING: Return 402 for credit/quota exhaustion
+        const billingResponse = handleBillingError(error);
+        if (billingResponse) return billingResponse;
+
         const errMsg = error instanceof Error ? error.message : String(error);
         console.error(`[${requestId}] ❌ route=cover-letter/generate error=${errMsg}`);
         return NextResponse.json({ error: errMsg || 'Generation failed', requestId }, { status: 500 });

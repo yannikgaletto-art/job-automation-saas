@@ -15,6 +15,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { searchJobs, type JobSearchFilters, type SerpLocale } from '@/lib/services/job-search-pipeline';
 import { complete } from '@/lib/ai/model-router';
+import { requireJobSearchQuota, handleBillingError } from '@/lib/middleware/credit-gate';
+import { incrementJobSearchUsage } from '@/lib/services/credit-service';
+import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+
+const jobSearchLimiter = createRateLimiter({ maxRequests: 10, windowMs: 60_000 });
 
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const MAX_SAVED_SEARCHES = 10;
@@ -144,6 +149,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
         }
 
+        // Rate limit: max 10 searches/min to prevent SerpAPI cost spikes
+        const rateLimited = checkRateLimit(jobSearchLimiter, user.id, 'job-search/query');
+        if (rateLimited) return rateLimited;
+
         const body = await request.json();
         const { query, location, filters, forceRefresh, mode } = body as {
             query: string;
@@ -155,6 +164,15 @@ export async function POST(request: NextRequest) {
 
         if (!query?.trim()) {
             return NextResponse.json({ error: 'Query is required' }, { status: 400 });
+        }
+
+        // §BILLING: Job Search Quota Gate — Free users (0 searches) blocked
+        try {
+            await requireJobSearchQuota(user.id);
+        } catch (quotaError) {
+            const billingResponse = handleBillingError(quotaError);
+            if (billingResponse) return billingResponse;
+            throw quotaError;
         }
 
         const searchMode = mode || 'keyword';
@@ -241,6 +259,9 @@ export async function POST(request: NextRequest) {
         const serpLocale = deriveSerpLocale(serpApiLocation, userLocale);
         console.log(`✅ [Search] Querying SerpAPI: "${serpApiQuery}" in "${serpApiLocation}" [hl=${serpLocale.hl}, gl=${serpLocale.gl}]`);
         const jobs = await searchJobs(serpApiQuery, serpApiLocation, filters, serpLocale);
+
+        // §BILLING: Count this as a used search (only for actual API calls, not cache hits)
+        await incrementJobSearchUsage(user.id);
 
         // ─── 3. Cross-Queue Check ────────────────────────────────────
         const enriched = await enrichWithQueueStatus(supabase, user.id, jobs);

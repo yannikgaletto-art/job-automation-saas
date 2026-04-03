@@ -1,13 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+/**
+ * Consent Recording API
+ * 
+ * §8: Auth Guard — userId derived from authenticated session, never from body.
+ * DSGVO Art. 7: Consent must be traceable, timestamped, and attributable.
+ */
 
-const supabase = createClient(
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
+
+const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-interface ConsentRequest {
-    user_id: string
+interface ConsentPayload {
     consents: Array<{
         document_type: 'privacy_policy' | 'terms_of_service' | 'ai_processing' | 'cookies'
         document_version: string
@@ -17,23 +24,29 @@ interface ConsentRequest {
 
 export async function POST(req: NextRequest) {
     try {
-        const body: ConsentRequest = await req.json()
+        // §8: Auth Guard — derive userId from session, never trust body
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
 
-        // Validate request
-        if (!body.user_id || !body.consents || !Array.isArray(body.consents)) {
+        const body: ConsentPayload = await req.json()
+
+        if (!body.consents || !Array.isArray(body.consents)) {
             return NextResponse.json(
                 { error: 'Invalid request body' },
                 { status: 400 }
             )
         }
 
-        // Extract IP and User Agent
+        // Extract IP and User Agent for DSGVO audit trail
         const ip_address = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
         const user_agent = req.headers.get('user-agent') || 'unknown'
 
-        // Prepare consent records
+        // §3: User-scoped — always use authenticated user.id
         const consentRecords = body.consents.map(consent => ({
-            user_id: body.user_id,
+            user_id: user.id,
             document_type: consent.document_type,
             document_version: consent.document_version,
             consent_given: consent.consent_given,
@@ -42,27 +55,13 @@ export async function POST(req: NextRequest) {
             consented_at: new Date().toISOString()
         }))
 
-        // Insert into consent_history table
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('consent_history')
             .insert(consentRecords)
             .select()
 
         if (error) {
-            console.error('Supabase error:', error)
-
-            // WORKAROUND FOR MVP/DEV: 
-            // If the error is a Foreign Key Violation (code 23503) because the user doesn't exist in auth.users,
-            // we ignore it and pretend it worked. This allows testing the onboarding flow without a real auth user.
-            if (error.code === '23503') {
-                console.warn('Ignoring FK constraint error for dev/mvp mode (user not in auth.users)')
-                return NextResponse.json({
-                    success: true,
-                    recorded: body.consents.length,
-                    message: `Successfully recorded ${body.consents.length} consent(s) (DEV MODE: FK Ignored)`
-                })
-            }
-
+            console.error('[Consent] Insert error:', error)
             return NextResponse.json(
                 { error: 'Failed to record consent', details: error.message },
                 { status: 500 }
@@ -76,7 +75,7 @@ export async function POST(req: NextRequest) {
         })
 
     } catch (error) {
-        console.error('Error recording consent:', error)
+        console.error('[Consent] Error recording consent:', error)
         return NextResponse.json(
             { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
             { status: 500 }
@@ -84,27 +83,25 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// GET endpoint to retrieve consent history for a user
-export async function GET(req: NextRequest) {
+// GET: Retrieve consent history for the authenticated user
+export async function GET() {
     try {
-        const { searchParams } = new URL(req.url)
-        const user_id = searchParams.get('user_id')
-
-        if (!user_id) {
-            return NextResponse.json(
-                { error: 'user_id parameter is required' },
-                { status: 400 }
-            )
+        // §8: Auth Guard
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { data, error } = await supabase
+        // §3: User-scoped — only return own consent records
+        const { data, error } = await supabaseAdmin
             .from('consent_history')
             .select('*')
-            .eq('user_id', user_id)
+            .eq('user_id', user.id)
             .order('consented_at', { ascending: false })
 
         if (error) {
-            console.error('Supabase error:', error)
+            console.error('[Consent] Fetch error:', error)
             return NextResponse.json(
                 { error: 'Failed to fetch consent history', details: error.message },
                 { status: 500 }
@@ -117,7 +114,7 @@ export async function GET(req: NextRequest) {
         })
 
     } catch (error) {
-        console.error('Error fetching consent history:', error)
+        console.error('[Consent] Error fetching consent history:', error)
         return NextResponse.json(
             { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
             { status: 500 }

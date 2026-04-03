@@ -110,83 +110,44 @@ export async function getUserCredits(userId: string): Promise<CreditInfo | null>
 
 /**
  * Check if user has enough coaching sessions remaining.
+ * Generic: works for all plans — if total is 0, returns false automatically.
  */
 export async function checkCoachingQuota(userId: string): Promise<boolean> {
     const credits = await getUserCredits(userId);
     if (!credits) return false;
-
-    // Free plan has 0 coaching sessions
-    if (credits.planType === 'free') return false;
 
     return credits.coachingSessionsUsed < credits.coachingSessionsTotal;
 }
 
 /**
  * Check if user has enough job search quota remaining.
+ * Generic: works for all plans — if total is 0, returns false automatically.
  */
 export async function checkJobSearchQuota(userId: string): Promise<boolean> {
     const credits = await getUserCredits(userId);
     if (!credits) return false;
-
-    // Free plan has 0 job searches
-    if (credits.planType === 'free') return false;
 
     return credits.jobSearchesUsed < credits.jobSearchesTotal;
 }
 
 /**
  * Increment coaching session counter.
- * Uses direct SQL to avoid race conditions.
+ * Calls an atomic SQL function to prevent race conditions.
  */
 export async function incrementCoachingUsage(userId: string): Promise<void> {
-    const { data, error } = await getAdmin()
-        .from('user_credits')
-        .select('coaching_sessions_used')
-        .eq('user_id', userId)
-        .single();
-
-    if (error || !data) {
-        console.error('❌ [Credits] Coaching read failed:', error?.message);
-        return;
-    }
-
-    const { error: updateError } = await getAdmin()
-        .from('user_credits')
-        .update({
-            coaching_sessions_used: data.coaching_sessions_used + 1,
-            updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
-
-    if (updateError) {
-        console.error('❌ [Credits] Coaching increment failed:', updateError.message);
+    const { error } = await getAdmin().rpc('increment_coaching_usage', { p_user_id: userId });
+    if (error) {
+        console.error('❌ [Credits] Coaching increment failed:', error.message);
     }
 }
 
 /**
  * Increment job search counter.
+ * Calls an atomic SQL function to prevent race conditions.
  */
 export async function incrementJobSearchUsage(userId: string): Promise<void> {
-    const { data, error } = await getAdmin()
-        .from('user_credits')
-        .select('job_searches_used')
-        .eq('user_id', userId)
-        .single();
-
-    if (error || !data) {
-        console.error('❌ [Credits] Search read failed:', error?.message);
-        return;
-    }
-
-    const { error: updateError } = await getAdmin()
-        .from('user_credits')
-        .update({
-            job_searches_used: data.job_searches_used + 1,
-            updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
-
-    if (updateError) {
-        console.error('❌ [Credits] Search increment failed:', updateError.message);
+    const { error } = await getAdmin().rpc('increment_job_search_usage', { p_user_id: userId });
+    if (error) {
+        console.error('❌ [Credits] Search increment failed:', error.message);
     }
 }

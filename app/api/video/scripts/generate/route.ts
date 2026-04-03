@@ -5,6 +5,8 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logging';
 import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
+import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
+import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -216,11 +218,18 @@ export async function POST(request: NextRequest) {
             templates || [],
         );
 
-        const aiResponse = await anthropic.messages.create({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 950,
-            messages: [{ role: 'user', content: aiPrompt }],
-        });
+        // §BILLING: Credit Gate — debit 0.5 credits, auto-refund on AI failure
+        const aiResponse = await withCreditGate(
+            user.id,
+            CREDIT_COSTS.video_script,
+            'video_script',
+            () => anthropic.messages.create({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 950,
+                messages: [{ role: 'user', content: aiPrompt }],
+            }),
+            jobId
+        );
 
         const aiText = aiResponse.content[0].type === 'text' ? aiResponse.content[0].text : '';
 
@@ -318,6 +327,9 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (error: unknown) {
+        const billingResponse = handleBillingError(error);
+        if (billingResponse) return billingResponse;
+
         const errMsg = error instanceof Error ? error.message : String(error);
         console.error(`[${requestId}] ❌ video/scripts/generate error=${errMsg}`);
         return NextResponse.json({ error: errMsg || 'Generation failed', requestId }, { status: 500 });

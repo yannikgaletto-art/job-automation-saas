@@ -6,6 +6,8 @@ import { inngest } from '@/lib/inngest/client';
 import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
 import { logger } from '@/lib/logging';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
+import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
+import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
 // Rate limit: 5 CV match requests per minute per user
 const cvMatchLimiter = createRateLimiter({ maxRequests: 5, windowMs: 60_000 });
@@ -105,21 +107,32 @@ export async function POST(req: NextRequest) {
             .eq('id', jobId)
             .eq('user_id', user.id);
 
+        // §BILLING: Credit Gate — debit 0.5 credits, auto-refund if Inngest send fails
         console.log('🚀 [CV Match] About to fire Inngest event...');
-        const sendResult = await inngest.send({
-            name: 'cv-match/analyze',
-            data: {
-                jobId,
-                userId: user.id,
-                cvDocumentId: cvData.documentId,
-                locale: await getUserLocale(user.id),
-            },
-        });
+        const userLocale = await getUserLocale(user.id);
+        const sendResult = await withCreditGate(
+            user.id,
+            CREDIT_COSTS.cv_match,
+            'cv_match',
+            () => inngest.send({
+                name: 'cv-match/analyze',
+                data: {
+                    jobId,
+                    userId: user.id,
+                    cvDocumentId: cvData.documentId,
+                    locale: userLocale,
+                },
+            }),
+            jobId
+        );
         console.log('🚀 [CV Match] Inngest event fired successfully!', sendResult);
 
         return NextResponse.json({ success: true, status: 'processing' });
 
     } catch (error: any) {
+        const billingResponse = handleBillingError(error);
+        if (billingResponse) return billingResponse;
+
         const msg = error?.message || String(error);
         console.error('❌ CV Match FATAL ERROR:', error);
         console.error('❌ Stack:', error?.stack);

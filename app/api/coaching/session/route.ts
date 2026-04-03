@@ -14,6 +14,8 @@ import { getInitialCoachingMessage } from '@/lib/services/coaching-service';
 import { COACHING_PROMPT_VERSION } from '@/lib/prompts/coaching-system-prompt';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
 import type { CreateSessionResponse } from '@/types/coaching';
+import { requireCoachingQuota, handleBillingError } from '@/lib/middleware/credit-gate';
+import { incrementCoachingUsage } from '@/lib/services/credit-service';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -132,6 +134,7 @@ export async function POST(request: Request) {
 
         // Idempotency check: return existing active session ONLY if params match.
         // If round or maxQuestions differ → the user wants a fresh session → abandon the old one.
+        // NOTE: Quota check happens AFTER this block — resuming an existing session is always free.
         const { data: existingSession } = await supabaseAdmin
             .from('coaching_sessions')
             .select('id, coaching_dossier, conversation_history, max_questions, interview_round')
@@ -153,7 +156,7 @@ export async function POST(request: Request) {
                     .update({ session_status: 'abandoned' })
                     .eq('id', existingSession.id);
             } else {
-                // Params match — reuse existing session
+                // Params match — reuse existing session (no quota consumed)
 
                 // Fix 3: Fall-forward if initial message was never generated (empty history)
                 let firstQuestion = existingSession.conversation_history?.[0]?.content || '';
@@ -172,10 +175,20 @@ export async function POST(request: Request) {
                     sessionId: existingSession.id,
                     dossier: existingSession.coaching_dossier,
                     firstQuestion,
-                    maxQuestions: existingSession.max_questions, // Fix 2: always include maxQuestions
+                    maxQuestions: existingSession.max_questions,
                     existing: true,
                 } satisfies CreateSessionResponse & { existing: boolean });
             }
+        }
+
+        // §BILLING: Coaching Quota Gate — only checked when creating a NEW session
+        // (existing session reuse above exits before reaching this point)
+        try {
+            await requireCoachingQuota(user.id);
+        } catch (quotaError) {
+            const billingResponse = handleBillingError(quotaError);
+            if (billingResponse) return billingResponse;
+            throw quotaError;
         }
 
         // Load job data (Contract 3: user-scoped)
@@ -228,6 +241,9 @@ export async function POST(request: Request) {
         const { aiMessage } = await getInitialCoachingMessage(session.id, user.id);
 
         console.log(`✅ [Coaching] Session created: ${session.id} for job ${jobId}`);
+
+        // §BILLING: Increment coaching usage counter
+        await incrementCoachingUsage(user.id);
 
         return NextResponse.json({
             sessionId: session.id,

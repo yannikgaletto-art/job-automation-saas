@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { inngest } from '@/lib/inngest/client';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
+import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
+import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
 export async function POST(request: NextRequest) {
     try {
@@ -128,11 +130,27 @@ export async function POST(request: NextRequest) {
             certificateId = inserted.id;
         }
 
-        // Send Inngest Event
-        await inngest.send({
-            name: 'certificates/generate',
-            data: { jobId, userId: user.id, locale: await getUserLocale(user.id) },
-        });
+        // §BILLING: Credit Gate — debit before triggering background AI
+        try {
+            await withCreditGate(
+                user.id,
+                CREDIT_COSTS.cv_match,
+                'cv_match',
+                async () => {
+                    // Send Inngest Event inside the gate
+                    await inngest.send({
+                        name: 'certificates/generate',
+                        data: { jobId, userId: user.id, locale: await getUserLocale(user.id) },
+                    });
+                    return true;
+                },
+                jobId
+            );
+        } catch (error) {
+            const billingResponse = handleBillingError(error);
+            if (billingResponse) return billingResponse;
+            throw error;
+        }
 
         console.log(`[Certificates] Triggered generation for job=${jobId} user=${user.id}`);
 

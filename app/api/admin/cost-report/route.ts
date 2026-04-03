@@ -2,15 +2,23 @@ import { getCostStats } from '@/lib/ai/model-router';
 import { getCacheStats } from '@/lib/services/cache-monitor';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+/** Constant-time string comparison to prevent timing attacks */
+function safeCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
 export async function GET(req: NextRequest) {
-    const adminSecret = req.headers.get('x-admin-secret');
-    if (adminSecret !== process.env.ADMIN_SECRET) {
+    const adminSecret = req.headers.get('x-admin-secret') || '';
+    const expected = process.env.ADMIN_SECRET || '';
+    if (!expected || !adminSecret || !safeCompare(adminSecret, expected)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

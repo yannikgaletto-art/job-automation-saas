@@ -420,6 +420,15 @@ CREATE TABLE IF NOT EXISTS application_history (
   cover_letter_url TEXT,
 
   applied_at TIMESTAMPTZ DEFAULT NOW(),
+  submitted_at TIMESTAMPTZ,
+
+  -- CRM fields (Strategy 3-Lite, 2026-04-03)
+  status TEXT DEFAULT 'applied' CHECK (status IN ('applied', 'follow_up_sent', 'interviewing', 'offer_received', 'rejected', 'ghosted')),
+  next_action_date DATE,
+  notes TEXT,
+  rejection_tags TEXT[] DEFAULT '{}',
+  contact_name TEXT,
+  learnings TEXT,
 
   UNIQUE(user_id, url_hash)
 );
@@ -428,6 +437,8 @@ CREATE INDEX IF NOT EXISTS idx_application_history_user ON application_history(u
 CREATE INDEX IF NOT EXISTS idx_application_history_method ON application_history(application_method);
 CREATE INDEX IF NOT EXISTS idx_application_history_applied_at ON application_history(applied_at);
 CREATE INDEX IF NOT EXISTS idx_application_history_company_slug ON application_history(company_slug);
+CREATE INDEX IF NOT EXISTS idx_application_history_next_action ON application_history(user_id, next_action_date) WHERE next_action_date IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_application_history_status ON application_history(user_id, status);
 
 ALTER TABLE application_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can only access their own application history"
@@ -833,7 +844,72 @@ CREATE POLICY "Users manage own volunteering_votes"
   ON volunteering_votes FOR ALL USING (auth.uid() = user_id);
 
 -- ============================================
--- 14. CRON JOBS
+-- 14. BILLING & CREDITS (Migration 20260401 + 20260403 Beta)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS user_credits (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  plan_type TEXT NOT NULL DEFAULT 'free' CHECK (plan_type IN ('free', 'starter', 'durchstarter')),
+  credits_total NUMERIC(10,2) NOT NULL DEFAULT 15.0,          -- Beta: was 6.0
+  credits_used NUMERIC(10,2) NOT NULL DEFAULT 0,
+  topup_credits NUMERIC(10,2) NOT NULL DEFAULT 0,
+  coaching_sessions_total INTEGER NOT NULL DEFAULT 5,           -- Beta: was 0
+  coaching_sessions_used INTEGER NOT NULL DEFAULT 0,
+  job_searches_total INTEGER NOT NULL DEFAULT 10,               -- Beta: was 0
+  job_searches_used INTEGER NOT NULL DEFAULT 0,
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
+  billing_period_start TIMESTAMPTZ,
+  billing_period_end TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE user_credits ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own credits" ON user_credits FOR SELECT USING (auth.uid() = user_id);
+
+CREATE TABLE IF NOT EXISTS credit_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  amount NUMERIC(10,2) NOT NULL,
+  job_id UUID REFERENCES job_queue(id) ON DELETE SET NULL,
+  reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE credit_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own credit events" ON credit_events FOR SELECT USING (auth.uid() = user_id);
+
+CREATE TABLE IF NOT EXISTS processed_stripe_events (
+  event_id TEXT PRIMARY KEY,
+  processed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Auto-create user_credits on signup
+CREATE OR REPLACE FUNCTION create_user_credits()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    INSERT INTO user_credits (
+        user_id, plan_type,
+        credits_total, coaching_sessions_total, job_searches_total
+    )
+    VALUES (
+        NEW.id, 'free',
+        15.0,   -- Beta: 15 credits
+        5,      -- Beta: 5 coaching sessions
+        10      -- Beta: 10 job searches
+    )
+    ON CONFLICT (user_id) DO NOTHING;
+    RETURN NEW;
+END; $$;
+
+CREATE TRIGGER trigger_create_user_credits
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION create_user_credits();
+
+-- ============================================
+-- 15. CRON JOBS
 -- ============================================
 
 CREATE OR REPLACE FUNCTION reset_daily_counts()
@@ -894,4 +970,5 @@ CREATE TABLE IF NOT EXISTS schema_version (
   applied_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-INSERT INTO schema_version (version) VALUES ('4.1') ON CONFLICT (version) DO NOTHING;
+INSERT INTO schema_version (version) VALUES ('4.2') ON CONFLICT (version) DO NOTHING;
+-- 4.2: Added user_credits, credit_events, processed_stripe_events (Billing + Beta Credits)

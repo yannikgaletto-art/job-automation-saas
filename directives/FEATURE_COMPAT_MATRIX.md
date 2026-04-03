@@ -418,3 +418,42 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via Migration
 | Security | `stripeCustomerId` nur server-side; `getUserCreditsForClient()` für Frontend |
 | i18n | Komplett: `billing` Namespace in de/en/es (45+ Keys) |
 
+---
+
+## 10. Feature-Silo: Application History CRM
+
+**Added:** 2026-04-03  
+**Scope:** Tracks submitted applications with CRM fields (status, follow-up, notes, contacts, rejection tags, learnings)
+
+### 10.1 Erlaubte Dateien
+
+| Datei | Rolle |
+|---|---|
+| `app/[locale]/dashboard/components/application-history.tsx` | Haupt-UI-Komponente |
+| `app/api/applications/track/route.ts` | POST: Neue Bewerbung tracken |
+| `app/api/applications/history/route.ts` | GET + PATCH: History abrufen & CRM-Felder updaten |
+| `app/api/applications/stats/route.ts` | GET: Bewerbungsstatistiken |
+| `lib/services/application-history.ts` | Service Layer (Admin Singleton) |
+| `components/empty-states/empty-application-history.tsx` | Empty State |
+| `supabase/migrations/20260403_application_history_crm.sql` | CRM-Spalten Migration |
+
+### 10.2 Verbotene Dateien
+
+| Datei | Grund |
+|---|---|
+| `lib/ai/model-router.ts` | SHARED — kein AI-Call in Application History |
+| `lib/inngest/**` | Kein Background-Job nötig |
+| `middleware.ts` | System-Level |
+| `app/dashboard/components/steckbrief/**` | Fremdes Feature-Silo |
+| `lib/services/cover-letter-*.ts` | Fremdes Feature-Silo |
+| `lib/services/coaching-*.ts` | Fremdes Feature-Silo |
+
+### 10.3 Bekannte Patterns
+
+| Pattern | Details |
+|---|---|
+| Admin Singleton | `lib/supabase/admin.ts` singleton — kein lokaler `createClient` |
+| Terminal Status Auto-Clear | Status `rejected`/`ghosted`/`offer_received` → `next_action_date = null` |
+| Zod PATCH Validation | `z.object()` auf API-Ebene mit max-length Guards |
+| i18n | `dashboard.application_history` Namespace in de/en/es (38 Keys) |
+| No AI Calls | Kein Credit-Gate, kein `generation_logs`, kein Model Router |
