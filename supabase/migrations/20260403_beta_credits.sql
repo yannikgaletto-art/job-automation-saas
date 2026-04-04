@@ -14,9 +14,9 @@ BEGIN
     )
     VALUES (
         NEW.id, 'free',
-        15.0,   -- Beta: 15 credits (was 6)
-        5,      -- Beta: 5 coaching sessions (was 0)
-        10      -- Beta: 10 job searches (was 0)
+        10.0,   -- Production: 10 credits (was 15 during Beta)
+        5,      -- 5 coaching sessions
+        10      -- 10 job searches
     )
     ON CONFLICT (user_id) DO NOTHING;
     RETURN NEW;

@@ -202,7 +202,7 @@ export function ValleyTemplate({ data, qrBase64, labels }: { data: CvStructuredD
 
                 {/* ===== EDUCATION ===== */}
                 {data.education.length > 0 && (
-                    <View style={s.sectionContainer}>
+                    <View style={s.sectionContainer} minPresenceAhead={80}>
                         <Text style={s.sectionTitle}>{labels.education}</Text>
                         {data.education.map((edu) => {
                             // Split description into sub-items (split on '. ' or ', ')

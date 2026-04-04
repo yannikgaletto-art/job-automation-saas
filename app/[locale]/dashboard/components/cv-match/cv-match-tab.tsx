@@ -199,6 +199,27 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 throw new Error(data?.error || t('error_analysis'));
             }
 
+            // Cache HIT: identical input already analyzed — load cached result immediately
+            if (data?.status === 'done_cached') {
+                console.log('✅ [CV Match] Cache HIT — loading existing result');
+                try {
+                    const cacheRes = await fetch(`/api/cv/match/cached?jobId=${jobId}`);
+                    const cacheData = await cacheRes.json();
+                    if (cacheData.success && cacheData.cached?.analyzed_at) {
+                        setMatchData(cacheData.cached);
+                        setIsMatchFromCache(true);
+                        setState('complete');
+                        onMatchComplete?.(cacheData.cached);
+                        return;
+                    }
+                } catch (cacheError) {
+                    console.warn('[CV Match] Cache read failed:', cacheError);
+                }
+                // Fallback: cache read failed — reset to idle so user can retry
+                setState('idle');
+                return;
+            }
+
             // Poll for results (Inngest processes in background)
             let attempts = 0;
             const maxAttempts = 60; // 60 × 3s = 180s max — single Sonnet call expected in 40-70s
@@ -531,6 +552,13 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         <p className="text-xs text-[#002e7a]/70 mt-0.5">{t('next_step_desc')}</p>
                     </div>
                     <div className="flex gap-3 mt-3 sm:mt-0">
+                        <button
+                            onClick={() => runAnalysis(undefined, true)}
+                            className="text-xs text-slate-400 hover:text-[#002e7a] transition-colors py-1.5 px-3"
+                            title={t('btn_reanalyze_tooltip')}
+                        >
+                            {t('btn_reanalyze')}
+                        </button>
                         <Button variant="primary" onClick={() => onNextStep?.()} className="shadow-sm text-sm">
                             {t('next_step_btn')}
                         </Button>

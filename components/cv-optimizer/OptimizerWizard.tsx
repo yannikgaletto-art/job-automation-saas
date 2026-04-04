@@ -113,6 +113,11 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     const [jobData, setJobData] = useState<any>(null);
     const [templateId, setTemplateId] = useState<string>("valley");
 
+    // P1: Layout-fix free retry state — read from jobData.metadata, no extra query
+    const [freeRetryUsed, setFreeRetryUsed] = useState(false);
+    const [isLayoutFixing, setIsLayoutFixing] = useState(false);
+    const [layoutFixError, setLayoutFixError] = useState<string | null>(null);
+
     // CVOptSettings — client-side only, not persisted to DB
     const [cvOptSettings, setCvOptSettings] = useState<CVOptSettings>(DEFAULT_CV_OPT_SETTINGS);
 
@@ -159,6 +164,10 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                 if (isMounted) {
                     if (jobRes) {
                         setJobData(jobRes);
+                        // P1: Read free-retry flag from metadata (no extra query, QA-7)
+                        if (jobRes.metadata?.cv_opt_free_retry_used) {
+                            setFreeRetryUsed(true);
+                        }
 
                         // Restore state: proposal is always restored if it exists.
                         // If decisions also exist → full restore (Step 2 skip below).
@@ -199,9 +208,9 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                             }
                             // Otherwise stay at Step 1 (Optimize)
                         }
-                        if (userRes.preferred_cv_template) {
-                            setTemplateId(userRes.preferred_cv_template);
-                        }
+                        // Valley is ALWAYS the default template (per Directive).
+                        // preferred_cv_template is intentionally NOT loaded from DB
+                        // so the ATS-warning popup always appears when switching to Tech.
                     }
                 }
             } catch (err) {
@@ -367,7 +376,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     const handleTemplateSwitchInPreview = (newId: string) => {
         if (newId === 'tech') {
             const alreadyDismissed = typeof window !== 'undefined'
-                && localStorage.getItem('pathly_tech_ats_warning_dismissed') === 'true';
+                && sessionStorage.getItem('pathly_tech_ats_warning_dismissed') === 'true';
             if (!alreadyDismissed) {
                 // Intercept: show warning, remember what to do if user proceeds
                 setTechAtsWarnDismiss(false);
@@ -381,7 +390,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
 
     const handleTechAtsWarningProceed = () => {
         if (techAtsWarnDismiss) {
-            localStorage.setItem('pathly_tech_ats_warning_dismissed', 'true');
+            sessionStorage.setItem('pathly_tech_ats_warning_dismissed', 'true');
         }
         setShowTechAtsWarning(false);
         pendingTechSwitch?.();
@@ -836,6 +845,80 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                                     {t('cover_letter')}
                                 </button>
+                            </div>
+                        </div>
+
+                        {/* P1: Layout-Fix Retry — free, once per job */}
+                        <div className="border border-amber-200 bg-amber-50/60 rounded-lg px-4 py-3 mb-4">
+                            <div className="flex items-start gap-3">
+                                <div className="shrink-0 mt-0.5">
+                                    <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-xs text-amber-800">{t('btn_layout_fix_desc')}</p>
+                                    <button
+                                        onClick={async () => {
+                                            if (freeRetryUsed || isLayoutFixing) return;
+                                            setIsLayoutFixing(true);
+                                            setLayoutFixError(null);
+                                            try {
+                                                const res = await fetch('/api/cv/optimize', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({
+                                                        cv_structured_data: cvData,
+                                                        cv_match_result: jobData?.metadata?.cv_match,
+                                                        template_id: templateId,
+                                                        job_id: jobId,
+                                                        user_id: userId,
+                                                        locale,
+                                                        layoutFix: true,
+                                                        cv_opt_settings: { showSummary: cvOptSettings.showSummary, summaryMode: cvOptSettings.summaryMode },
+                                                    }),
+                                                });
+                                                const data = await res.json();
+                                                if (!res.ok) {
+                                                    if (data.error === 'free_retry_exhausted') {
+                                                        setFreeRetryUsed(true);
+                                                        setLayoutFixError(t('error_free_retry_exhausted'));
+                                                    } else {
+                                                        setLayoutFixError(data.details || t('error_failed'));
+                                                    }
+                                                    return;
+                                                }
+                                                // Apply the new proposal
+                                                if (data.proposal) {
+                                                    setProposal(data.proposal);
+                                                    setFreeRetryUsed(true);
+                                                    setStep(1); // Back to diff-review with new proposal
+                                                }
+                                            } catch {
+                                                setLayoutFixError(t('error_failed'));
+                                            } finally {
+                                                setIsLayoutFixing(false);
+                                            }
+                                        }}
+                                        disabled={freeRetryUsed || isLayoutFixing}
+                                        className="mt-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors
+                                            disabled:opacity-40 disabled:cursor-not-allowed
+                                            bg-amber-100 text-amber-800 hover:bg-amber-200"
+                                        title={freeRetryUsed ? t('btn_layout_fix_used') : t('btn_layout_fix_tooltip')}
+                                    >
+                                        {isLayoutFixing ? (
+                                            <span className="flex items-center gap-1.5">
+                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                                {t('optimizing_title')}
+                                            </span>
+                                        ) : freeRetryUsed ? (
+                                            t('btn_layout_fix_used')
+                                        ) : (
+                                            t('btn_layout_fix')
+                                        )}
+                                    </button>
+                                    {layoutFixError && (
+                                        <p className="text-xs text-red-600 mt-1">{layoutFixError}</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>

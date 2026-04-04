@@ -23,16 +23,17 @@ export async function GET() {
         const credits = await getUserCreditsForClient(user.id);
 
         if (!credits) {
-            // New user — should have been auto-created by trigger
+            // New user — no user_credits row yet (trigger may not have fired in beta)
+            // Return full plan defaults so the UI shows correct quota bars
             return NextResponse.json({
                 planType: 'free',
                 creditsTotal: PLAN_CONFIG.free.credits,
                 creditsUsed: 0,
                 topupCredits: 0,
                 creditsAvailable: PLAN_CONFIG.free.credits,
-                coachingSessionsTotal: 0,
+                coachingSessionsTotal: PLAN_CONFIG.free.coachingSessions,
                 coachingSessionsUsed: 0,
-                jobSearchesTotal: 0,
+                jobSearchesTotal: PLAN_CONFIG.free.jobSearches,
                 jobSearchesUsed: 0,
                 billingPeriodEnd: null,
                 stripeCustomerId: null,

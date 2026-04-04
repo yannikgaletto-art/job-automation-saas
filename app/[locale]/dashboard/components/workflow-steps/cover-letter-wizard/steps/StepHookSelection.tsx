@@ -31,6 +31,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     const [openAccordion, setOpenAccordion] = useState<string | null>(null);
     const [websiteInput, setWebsiteInput] = useState(setupData.companyWebsite || '');
     const [validationWarning, setValidationWarning] = useState<string | null>(null);
+    const [quoteRefreshCount, setQuoteRefreshCount] = useState(0);
 
     // ─── State Machine: resume at correct phase ────────────────────
     const getInitialPhase = (): Phase => {
@@ -124,6 +125,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     const handleQuoteSearch = async () => {
         setPhase('quoteSearching');
         setQuoteError(null);
+        setQuoteRefreshCount(prev => prev + 1);
         try {
             // Extract company values from value/vision hooks (primary)
             // Fall back to all non-manual hooks if primary is insufficient
@@ -171,7 +173,9 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     };
 
     const handleProceedToStep2 = () => {
-        setStep(2);
+        // WHY: Only call onNext() — parent (CoverLetterWizard) handles setStep(2).
+        // Previously this called setStep(2) + onNext() (which also called setStep(2)),
+        // causing a double Zustand update that raced with AnimatePresence transitions.
         onNext();
     };
 
@@ -444,9 +448,10 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                         </h4>
                         <button
                             onClick={handleQuoteSearch}
-                            className="text-[10px] text-[#73726E] hover:text-[#002e7a] flex items-center gap-1"
+                            disabled={quoteRefreshCount >= 2}
+                            className={`text-[10px] flex items-center gap-1 ${quoteRefreshCount >= 2 ? 'text-[#D0CFC8] cursor-not-allowed' : 'text-[#73726E] hover:text-[#002e7a]'}`}
                         >
-                            <RefreshCw className="w-3 h-3" /> {t('btn_new_quotes')}
+                            <RefreshCw className="w-3 h-3" /> {t('btn_new_quotes')} {quoteRefreshCount >= 2 ? `(${t('limit_reached') || 'max.'})` : ''}
                         </button>
                     </div>
 

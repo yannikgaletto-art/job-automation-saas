@@ -553,6 +553,15 @@
       "description": "Setze alle abgeschlossenen Touren zurück, damit sie beim nächsten Besuch erneut erscheinen.",
       "reset_btn": "Alle Touren zurücksetzen",
       "reset_done": "Zurückgesetzt"
+    },
+    "credits": {
+      "title": "Dein Kontingent",
+      "description": "Dein aktuelles Guthaben für Bewerbungen, Coaching und Jobsuche.",
+      "plan_label": "Aktueller Plan",
+      "credits_label": "Job Queue",
+      "coaching_label": "Coaching",
+      "searches_label": "Job Searches",
+      "cost_hint": "Jede KI-Aktion (CV Match, Anschreiben, CV-Optimierung) verbraucht 0,5 Credits."
     }
   },
   "legal": {
@@ -866,7 +875,14 @@
     "tech_ats_warning_body": "Das Template \"Valley\" ist für ATS-Systeme optimal: es nutzt ein einspaltiges Layout, das Systeme fehlerfrei von oben nach unten lesen. Das Template \"Tech\" ist optisch ansprechend, birgt aber das Risiko, dass das zweispaltige Design und grafische Elemente (farbige Skill-Boxen, Icon-Bullets) von vielen ATS-Parsern falsch zusammengesetzt oder ignoriert werden.",
     "tech_ats_warning_dismiss": "Diese Warnung nicht mehr anzeigen",
     "tech_ats_warning_proceed": "Verstanden, trotzdem \"Tech\" verwenden",
-    "tech_ats_warning_stay": "Bei \"Valley\" bleiben (empfohlen)"
+    "tech_ats_warning_stay": "Bei \"Valley\" bleiben (empfohlen)",
+    "error_pdf_download": "PDF konnte nicht erstellt werden. Bitte versuche es erneut.",
+    "downloading_pdf": "PDF wird erstellt…",
+    "btn_layout_fix": "Formatierung korrigieren",
+    "btn_layout_fix_tooltip": "Kostenlose Korrektur — 1× pro Job",
+    "btn_layout_fix_used": "Korrektur bereits genutzt",
+    "btn_layout_fix_desc": "Wenn Titel und Zusammenfassung zu viel Platz einnehmen.",
+    "error_free_retry_exhausted": "Die kostenlose Korrektur wurde bereits genutzt."
   },
   "diff_review": {
     "section_experience": "Erfahrung",
@@ -1030,18 +1046,20 @@
     "fit_weak": "Wenig passend",
     "toggle_ats_keywords": "ATS Keywords",
     "breakdown_language": "Sprache",
-    "breakdown_summary": "Zusammenfassung",
+    "breakdown_summary": "Empfehlung",
     "orbit_loading": "wird ermittelt…",
     "step_4": "Empfehlungen ableiten",
     "step_5": "Ergebnisse aufbereiten",
     "card_empty_hint": "Klicke einen Orbit an, um die Details zu sehen",
     "card_relevant_skills": "RELEVANTE SKILLS",
-    "card_gaps_title": "LÜCKEN VS. STELLENBESCHREIBUNG",
+    "card_gaps_title": "LÜCKEN IN DER STELLENBESCHREIBUNG",
     "card_additional_tools": "EMPFEHLUNGEN",
     "card_no_gaps": "Keine Lücken für diese Dimension",
     "card_default_title": "Alle Anforderungen",
     "card_not_analyzed": "Für diese Kategorie wurden keine Anforderungen analysiert",
-    "summary_overall": "Gesamtempfehlung"
+    "summary_overall": "Gesamtempfehlung",
+    "btn_reanalyze": "Neu analysieren",
+    "btn_reanalyze_tooltip": "Erneute Analyse mit aktuellem CV (verbraucht 0,5 Credits)"
   },
   "documents_required": {
     "cv_title": "Lebenslauf benötigt",
@@ -1109,6 +1127,7 @@
     "quote_error": "Zitate konnten nicht geladen werden.",
     "quote_results_title": "Passende Zitate ({count})",
     "btn_new_quotes": "3 neue Zitate",
+    "limit_reached": "max.",
     "quote_example_title": "💡 So wirkt ein Zitat im Anschreiben:",
     "quote_example_intro": "ich möchte gerne ein Zitat mit Euch teilen, da es mich an Eure Maxime des 'Challenging the Status Quo' erinnert hat:",
     "quote_example_quote": "'The most dangerous phrase is: We have always done it this way.'",

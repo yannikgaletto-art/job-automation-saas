@@ -147,6 +147,13 @@ export const BLACKLIST_PATTERNS: BlacklistPattern[] = [
         reason: 'Generische Firmenbeschreibung',
         category: 'structure',
     },
+
+    // ─── Leere Kompetenzbehauptungen ──────────────────────────────────────
+    {
+        pattern: 'teamfähig und belastbar',
+        reason: 'Leere Doppel-Adjektiv-Floskel ohne Beweis',
+        category: 'cliche',
+    },
 ];
 
 export interface FluffScanResult {

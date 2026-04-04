@@ -181,9 +181,14 @@ For each card, produce:
 
 5. **context**: 1–2 sentences explaining the assessment. Address with "${addressForm}".
    MUST reference the CV document, not the person. Use "${addressForm === 'Du' ? 'In deinem Lebenslauf' : addressForm === 'you' ? 'In your CV' : 'En tu CV'}..." or "${addressForm === 'Du' ? 'Dein CV zeigt' : addressForm === 'you' ? 'Your CV shows' : 'Tu CV muestra'}...".
+   ⚠️ FORMATTING: Wrap the 2-3 most important terms or phrases in **double asterisks** for emphasis.
+   Example: "${addressForm === 'Du' ? 'Dein CV zeigt **direkte Erfahrung** in **Prozessoptimierung** bei KPMG.' : addressForm === 'you' ? 'Your CV shows **direct experience** in **process optimization** at KPMG.' : 'Tu CV muestra **experiencia directa** en **optimización de procesos** en KPMG.'}"
+   This is MANDATORY — EVERY context string must have at least 2 bold-wrapped terms.
 
 6. **gaps**: Array of 0–3 specific gap bullet points. Each describes what's MISSING from the CV vs. the job description.
    EVERY gap MUST start with a document reference: "${addressForm === 'Du' ? 'In deinem Lebenslauf wird nicht erwähnt' : addressForm === 'you' ? 'Your CV does not mention' : 'Tu CV no menciona'}..." or similar.
+   ⚠️ FORMATTING: Wrap the key missing skill/term in **double asterisks**.
+   Example: "${addressForm === 'Du' ? 'In deinem Lebenslauf wird keine Erfahrung mit **OKR-Methodik** erwähnt' : addressForm === 'you' ? 'Your CV does not mention experience with **OKR methodology**' : 'Tu CV no menciona experiencia con **metodología OKR**'}"
    ONLY list gaps for requirements that are EXPLICITLY in the job description. Never invent requirements.
    Empty array if no gaps for this dimension.
 
@@ -234,6 +239,8 @@ STRICT: Do NOT infer. Using "make.com" does NOT mean "Sales Automation". "Projec
 - **IMPORTANT: reasons arrays MAXIMUM 2 entries** — short and precise!
 - **IMPORTANT: relevantChips, gaps, additionalChips are ALWAYS arrays (use [] if empty).**
 - **IMPORTANT: Output ONLY complete, valid JSON. Shorten texts if needed but always close the JSON correctly.**
+- **BOLD FORMATTING: In context, gaps, and overallRecommendation strings, wrap 2-3 key terms in **double asterisks** (e.g. \"**Prozessoptimierung**\"). This is MANDATORY.**
+- **COVERAGE RULE: For EVERY scoreBreakdown category where level ≠ "gap" (i.e. "strong" or "solid"), there MUST be at least 1 requirementRow with that orbitCategory. If the JD has ANY requirement in domain/experience/soft/technical, produce a card for it. Empty filtered satellite views are a UX failure.**
 
 ***
 

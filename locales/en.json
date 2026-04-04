@@ -553,6 +553,15 @@
       "description": "Reset all completed tours so they appear again on your next visit.",
       "reset_btn": "Reset all tours",
       "reset_done": "Reset done"
+    },
+    "credits": {
+      "title": "Your Usage",
+      "description": "Your current balance for applications, coaching, and job searches.",
+      "plan_label": "Current plan",
+      "credits_label": "Job Queue",
+      "coaching_label": "Coaching",
+      "searches_label": "Job Searches",
+      "cost_hint": "Each AI action (CV Match, Cover Letter, CV Optimization) uses 0.5 credits."
     }
   },
   "legal": {
@@ -866,7 +875,14 @@
     "tech_ats_warning_body": "The \"Valley\" template is optimised for ATS systems: its single-column layout is read flawlessly top-to-bottom. The \"Tech\" template looks great visually, but its two-column design and graphic elements (coloured skill badges, arrow bullets) are frequently misread or ignored by ATS parsers.",
     "tech_ats_warning_dismiss": "Do not show this warning again",
     "tech_ats_warning_proceed": "I understand, use \"Tech\" anyway",
-    "tech_ats_warning_stay": "Stay with \"Valley\" (recommended)"
+    "tech_ats_warning_stay": "Stay with \"Valley\" (recommended)",
+    "error_pdf_download": "PDF could not be created. Please try again.",
+    "downloading_pdf": "Generating PDF…",
+    "btn_layout_fix": "Fix formatting",
+    "btn_layout_fix_tooltip": "Free correction — once per job",
+    "btn_layout_fix_used": "Correction already used",
+    "btn_layout_fix_desc": "If the title and summary take up too much space.",
+    "error_free_retry_exhausted": "The free correction has already been used."
   },
   "diff_review": {
     "section_experience": "Experience",
@@ -1030,18 +1046,20 @@
     "fit_weak": "Weak Fit",
     "toggle_ats_keywords": "ATS Keywords",
     "breakdown_language": "Language",
-    "breakdown_summary": "Summary",
+    "breakdown_summary": "Recommendation",
     "orbit_loading": "determining…",
     "step_4": "Deriving recommendations",
     "step_5": "Preparing results",
     "card_empty_hint": "Click a satellite to view details",
     "card_relevant_skills": "RELEVANT SKILLS",
-    "card_gaps_title": "GAPS VS. JOB DESCRIPTION",
+    "card_gaps_title": "GAPS IN THE JOB DESCRIPTION",
     "card_additional_tools": "RECOMMENDATIONS",
     "card_no_gaps": "No gaps for this dimension",
     "card_default_title": "All Requirements",
     "card_not_analyzed": "No requirements were analyzed for this category",
-    "summary_overall": "Overall Recommendation"
+    "summary_overall": "Overall Recommendation",
+    "btn_reanalyze": "Re-analyze",
+    "btn_reanalyze_tooltip": "Run a fresh analysis with your current CV (uses 0.5 credits)"
   },
   "documents_required": {
     "cv_title": "CV Required",
@@ -1109,6 +1127,7 @@
     "quote_error": "Quotes could not be loaded.",
     "quote_results_title": "Matching quotes ({count})",
     "btn_new_quotes": "3 new quotes",
+    "limit_reached": "max.",
     "quote_example_title": "How a quote works in a cover letter:",
     "quote_example_intro": "I would like to share a quote with you, as it reminded me of your principle of 'Challenging the Status Quo':",
     "quote_example_quote": "'The most dangerous phrase is: We have always done it this way.'",

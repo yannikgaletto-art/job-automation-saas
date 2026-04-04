@@ -553,6 +553,15 @@
       "description": "Restablece todos los tours completados para que aparezcan de nuevo en tu próxima visita.",
       "reset_btn": "Restablecer todos los tours",
       "reset_done": "Restablecido"
+    },
+    "credits": {
+      "title": "Tu consumo",
+      "description": "Tu saldo actual para solicitudes, coaching y búsquedas de empleo.",
+      "plan_label": "Plan actual",
+      "credits_label": "Job Queue",
+      "coaching_label": "Coaching",
+      "searches_label": "Job Searches",
+      "cost_hint": "Cada acción de IA (CV Match, carta de presentación, optimización de CV) consume 0,5 créditos."
     }
   },
   "legal": {
@@ -866,7 +875,14 @@
     "tech_ats_warning_body": "La plantilla \"Valley\" está optimizada para sistemas ATS: su diseño de una sola columna se lee de forma impecable de arriba a abajo. La plantilla \"Tech\" es visualmente atractiva, pero su diseño de dos columnas y los elementos gráficos (insignias de habilidades, viñetas con iconos) suelen ser mal interpretados o ignorados por los analizadores ATS.",
     "tech_ats_warning_dismiss": "No volver a mostrar este aviso",
     "tech_ats_warning_proceed": "Entendido, usar \"Tech\" de todos modos",
-    "tech_ats_warning_stay": "Quedarse con \"Valley\" (recomendado)"
+    "tech_ats_warning_stay": "Quedarse con \"Valley\" (recomendado)",
+    "error_pdf_download": "No se pudo crear el PDF. Por favor, inténtalo de nuevo.",
+    "downloading_pdf": "Generando PDF…",
+    "btn_layout_fix": "Corregir formato",
+    "btn_layout_fix_tooltip": "Corrección gratuita — una vez por empleo",
+    "btn_layout_fix_used": "Corrección ya utilizada",
+    "btn_layout_fix_desc": "Si el título y el resumen ocupan demasiado espacio.",
+    "error_free_retry_exhausted": "La corrección gratuita ya ha sido utilizada."
   },
   "diff_review": {
     "section_experience": "Experiencia",
@@ -1030,18 +1046,20 @@
     "fit_weak": "Bajo Ajuste",
     "toggle_ats_keywords": "Palabras Clave ATS",
     "breakdown_language": "Idioma",
-    "breakdown_summary": "Resumen",
+    "breakdown_summary": "Recomendación",
     "orbit_loading": "determinando…",
     "step_4": "Derivando recomendaciones",
     "step_5": "Preparando resultados",
     "card_empty_hint": "Haz clic en un satélite para ver los detalles",
     "card_relevant_skills": "HABILIDADES RELEVANTES",
-    "card_gaps_title": "BRECHAS VS. DESCRIPCIÓN DEL PUESTO",
+    "card_gaps_title": "BRECHAS EN LA DESCRIPCIÓN DEL PUESTO",
     "card_additional_tools": "RECOMENDACIONES",
     "card_no_gaps": "Sin brechas para esta dimensión",
     "card_default_title": "Todos los Requisitos",
     "card_not_analyzed": "No se analizaron requisitos para esta categoría",
-    "summary_overall": "Recomendación General"
+    "summary_overall": "Recomendación General",
+    "btn_reanalyze": "Analizar de nuevo",
+    "btn_reanalyze_tooltip": "Ejecutar un nuevo análisis con tu CV actual (consume 0,5 créditos)"
   },
   "documents_required": {
     "cv_title": "CV necesario",
@@ -1109,6 +1127,7 @@
     "quote_error": "No se pudieron cargar las citas.",
     "quote_results_title": "Citas adecuadas ({count})",
     "btn_new_quotes": "3 nuevas citas",
+    "limit_reached": "máx.",
     "quote_example_title": "Cómo funciona una cita en una carta de presentación:",
     "quote_example_intro": "Me gustaría compartir una cita contigo, ya que me recordó a tu principio de 'Challenging the Status Quo':",
     "quote_example_quote": "'La frase más peligrosa es: Siempre lo hemos hecho así.'",

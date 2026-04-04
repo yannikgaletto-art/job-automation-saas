@@ -68,16 +68,33 @@ export function buildSystemPrompt(
     const isDuForm = ctx?.tone.formality === 'du';
     let contactPersonGreeting: string;
     if (ctx?.tone.contactPerson) {
-        // Strip common greeting prefixes to prevent double-salutation
-        // e.g. user types "Hello Mr. Curry" → would become "Dear Hello Mr. Curry" without this guard
+        // Strip greeting-only prefixes (e.g. "Hello Mr. Curry" → "Mr. Curry")
         const rawName = ctx.tone.contactPerson.trim();
         const name = rawName.replace(/^(dear|hello|hi|hallo|liebe[rs]?|sehr geehrte[rs]?|good\s+(?:morning|afternoon|evening))\s+/i, '').trim();
+
+        // Detect formal title (Herr/Frau/Mr./Mrs./Ms.) to generate correct salutation
+        const herrMatch = name.match(/^Herr\s+/i);
+        const frauMatch = name.match(/^Frau\s+/i);
+        const mrMatch = name.match(/^Mr\.?\s+/i);
+        const mrsMatch = name.match(/^(?:Mrs|Ms)\.?\s+/i);
+
         if (lang === 'English') {
             contactPersonGreeting = `"Dear ${name},"`;
         } else if (isDuForm) {
-            contactPersonGreeting = `"Hallo ${name},"`;
+            // Du-Form: strip title, use first name only
+            const casualName = name.replace(/^(Herr|Frau|Mr\.?|Mrs\.?|Ms\.?)\s+/i, '').trim();
+            contactPersonGreeting = `"Hallo ${casualName},"`;
+        } else if (herrMatch) {
+            contactPersonGreeting = `"Sehr geehrter ${name},"`;
+        } else if (frauMatch) {
+            contactPersonGreeting = `"Sehr geehrte ${name},"`;
+        } else if (mrMatch) {
+            contactPersonGreeting = `"Dear ${name},"`;
+        } else if (mrsMatch) {
+            contactPersonGreeting = `"Dear ${name},"`;
         } else {
-            contactPersonGreeting = `"Liebe/r ${name}," (nutze die wahrscheinlich korrekte Anrede, z.B. "Lieber Max," oder "Liebe Anna,")`;
+            // No title detected → Claude infers gender from context
+            contactPersonGreeting = `"Sehr geehrte/r ${name}," (nutze die wahrscheinlich korrekte Anrede basierend auf dem Namen, z.B. "Sehr geehrter Herr ${name}," oder "Sehr geehrte Frau ${name},")`;
         }
     } else if (style?.greeting && style.greeting !== 'Sehr geehrte Damen und Herren') {
         contactPersonGreeting = `"${style.greeting}"`;
@@ -251,6 +268,7 @@ VERBOT: Erwähne KEINE anderen Stationen aus dem CV — nur die oben genannten s
 - Schreibe keinen Fließtext-Lebenslauf! Widme jeder ausgewählten CV-Station einen EIGENEN, kurzen Absatz (max. 3 Sätze).
 - Nenne den Kontext kurz, aber fokussiere dich zu 70% auf den erlernten WERT (Was hat der Kandidat gelernt? Warum ist das für den neuen Arbeitgeber relevant?). Verbinde Sätze logisch (z.B. 'Diese Erfahrung hat meinen Blick dafür geschärft, wie...').
 - REDUZIERE BUZZWORDS DRASTISCH. Pro Absatz maximal 2 zentrale Fachbegriffe. Wenn eine CV-Station viele Technologien enthält, erwähne NUR diejenige, die absolut essenziell für die ausgeschriebene Stelle ist. Lass alles andere weg.
+- ROTER FADEN (optional): Wenn die Stellenanzeige ein prägnantes Schlüsselwort enthält (z.B. "Generalist", "Teamaufbau"), darfst du es im Intro UND im ersten Stations-Absatz organisch aufgreifen — nicht wörtlich kopieren, sondern als verbindendes Motiv nutzen.
 
 ` + ctx.cvStations.map(s => `Station ${s.stationIndex}: ${s.role} @ ${s.company} (${s.period})
   → Beweis für Job-Anforderung: "${s.matchedRequirement}"
@@ -308,6 +326,7 @@ Wähle frei zwischen A und B, aber NIEMALS den Autor an BEIDEN Stellen nennen!
 - DIREKT NACH dem Zitat: Ein EIGENER Begründungssatz (1 Satz), der erklärt WARUM dieses Zitat zum Unternehmen UND zum Kandidaten passt.
 - Der Begründungssatz MUSS eine konkrete Brücke zu einer Erfahrung aus dem CV bauen.
 - KEINE leeren Floskeln wie 'Genau diese Haltung treibt mich an'.
+- ANTI-DOPPLUNG: Der Begründungssatz und der ERSTE Satz des nächsten Absatzes dürfen sich INHALTLICH NICHT überschneiden. Wenn beide denselben Gedanken enthalten (z.B. beide über "nachhaltige Wachstumsorientierung") → formuliere den nächsten Absatz-Start komplett anders.
 ${enablePingPong ? `
 [PING-PONG EINLEITUNG — DU BIST NOCH IN DER EINLEITUNG, NICHT in Absatz 2]
 Nach dem Zitat und dem Brückensatz fügst du ZWEI weitere Sätze hinzu (Antithese + Synthese):
@@ -472,19 +491,21 @@ VERBOTEN: Mehr als 60 Wörter für diesen Block.`;
 Analysiere die Stellenbeschreibung auf implizite Probleme:
 - Explizit gesucht (z.B. Python, Teamführung) = Skill Match → direkt benennen
 - Impliziter Schmerz (z.B. "Aufbau eines neuen Teams" = Wachstumsproblem) → Zeige mit einer konkreten CV-Station, wo genau du das schon gelöst hast
-Nicht "Ich kann das", sondern "Hier habe ich das gelöst: [konkret]".`;
+TON: Sachlich beobachten und Best-Practice-Transfer anbieten. Nicht "Ich bin der Ideale" oder "Ich werde das lösen" — sondern "Ich sehe [Problem]. Bei [Station] habe ich ähnliche Erfahrungen gesammelt."
+VERBOTEN: Retter-Komplex, Heilsversprechen, Selbstbewertung als "idealer Kandidat".`;
     }
 
     let vulnerabilitySection = '';
     if (modules.vulnerabilityInjector) {
         vulnerabilitySection = `[REGEL: VULNERABILITY INJECTOR — MAX. 2x VERWENDEN]
 Baue 1-2 strategische, authentische Schwächen oder Lernkurven ein.
-Format: "${t('Ich habe bei [Station] schnell gemerkt, dass mein erster Ansatz zu komplex gedacht war. Das hat mich gezwungen, radikal zu vereinfachen — ein Prinzip, das ich auch in eurem [Firmen-Kontext] sehe.', 'I quickly realized at [Station] that my initial approach was too complex. This forced me to radically simplify — a principle I also see in your [company context].')}"
+Format: "${t('Bei [Station] lernte ich schnell, dass mein erster Ansatz [Problem] zu komplex war. Über Umwege stieß ich auf ein Prinzip, das ich auch in den Werten/auf der Website des Unternehmens wiederfinde.', 'At [Station] I quickly learned that my initial approach to [problem] was too complex. Through trial and error I discovered a principle that I also see reflected in the company\'s values/website.')}"
+WICHTIG: Die Lernkurve MUSS an einen KONKRETEN Firmenwert gebunden werden (z.B. aus ${JSON.stringify(company?.company_values?.slice(0, 2) || [])}). Generische Platzhalter wie "eure Philosophie" sind VERBOTEN.
 REGELN:
 - Darf NIE wie eine Entschuldigung klingen — immer als Wachstum framen
 - MAXIMAL 2 Stellen im gesamten Anschreiben
 - Jede Vulnerability MUSS in [VUL]...[/VUL] Tags eingeschlossen werden (wird nach Generierung automatisch geprüft und entfernt)
-- Beispiel: ${t('[VUL]Ich habe bei Fraunhofer schnell gemerkt, dass...[/VUL]', '[VUL]I quickly realized at Fraunhofer that...[/VUL]')}`;
+- Beispiel: ${t('[VUL]Bei Fraunhofer lernte ich schnell, dass...[/VUL]', '[VUL]At Fraunhofer I quickly learned that...[/VUL]')}`;
     }
 
     // ─── B3.2: Persona-Kontext (Hiring Manager Panel) ──────────────────────
@@ -496,7 +517,7 @@ Du schreibst für: ${persona.name} (${persona.role})
 Vermutliche Prioritäten: ${persona.traits.join(', ')}
 Bevorzugter Stil: ${persona.preferredStyle}
 → Passe Ton und Argumentationsstruktur entsprechend an.
-→ KEIN explizites Naming der Persona im Text. Der Kandidat soll nicht zeigen, dass er recherchiert hat WER liest — nur WOVON diese Person überzeugt wäre.`;
+→ KEIN explizites Naming der Persona im Text. Der Kandidat soll nicht zeigen, dass er recherchiert hat WER liest — nur WOVON diese Person überzeugt wäre.${ctx?.tone.contactPerson ? `\n→ ANREDE-SCHUTZ: Die Anrede ist AUSSCHLIESSLICH ${contactPersonGreeting}. NIEMALS den Persona-Namen "${persona.name}" für die Anrede nutzen. Die Persona beeinflusst nur Ton und Argumentation.` : ''}`;
     }
 
     const wordCountFeedback = (() => {
@@ -593,6 +614,10 @@ VERBOTEN: Denselben Einleitungstyp oder dieselbe Satzstruktur für zwei aufeinan
 Beispiel VERBOTEN: „Die Verbindung von X und Y bei Firma A..." gefolgt von „Die Verbindung von X und Y bei Firma B..."
 Jeder Absatz muss einen eigenen Einstieg haben: Mal ein konkretes Ergebnis, mal ein Kontext-Setting, mal eine Problemstellung.
 
+ABSATZ-DICHTE (PFLICHT): Jeder Stations-Absatz im Hauptteil MUSS mindestens 3 Sätze enthalten. Ein Absatz mit nur 1-2 Sätzen ist ZU DÜNN und wirkt oberflächlich.
+
+SATZVARIANZ — "habe ich"-LIMIT: Die Formulierung "habe ich" darf im GESAMTEN Anschreiben maximal 2x vorkommen und NIEMALS in aufeinanderfolgenden Sätzen. Varianten: "konnte ich", "gelang es mir", aktive Konstruktionen ("Ich leitete", "Dort steuerte ich"), Nominalstil ("Meine Arbeit bei X umfasste...").
+
 ${bodyIntegrationGuidance}
 
 ${stationsSection}
@@ -600,9 +625,13 @@ ${stationsSection}
 Job-Anforderungen für die Relevanzkontrolle:
 ${JSON.stringify(job?.requirements?.slice(0, 3) || [], null, 2)}
 
-Unternehmens-Kontext (nutze für spezifische Verbindungen):
-Werte: ${JSON.stringify(company?.company_values?.slice(0, 3) || [])}
-Tech: ${JSON.stringify(company?.tech_stack?.slice(0, 3) || [])}
+Unternehmens-Kontext (ALLE verfügbaren Daten — nutze für spezifische Verbindungen):
+Werte: ${JSON.stringify(company?.company_values || [])}
+Tech: ${JSON.stringify(company?.tech_stack || [])}
+${(company as any)?.current_challenges?.length ? `Aktuelle Herausforderungen: ${JSON.stringify((company as any).current_challenges)}` : ''}
+${(company as any)?.roadmap_signals?.length ? `Roadmap-Signale: ${JSON.stringify((company as any).roadmap_signals)}` : ''}
+${(company as any)?.recent_news?.length ? `Aktuelle News: ${JSON.stringify((company as any).recent_news.slice(0, 3))}` : ''}
+HALLUZINATIONS-BREMSE: Verwende NUR Fakten (Ort, News, Werte, Challenges), die EXPLIZIT oben stehen. Wenn ein Datum fehlt → ERFINDE NICHTS, weiche auf allgemein belegbare Aussagen aus.
 
 ${cvInput}
 
@@ -617,9 +646,12 @@ ${personaSection}
 === SECTION 5: CLOSING & CALL TO ACTION ===
 [RULE: CLOSING]
 - FORBIDDEN: Do NOT summarize career stations or experience again at the end. That is filler.
-- FORBIDDEN: Do NOT repeat the quote or hook from the opening paragraph. No poetic metaphors at the end.
-- The closing sentence is a DIRECT, SHORT call-to-action at eye level (max 2 sentences). Embed a concrete conversation proposal.
-- Example: ${isEnglish
+${hasQuote && (preset === 'storytelling' || preset === 'philosophisch')
+    ? '- KLAMMER-OPTION: Du DARFST im letzten Satz auf den Gedanken aus der Einleitung zurückgreifen — als inhaltliche Klammer. Kein wörtliches Zitieren, sondern eine kurze Rück-Referenz. Nur wenn es sich natürlich anfühlt.'
+    : '- FORBIDDEN: Do NOT repeat the quote or hook from the opening paragraph.'}
+- The closing sentence is a DIRECT, SHORT call-to-action at eye level (max 2 sentences). Wähle den Ton passend zum Preset:
+  Souverän-knapp: ${isEnglish ? '"If the timing works: I am available over the coming weeks."' : isDuForm ? '"Wenn der Termin passt: Ich bin die nächsten Wochen flexibel."' : '"Wenn es zeitlich passt: Ich bin in den kommenden Wochen verfügbar."'}
+  Verbindlich: ${isEnglish
     ? '"I would welcome the opportunity to discuss in a brief call how I could contribute to [specific point] at ' + companyName + '."'
     : isDuForm
         ? '"Ich würde mich freuen, in einem kurzen Gespräch zu zeigen, wie ich [konkreter Punkt] bei euch vorantreiben kann."'

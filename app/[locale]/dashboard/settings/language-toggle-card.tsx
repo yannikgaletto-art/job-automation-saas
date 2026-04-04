@@ -2,18 +2,18 @@
 
 /**
  * Language Toggle Card — Settings page.
- * Dropdown: DE 🇩🇪 / EN 🇬🇧 / ES 🇪🇸
+ * Circular flag-only buttons: DE 🇩🇪 / EN 🇬🇧 / ES 🇪🇸
  * On change: PATCH /api/settings/profile { language } → DB update + set NEXT_LOCALE cookie + reload page with new locale.
  */
 
 import { useState, useEffect } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Check, Loader2, Globe } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 
 const LOCALE_OPTIONS = [
-    { code: "de", flag: "🇩🇪" },
-    { code: "en", flag: "🇬🇧" },
-    { code: "es", flag: "🇪🇸" },
+    { code: "de", flag: "🇩🇪", label: "Deutsch" },
+    { code: "en", flag: "🇬🇧", label: "English" },
+    { code: "es", flag: "🇪🇸", label: "Español" },
 ] as const;
 
 export function LanguageToggleCard() {
@@ -76,31 +76,30 @@ export function LanguageToggleCard() {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-1">
-                <Globe className="w-4 h-4 text-[#012e7a]" />
-                <span className="text-sm font-medium text-[#37352F]">{t("description")}</span>
-            </div>
-
-            <div className="flex gap-2">
-                {LOCALE_OPTIONS.map(({ code, flag }) => (
+            {/* Flag-only circles */}
+            <div className="flex gap-3">
+                {LOCALE_OPTIONS.map(({ code, flag, label }) => (
                     <button
                         key={code}
                         onClick={() => handleChange(code)}
                         disabled={saving}
+                        title={label}
+                        aria-label={label}
                         className={`
-                            flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium
-                            transition-all duration-200 border cursor-pointer
+                            relative w-11 h-11 rounded-full flex items-center justify-center text-xl
+                            transition-all duration-200 border-2 cursor-pointer
                             ${selected === code
-                                ? "bg-[#012e7a] text-white border-[#012e7a] shadow-sm"
-                                : "bg-white text-[#37352F] border-[#E7E7E5] hover:border-[#012e7a]/30 hover:bg-[#F7F7F5]"
+                                ? "border-[#012e7a] bg-[#012e7a]/10 shadow-sm ring-2 ring-[#012e7a]/20"
+                                : "border-[#E7E7E5] bg-white hover:border-[#012e7a]/40 hover:bg-[#F7F7F5]"
                             }
                             disabled:opacity-50 disabled:cursor-not-allowed
                         `}
                     >
-                        <span className="text-base">{flag}</span>
-                        <span>{t(code)}</span>
+                        <span className="leading-none select-none">{flag}</span>
                         {selected === code && !saving && (
-                            <Check className="w-3.5 h-3.5 ml-1" />
+                            <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#012e7a] flex items-center justify-center">
+                                <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                            </span>
                         )}
                     </button>
                 ))}

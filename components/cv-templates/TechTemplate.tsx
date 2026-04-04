@@ -9,7 +9,7 @@ import { CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 
 registerPdfFonts();
 
-const ACCENT = '#0E7490';
+const ACCENT = '#012e7a';
 const DARK = '#0F172A';
 const GRAY = '#475569';
 const LIGHT = '#F1F5F9';
@@ -108,7 +108,7 @@ const s = StyleSheet.create({
         fontSize: 8,
         fontWeight: 600,
         color: ACCENT,
-        backgroundColor: '#CFFAFE',
+        backgroundColor: '#DBEAFE',
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 4,

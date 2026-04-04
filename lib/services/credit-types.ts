@@ -11,9 +11,9 @@
 
 export const PLAN_CONFIG = {
     free: {
-        credits: 15.0,       // Beta: 5 full apps (×1.5) + 7.5 buffer for extras
-        coachingSessions: 5, // Beta: 5 coaching sessions
-        jobSearches: 10,     // Beta: 10 unique SerpAPI queries (cache hits are free)
+        credits: 10.0,       // Free plan: 10 credits
+        coachingSessions: 5, // 5 coaching sessions
+        jobSearches: 10,     // 10 unique SerpAPI queries (cache hits are free)
         label: 'Free',
     },
     starter: {

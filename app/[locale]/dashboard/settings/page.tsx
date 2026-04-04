@@ -2,8 +2,9 @@ import { ActiveCVCard } from "./active-cv-card"
 import { LanguageToggleCard } from "./language-toggle-card"
 import { CheckinSettingsCard } from "./checkin-settings-card"
 import { TourResetCard } from "./tour-reset-card"
+import { CreditUsageCard } from "./credit-usage-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Sparkles, Globe, GraduationCap } from "lucide-react"
+import { FileText, Sparkles, Globe, GraduationCap, Zap } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { getTranslations } from "next-intl/server"
@@ -35,6 +36,22 @@ export default async function SettingsPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Credits & Usage Section */}
+            <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">
+                <CardHeader className="pb-4">
+                    <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
+                        <Zap className="h-5 w-5 text-[#012e7a]" />
+                        {t('credits.title')}
+                    </CardTitle>
+                    <CardDescription className="text-[#73726E]">
+                        {t('credits.description')}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <CreditUsageCard />
+                </CardContent>
+            </Card>
 
             {/* Language Settings Section */}
             <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">

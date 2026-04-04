@@ -972,3 +972,29 @@ CREATE TABLE IF NOT EXISTS schema_version (
 
 INSERT INTO schema_version (version) VALUES ('4.2') ON CONFLICT (version) DO NOTHING;
 -- 4.2: Added user_credits, credit_events, processed_stripe_events (Billing + Beta Credits)
+
+-- ============================================
+-- WAITLIST LEADS (Marketing Website → Early Access)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS waitlist_leads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email TEXT NOT NULL,
+    source TEXT DEFAULT 'website',
+    locale TEXT DEFAULT 'de',
+    ip_hash TEXT,
+    utm_source TEXT,
+    confirmation_token UUID DEFAULT gen_random_uuid(),
+    confirmed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT waitlist_leads_email_unique UNIQUE (email)
+);
+
+CREATE INDEX IF NOT EXISTS idx_waitlist_leads_created
+    ON waitlist_leads(created_at DESC);
+
+ALTER TABLE waitlist_leads ENABLE ROW LEVEL SECURITY;
+
+INSERT INTO schema_version (version) VALUES ('4.3') ON CONFLICT (version) DO NOTHING;
+-- 4.3: Added waitlist_leads (DOI, marketing website email capture)
+

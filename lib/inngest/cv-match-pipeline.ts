@@ -13,6 +13,7 @@ import { NonRetriableError } from 'inngest';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { getCVText } from '@/lib/services/cv-text-retriever';
 import { runCVMatchAnalysis } from '@/lib/services/cv-match-analyzer';
+import { computeInputHash } from '@/lib/services/cv-match-hash';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -256,7 +257,7 @@ export const analyzeCVMatch = inngest.createFunction(
         // Step 3: Run CV Match Analysis (the heavy LLM work)
         const matchResult = await step.run('analyze-match', async () => {
             try {
-                return await runCVMatchAnalysis({
+                const result = await runCVMatchAnalysis({
                     userId,
                     jobId: job.id,
                     cvText: cvData.text,
@@ -270,6 +271,7 @@ export const analyzeCVMatch = inngest.createFunction(
                     // Stufe 2: Pass deterministic pre-match results (or undefined for LLM-only fallback)
                     preMatchedKeywords: preMatchedKeywords ?? undefined,
                 });
+                return result;
             } catch (err: any) {
                 if (err?.status === 400 || err?.status === 401 || err?.status === 404) {
                     throw new NonRetriableError(`AI API permanent error: ${err.message}`);
@@ -277,6 +279,13 @@ export const analyzeCVMatch = inngest.createFunction(
                 throw err;
             }
         });
+
+        // Compute input hash for cache storage (deterministic, no LLM involvement)
+        const inputHashForStorage = computeInputHash(
+            cvData.text,
+            job.description || '',
+            Array.isArray(job.requirements) ? job.requirements : []
+        );
 
         // Step 4: Save result to DB (JSONB Merge! + Status → cv_matched per DB constraint)
         await step.run('save-results', async () => {
@@ -368,6 +377,8 @@ export const analyzeCVMatch = inngest.createFunction(
                         cv_match: {
                             analyzed_at: new Date().toISOString(),
                             cv_document_id: cvData.documentId,
+                            // §QA: Content hash for deterministic caching (mirrors route.ts check)
+                            input_hash: inputHashForStorage,
                             ...safeResult,
                         },
                         cv_match_error: null, // Clear any previous error

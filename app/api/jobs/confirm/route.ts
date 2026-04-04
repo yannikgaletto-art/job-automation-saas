@@ -31,20 +31,28 @@ export async function POST(request: NextRequest) {
         }).parse(await request.json());
 
         // §12.5: Whitelist-spread — only allowed fields from edits
-        const safeEdits: Record<string, any> = { status: 'pending' };
+        const safeEdits: Record<string, any> = { status: 'steckbrief_confirmed' };
         if (edits?.tasks) safeEdits.tasks = edits.tasks;
-        if (edits?.hard_requirements) safeEdits.hard_requirements = edits.hard_requirements;
-        if (edits?.ats_keywords) safeEdits.ats_keywords = edits.ats_keywords;
+        if (edits?.hard_requirements) safeEdits.requirements = edits.hard_requirements;
+        if (edits?.ats_keywords) safeEdits.buzzwords = edits.ats_keywords;
         if (edits?.benefits) safeEdits.benefits = edits.benefits;
 
-        const { error } = await supabaseAdmin
+        // Guard: Accept jobs in pre-confirmed states (pending, pending_review, processing)
+        const { data: updated, error } = await supabaseAdmin
             .from('job_queue')
             .update(safeEdits)
             .eq('id', jobId)
             .eq('user_id', user.id)
-            .eq('status', 'pending_review'); // Guard: only confirm pending_review jobs
+            .in('status', ['pending', 'pending_review', 'processing'])
+            .select('id');
 
         if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+
+        // §1 Double-Assurance: verify the DB was actually updated
+        if (!updated || updated.length === 0) {
+            console.warn('⚠️ [confirm] No rows affected — job may already be confirmed or in wrong status');
+            return NextResponse.json({ success: true, alreadyConfirmed: true });
+        }
 
         return NextResponse.json({ success: true });
     } catch (err: unknown) {

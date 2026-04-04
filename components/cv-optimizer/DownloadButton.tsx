@@ -6,8 +6,9 @@ import { CvStructuredData } from '@/types/cv';
 import { TechTemplate } from '../cv-templates/TechTemplate';
 import { ValleyTemplate } from '../cv-templates/ValleyTemplate';
 import { Download, Loader2 } from 'lucide-react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { getCvTemplateLabels, CvTemplateLabels } from '@/lib/utils/cv-template-labels';
+import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
 
 interface DownloadButtonProps {
     data: CvStructuredData;
@@ -29,12 +30,22 @@ function resolveDocument(data: CvStructuredData, templateId: string, qrBase64: s
 
 export default function DownloadButton({ data, templateId, qrBase64 }: DownloadButtonProps) {
     const [isDownloading, setIsDownloading] = React.useState(false);
+    const [downloadError, setDownloadError] = React.useState<string | null>(null);
     const locale = useLocale();
+    const t = useTranslations('cv_optimizer');
     const labels = React.useMemo(() => getCvTemplateLabels(locale), [locale]);
 
     const handleDownload = async () => {
+        if (!data) return;
         setIsDownloading(true);
+        setDownloadError(null);
         try {
+            // Ensure fonts are registered before PDF generation.
+            // Templates call registerPdfFonts() at module-level, but dynamic
+            // imports can delay evaluation. The internal `registered` guard
+            // prevents double-registration, making this call always safe.
+            registerPdfFonts();
+
             const document = resolveDocument(data, templateId, qrBase64, labels);
             const blob = await pdf(document).toBlob();
 
@@ -53,25 +64,31 @@ export default function DownloadButton({ data, templateId, qrBase64 }: DownloadB
             // before the blob URL is freed (synchronous revoke causes empty downloads)
             setTimeout(() => URL.revokeObjectURL(url), 60_000);
         } catch (err) {
-            console.error(err);
+            console.error('[DownloadButton] PDF generation failed:', err);
+            setDownloadError(t('error_pdf_download'));
         } finally {
             setIsDownloading(false);
         }
     };
 
     return (
-        <button
-            onClick={handleDownload}
-            disabled={isDownloading}
-            className="px-6 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white font-medium
-                       rounded-lg flex items-center justify-center gap-2 transition-colors
-                       disabled:opacity-50 min-w-[200px]"
-        >
-            {isDownloading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Generating PDF...</>
-            ) : (
-                <><Download className="w-4 h-4" /> Download</>
+        <div className="flex flex-col items-center gap-1.5">
+            <button
+                onClick={handleDownload}
+                disabled={isDownloading || !data}
+                className="px-6 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white font-medium
+                           rounded-lg flex items-center justify-center gap-2 transition-colors
+                           disabled:opacity-50 min-w-[200px]"
+            >
+                {isDownloading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> {t('downloading_pdf')}</>
+                ) : (
+                    <><Download className="w-4 h-4" /> Download</>
+                )}
+            </button>
+            {downloadError && (
+                <p className="text-xs text-amber-600 text-center max-w-[250px]">{downloadError}</p>
             )}
-        </button>
+        </div>
     );
 }

@@ -295,7 +295,7 @@ export default function JobQueuePage() {
                 body: JSON.stringify({ jobId }),
             });
             setJobs(prev => prev.map(j =>
-                j.id === jobId ? { ...j, status: 'JOB_REVIEWED', workflowStep: 10 } : j
+                j.id === jobId ? { ...j, status: 'JOB_REVIEWED', dbStatus: 'steckbrief_confirmed', workflowStep: 30 } : j
             ));
             notify(t('notify_confirmed'));
         } catch {

@@ -448,7 +448,26 @@ Siehe: `directives/DEFERRED_FEATURES.md`
 
 ---
 
-> **Letztes Update:** 2026-02-26
+> **Letztes Update:** 2026-04-05
 > **Nächster Review:** Nach Batch 1 vollständig live
 > **Owner:** Yannik Galetto
 > **Qualitätsreferenz:** T1 (Mission Wertvoll) + T2 (Exxeta) — die Benchmark-Anschreiben
+
+---
+
+## 7. AUTHENTICITY PRINCIPLES (Update 2026-04-05)
+
+Diese 8 "Golden Rules" wurden aus direkten Trainingssessions destilliert. Sie definieren den Unterschied zwischen "KI-Sprache" (Averaging) und echter, glaubwürdiger Sprache ("Meine Sprache").
+
+| ID | Prinzip | Wie es richtig klingt | KI-Anti-Pattern |
+|----|---------|-----------------------|------------------|
+| A | **Red Threading** | Ein zentrales Keyword (z.B. "Generalist") aus der Anzeige wird organisch im Intro und im ersten Hauptabsatz aufgegriffen, um eine Brücke zu bauen. | Fakten werden ohne roten Faden in Bulletpoints aneinandergereiht. |
+| B | **Pain Point (sachlich)** | *"Ich sehe, dass ihr ein Team neu aufbaut. Ich habe ähnliche Best Practices entwickelt."* | *"Ich bin der ideale Kandidat, um dieses Problem zu lösen."* (Retter-Komplex) |
+| C | **Vulnerability-Value Binding**| *"Bei [Station] lernte ich, dass mein Ansatz zu komplex war. Ich stieß auf ein Prinzip, das ich in euren Werten ([Konkreter Wert]) sehe."* | *"Als Schwäche könnte man meinen Perfektionismus ansehen."* (Generisch) |
+| D | **Fokus-Balance (90 Days)** | *"...mich auf die Engpässe fokussieren; ohne dabei Produktentwicklung und Prozesse aus den Augen zu verlieren."* | *"In den ersten 30 Tagen werde ich zuhören und verstehen."* (Passiv) |
+| E | **Enabler-Framing** (Quereinstieg) | *"Mir hat es in der Tech-Beratung sehr geholfen, einen medienwissenschaftlichen Hintergrund zu haben."* | *"Obwohl ich aus einem anderen Bereich komme, habe ich die nötigen Fähigkeiten..."* |
+| F | **Souveräne Ambition** | *"Nicht weil es schlecht war; sondern weil ich sehen wollte, ob ich dieselben Probleme mit mehr Budget schneller lösen kann."* | *"Aufbauend auf diesen wertvollen Erfahrungen suche ich eine neue Herausforderung."* |
+| G | **Minimalistisches Closing**| *"Wenn der Termin passt: Ich bin die nächsten Wochen flexibel/verfügbar."* | *"Ich würde mich sehr über die Möglichkeit eines Gesprächs freuen..."* |
+| H | **Aktiver Skill-Beweis** | *"Bei [Firma] habe ich mich für die Strategie X eingesetzt."* (Zeigt Aktion) | *"Die Strategie X zählte zu meinen Kernverantwortlichkeiten."* (Listet auf) |
+
+**Klammer-Technik (Optional):** Bei `storytelling` oder `philosophisch` Presets darf im Closing kurz auf den Eingangs-Gedanken (z.B. ein Zitat) zurückgegriffen werden.

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { isAdmin } from '@/lib/admin';
-import { Users, Trash2, RotateCcw, CheckCircle, XCircle, Shield, Loader2, Mail, Clock, Briefcase, FileText } from 'lucide-react';
+import { Users, Trash2, RotateCcw, CheckCircle, XCircle, Shield, Loader2, Mail, Clock, Briefcase, FileText, Inbox } from 'lucide-react';
 
 type AdminUser = {
     id: string;
@@ -16,6 +16,15 @@ type AdminUser = {
     onboarding_completed: boolean;
     active_jobs: number;
     applications: number;
+};
+
+type WaitlistLead = {
+    id: string;
+    email: string;
+    source: string;
+    locale: string;
+    confirmed_at: string | null;
+    created_at: string;
 };
 
 function formatDate(d: string | null) {
@@ -48,6 +57,12 @@ export default function AdminPage() {
     const [authorized, setAuthorized] = useState(false);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+    // Waitlist
+    const [leads, setLeads] = useState<WaitlistLead[]>([]);
+    const [leadsTotal, setLeadsTotal] = useState(0);
+    const [leadsConfirmed, setLeadsConfirmed] = useState(0);
+    const [leadsLoading, setLeadsLoading] = useState(true);
+
     useEffect(() => {
         const init = async () => {
             const supabase = createClient();
@@ -59,7 +74,7 @@ export default function AdminPage() {
             }
 
             setAuthorized(true);
-            await loadUsers();
+            await Promise.all([loadUsers(), loadWaitlist()]);
         };
         init();
     }, [router]);
@@ -77,6 +92,49 @@ export default function AdminPage() {
             console.error('Failed to load users:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadWaitlist = async () => {
+        setLeadsLoading(true);
+        try {
+            const res = await fetch('/api/admin/waitlist');
+            const data = await res.json();
+            if (data.success) {
+                setLeads(data.leads);
+                setLeadsTotal(data.total);
+                setLeadsConfirmed(data.confirmed);
+            }
+        } catch (err) {
+            console.error('Failed to load waitlist:', err);
+        } finally {
+            setLeadsLoading(false);
+        }
+    };
+
+    const handleDeleteLead = async (leadId: string, email: string) => {
+        if (!confirm(`Lead „${email}" wirklich löschen?`)) return;
+
+        // Remember confirmed status BEFORE removing from local state
+        const wasConfirmed = leads.find(l => l.id === leadId)?.confirmed_at != null;
+
+        setActionLoading(leadId);
+        try {
+            const res = await fetch('/api/admin/waitlist', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ leadId }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setLeads(prev => prev.filter(l => l.id !== leadId));
+                setLeadsTotal(prev => prev - 1);
+                if (wasConfirmed) setLeadsConfirmed(prev => prev - 1);
+            } else {
+                alert(data.error || 'Löschen fehlgeschlagen');
+            }
+        } finally {
+            setActionLoading(null);
         }
     };
 
@@ -187,6 +245,18 @@ export default function AdminPage() {
                     </div>
                     <p className="text-2xl font-bold text-purple-600">
                         {users.reduce((sum, u) => sum + u.applications, 0)}
+                    </p>
+                </div>
+                <div className="bg-white border border-[#E7E7E5] rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-[#73726E] text-xs font-medium mb-1">
+                        <Inbox className="w-3.5 h-3.5 text-teal-500" />
+                        Warteliste
+                    </div>
+                    <p className="text-2xl font-bold text-teal-600">
+                        {leadsTotal}
+                        {leadsConfirmed > 0 && (
+                            <span className="text-sm font-normal text-[#73726E] ml-1">({leadsConfirmed} bestätigt)</span>
+                        )}
                     </p>
                 </div>
             </div>
@@ -301,6 +371,96 @@ export default function AdminPage() {
                                                 title="User löschen"
                                             >
                                                 <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+
+            {/* Waitlist Table */}
+            <div className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden mt-6">
+                <div className="px-5 py-3 bg-[#FAFAF9] border-b border-[#E7E7E5] flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-[#37352F] flex items-center gap-2">
+                        <Inbox className="w-4 h-4 text-teal-500" />
+                        Warteliste
+                    </h2>
+                    <button
+                        onClick={loadWaitlist}
+                        disabled={leadsLoading}
+                        className="text-xs text-[#73726E] hover:text-[#012e7a] transition-colors flex items-center gap-1"
+                    >
+                        <RotateCcw className={`w-3 h-3 ${leadsLoading ? 'animate-spin' : ''}`} />
+                        Aktualisieren
+                    </button>
+                </div>
+
+                {leadsLoading ? (
+                    <div className="p-12 flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 animate-spin text-[#73726E]" />
+                    </div>
+                ) : leads.length === 0 ? (
+                    <div className="p-8 text-center text-[#B4B4B0] text-sm">
+                        Noch keine Warteliste-Einträge.
+                    </div>
+                ) : (
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-[#E7E7E5] text-[#73726E]">
+                                <th className="px-5 py-3 text-left font-medium">E-Mail</th>
+                                <th className="px-5 py-3 text-center font-medium">Status</th>
+                                <th className="px-5 py-3 text-center font-medium">Sprache</th>
+                                <th className="px-5 py-3 text-left font-medium">Quelle</th>
+                                <th className="px-5 py-3 text-left font-medium">Eingetragen</th>
+                                <th className="px-5 py-3 text-right font-medium">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#E7E7E5]">
+                            {leads.map((lead) => (
+                                <tr key={lead.id} className="hover:bg-[#FAFAF9] transition-colors">
+                                    <td className="px-5 py-3">
+                                        <p className="font-medium text-[#37352F]">{lead.email}</p>
+                                    </td>
+                                    <td className="px-5 py-3 text-center">
+                                        {lead.confirmed_at ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                                                <CheckCircle className="w-3 h-3" />
+                                                Bestätigt
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                                <Clock className="w-3 h-3" />
+                                                Offen
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-3 text-center">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                                            {lead.locale?.toUpperCase() || 'DE'}
+                                        </span>
+                                    </td>
+                                    <td className="px-5 py-3 text-[#73726E] text-xs capitalize">
+                                        {lead.source}
+                                    </td>
+                                    <td className="px-5 py-3 text-[#73726E] text-xs">
+                                        {formatDate(lead.created_at)}
+                                    </td>
+                                    <td className="px-5 py-3">
+                                        <div className="flex items-center justify-end">
+                                            <button
+                                                onClick={() => handleDeleteLead(lead.id, lead.email)}
+                                                disabled={actionLoading === lead.id}
+                                                className="p-1.5 text-[#73726E] hover:text-red-600 hover:bg-red-50 rounded-md transition-all disabled:opacity-40"
+                                                title="Lead löschen"
+                                            >
+                                                {actionLoading === lead.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="w-4 h-4" />
+                                                )}
                                             </button>
                                         </div>
                                     </td>

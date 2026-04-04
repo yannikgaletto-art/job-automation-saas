@@ -226,25 +226,10 @@ function SteckbriefCard({ row, index, t }: { row: RequirementRow; index: number;
                     </div>
                 )}
 
-                {/* Context — Assessment Text */}
+                {/* Context — Assessment Text (Bold via **markdown**) */}
                 {normalized.context && (
                     <p className="text-xs text-slate-600 leading-relaxed">
-                        {normalized.context.split(/(?<=[.!?])\s+/).map((sentence, i) => {
-                            if (i === 0) {
-                                return (
-                                    <span key={i}>
-                                        {sentence.split(/(\*\*[^*]+\*\*)/).map((part, j) => {
-                                            if (part.startsWith('**') && part.endsWith('**')) {
-                                                return <strong key={j} className="font-semibold text-[#37352F]">{part.slice(2, -2)}</strong>;
-                                            }
-                                            return <span key={j}>{part}</span>;
-                                        })}
-                                        {' '}
-                                    </span>
-                                );
-                            }
-                            return <span key={i}>{sentence} </span>;
-                        })}
+                        {renderBoldText(normalized.context)}
                     </p>
                 )}
 
@@ -306,14 +291,26 @@ function SteckbriefCard({ row, index, t }: { row: RequirementRow; index: number;
 interface SummaryCardProps {
     summaryData: SummaryData;
     overallRecommendation?: string;
+    overallScore?: number;
     t: ReturnType<typeof useTranslations>;
 }
 
-function SummaryCard({ summaryData, overallRecommendation, t }: SummaryCardProps) {
+// Bold text helper — splits on **bold** patterns and renders <strong> tags
+function renderBoldText(text: string) {
+    return text.split(/(\*\*[^*]+\*\*)/).map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i} className="font-semibold text-[#37352F]">{part.slice(2, -2)}</strong>;
+        }
+        return <span key={i}>{part}</span>;
+    });
+}
+
+function SummaryCard({ summaryData, overallRecommendation, overallScore, t }: SummaryCardProps) {
+    // Derive summaryLevel from overallScore (consistent with center label)
     const summaryLevel: ScoreLevel =
-        (summaryData.gaps.length > summaryData.strengths.length) ? 'gap'
-            : (summaryData.strengths.length > summaryData.gaps.length) ? 'strong'
-            : 'solid';
+        (overallScore ?? 50) >= 70 ? 'strong'
+            : (overallScore ?? 50) >= 50 ? 'solid'
+            : 'gap';
 
     return (
         <motion.div
@@ -365,7 +362,7 @@ function SummaryCard({ summaryData, overallRecommendation, t }: SummaryCardProps
                                 {summaryData.gaps.slice(0, 3).map((gap, i) => (
                                     <li key={i} className="text-xs text-[#37352F] flex gap-2 items-start leading-relaxed">
                                         <span className="text-red-400 mt-0.5 shrink-0">•</span>
-                                        <span>{gap}</span>
+                                        <span>{renderBoldText(gap)}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -395,7 +392,7 @@ function SummaryCard({ summaryData, overallRecommendation, t }: SummaryCardProps
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
                                 {t('summary_overall')}
                             </p>
-                            <p className="text-xs text-slate-600 leading-relaxed">{overallRecommendation}</p>
+                            <p className="text-xs text-slate-600 leading-relaxed">{renderBoldText(overallRecommendation)}</p>
                         </div>
                     )}
                 </div>
@@ -454,18 +451,19 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, overallRecomm
         languageMatch:    breakdown?.languageMatch     ?? { level: 'solid' as ScoreLevel, reasons: [] },
     };
 
+    // Derive summaryLevel from overallScore (consistent with center label)
     const summaryLevel: ScoreLevel =
-        (summaryData.gaps.length > summaryData.strengths.length) ? 'gap'
-            : (summaryData.strengths.length > summaryData.gaps.length) ? 'strong'
-            : 'solid';
+        overallScore >= 70 ? 'strong'
+            : overallScore >= 50 ? 'solid'
+            : 'gap';
 
+    // 5 satellites — language removed (low signal), angles evenly distributed at 72° intervals
     const satellites: SatelliteConfig[] = [
-        { key: 'technical',  i18nKey: 'breakdown_technical',  angle: -60,  data: safe.technicalSkills  },
+        { key: 'technical',  i18nKey: 'breakdown_technical',  angle: -72,  data: safe.technicalSkills  },
         { key: 'soft',       i18nKey: 'breakdown_soft',       angle: 0,    data: safe.softSkills       },
-        { key: 'experience', i18nKey: 'breakdown_experience', angle: 60,   data: safe.experienceLevel  },
-        { key: 'domain',     i18nKey: 'breakdown_domain',     angle: 120,  data: safe.domainKnowledge  },
-        { key: 'language',   i18nKey: 'breakdown_language',   angle: 180,  data: safe.languageMatch    },
-        { key: 'summary',    i18nKey: 'breakdown_summary',    angle: -120, data: { level: summaryLevel, reasons: [] }, isSummary: true },
+        { key: 'experience', i18nKey: 'breakdown_experience', angle: 72,   data: safe.experienceLevel  },
+        { key: 'domain',     i18nKey: 'breakdown_domain',     angle: 144,  data: safe.domainKnowledge  },
+        { key: 'summary',    i18nKey: 'breakdown_summary',    angle: -144, data: { level: summaryLevel, reasons: [] }, isSummary: true },
     ];
 
     // Filter requirement rows based on active satellite
@@ -478,10 +476,36 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, overallRecomm
             return []; // Summary has its own special rendering
         }
         // Satellite click → filter by orbitCategory
-        return requirementRows
+        const matched = requirementRows
             .map(normalizeRowToV2)
             .filter(row => row.orbitCategory === activeSatellite);
-    }, [activeSatellite, requirementRows]);
+
+        // F3-Fallback: If breakdown has a score for this category but no requirementRows exist,
+        // create a synthetic card from the breakdown reasons so the panel is never empty with dots.
+        if (matched.length === 0) {
+            const categoryMap: Record<string, keyof typeof safe> = {
+                'technical': 'technicalSkills',
+                'soft': 'softSkills',
+                'experience': 'experienceLevel',
+                'domain': 'domainKnowledge',
+            };
+            const breakdownKey = categoryMap[activeSatellite];
+            if (breakdownKey && safe[breakdownKey]) {
+                const bd = safe[breakdownKey];
+                const syntheticCard: RequirementRow = {
+                    title: t(satellites.find(s => s.key === activeSatellite)?.i18nKey || 'card_default_title'),
+                    orbitCategory: activeSatellite as OrbitCategory,
+                    level: bd.level,
+                    relevantChips: [],
+                    context: bd.reasons.join(' '),
+                    gaps: [],
+                    additionalChips: [],
+                };
+                return [syntheticCard];
+            }
+        }
+        return matched;
+    }, [activeSatellite, requirementRows, safe, t, satellites]);
 
     const handleSatelliteClick = useCallback((key: string) => {
         setActiveSatellite(prev => (prev === key ? null : key));
@@ -628,6 +652,7 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, overallRecomm
                             key="summary"
                             summaryData={summaryData}
                             overallRecommendation={overallRecommendation}
+                            overallScore={overallScore}
                             t={t}
                         />
                     )}

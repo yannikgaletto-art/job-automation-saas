@@ -8,14 +8,18 @@ import { logger } from '@/lib/logging';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
+import { runCVMatchAnalysis } from '@/lib/services/cv-match-analyzer';
+import { computeInputHash } from '@/lib/services/cv-match-hash';
 
 // Rate limit: 5 CV match requests per minute per user
 const cvMatchLimiter = createRateLimiter({ maxRequests: 5, windowMs: 60_000 });
 
+const IS_DEV = process.env.NODE_ENV === 'development';
+
 /**
  * POST /api/cv/match — Smart Trigger
  *
- * DEV:  Runs synchronously (no Inngest CLI needed locally).
+ * DEV:  Runs synchronously via runCVMatchAnalysis() — no Inngest CLI needed.
  * PROD: Fires Inngest background event (no Vercel timeout risk).
  *
  * Contracts: §8 (Auth Guard), §3 (user-scoped), §2 (CV Safety), JSONB Merge Pflicht
@@ -69,12 +73,31 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        // ── Stale-Recovery Check (Batch 2.1) ────────────────────────────
-        // If already processing, check if it's stale (> 2.5 min, synced with frontend polling timeout).
-        // If forceRestart is true (user clicked "Try again" after timeout), skip this check entirely.
+        // ── Content-Hash Idempotency Check (QA Strategie 3) ──────────────
+        // If an identical (CV text + job description) was already analyzed,
+        // return the cached result instead of re-running the LLM.
+        // forceRestart explicitly bypasses this cache.
         const currentMetadata = (job.metadata as Record<string, unknown>) || {};
         const existingStatus = currentMetadata.cv_match_status as string | undefined;
         const startedAt = currentMetadata.cv_match_started_at as string | undefined;
+
+        if (!forceRestart && existingStatus === 'done') {
+            const existingMatch = currentMetadata.cv_match as Record<string, unknown> | undefined;
+            const existingHash = existingMatch?.input_hash as string | undefined;
+            if (existingHash) {
+                const currentHash = computeInputHash(
+                    cvData.text,
+                    job.description || '',
+                    (job.requirements as string[]) || []
+                );
+                if (currentHash === existingHash) {
+                    // Identical input — serve cached result (no LLM call, no credit debit)
+                    console.log(`✅ [CV Match] Cache HIT — identical input (hash: ${currentHash.slice(0, 8)}…). Serving cached result.`);
+                    return NextResponse.json({ success: true, status: 'done_cached' });
+                }
+                console.log(`🔄 [CV Match] Cache MISS — input changed (hash: ${currentHash.slice(0, 8)}… vs ${existingHash.slice(0, 8)}…). Re-analyzing.`);
+            }
+        }
 
         if (!forceRestart && existingStatus === 'processing' && startedAt) {
             const elapsed = Date.now() - new Date(startedAt).getTime();
@@ -107,9 +130,115 @@ export async function POST(req: NextRequest) {
             .eq('id', jobId)
             .eq('user_id', user.id);
 
-        // §BILLING: Credit Gate — debit 0.5 credits, auto-refund if Inngest send fails
-        console.log('🚀 [CV Match] About to fire Inngest event...');
         const userLocale = await getUserLocale(user.id);
+
+        // ── DEV: Synchronous pipeline (no Inngest CLI needed) ──────────
+        if (IS_DEV) {
+            console.log('🔧 [CV Match] DEV MODE — running synchronously (no Inngest)');
+            try {
+                await withCreditGate(
+                    user.id,
+                    CREDIT_COSTS.cv_match,
+                    'cv_match',
+                    async () => {
+                        // Run the LLM analysis directly
+                        const matchResult = await runCVMatchAnalysis({
+                            userId: user.id,
+                            jobId: job.id,
+                            cvText: cvData.text,
+                            jobTitle: job.job_title || 'Unknown Title',
+                            company: job.company_name || 'Unknown Company',
+                            jobDescription: job.description || '',
+                            requirements: job.requirements || [],
+                            atsKeywords: job.buzzwords || [],
+                            level: job.seniority || '',
+                            locale: (userLocale as any) || 'de',
+                        });
+
+                        // Save result to DB (mirrors cv-match-pipeline.ts Step 4)
+                        const { data: freshJob } = await supabaseAdmin
+                            .from('job_queue')
+                            .select('metadata')
+                            .eq('id', jobId)
+                            .eq('user_id', user.id)
+                            .single();
+
+                        const freshMetadata = (freshJob?.metadata as Record<string, unknown>) || {};
+
+                        // Normalize arrays defensively
+                        const safeResult = {
+                            ...matchResult,
+                            _schemaVersion: 2,
+                            requirementRows: Array.isArray(matchResult.requirementRows) ? matchResult.requirementRows : [],
+                            strengths: Array.isArray(matchResult.strengths) ? matchResult.strengths : [],
+                            gaps: Array.isArray(matchResult.gaps) ? matchResult.gaps : [],
+                            potentialHighlights: Array.isArray(matchResult.potentialHighlights) ? matchResult.potentialHighlights : [],
+                            keywordsFound: Array.isArray(matchResult.keywordsFound) ? matchResult.keywordsFound : [],
+                            keywordsMissing: Array.isArray(matchResult.keywordsMissing) ? matchResult.keywordsMissing : [],
+                        };
+
+                        // F2-Fix: Store input_hash in DEV mode (mirrors Inngest pipeline)
+                        const devInputHash = computeInputHash(
+                            cvData.text,
+                            job.description || '',
+                            (job.requirements as string[]) || []
+                        );
+
+                        await supabaseAdmin
+                            .from('job_queue')
+                            .update({
+                                metadata: {
+                                    ...freshMetadata,
+                                    cv_match: {
+                                        analyzed_at: new Date().toISOString(),
+                                        cv_document_id: cvData.documentId,
+                                        input_hash: devInputHash,
+                                        ...safeResult,
+                                    },
+                                    cv_match_error: null,
+                                    cv_match_status: 'done',
+                                },
+                                status: 'cv_matched',
+                            })
+                            .eq('id', jobId)
+                            .eq('user_id', user.id);
+
+                        console.log(`✅ [CV Match] DEV sync complete for job ${jobId}`);
+                        return matchResult;
+                    },
+                    jobId
+                );
+            } catch (devError: any) {
+                // Write error to DB so frontend can show it
+                const { data: freshJob } = await supabaseAdmin
+                    .from('job_queue')
+                    .select('metadata')
+                    .eq('id', jobId)
+                    .eq('user_id', user.id)
+                    .single();
+
+                const freshMetadata = (freshJob?.metadata as Record<string, unknown>) || {};
+                await supabaseAdmin
+                    .from('job_queue')
+                    .update({
+                        metadata: {
+                            ...freshMetadata,
+                            cv_match_status: 'error',
+                            cv_match_error: devError?.message || 'Unknown error',
+                        },
+                    })
+                    .eq('id', jobId)
+                    .eq('user_id', user.id);
+
+                // Re-throw so the catch block handles billing errors
+                throw devError;
+            }
+
+            return NextResponse.json({ success: true, status: 'processing' });
+        }
+
+        // ── PROD: Inngest background event ─────────────────────────────
+        console.log('🚀 [CV Match] PROD MODE — firing Inngest event...');
         const sendResult = await withCreditGate(
             user.id,
             CREDIT_COSTS.cv_match,

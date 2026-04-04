@@ -8,6 +8,7 @@ import { ValleyTemplate } from './ValleyTemplate';
 import { Download, Loader2, RefreshCw } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { getCvTemplateLabels, CvTemplateLabels } from '@/lib/utils/cv-template-labels';
+import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
 
 interface PdfViewerWrapperProps {
     data: CvStructuredData;
@@ -61,6 +62,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels }: {
             setError(null);
 
             try {
+                registerPdfFonts();
                 const document = resolveTemplate(data, templateId, qrBase64, labels);
                 const blob = await pdf(document).toBlob();
 
@@ -203,6 +205,7 @@ function MobileDownload({ data, templateId, qrBase64, labels }: {
         let cancelled = false;
         async function generate() {
             try {
+                registerPdfFonts();
                 const document = resolveTemplate(data, templateId, qrBase64, labels);
                 const blob = await pdf(document).toBlob();
                 if (cancelled) return;

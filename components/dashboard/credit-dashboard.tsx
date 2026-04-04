@@ -49,24 +49,23 @@ export function CreditDashboard() {
     const usedCredits = credits.creditsUsed;
     const totalCredits = credits.creditsTotal;
     const available = credits.creditsAvailable;
-    const progressPct = totalCredits > 0 ? Math.min((usedCredits / totalCredits) * 100, 100) : 0;
+    // Bar shows REMAINING credits: 50% used → 50% bar visible (dark blue)
+    const remainingPct = totalCredits > 0 ? Math.min((available / totalCredits) * 100, 100) : 0;
 
     const planLabel = t(`plan_${credits.planType}` as 'plan_free' | 'plan_starter' | 'plan_durchstarter');
 
-    const planEmoji = credits.planType === 'durchstarter' ? '🚀' : credits.planType === 'starter' ? '⚡' : '✨';
-
-    // Color based on usage
+    // Color based on how much is LEFT (inverted: low remaining = danger)
     const barColor =
-        progressPct > 90 ? 'bg-red-500' :
-        progressPct > 70 ? 'bg-amber-500' :
-        'bg-emerald-500';
+        remainingPct < 10 ? 'bg-red-500' :
+        remainingPct < 30 ? 'bg-amber-500' :
+        'bg-[#002e7a]'; // Pathly dark blue when healthy
 
     return (
         <div className="rounded-xl border border-border/40 bg-card/50 p-4 space-y-3">
             {/* Plan badge */}
             <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    {planEmoji} {planLabel}
+                    {planLabel}
                 </span>
                 {credits.planType !== 'free' && credits.billingPeriodEnd && (
                     <span className="text-[10px] text-muted-foreground">
@@ -75,12 +74,12 @@ export function CreditDashboard() {
                 )}
             </div>
 
-            {/* Progress bar */}
+            {/* Progress bar — colored = remaining, light gray = consumed */}
             <div className="space-y-1">
-                <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
+                <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
                     <div
                         className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                        style={{ width: `${progressPct}%` }}
+                        style={{ width: `${remainingPct}%` }}
                     />
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
@@ -96,13 +95,11 @@ export function CreditDashboard() {
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                     {credits.coachingSessionsTotal > 0 && (
                         <div className="flex items-center gap-1 text-muted-foreground">
-                            <span>🎯</span>
                             <span>{credits.coachingSessionsUsed}/{credits.coachingSessionsTotal} {t('coaching_label')}</span>
                         </div>
                     )}
                     {credits.jobSearchesTotal > 0 && (
                         <div className="flex items-center gap-1 text-muted-foreground">
-                            <span>🔍</span>
                             <span>{credits.jobSearchesUsed}/{credits.jobSearchesTotal} {t('searches_label')}</span>
                         </div>
                     )}
