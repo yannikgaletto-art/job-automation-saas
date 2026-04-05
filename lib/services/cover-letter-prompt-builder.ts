@@ -40,6 +40,9 @@ interface JobData {
 interface CompanyResearchData {
     company_values?: string[];
     tech_stack?: string[];
+    current_challenges?: string[];
+    roadmap_signals?: string[];
+    recent_news?: Array<{ title?: string; date?: string; source?: string; [key: string]: unknown }>;
     [key: string]: unknown;
 }
 
@@ -626,11 +629,11 @@ Job-Anforderungen für die Relevanzkontrolle:
 ${JSON.stringify(job?.requirements?.slice(0, 3) || [], null, 2)}
 
 Unternehmens-Kontext (ALLE verfügbaren Daten — nutze für spezifische Verbindungen):
-Werte: ${JSON.stringify(company?.company_values || [])}
-Tech: ${JSON.stringify(company?.tech_stack || [])}
-${(company as any)?.current_challenges?.length ? `Aktuelle Herausforderungen: ${JSON.stringify((company as any).current_challenges)}` : ''}
-${(company as any)?.roadmap_signals?.length ? `Roadmap-Signale: ${JSON.stringify((company as any).roadmap_signals)}` : ''}
-${(company as any)?.recent_news?.length ? `Aktuelle News: ${JSON.stringify((company as any).recent_news.slice(0, 3))}` : ''}
+Werte: ${JSON.stringify((company?.company_values || []).slice(0, 10))}
+Tech: ${JSON.stringify((company?.tech_stack || []).slice(0, 10))}
+${company?.current_challenges?.length ? `Aktuelle Herausforderungen: ${JSON.stringify(company.current_challenges)}` : ''}
+${company?.roadmap_signals?.length ? `Roadmap-Signale: ${JSON.stringify(company.roadmap_signals)}` : ''}
+${company?.recent_news?.length ? `Aktuelle News: ${JSON.stringify(company.recent_news.slice(0, 3))}` : ''}
 HALLUZINATIONS-BREMSE: Verwende NUR Fakten (Ort, News, Werte, Challenges), die EXPLIZIT oben stehen. Wenn ein Datum fehlt → ERFINDE NICHTS, weiche auf allgemein belegbare Aussagen aus.
 
 ${cvInput}

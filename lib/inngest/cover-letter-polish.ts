@@ -186,8 +186,9 @@ RETURN ONLY THE REVISED TEXT! No introductions, no markdown, no comments.`
         }
 
 
+        // Steps 3+4 (Perplexity Fact Check, Quote Injection) — removed 2026-03-30 (Phase 2 simplification)
 
-        // ── Step 5: JSONB Merge-Update on documents.metadata ─────────
+        // ── Step 3: JSONB Merge-Update on documents.metadata ─────────
         await step.run('save-polished-draft', async () => {
             // Read current metadata first (JSONB merge, not overwrite)
             const { data: currentDoc } = await supabase
