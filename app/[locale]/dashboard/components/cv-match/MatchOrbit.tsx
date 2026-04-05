@@ -344,7 +344,7 @@ function SummaryCard({ summaryData, overallRecommendation, overallScore, t }: Su
                             <div className="flex flex-wrap gap-1.5">
                                 {summaryData.strengths.slice(0, 3).map((s, i) => (
                                     <span key={i} className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium bg-green-50 text-green-700 border border-green-100">
-                                        {s}
+                                        {renderBoldText(s)}
                                     </span>
                                 ))}
                             </div>
@@ -379,7 +379,7 @@ function SummaryCard({ summaryData, overallRecommendation, overallScore, t }: Su
                             <div className="flex flex-wrap gap-1.5">
                                 {summaryData.potentialHighlights.slice(0, 3).map((p, i) => (
                                     <span key={i} className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-100">
-                                        {p}
+                                        {renderBoldText(p)}
                                     </span>
                                 ))}
                             </div>

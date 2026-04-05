@@ -198,10 +198,27 @@ For each card, produce:
 
 ***
 
-**STEP 3 — SCORE:**
-Calculate a realistic overall score (0–100).
-Be honest: a "gap" on a core requirement significantly lowers the score.
-For each of the 5 sub-categories (technicalSkills, softSkills, experienceLevel, domainKnowledge, languageMatch), assign a LEVEL and provide 1-2 brief bullet points explaining why.
+**STEP 3 — SCORE (Calibrated — follow this table exactly):**
+
+Assign a score using this calibration table as hard constraint:
+
+| Situation | Score range |
+|-----------|-------------|
+| All core requirements clearly met in CV | 80–100 |
+| 1 minor gap, core requirements mostly met | 65–79 |
+| 1 major gap OR 2 minor gaps | 50–64 |
+| 2+ major gaps (core requirements) | 30–49 |
+| Fundamental mismatch (wrong field, degree, or level) | 0–29 |
+
+A "major gap" = a core requirement (repeated in JD, first in requirements list, or tagged as essential) with NO evidence in ${cvRef}.
+A "minor gap" = a secondary or "plus" requirement missing from ${cvRef}.
+
+For each of the 5 sub-categories (technicalSkills, softSkills, experienceLevel, domainKnowledge, languageMatch), assign a LEVEL and provide 1-2 brief bullet points.
+
+SOFT SKILLS RULE (mandatory, anti-averaging):
+SoftSkills = "strong" ONLY if ${cvRef} documents specific, named leadership/communication/stakeholder situations lasting >6 months (e.g., leading a team, running executive workshops). Generic CV phrases like "kommunikationsstark" or listing TEDx without content = "solid" at most. If soft skills are only implied or minimal → "solid" or "gap".
+Do NOT assign "strong" just because the candidate seems generally professional.
+
 Address the user with "${addressForm}" in each reason. Always reference ${cvRef}.
 
 ***
@@ -247,13 +264,14 @@ STRICT: Do NOT infer. Using "make.com" does NOT mean "Sales Automation". "Projec
 **STEP 5 — SELF-CRITIQUE (mandatory before outputting):**
 Before writing the final JSON, silently check:
 1. Every "strong": backed by >6 months direct CV evidence? If not → downgrade to "solid".
-2. Score vs. level distribution consistent? (2+ "gap" ⇒ score ≤ 60)
-3. Every text field is in ${lang}?
-4. Every orbitCategory is exactly one of: "technical", "soft", "experience", "domain", "language"?
-5. relevantChips, gaps, additionalChips are all valid arrays (not null)?
-6. HALLUCINATION CHECK: Does every card title and gap reference a requirement that is EXPLICITLY in the job description? If a term (e.g. "CRM", "Salesforce") is NOT in the JD → REMOVE it.
-7. DOCUMENT CHECK: Does every gap/context sentence reference the CV document ("${addressForm === 'Du' ? 'In deinem Lebenslauf' : addressForm === 'you' ? 'In your CV' : 'En tu CV'}")? If it judges the person directly → REWRITE.
-8. ATS STRICT CHECK: Is every "found" keyword actually present in the CV text (literally or by direct synonym)? If uncertain → mark as "missing".
+2. Score vs. calibration table consistent? Count major gaps first. 2+ major gaps → score MUST be ≤ 49.
+3. softSkills "strong": Is there a named, documented leadership or executive-communication situation >6 months? If only implied or brief → downgrade to "solid".
+4. Every text field is in ${lang}?
+5. Every orbitCategory is exactly one of: "technical", "soft", "experience", "domain", "language"?
+6. relevantChips, gaps, additionalChips are all valid arrays (not null)?
+7. HALLUCINATION CHECK: Does every card title and gap reference a requirement EXPLICITLY in the JD? If not → REMOVE it.
+8. DOCUMENT CHECK: Does every gap/context sentence reference the CV document? If it judges the person directly → REWRITE.
+9. ATS STRICT CHECK: Is every "found" keyword actually in the CV text? If uncertain → mark as "missing".
 Silently fix and output.
 
 **OUTPUT FORMAT:**
