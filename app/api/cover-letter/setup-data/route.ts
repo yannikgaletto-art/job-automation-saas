@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         const [jobRes, docsRes, profileRes, allCLDocsRes] = await Promise.all([
             supabase
                 .from('job_queue')
-                .select('requirements, metadata, company_name, company_website, job_title')
+                .select('requirements, metadata, company_name, company_website, job_title, cv_optimization_proposal')
                 .eq('id', jobId)
                 .single(),
 
@@ -170,16 +170,26 @@ export async function GET(req: NextRequest) {
             relevanceScore: 0,
         });
 
-        // ─── CV Stations (Step B) ──────────────────────────────────────
-        // First try to get it from job metadata (for legacy or direct uploads)
-        let cvData = job.metadata?.cv_structured_data?.experience || [];
+        // ─── CV Station Bullets Source (priority order) ────────────────
+        // 1. Optimiertes CV (finalCv aus cv_optimization_proposal) — wenn User Änderungen akzeptiert hat
+        // 2. job.metadata.cv_structured_data (direkter Upload / Legacy)
+        // 3. user_profiles.cv_structured_data (Standard-Onboarding)
+        // WHY: Cover Letter Wizard soll dieselben Bullets zeigen wie das generierte PDF.
+        let cvData: any[] = [];
 
-        // If not found on job, fallback to user_profile (standard onboarding flow)
-        if (cvData.length === 0 && profileRes.data?.cv_structured_data) {
+        const optimizedFinalCv = (job as any).cv_optimization_proposal?.finalCv;
+        if (optimizedFinalCv?.experience?.length > 0) {
+            // ✅ Nutze optimiertes CV (Bullets übereinstimmend mit dem generierten PDF)
+            cvData = optimizedFinalCv.experience;
+            console.log(`🔄 [SetupData] Using optimized finalCv for job ${jobId} (${cvData.length} stations)`);
+        } else if (job.metadata?.cv_structured_data?.experience?.length > 0) {
+            // Fallback: job-level upload
+            cvData = job.metadata.cv_structured_data.experience;
+        } else if (profileRes.data?.cv_structured_data) {
+            // Fallback: user profile (standard onboarding)
             const parsedCv = typeof profileRes.data.cv_structured_data === 'string'
                 ? JSON.parse(profileRes.data.cv_structured_data)
                 : profileRes.data.cv_structured_data;
-
             cvData = parsedCv?.experience || [];
         }
 
@@ -190,6 +200,11 @@ export async function GET(req: NextRequest) {
         // Read CV Match result (if completed) for hint generation
         const cvMatch = job.metadata?.cv_match;
         const requirementRows: any[] = cvMatch?.requirementRows || [];
+
+        // Read CV Optimizer changes (if completed) for context auto-fill
+        // Structure: { appliedChanges: [{ target: { section }, before, after }] }
+        const cvOptimizerChanges: Array<{ target: { section: string }; before: string; after: string }> =
+            job.metadata?.cv_optimization_user_decisions?.appliedChanges || [];
         
         // Detect UI locale from Accept-Language or job language
         const acceptLang = req.headers.get('accept-language') || '';
@@ -256,12 +271,39 @@ export async function GET(req: NextRequest) {
                     }
                 }
 
+                // ─── CV Optimizer Context Auto-fill ──────────────────────────────
+                // Match optimizer changes to this station by looking for company/role keywords
+                // in the 'section' field (e.g. "experience.Ingrano Solutions" or similar)
+                let cvOptimizerContext: string | undefined;
+                if (cvOptimizerChanges.length > 0) {
+                    const stationKeywords = [
+                        exp.company?.toLowerCase(),
+                        exp.role?.toLowerCase(),
+                    ].filter(Boolean);
+
+                    const matchingChanges = cvOptimizerChanges.filter(c => {
+                        const section = (c.target?.section || '').toLowerCase();
+                        return stationKeywords.some(kw => kw && section.includes(kw));
+                    });
+
+                    if (matchingChanges.length > 0) {
+                        // Summarize: take the first 'after' text, trim to ~180 chars
+                        const firstAfter = matchingChanges[0].after?.trim() || '';
+                        if (firstAfter.length > 10) {
+                            cvOptimizerContext = firstAfter.length > 180
+                                ? firstAfter.substring(0, 177) + '...'
+                                : firstAfter;
+                        }
+                    }
+                }
+
                 return {
                     company: exp.company || '',
                     role: stationRole,
                     period: exp.dateRangeText || exp.period || '',
                     bullets: stationBullets,
                     ...(hint ? { hint } : {}),
+                    ...(cvOptimizerContext ? { cvOptimizerContext } : {}),
                 };
             });
         const requirements: string[] = (job.requirements || []).slice(0, 3).map((r: any) =>

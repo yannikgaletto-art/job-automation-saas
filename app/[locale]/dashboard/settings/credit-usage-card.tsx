@@ -34,8 +34,8 @@ function PillBar({
     total: number
 }) {
     const remaining = Math.max(total - used, 0)
-    // Build array of segments: filled (used) + empty (remaining)
-    const segments = Array.from({ length: total }, (_, i) => i < remaining)
+    const fullSegments = Math.floor(remaining)
+    const fractionalPart = remaining - fullSegments // e.g. 0.5 for 0.5 credits
 
     return (
         <div className="space-y-2">
@@ -46,17 +46,39 @@ function PillBar({
                 </span>
             </div>
             <div className="flex gap-1">
-                {segments.map((isFilled, i) => (
-                    <div
-                        key={i}
-                        className={cn(
-                            "h-[10px] flex-1 rounded-[3px] transition-all duration-300",
-                            isFilled
-                                ? "bg-[#012e7a]"
-                                : "bg-[#012e7a]/10 border border-[#012e7a]/20"
-                        )}
-                    />
-                ))}
+                {Array.from({ length: total }, (_, i) => {
+                    const isFull = i < fullSegments
+                    const isFractional = i === fullSegments && fractionalPart > 0
+
+                    if (isFull) {
+                        return (
+                            <div
+                                key={i}
+                                className="h-[10px] flex-1 rounded-[3px] bg-[#012e7a] transition-all duration-300"
+                            />
+                        )
+                    }
+                    if (isFractional) {
+                        // Half-filled segment — proportional inner div
+                        return (
+                            <div
+                                key={i}
+                                className="h-[10px] flex-1 rounded-[3px] bg-[#012e7a]/10 border border-[#012e7a]/20 overflow-hidden transition-all duration-300"
+                            >
+                                <div
+                                    className="h-full bg-[#012e7a] rounded-[2px]"
+                                    style={{ width: `${fractionalPart * 100}%` }}
+                                />
+                            </div>
+                        )
+                    }
+                    return (
+                        <div
+                            key={i}
+                            className="h-[10px] flex-1 rounded-[3px] bg-[#012e7a]/10 border border-[#012e7a]/20 transition-all duration-300"
+                        />
+                    )
+                })}
             </div>
         </div>
     )

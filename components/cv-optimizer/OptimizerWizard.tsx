@@ -2,8 +2,6 @@
 
 import { useTranslations, useLocale } from 'next-intl'
 
-import { createPortal } from 'react-dom';
-
 import { useState, useEffect, useMemo, useRef } from "react"
 import { motion } from "framer-motion"
 import { DiffReview } from "./DiffReview"
@@ -15,12 +13,13 @@ import { saveCvDecisions } from "@/app/actions/save-cv-decisions"
 import { createClient } from '@/lib/supabase/client'
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { CustomDialog } from "@/components/ui/custom-dialog"
-import { Check, Settings, Sparkles, FileText, Layout, Pencil, CheckCheck, ToggleLeft, ToggleRight, Video, Loader2 } from "lucide-react"
+import { Check, Settings, Sparkles, Layout, Pencil, CheckCheck, ToggleLeft, ToggleRight, Video, Loader2 } from "lucide-react"
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
 import { cn } from '@/lib/utils';
 import QRCode from 'qrcode';
+import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
 
 const DynamicPdfViewer = dynamic(
     () => import('@/components/cv-templates/PdfViewerWrapper'),
@@ -70,6 +69,7 @@ function OptCancelButton({ onCancel, label }: { onCancel: () => void; label: str
 export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onComplete }: OptimizerWizardProps) {
     const t = useTranslations('cv_optimizer');
     const locale = useLocale();
+    const { showPaywall } = useCreditExhausted();
     const [step, setStep] = useState<1 | 2>(1);
 
     const [isLoading, setIsLoading] = useState(true);
@@ -315,6 +315,13 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
             clearTimeout(timeoutId);
 
             const data = await res.json();
+
+            // ── Credit Exhaustion: show paywall modal, not generic error ──
+            if (res.status === 402 && data.error === 'CREDITS_EXHAUSTED') {
+                showPaywall('credits', { remaining: data.remaining ?? 0 });
+                return; // Do NOT set optimizerError — paywall modal handles the UX
+            }
+
             if (!res.ok || !data.success) {
                 // API returns error codes (e.g. 'error_ai_failed') — translate via t()
                 const errorCode = data.error || 'error_failed';
@@ -400,6 +407,55 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     const handleTechAtsWarningStay = () => {
         setShowTechAtsWarning(false);
         setPendingTechSwitch(null);
+    };
+
+    // -- Layout-Fix Retry: free, once per job --
+    const handleLayoutFixRetry = async () => {
+        if (freeRetryUsed || isLayoutFixing) return;
+        setIsLayoutFixing(true);
+        setLayoutFixError(null);
+        try {
+            const res = await fetch('/api/cv/optimize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cv_structured_data: cvData,
+                    cv_match_result: jobData?.metadata?.cv_match,
+                    template_id: templateId,
+                    job_id: jobId,
+                    user_id: userId,
+                    locale,
+                    layoutFix: true,
+                    cv_opt_settings: { showSummary: cvOptSettings.showSummary, summaryMode: cvOptSettings.summaryMode },
+                }),
+            });
+            const data = await res.json();
+
+            // ── Credit Exhaustion on layout-fix (should not happen — it's free — but guard anyway)
+            if (res.status === 402 && data.error === 'CREDITS_EXHAUSTED') {
+                showPaywall('credits', { remaining: data.remaining ?? 0 });
+                return;
+            }
+
+            if (!res.ok) {
+                if (data.error === 'free_retry_exhausted') {
+                    setFreeRetryUsed(true);
+                    setLayoutFixError(t('error_free_retry_exhausted'));
+                } else {
+                    setLayoutFixError(data.details || t('error_failed'));
+                }
+                return;
+            }
+            if (data.proposal) {
+                setProposal(data.proposal);
+                setFreeRetryUsed(true);
+                setStep(1); // Back to diff-review with new proposal
+            }
+        } catch {
+            setLayoutFixError(t('error_failed'));
+        } finally {
+            setIsLayoutFixing(false);
+        }
     };
 
     // -- QR-Video: Button opens dialog or toggles off --
@@ -835,6 +891,28 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                             </button>
 
                             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                                <div className="flex flex-col items-center sm:items-start w-full sm:w-auto">
+                                    <button
+                                        onClick={handleLayoutFixRetry}
+                                        disabled={freeRetryUsed || isLayoutFixing}
+                                        title={freeRetryUsed ? t('btn_layout_fix_used') : t('btn_layout_fix_tooltip')}
+                                        className={[
+                                            'px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors w-full sm:w-auto justify-center',
+                                            freeRetryUsed || isLayoutFixing
+                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                                        ].join(' ')}
+                                    >
+                                        {isLayoutFixing ? (
+                                            <><Loader2 className="w-4 h-4 animate-spin" /> {t('optimizing_title')} (~30-75s)</>
+                                        ) : (
+                                            <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> {freeRetryUsed ? t('btn_layout_fix_used') : t('btn_layout_fix')}</>
+                                        )}
+                                    </button>
+                                    {isLayoutFixing && (
+                                        <span className="text-[10px] text-gray-400 mt-1 text-center">{t('optimizing_duration')}</span>
+                                    )}
+                                </div>
                                 <div className="w-full sm:w-auto">
                                     <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} />
                                 </div>
@@ -846,81 +924,11 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                     {t('cover_letter')}
                                 </button>
                             </div>
+                            {layoutFixError && (
+                                <p className="text-xs text-red-600 mt-1 w-full text-center sm:text-right">{layoutFixError}</p>
+                            )}
                         </div>
 
-                        {/* P1: Layout-Fix Retry — free, once per job */}
-                        <div className="border border-amber-200 bg-amber-50/60 rounded-lg px-4 py-3 mb-4">
-                            <div className="flex items-start gap-3">
-                                <div className="shrink-0 mt-0.5">
-                                    <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-xs text-amber-800">{t('btn_layout_fix_desc')}</p>
-                                    <button
-                                        onClick={async () => {
-                                            if (freeRetryUsed || isLayoutFixing) return;
-                                            setIsLayoutFixing(true);
-                                            setLayoutFixError(null);
-                                            try {
-                                                const res = await fetch('/api/cv/optimize', {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({
-                                                        cv_structured_data: cvData,
-                                                        cv_match_result: jobData?.metadata?.cv_match,
-                                                        template_id: templateId,
-                                                        job_id: jobId,
-                                                        user_id: userId,
-                                                        locale,
-                                                        layoutFix: true,
-                                                        cv_opt_settings: { showSummary: cvOptSettings.showSummary, summaryMode: cvOptSettings.summaryMode },
-                                                    }),
-                                                });
-                                                const data = await res.json();
-                                                if (!res.ok) {
-                                                    if (data.error === 'free_retry_exhausted') {
-                                                        setFreeRetryUsed(true);
-                                                        setLayoutFixError(t('error_free_retry_exhausted'));
-                                                    } else {
-                                                        setLayoutFixError(data.details || t('error_failed'));
-                                                    }
-                                                    return;
-                                                }
-                                                // Apply the new proposal
-                                                if (data.proposal) {
-                                                    setProposal(data.proposal);
-                                                    setFreeRetryUsed(true);
-                                                    setStep(1); // Back to diff-review with new proposal
-                                                }
-                                            } catch {
-                                                setLayoutFixError(t('error_failed'));
-                                            } finally {
-                                                setIsLayoutFixing(false);
-                                            }
-                                        }}
-                                        disabled={freeRetryUsed || isLayoutFixing}
-                                        className="mt-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors
-                                            disabled:opacity-40 disabled:cursor-not-allowed
-                                            bg-amber-100 text-amber-800 hover:bg-amber-200"
-                                        title={freeRetryUsed ? t('btn_layout_fix_used') : t('btn_layout_fix_tooltip')}
-                                    >
-                                        {isLayoutFixing ? (
-                                            <span className="flex items-center gap-1.5">
-                                                <Loader2 className="w-3 h-3 animate-spin" />
-                                                {t('optimizing_title')}
-                                            </span>
-                                        ) : freeRetryUsed ? (
-                                            t('btn_layout_fix_used')
-                                        ) : (
-                                            t('btn_layout_fix')
-                                        )}
-                                    </button>
-                                    {layoutFixError && (
-                                        <p className="text-xs text-red-600 mt-1">{layoutFixError}</p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 )}
             </motion.div>

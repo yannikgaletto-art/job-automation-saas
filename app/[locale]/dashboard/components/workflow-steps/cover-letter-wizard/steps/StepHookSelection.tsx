@@ -283,6 +283,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     </p>
                 </div>
                 <button
+                    type="button"
                     onClick={() => handleAnalyze()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium transition-colors border border-[#E7E7E5] text-[#73726E] hover:bg-gray-50 shrink-0"
                     title="Analyse wiederholen"
@@ -406,6 +407,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     </div>
                     <div className="flex gap-2">
                         <button
+                            type="button"
                             onClick={handleQuoteSearch}
                             className="flex items-center gap-2 px-4 py-2 bg-[#002e7a] text-white text-xs font-semibold rounded-lg hover:bg-[#001e5a] transition-colors"
                         >
@@ -413,6 +415,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                             {t('btn_search_quotes')}
                         </button>
                         <button
+                            type="button"
                             onClick={handleProceedToStep2}
                             className="flex items-center gap-2 px-4 py-2 text-[#73726E] text-xs font-medium rounded-lg border border-[#E7E7E5] hover:bg-gray-50 transition-colors"
                         >
@@ -447,11 +450,12 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                             {t('quote_results_title', { count: fetchedQuotes.length })}
                         </h4>
                         <button
+                            type="button"
                             onClick={handleQuoteSearch}
                             disabled={quoteRefreshCount >= 2}
                             className={`text-[10px] flex items-center gap-1 ${quoteRefreshCount >= 2 ? 'text-[#D0CFC8] cursor-not-allowed' : 'text-[#73726E] hover:text-[#002e7a]'}`}
                         >
-                            <RefreshCw className="w-3 h-3" /> {t('btn_new_quotes')} {quoteRefreshCount >= 2 ? `(${t('limit_reached') || 'max.'})` : ''}
+                            <RefreshCw className="w-3 h-3" /> {t('btn_new_quotes')} {quoteRefreshCount >= 2 ? `(${t('limit_reached') || 'max.'})` : quoteRefreshCount > 0 ? `(${2 - quoteRefreshCount}/2)` : '(max.)'}
                         </button>
                     </div>
 
@@ -504,8 +508,11 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 </motion.div>
             )}
 
-            {/* ─── Intro Focus Toggle (nur wenn Hook + Zitat gewählt) ─── */}
-            {selectedHook && selectedQuote && phase === 'quoteResults' && (
+            {/* ─── Intro Focus Toggle (sichtbar sobald ein Zitat gewählt wurde) ─── */}
+            {/* WHY: Toggle war vorher an selectedHook gebunden → unsichtbar bei Quote-only Szenario.
+                Jetzt: introFocus steuert Quote-Placement für ALLE Kombinationen (per Routing-Fix).
+                Das Toggle muss daher für jeden User zugänglich sein, der ein Zitat gewählt hat. */}
+            {selectedQuote && phase === 'quoteResults' && (
                 <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -518,6 +525,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                         {t('intro_focus_desc')} <strong className="text-[#37352F]">{t('intro_focus_desc_bold')}</strong>
                     </p>
                     <div className="flex flex-col gap-1.5 mt-1">
+                        {/* Option A: Quote in Intro */}
                         <label
                             className={[
                                 'flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-all text-xs',
@@ -535,10 +543,16 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                             />
                             <div>
                                 <span className="font-semibold text-[#37352F]">{t('focus_quote_label')}</span>
-                                <span className="text-[#73726E]"> {t('focus_quote_desc')}</span>
+                                {/* Desc adapts based on what else is available */}
+                                <span className="text-[#73726E]">
+                                    {selectedHook
+                                        ? ` — ${t('focus_quote_desc')}`
+                                        : ` — ${t('focus_quote_desc_no_hook')}`}
+                                </span>
                                 <span className="block text-[10px] text-[#A8A29E] mt-0.5">{t('focus_quote_recommended')}</span>
                             </div>
                         </label>
+                        {/* Option B: Quote in Karriere-Abschnitt */}
                         <label
                             className={[
                                 'flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-all text-xs',
@@ -553,9 +567,8 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                 checked={introFocus === 'hook'}
                                 onChange={() => {
                                     setIntroFocus('hook');
-                                    // WHY: Ping-Pong logic lives exclusively in quoteIntroBlock.
-                                    // When quote moves to body, there's nothing to ping-pong against.
-                                    // CONFLICTS RESOLVED: Ping-Pong Ghost (Blind Spot #1, QA Report 2026-02-28)
+                                    // WHY: Ping-Pong lives only in quoteIntroBlock.
+                                    // When quote moves to body, disable Ping-Pong.
                                     if (optInModules.pingPong) {
                                         setOptInModule('pingPong', false);
                                     }
@@ -563,8 +576,15 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                 className="mt-0.5 accent-[#002e7a]"
                             />
                             <div>
-                                <span className="font-semibold text-[#37352F]">{t('focus_hook_label')}</span>
-                                <span className="text-[#73726E]"> {t('focus_hook_desc')}</span>
+                                {/* Label adapts: if hook available → "News/Hook in Einleitung", else → generic */}
+                                <span className="font-semibold text-[#37352F]">
+                                    {selectedHook ? t('focus_hook_label') : t('focus_hook_label_no_hook')}
+                                </span>
+                                <span className="text-[#73726E]">
+                                    {selectedHook
+                                        ? ` ${t('focus_hook_desc')}`
+                                        : ` ${t('focus_hook_desc_no_hook')}`}
+                                </span>
                             </div>
                         </label>
                     </div>
@@ -622,16 +642,11 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 );
             })()}
 
-            {/* ─── Weiter / Ohne Zitat — IMMER ganz unten in results ─── */}
+            {/* ─── Weiter — IMMER ganz unten in results ─── */}
             {(phase === 'results' || phase === 'quoteResults') && canProceed && (
-                <div className="flex justify-end gap-2 pt-3">
+                <div className="flex justify-end pt-3">
                     <button
-                        onClick={() => { setQuote(null); handleProceedToStep2(); }}
-                        className="text-xs text-[#73726E] px-3 py-1.5 hover:underline"
-                    >
-                        {t('btn_skip_quote')}
-                    </button>
-                    <button
+                        type="button"
                         onClick={handleProceedToStep2}
                         disabled={!canProceed}
                         className={[

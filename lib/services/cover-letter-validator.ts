@@ -1,10 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { BLACKLIST_PATTERNS } from './anti-fluff-blacklist';
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// ─── Supabase Admin (per-call, not module-level — §QA Audit: Serverless Hygiene) ──
+function getSupabase() {
+    return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+}
 
 export interface ValidationResult {
     isValid: boolean;
@@ -43,17 +46,24 @@ export function validateCoverLetter(
 
     // 2. COMPANY NAME CHECK (fuzzy — strips legal suffixes like AG, GmbH, SE)
     const LEGAL_SUFFIXES = /\s*(AG|GmbH|SE|e\.V\.|Inc\.?|Ltd\.?|Co\.?|KG|OHG|UG|mbH|S\.A\.|GbR|Corp\.?)\s*$/gi;
+    // Business words that often follow the core brand name
+    const BUSINESS_WORDS = /\s*(Group|Gruppe|Software|Digital|Solutions|Technologies|Consulting|Services|Partners|Systems|Holdings|International|Deutschland|Europe)\s*$/gi;
     const baseName = companyName.replace(LEGAL_SUFFIXES, '').trim();
+    const coreName = baseName.replace(BUSINESS_WORDS, '').trim();
     
-    // Try exact name first, then base name (without suffix)
+    // Try exact name first, then base name (without legal suffix), then core name (without business words)
     const exactPattern = new RegExp(companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     const basePattern = baseName.length > 2 
         ? new RegExp(baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
         : null;
+    const corePattern = coreName.length > 2 && coreName !== baseName
+        ? new RegExp(coreName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+        : null;
     
     const exactMentions = (coverLetter.match(exactPattern) || []).length;
     const baseMentions = basePattern ? (coverLetter.match(basePattern) || []).length : 0;
-    const companyMentions = Math.max(exactMentions, baseMentions);
+    const coreMentions = corePattern ? (coverLetter.match(corePattern) || []).length : 0;
+    const companyMentions = Math.max(exactMentions, baseMentions, coreMentions);
 
     if (companyMentions === 0) {
         errors.push(`Company name "${companyName}" not mentioned at all`);
@@ -68,6 +78,32 @@ export function validateCoverLetter(
     for (const { pattern, reason } of BLACKLIST_PATTERNS) {
         if (lowerText.includes(pattern.toLowerCase())) {
             errors.push(`Forbidden phrase detected: "${pattern}" - ${reason}`);
+            forbiddenCount++;
+        }
+    }
+
+    // 3b. HARD PHRASE BLACKLIST — Deterministic pre-delivery stop (§Fix F)
+    // These phrases have been observed to survive the LLM Judge across MAX_ITERATIONS.
+    // Unlike BLACKLIST_PATTERNS (which are guidance to Claude), these are hard stops
+    // that produce explicit feedback strings for the re-generation loop.
+    const HARD_PHRASE_BLACKLIST: Array<{ phrase: string; feedback: string }> = [
+        {
+            phrase: 'Vielmehr als nur',
+            feedback: 'Entferne sofort den Ausdruck "Vielmehr als nur" — er ist logisch gebrochen (korrekt wäre "Mehr als nur", aber auch das ist gestelzt). Formuliere den Satz komplett um.',
+        },
+        {
+            phrase: 'Möchte ich mein Projekt',
+            feedback: 'Der Satz beginnt mit einem invertierten Modalsatz ("Möchte ich..."), der als Aussagesatz grammatikalisch falsch ist. Schreibe: "Zudem habe ich bei [Firma]..." oder "Auch meine Zeit bei [Firma] zeigt...".',
+        },
+        {
+            phrase: 'schnell den Sprung von',
+            feedback: 'Entferne das "Sprung von X zur Y"-Konstrukt — es ist eine erkennbare KI-Schablone. Formuliere stattdessen konkret, was du einbringen willst.',
+        },
+    ];
+
+    for (const { phrase, feedback } of HARD_PHRASE_BLACKLIST) {
+        if (lowerText.includes(phrase.toLowerCase())) {
+            errors.push(`HARD_BLACKLIST: "${phrase}" — ${feedback}`);
             forbiddenCount++;
         }
     }
@@ -111,7 +147,7 @@ export async function logValidation(
     validation: ValidationResult
 ) {
     try {
-        await supabase.from('validation_logs').insert({
+        await getSupabase().from('validation_logs').insert({
             job_id: jobId,
             user_id: userId,
             iteration,

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useLocale } from 'next-intl';
 import { motion } from 'framer-motion';
-import { Video, Mic, Square, Upload, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Video, Mic, Square, Upload, RefreshCw, AlertTriangle, CheckCircle2, Trash2, ExternalLink } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { createClient } from '@/lib/supabase/client';
 import { VideoScriptStudio } from './video-script-studio';
@@ -23,8 +23,11 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
     const locale = useLocale();
     const [state, setState] = useState<VideoState>('loading');
     const [expiresAt, setExpiresAt] = useState<string | null>(null);
+    const [accessToken, setAccessToken] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showPrivacyConsent, setShowPrivacyConsent] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Script data for overlay during recording
     const [scriptBlocks, setScriptBlocks] = useState<{ id: string; title: string; content: string; durationSeconds: number; isRequired: boolean; templateId: string | null; sortOrder: number }[]>([]);
@@ -55,6 +58,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
 
                 if (data.status === 'uploaded') {
                     setExpiresAt(data.expiresAt);
+                    setAccessToken(data.accessToken || null);
                     setState('done');
                 } else if (data.status === 'prompts_ready' || data.hasScript) {
                     // QR token created or script already exists — skip consent, go straight to script studio
@@ -234,6 +238,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
 
             setUploadProgress(100);
             setExpiresAt(confirmData.expiresAt);
+            setAccessToken(confirmData.accessToken || null);
             setState('done');
 
         } catch (err) {
@@ -247,7 +252,36 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         setRecordedBlob(null);
         setPreviewUrl(null);
+        setShowDeleteConfirm(false);
         setState('record');
+    };
+
+    // Delete video
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        try {
+            const res = await fetch('/api/video/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setError(data.error || t('error_generic'));
+                setIsDeleting(false);
+                return;
+            }
+            // Reset UI — go back to script studio (script is preserved)
+            setExpiresAt(null);
+            setRecordedBlob(null);
+            setPreviewUrl(null);
+            setShowDeleteConfirm(false);
+            setState('script-studio');
+        } catch {
+            setError(t('error_generic'));
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     // Cleanup
@@ -486,12 +520,13 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
         const expiryFormatted = expiresAt
             ? new Date(expiresAt).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
             : null;
+        const previewHref = accessToken ? `/v/${accessToken}` : null;
 
         return (
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-8 bg-white border border-gray-200 rounded-xl max-w-sm mx-auto text-center space-y-5"
+                className="p-8 bg-white border border-gray-200 rounded-xl max-w-md mx-auto text-center space-y-5"
             >
                 <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto">
                     <CheckCircle2 className="w-7 h-7 text-green-600" />
@@ -507,12 +542,75 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                         </p>
                     )}
                 </div>
-                <button
-                    onClick={handleReRecord}
-                    className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition flex items-center gap-2 mx-auto"
-                >
-                    <RefreshCw className="w-4 h-4" /> {t('done_new_recording')}
-                </button>
+
+                {/* Preview link — opens public video page in new tab */}
+                {previewHref && (
+                    <a
+                        href={previewHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white text-sm font-medium rounded-lg transition"
+                    >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        {t('done_preview_link')}
+                    </a>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-center gap-3 pt-1">
+                    <button
+                        onClick={handleReRecord}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition flex items-center gap-1.5"
+                    >
+                        <RefreshCw className="w-3.5 h-3.5" /> {t('done_new_recording')}
+                    </button>
+                    <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg transition flex items-center gap-1.5"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" /> {t('done_delete_btn')}
+                    </button>
+                </div>
+
+                {/* Inline Delete Confirmation */}
+                {showDeleteConfirm && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left space-y-3"
+                    >
+                        <h4 className="text-sm font-semibold text-amber-800 flex items-center gap-1.5">
+                            <AlertTriangle className="w-4 h-4" />
+                            {t('done_delete_confirm_title')}
+                        </h4>
+                        <p className="text-xs text-amber-700 leading-relaxed">
+                            {t('done_delete_confirm_body')}
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                                {isDeleting ? <LoadingSpinner className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                {t('done_delete_confirm_yes')}
+                            </button>
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition"
+                            >
+                                {t('done_delete_confirm_cancel')}
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+
+                {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-700">{error}</p>
+                    </div>
+                )}
             </motion.div>
         );
     }

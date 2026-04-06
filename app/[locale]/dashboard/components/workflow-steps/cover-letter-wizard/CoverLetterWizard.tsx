@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import { WizardProgressBar } from './WizardProgressBar';
@@ -10,13 +9,7 @@ import { StepStationMapping } from './steps/StepStationMapping';
 import { StepToneConfig } from './steps/StepToneConfig';
 import type { CoverLetterSetupContext, SetupDataResponse } from '@/types/cover-letter-setup';
 
-// ─── Module-level constant: prevents framer-motion from losing track
-//     of variant identity across re-renders (was causing Step 2 blank bug) ───
-const SLIDE_VARIANTS = {
-    initial: { opacity: 0, x: 20 },
-    animate: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: -20 },
-} as const;
+
 
 interface Props {
     jobId: string;
@@ -44,8 +37,15 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
 
     useEffect(() => {
         initForJob(jobId);
+        // Always reset to step 1 on mount — prevents "stuck on Step 2 with disabled button"
+        // WHY: initForJob() only resets the store when jobId CHANGES. If the same job is
+        // reopened, currentStep stays persisted (e.g. 2) but cvStations may be empty,
+        // resulting in the Weiter button being disabled with no way to proceed.
+        // Resetting to step 1 on every mount is safe: the hook selection and tone config
+        // are preserved in the store, so the user can skip through quickly.
+        setStep(1);
         fetchSetupData();
-    }, [jobId]);
+    }, [jobId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchSetupData = async () => {
         try {
@@ -132,44 +132,36 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
                 </div>
             )}
 
-            {/* Steps — mode="popLayout" prevents exit animations from blocking entry.
-                WHY: "wait" mode caused Step 2 to get stuck at opacity:0 when
-                     Zustand state updates (setStep) fired during the exit→enter gap.
-                     "popLayout" exits outgoing content with layout animation while
-                     immediately mounting incoming content. */}
-            <AnimatePresence mode="popLayout">
-                {currentStep === 1 && (
-                    <motion.div key="step-1" variants={SLIDE_VARIANTS} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.15 }}>
-                        <StepHookSelection
-                            jobId={jobId}
-                            companyName={companyName}
-                            setupData={setupData}
-                            onNext={() => setStep(2)}
-                            onReloadData={fetchSetupData}
-                        />
-                    </motion.div>
-                )}
+            {/* Steps — direct conditional rendering, NO AnimatePresence.
+                WHY: AnimatePresence mode="popLayout" caused exit-animated elements to
+                     remain in the DOM as position:absolute ghost elements that intercepted
+                     all click events on the new step's buttons. This was the root cause of
+                     the persistent "Weiter/Zurück buttons don't work" bug. */}
+            {currentStep === 1 && (
+                <StepHookSelection
+                    jobId={jobId}
+                    companyName={companyName}
+                    setupData={setupData}
+                    onNext={() => setStep(2)}
+                    onReloadData={fetchSetupData}
+                />
+            )}
 
-                {currentStep === 2 && (
-                    <motion.div key="step-2" variants={SLIDE_VARIANTS} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.15 }}>
-                        <StepStationMapping
-                            setupData={setupData}
-                            onBack={() => setStep(1)}
-                            onNext={() => setStep(3)}
-                        />
-                    </motion.div>
-                )}
+            {currentStep === 2 && (
+                <StepStationMapping
+                    setupData={setupData}
+                    onBack={() => setStep(1)}
+                    onNext={() => setStep(3)}
+                />
+            )}
 
-                {currentStep === 3 && (
-                    <motion.div key="step-3" variants={SLIDE_VARIANTS} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.15 }}>
-                        <StepToneConfig
-                            setupData={setupData}
-                            onBack={() => setStep(2)}
-                            onGenerate={handleFinish}
-                        />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {currentStep === 3 && (
+                <StepToneConfig
+                    setupData={setupData}
+                    onBack={() => setStep(2)}
+                    onGenerate={handleFinish}
+                />
+            )}
         </div>
     );
 }

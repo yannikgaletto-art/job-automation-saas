@@ -125,7 +125,7 @@ export async function runMultiAgentPipeline(
     coverLetter: string,
     jobData?: JobData,
     companyResearch?: CompanyResearchData,
-    targetLanguage?: 'de' | 'en',
+    targetLanguage?: 'de' | 'en' | 'es',
 ): Promise<PipelineResult> {
     const warnings: string[] = [];
     let finalText = coverLetter;

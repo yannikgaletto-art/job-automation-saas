@@ -145,6 +145,98 @@ Every gap statement MUST begin with a reference to the CV document, never with a
 
 ***
 
+**STEP 0 — GAP CENSUS (MANDATORY — do this BEFORE any scoring):**
+Count ONLY requirements explicitly stated in the job description above.
+
+majorGaps: Count core requirements (first in requirements list, repeated in description, or marked as essential/required) with ZERO evidence in ${cvRef} — not even partial.
+minorGaps: Count secondary/nice-to-have/"wünschenswert" requirements missing from ${cvRef}.
+
+CALIBRATION (apply MECHANICALLY based on your count — NO exceptions):
+  0 major, 0 minor  → overallScore: 85–100
+  0 major, 1-2 minor → overallScore: 70–84
+  1 major, 0 minor   → overallScore: 55–69
+  1 major, 1+ minor  → overallScore: 40–54
+  2+ major           → overallScore: 25–39
+  Fundamental mismatch (wrong field/level/domain entirely) → overallScore: 0–24
+
+Output _gapCensus in the final JSON: { "majorGaps": X, "minorGaps": Y }
+This field is for audit only — frontend does not display it.
+
+***
+
+**STEP 0.5 — JOB CATEGORY CLASSIFICATION (output as _jobCategory):**
+Based exclusively on the job title and description above, classify into EXACTLY ONE of:
+
+- TECH: Software Engineering, Data Science, IT, DevOps, Hardware, Semiconductors, AI Engineering
+- SALES: Account Executive, Business Development, Go-to-Market, Revenue roles
+- LEADERSHIP: Director, VP, Head of, C-Level, General Management, Team Lead (>5 reports)
+- OPERATIONS: HR, Finance, Legal, Controlling, Compliance, Process Management, Change Management
+- CREATIVE: Design, Marketing, Content, Media, Communications, Brand
+- HEALTHCARE: Physicians, Nurses, Clinical roles, Medical devices, Pharmacists, Therapists
+- EDUCATION: Teachers, Lecturers, Trainers, Educators, Didactics, Academic roles
+- UNKNOWN: If the role spans multiple categories equally or is unclear
+
+Output: _jobCategory in JSON. Use UNKNOWN if uncertain — never guess.
+
+***
+
+**STEP 0.6 — CATEGORY-AWARE SCORING (apply based on _jobCategory):**
+
+Apply these emphasis weights when assessing level = "strong" vs "solid" vs "gap":
+
+IF TECH:
+  Primary (60%): Technical skills — programming, tools, system architecture.
+                 Tier A evidence preferred: GitHub links, specific versions, quantified systems.
+  Secondary (30%): Methodology — Agile, CI/CD, Cloud, Project Mgmt.
+  Tertiary (10%): Formal education — heavily outweighed by practical proof.
+  Red Flag: Outdated tech stack (>5 years) without re-skilling evidence.
+
+IF SALES:
+  Primary (50%): Track record — quota %, ARR, deal sizes, revenue numbers.
+                 MISSING numerical metrics = high-signal gap.
+  Secondary (30%): Methodology — MEDDPICC, Value Engineering, C-Level communication.
+  Tertiary (20%): Domain knowledge — industry/product understanding.
+  Red Flag: No quantified success metrics anywhere in CV.
+
+IF LEADERSHIP:
+  Primary (50%): Strategic impact — org scaling, P&L/budget responsibility (in €/$ amounts).
+  Secondary (35%): Leadership metrics — team size (exact number), change mgmt, org-building.
+  Tertiary (15%): Technical/operational expertise.
+  Red Flag: Job-hopping <18 months without growth narrative; no budget figures.
+
+IF OPERATIONS:
+  Primary (50%): Domain knowledge + compliance — ISO, DSGVO, GAAP/IFRS, regulations named.
+  Secondary (30%): Process optimization — measurable efficiency improvements, audit success.
+  Tertiary (20%): Systems knowledge — ERP (SAP, Workday), Power Platform, automation tools.
+  Red Flag: Vague regulatory language; no quantified efficiency gains.
+
+IF CREATIVE:
+  Primary (35%): Portfolio + work samples — portfolio links, published work, campaigns.
+  Secondary (25%): Experience depth — relevant role history, brand/agency names.
+  Tertiary (25%): Culture fit signals — values alignment, company stage match.
+  Quaternary (15%): Education.
+  Red Flag: No portfolio reference or published work anywhere in CV.
+
+IF HEALTHCARE:
+  Primary (50%): Formal licenses + credentials — Approbation, Facharzttitel, RN license.
+                 If required license is MISSING from CV: flag as MAJOR GAP in _gapCensus.
+                 (Note: This is a coaching flag, not a hard rejection — Pathly helps, not rejects.)
+  Secondary (30%): Clinical track record — procedure types, specializations, patient contexts.
+  Tertiary (20%): Quality of care evidence — CME training, EBM experience, measurable outcomes.
+  Red Flag: No license named; expired credentials mentioned; no clinical specifics.
+
+IF EDUCATION:
+  Primary (45%): Subject matter competence — formal credentials (Staatsexamen, Master Lehramt),
+                 depth in specific subjects taught.
+  Secondary (35%): Pedagogical/didactic evidence — classroom management, inclusion experience,
+                   differentiation methods, student outcomes (Abschlussquoten, Testergebnisse).
+  Tertiary (20%): Engagement + EdTech — digital tools, mentoring, extracurricular contributions.
+  Red Flag: Missing formal teaching qualification; no evidence of diverse student groups.
+
+IF UNKNOWN: Apply balanced weights (25% each across skills/experience/soft/domain).
+
+***
+
 **STEP 1 — CONSOLIDATION (MANDATORY):**
 Consolidate the requirements list into 3–5 core competency dimensions.
 Merge semantically identical requirements into one card.
@@ -198,26 +290,43 @@ For each card, produce:
 
 ***
 
-**STEP 3 — SCORE (Calibrated — follow this table exactly):**
+**STEP 3 — SCORE (Calibrated — follow Gap Census table from STEP 0 exactly):**
 
-Assign a score using this calibration table as hard constraint:
+Your overallScore MUST be consistent with the _gapCensus you computed in STEP 0.
+If you counted 2+ majorGaps, your score MUST be ≤ 39. No exceptions.
 
-| Situation | Score range |
-|-----------|-------------|
-| All core requirements clearly met in CV | 80–100 |
-| 1 minor gap, core requirements mostly met | 65–79 |
-| 1 major gap OR 2 minor gaps | 50–64 |
-| 2+ major gaps (core requirements) | 30–49 |
-| Fundamental mismatch (wrong field, degree, or level) | 0–29 |
+EVIDENCE QUALITY TIERS (apply for ALL level assessments in scoreBreakdown):
 
-A "major gap" = a core requirement (repeated in JD, first in requirements list, or tagged as essential) with NO evidence in ${cvRef}.
-A "minor gap" = a secondary or "plus" requirement missing from ${cvRef}.
+Tier A → "strong": CV contains ACTION VERB + QUANTIFIED RESULT for this skill.
+  Good: "Orchestrated cloud migration, reducing server costs by 15%"
+  Good: "Led team of 12 engineers across 2 years at KPMG"
+
+Tier B → "solid": CV mentions skill in role context, but without quantified impact
+  or only as a listed responsibility without concrete outcome.
+  Example: "Verantwortlich für Cloud-Infrastruktur" (no measurable outcome)
+
+Tier C → "gap": Skill not found in CV, or only mentioned in education/certifications
+  without practical application evidence within the past 7 years.
+
+RECENCY (hint only — never penalize harshly):
+- Last 3 years: full weight.
+- 3–7 years ago: relevant, may have evolved. Mention gently as growth opportunity.
+- >7 years ago: lower weight — only cite if it's the SOLE evidence for a core requirement.
+- No dates in CV for a skill: apply neutral weight — NEVER penalize for missing dates.
+
+FRAMING RULE for older experience (MANDATORY):
+- NEVER use: "veraltet", "outdated", "zu alt", "nicht mehr relevant"
+- ALWAYS USE encouraging framing: "[Skill] aus [Rolle] bietet eine solide Basis. Aktuelle Praxisbeispiele würden diese Dimension noch stärker belegen."
 
 For each of the 5 sub-categories (technicalSkills, softSkills, experienceLevel, domainKnowledge, languageMatch), assign a LEVEL and provide 1-2 brief bullet points.
 
-SOFT SKILLS RULE (mandatory, anti-averaging):
-SoftSkills = "strong" ONLY if ${cvRef} documents specific, named leadership/communication/stakeholder situations lasting >6 months (e.g., leading a team, running executive workshops). Generic CV phrases like "kommunikationsstark" or listing TEDx without content = "solid" at most. If soft skills are only implied or minimal → "solid" or "gap".
-Do NOT assign "strong" just because the candidate seems generally professional.
+SOFT SKILLS CALIBRATION (mandatory, anti-averaging):
+- Count softSkills as "majorGap" ONLY if JD EXPLICITLY requires "Führungserfahrung", "Stakeholder-Management", "C-Level-Kommunikation", or equivalent.
+- "strong": Named situation with documented leadership/exec-communication >6 months. e.g., "led 8-person team at KPMG for 2 years" — REQUIRES named company + duration.
+- "solid": Generic phrases ("kommunikationsstark"), implied but undocumented, OR leadership without duration specified. TEDx/conference mentions = "solid" at best.
+- "gap": JD requires it explicitly, CV shows nothing.
+- DEFAULT when JD has NO explicit soft-skill requirement: "solid" (never "strong" by default).
+- Do NOT assign "strong" just because the candidate seems generally professional.
 
 Address the user with "${addressForm}" in each reason. Always reference ${cvRef}.
 
@@ -256,15 +365,18 @@ STRICT: Do NOT infer. Using "make.com" does NOT mean "Sales Automation". "Projec
 - **IMPORTANT: reasons arrays MAXIMUM 2 entries** — short and precise!
 - **IMPORTANT: relevantChips, gaps, additionalChips are ALWAYS arrays (use [] if empty).**
 - **IMPORTANT: Output ONLY complete, valid JSON. Shorten texts if needed but always close the JSON correctly.**
-- **BOLD FORMATTING: In context, gaps, and overallRecommendation strings, wrap 2-3 key terms in **double asterisks** (e.g. \"**Prozessoptimierung**\"). This is MANDATORY.**
+- **BOLD FORMATTING: In context, gaps, strengths, potentialHighlights, AND overallRecommendation strings, wrap 2-3 key terms in **double asterisks** (e.g. \"**Prozessoptimierung**\"). This is MANDATORY for ALL text fields.**
 - **COVERAGE RULE: For EVERY scoreBreakdown category where level ≠ "gap" (i.e. "strong" or "solid"), there MUST be at least 1 requirementRow with that orbitCategory. If the JD has ANY requirement in domain/experience/soft/technical, produce a card for it. Empty filtered satellite views are a UX failure.**
+- **PUNCTUATION: NEVER use em dashes (—) or en dashes (–) in output text fields. Use semicolons (;) instead.**
+- **STRENGTHS FORMAT: Each strength item MUST be max 6 words. Use keyword phrases, NOT full sentences. Example: "**CRM-Erfahrung** (Close.io, HubSpot)" — NOT "Erfahrung mit CRM-Systemen wie Close.io und HubSpot, die die Anforderungen vollständig erfüllen".**
+- **POTENTIAL FORMAT: Each potentialHighlights item MUST be max 12 words. Start with the skill/asset, NOT with "Deine Rolle bei...". Example: "**Automatisierungserfahrung** (Make, N8N); Differenzierungsmerkmal für Kanzlei" — NOT "Deine Erfahrung mit Automatisierung könnte für eine moderne Kanzlei relevant sein".**
 
 ***
 
 **STEP 5 — SELF-CRITIQUE (mandatory before outputting):**
 Before writing the final JSON, silently check:
 1. Every "strong": backed by >6 months direct CV evidence? If not → downgrade to "solid".
-2. Score vs. calibration table consistent? Count major gaps first. 2+ major gaps → score MUST be ≤ 49.
+2. Score vs. Gap Census table consistent? 2+ major gaps → score MUST be ≤ 39. 1 major → ≤ 69.
 3. softSkills "strong": Is there a named, documented leadership or executive-communication situation >6 months? If only implied or brief → downgrade to "solid".
 4. Every text field is in ${lang}?
 5. Every orbitCategory is exactly one of: "technical", "soft", "experience", "domain", "language"?
@@ -277,6 +389,8 @@ Silently fix and output.
 **OUTPUT FORMAT:**
 {
   "_schemaVersion": 2,
+  "_gapCensus": { "majorGaps": <number>, "minorGaps": <number> },
+  "_jobCategory": "TECH|SALES|LEADERSHIP|OPERATIONS|CREATIVE|HEALTHCARE|EDUCATION|UNKNOWN",
   "overallScore": <0-100>,
   "scoreBreakdown": {
     "technicalSkills": { "level": "strong|solid|gap", "reasons": ["<reason 1>", "<reason 2>"] },
@@ -313,7 +427,7 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
         const result = await complete({
             taskType: 'cv_match',
             prompt: CV_MATCH_PROMPT(req),
-            temperature: 0.1,
+            temperature: 0, // Gap Census is deterministic — 0.1 allows inconsistent gap counting
             maxTokens: 5000,
         });
 
@@ -322,10 +436,28 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
 
         const firstResult: CVMatchResult = safeParseJson(jsonMatch[0]);
 
-        // Single-pass: Self-Critique is integrated into the prompt (STEP 5).
-        // No separate realism check call needed — significantly reduces latency.
-        const finalResult = firstResult;
+        // SICHERHEITSARCHITEKTUR §Golden Rule: keine falschen Responses.
+        // Post-Parse Consistency Check: Gap Census vs. Score must be consistent.
+        const gapCensus = (firstResult as any)._gapCensus;
+        if (gapCensus && typeof gapCensus.majorGaps === 'number') {
+            const major = gapCensus.majorGaps;
+            const minor = gapCensus.minorGaps ?? 0;
 
+            if (major >= 2 && firstResult.overallScore > 39) {
+                console.warn(`⚠️ [CV Match] Gap Census inconsistency: majorGaps=${major} but score=${firstResult.overallScore} — capping to 39`);
+                firstResult.overallScore = 39;
+            } else if (major >= 1 && minor >= 1 && firstResult.overallScore > 54) {
+                console.warn(`⚠️ [CV Match] Gap Census inconsistency: majorGaps=${major}, minorGaps=${minor} but score=${firstResult.overallScore} — capping to 54`);
+                firstResult.overallScore = 54;
+            } else if (major >= 1 && firstResult.overallScore > 69) {
+                console.warn(`⚠️ [CV Match] Gap Census inconsistency: majorGaps=${major} but score=${firstResult.overallScore} — capping to 69`);
+                firstResult.overallScore = 69;
+            }
+        }
+
+        // Log for audit trail
+        const jobCategory = (firstResult as any)._jobCategory ?? 'N/A';
+        console.log(`📊 [CV Match] Category: ${jobCategory}, Score: ${firstResult.overallScore}, MajorGaps: ${gapCensus?.majorGaps ?? 'n/a'}, MinorGaps: ${gapCensus?.minorGaps ?? 'n/a'}`);
 
 
         const { error: logError } = await supabaseAdmin.from('generation_logs').insert({
@@ -336,8 +468,9 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
             iteration: 1,
             prompt_tokens: result.tokensUsed || 0,
             completion_tokens: 0,
-            realism_score: null, // single-pass: no separate realism score
-            issues: null,
+            realism_score: null,
+            // Audit: capture Gap Census and Job Category for quality monitoring
+            issues: gapCensus ? { jobCategory, majorGaps: gapCensus.majorGaps, minorGaps: gapCensus.minorGaps ?? 0 } : null,
         });
 
         if (logError) {
@@ -345,9 +478,11 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
             console.error('⚠️ [CV Match] generation_logs insert failed (non-blocking):', logError.message);
         }
 
-        console.log('✅ CV Match complete (single-pass with Self-Critique). Score:', finalResult.overallScore);
+        console.log('✅ CV Match complete (single-pass with Self-Critique). Score:', firstResult.overallScore);
 
-        const { realismTokens, realismCost, realismLatency, ...cleanResult } = finalResult as any;
+        // Strip legacy realism fields (dead code from old 2-pass approach — never set by Claude)
+        // _gapCensus and _jobCategory are intentionally retained for DB storage / audit trail
+        const { realismTokens, realismCost, realismLatency, ...cleanResult } = firstResult as any;
         return cleanResult;
 
     } catch (error: any) {

@@ -463,11 +463,23 @@ Diese 8 "Golden Rules" wurden aus direkten Trainingssessions destilliert. Sie de
 |----|---------|-----------------------|------------------|
 | A | **Red Threading** | Ein zentrales Keyword (z.B. "Generalist") aus der Anzeige wird organisch im Intro und im ersten Hauptabsatz aufgegriffen, um eine Brücke zu bauen. | Fakten werden ohne roten Faden in Bulletpoints aneinandergereiht. |
 | B | **Pain Point (sachlich)** | *"Ich sehe, dass ihr ein Team neu aufbaut. Ich habe ähnliche Best Practices entwickelt."* | *"Ich bin der ideale Kandidat, um dieses Problem zu lösen."* (Retter-Komplex) |
-| C | **Vulnerability-Value Binding**| *"Bei [Station] lernte ich, dass mein Ansatz zu komplex war. Ich stieß auf ein Prinzip, das ich in euren Werten ([Konkreter Wert]) sehe."* | *"Als Schwäche könnte man meinen Perfektionismus ansehen."* (Generisch) |
+| C | **Vulnerability-Value Binding**| Authentische Lernkurve aus einer CV-Station, verknüpft mit einem konkreten Firmenwert. KEIN festes Satzmuster — jede Vulnerability muss einzigartig formuliert sein. | *"Als Schwäche könnte man meinen Perfektionismus ansehen."* (Generisch) / Wörtliche Kopie eines Template-Satzes (Prompt Leakage) |
 | D | **Fokus-Balance (90 Days)** | *"...mich auf die Engpässe fokussieren; ohne dabei Produktentwicklung und Prozesse aus den Augen zu verlieren."* | *"In den ersten 30 Tagen werde ich zuhören und verstehen."* (Passiv) |
 | E | **Enabler-Framing** (Quereinstieg) | *"Mir hat es in der Tech-Beratung sehr geholfen, einen medienwissenschaftlichen Hintergrund zu haben."* | *"Obwohl ich aus einem anderen Bereich komme, habe ich die nötigen Fähigkeiten..."* |
 | F | **Souveräne Ambition** | *"Nicht weil es schlecht war; sondern weil ich sehen wollte, ob ich dieselben Probleme mit mehr Budget schneller lösen kann."* | *"Aufbauend auf diesen wertvollen Erfahrungen suche ich eine neue Herausforderung."* |
 | G | **Minimalistisches Closing**| *"Wenn der Termin passt: Ich bin die nächsten Wochen flexibel/verfügbar."* | *"Ich würde mich sehr über die Möglichkeit eines Gesprächs freuen..."* |
 | H | **Aktiver Skill-Beweis** | *"Bei [Firma] habe ich mich für die Strategie X eingesetzt."* (Zeigt Aktion) | *"Die Strategie X zählte zu meinen Kernverantwortlichkeiten."* (Listet auf) |
+| I | **Intro-Dichte** | Max. 1 Organisation namentlich in der Einleitung. Zweite Referenz → Hauptteil. | Intro nennt 3 CV-Stationen → kein Futter für Hauptteil. |
+| J | **Subjekt-bezogene Firmenreferenz** | *"Nach meiner Recherche zu Ihren Projekten…"*, *"Auf LinkedIn sind mir Ihre Beiträge aufgefallen…"* | *"[Firma] agiert an der Schnittstelle…"* (allwissend) |
+| K | **Persönliche Kompetenz-Reflexion** | *"Aus diesen Erfahrungen habe ich gelernt, sowohl X als auch Y einzunehmen."* | *"Die Kombination aus X und Y ermöglicht es mir…"* (generisch) |
+| L | **Rhetorische Übergangs-Frage** | *"Bei Ingrano habe ich mich gefragt, wie wir NIS-2 nicht als Last, sondern als Ressource positionieren."* | Absätze ohne Übergang aneinandergereiht. |
+| M | **Logische Kohärenz** | Firmenbrücke + Station müssen thematisch zusammenpassen. *"EYs Fokus auf Nachhaltigkeit erinnert mich an meine Zeit als Co-Founder der Nachhaltigkeitsstrategie."* | *"EYs Fokus auf Nachhaltigkeit erinnert mich an meine Arbeit im Vertrieb."* (kein logischer Bezug) |
+| N | **Eloquenz + Bescheidenheit** | *"Daher gehe ich zuversichtlich ran."*, *"Ich freue mich, von Ihrer Expertise zu lernen."* | *"Ich bringe eine solide Grundlage mit."*, *"Meine Erfahrung befähigt mich."* (anmaßend) |
 
 **Klammer-Technik (Optional):** Bei `storytelling` oder `philosophisch` Presets darf im Closing kurz auf den Eingangs-Gedanken (z.B. ein Zitat) zurückgegriffen werden.
+
+**Format-Regeln (Update 2026-04-06):**
+- Maximale Satzlänge: 25 Wörter (Target). Claude überschreitet Fast-Targets systematisch um 10-15%, daher 25 statt 30.
+- Max. 2 Kommas pro Satz. Bei mehr → Satz aufteilen.
+- KEIN Gedankenstrich (– oder —). Semikolon (;) oder Punkt verwenden.
+- Gedankenstrich-Enforcement: Prompt-Anweisung + Post-Generation Regex (`text.replace(/\s*[–—]\s*/g, '; ')`).

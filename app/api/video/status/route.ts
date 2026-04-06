@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
         const { data: videoApproach } = await supabaseAdmin
             .from('video_approaches')
-            .select('status, talking_points, expires_at, storage_path')
+            .select('status, talking_points, expires_at, storage_path, access_token')
             .eq('user_id', user.id)
             .eq('job_id', jobId)
             .maybeSingle();
@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
                 expiresAt: null,
                 hasVideo: false,
                 hasScript: !!existingScript,
+                accessToken: null,
             });
         }
 
@@ -73,6 +74,7 @@ export async function GET(request: NextRequest) {
                     talkingPoints: videoApproach.talking_points?.items || null,
                     expiresAt,
                     hasVideo: true,
+                    accessToken: videoApproach.access_token,
                 });
             }
         }
@@ -83,6 +85,7 @@ export async function GET(request: NextRequest) {
             expiresAt: videoApproach.expires_at,
             hasVideo: videoApproach.status === 'uploaded',
             hasScript: true, // If videoApproach exists, script system is active
+            accessToken: videoApproach.access_token,
         });
 
     } catch (error: unknown) {

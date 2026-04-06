@@ -3,13 +3,14 @@ import { generateCoverLetterWithQuality } from '@/lib/services/cover-letter-gene
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
-import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
 import { logger } from '@/lib/logging';
 import { inngest } from '@/lib/inngest/client';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
+import { parseGenerateRequest } from '@/lib/schemas/cover-letter-schema';
+import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 
 export const maxDuration = 120; // Vercel timeout — frontend client waits 180s, server allows 120s
 
@@ -42,13 +43,14 @@ export async function POST(request: NextRequest) {
         // §3: User-scoped — always use session user.id, never trust body
         const userId = user.id;
 
-        const { jobId, setupContext, fixMode, targetFix, currentLetter } = await request.json() as {
-            jobId: string;
-            setupContext?: CoverLetterSetupContext;
-            fixMode?: 'full' | 'targeted';
-            targetFix?: string;
-            currentLetter?: string;
-        };
+        // §SANITIZE: Zod schema — repairs bad input, never blocks
+        const rawBody = await request.json();
+        const { data: parsed, warnings: sanitizationWarnings } = parseGenerateRequest(rawBody);
+        const { jobId, targetFix, currentLetter } = parsed;
+        // Zod sanitizes 5 critical fields (tone, stations, quote); passthrough preserves the rest.
+        // Cast is safe because the frontend always sends the full CoverLetterSetupContext shape.
+        const setupContext = parsed.setupContext as unknown as CoverLetterSetupContext | undefined;
+        const fixMode = parsed.fixMode as 'full' | 'targeted' | undefined;
 
         console.log(`[${requestId}] route=cover-letter/generate step=start userId=${userId} jobId=${jobId ?? 'none'} fixMode=${fixMode || 'full'}`);
 
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Collect warnings for transparent user communication
-        const warnings: string[] = [];
+        const warnings: string[] = [...sanitizationWarnings];
         if (!setupContext && fixMode !== 'targeted') {
             warnings.push('Kein Setup-Kontext — generische Qualität.');
         }

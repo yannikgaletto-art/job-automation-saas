@@ -28,26 +28,51 @@ const supabaseAdmin = createAdminClient(
 );
 
 /**
- * Attempts to parse JSON, with a fallback that truncates the string at the
- * last complete object/array boundary if the raw parse fails.
+ * Attempts to parse JSON, with two recovery passes:
+ * Pass 1: truncate at last '}' — recovers partial objects
+ * Pass 2: truncate at last ']' and close the outer object — recovers partial changes arrays
+ * This handles the common case where Claude truncates mid-change due to token limits.
  */
 function safeParseJson(raw: string): any {
-    try {
-        return JSON.parse(raw);
-    } catch {
-        let truncated = raw;
-        for (let i = raw.length - 1; i >= 0; i--) {
+    // Pass 0: direct parse
+    try { return JSON.parse(raw); } catch { /* continue */ }
+
+    // Pass 1: find all '}' positions, try from rightmost inward (O(n) linear scan + bounded retries)
+    const closeBracePositions: number[] = [];
+    for (let i = 0; i < raw.length; i++) {
+        if (raw[i] === '}') closeBracePositions.push(i);
+    }
+    for (let j = closeBracePositions.length - 1; j >= 0; j--) {
+        try { return JSON.parse(raw.slice(0, closeBracePositions[j] + 1)); } catch { continue; }
+    }
+
+    // Pass 2: truncate at last complete array element ']', then close outer object
+    // Handles: {"changes":[{...},{...}, <truncated>
+    const lastBracket = raw.lastIndexOf(']');
+    if (lastBracket !== -1) {
+        const candidate = raw.slice(0, lastBracket + 1);
+        // Balance braces to close the outer object
+        const openBraces = (candidate.match(/\{/g) || []).length;
+        const closeBraces = (candidate.match(/\}/g) || []).length;
+        const missingClose = '}' .repeat(Math.max(0, openBraces - closeBraces));
+        try { return JSON.parse(candidate + missingClose); } catch { /* continue */ }
+    }
+
+    // Pass 3: Find last COMPLETE change object (ends with '}') and build a valid array from it.
+    // This handles the most common truncation: Claude cuts off mid-string-value like "B2-Niveau)
+    // Strategy: walk backwards searching for a '}' that closes a complete change object
+    const changesStart = raw.indexOf('"changes"');
+    if (changesStart !== -1) {
+        // Find each '}' and try to recover [prefix up to that }] as a valid changes array
+        for (let i = raw.length - 1; i > changesStart; i--) {
             if (raw[i] === '}') {
-                truncated = raw.slice(0, i + 1);
-                try {
-                    return JSON.parse(truncated);
-                } catch {
-                    continue;
-                }
+                const candidate = raw.slice(0, i + 1) + '\n  ]\n}';
+                try { return JSON.parse(candidate); } catch { continue; }
             }
         }
-        throw new Error('Could not parse AI JSON response: ' + raw.slice(-200));
     }
+
+    throw new Error('Could not parse AI JSON response: ' + raw.slice(-300));
 }
 
 /**
@@ -401,7 +426,7 @@ This is a layout correction — not an optimization round.
                     taskType: 'optimize_cv',
                     prompt,
                     temperature: 0,
-                    maxTokens: 5000,
+                    maxTokens: 8000, // Increased: 5000 caused truncation on large CVs with 12 changes
                 });
                 // Wrap in the same shape withCreditGate returns
                 response = { text: response.text, ...(response as any) };
@@ -414,7 +439,7 @@ This is a layout correction — not an optimization round.
                         taskType: 'optimize_cv',
                         prompt,
                         temperature: 0,
-                        maxTokens: 5000,
+                        maxTokens: 8000, // Increased: 5000 caused truncation on large CVs with 12 changes
                     }),
                     job_id
                 );

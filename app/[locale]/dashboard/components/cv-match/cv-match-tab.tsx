@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { CVSelectDialog, type CVOption } from '@/components/dashboard/cv-select-dialog';
 import { DocumentsRequiredDialog } from '@/components/shared/documents-required-dialog';
 import { useNotification } from '@/hooks/use-notification';
+import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
 
 interface CVMatchTabProps {
     jobId: string;
@@ -63,6 +64,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const router = useRouter();
     const notify = useNotification();
+    const { showPaywall } = useCreditExhausted();
     const [matchData, setMatchData] = useState<CVMatchResult | null>(null);
     const [loadingStep, setLoadingStep] = useState(0);
     const [atsOpen, setAtsOpen] = useState(false);
@@ -192,6 +194,11 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
             }
 
             if (!res.ok || !data?.success) {
+                if (res.status === 402 && data?.error === 'CREDITS_EXHAUSTED') {
+                    showPaywall('credits', { remaining: data.remaining ?? 0 });
+                    setState('idle');
+                    return;
+                }
                 if (data?.code === 'CV_NOT_FOUND') {
                     setState('no-cv');
                     return;

@@ -73,7 +73,7 @@ export function PersonaPanel({
             <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-gray-500" />
-                    <h3 className="text-sm font-semibold text-gray-900">Hiring Manager</h3>
+                    <h3 className="text-sm font-semibold text-gray-900">Recruiter Simulation</h3>
                 </div>
                 <button
                     onClick={fetchPersonas}

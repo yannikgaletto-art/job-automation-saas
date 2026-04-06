@@ -34,6 +34,20 @@ interface GeneratedBlock {
     sortOrder: number;
 }
 
+// ── Fixed Vorstellung Script — USER REQUEST 2025-04 ───────────────────────────────
+// These are shown as editable defaults. [Name] = Hiring Manager, [Dein Name] = Applicant.
+const INTRO_DEFAULTS: Record<string, string> = {
+    de: 'Hallo [Name], ich bin [Dein Name]. Weil ein kurzes Video oft mehr sagt als ein langes Anschreiben, dachte ich, ich stelle mich Ihnen einfach mal persönlich vor. Und bevor wir jetzt meinen Lebenslauf durchgehen, möchte ich lieber direkt auf den Punkt kommen und Ihnen sagen, warum ich genau in Ihrem Team mit anpacken möchte.',
+    en: 'Hello [Name], I’m [Your Name]. Because a short video often says more than a long cover letter, I thought I’d introduce myself to you in person. And before we go through my CV, I’d rather get straight to the point and tell you why I specifically want to roll up my sleeves and join your team.',
+    es: 'Hola [Nombre], soy [Tu Nombre]. Porque un vídeo corto dice más que una larga carta de presentación, pensé en presentarme personalmente. Y antes de repasar mi CV, prefiero ir al grano y decirle por qué quiero exactamente unirme a su equipo.',
+};
+// Localized title of the intro block (must match TITLE_MAPS)
+const INTRO_TITLES: Record<string, string> = {
+    de: 'Vorstellung',
+    en: 'Introduction',
+    es: 'Introducción',
+};
+
 /**
  * POST /api/video/scripts/generate
  * 
@@ -263,6 +277,17 @@ export async function POST(request: NextRequest) {
                 sortOrder: i,
             };
         });
+
+        // ── Always override Vorstellung with the fixed default script ────────────────
+        // The user requested a fixed, personal intro template — AI generates only the
+        // other blocks (Erfahrung, Motivation, Abschluss). The intro placeholders
+        // [Name] and [Dein Name] are filled in by the user before recording.
+        const introTitle = INTRO_TITLES[locale!] || INTRO_TITLES.de;
+        const introDefault = INTRO_DEFAULTS[locale!] || INTRO_DEFAULTS.de;
+        const introBlock = blocks.find(b => b.title === introTitle);
+        if (introBlock) {
+            introBlock.content = introDefault;
+        }
         // Upsert video_scripts row
         const { error: upsertError } = await supabaseAdmin
             .from('video_scripts')

@@ -138,7 +138,7 @@ IMPORTANT for benefits:
 - Extract ONLY the 6 most standout benefits, max 3 words each.
 - Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
-{"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8 responsibilities as condensed complete sentences in ${languageName}"],"qualifications":["max 8 qualifications as condensed complete sentences in ${languageName}"],"benefits":["TOP 6 most important, max 3 words each, e.g. '30 Tage Urlaub'"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["max 12 ATS Keywords"]}`,
+{"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8 responsibilities"],"qualifications":["max 8 qualifications"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["MAXIMUM 15 ATS keywords. ONLY: software tools, frameworks, platforms, technical standards, certifications, specific domain/methodology terms. INCLUDE: Python, SAP, Jira, ISO 26262, SCRUM, OKR, MEDDPICC, M&A, IFRS, Power BI, ROI. EXCLUDE: generic verbs (Implementierung, Schulungen), language names (Deutsch, Englisch, Fluent), company names that are the job subject, adjectives (Agile), soft skills, job titles. Quality over quantity — 8-12 strong keywords beats 20 weak ones."]}`,
                 prompt: job.description,
                 temperature: 0,
                 maxTokens: 2000,

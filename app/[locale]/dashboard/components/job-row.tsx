@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, FileText, Check, Sparkles, Mail, Video, Info, Trash2, ChevronDown } from 'lucide-react';
+import { ChevronRight, FileText, Check, Sparkles, Mail, Video, Info, Trash2, ChevronDown, BriefcaseBusiness, Loader2 } from 'lucide-react';
 import { ProgressWorkflow } from './progress-workflow';
 import { Button } from '@/components/motion/button';
 
@@ -44,6 +44,7 @@ interface JobRowProps {
     onReanalyze?: (jobId: string) => void;
     onConfirm?: (jobId: string) => void;
     onDelete?: (jobId: string) => void;
+    onMarkApplied?: (jobId: string) => void;
     isOptimizing?: boolean;
 }
 
@@ -229,7 +230,7 @@ function BenefitsGrid({ benefits }: { benefits: string[] }) {
 // Main Component
 // ---------------------------------------------------------------
 
-export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onConfirm, onDelete, isOptimizing }: JobRowProps) {
+export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onConfirm, onDelete, onMarkApplied, isOptimizing }: JobRowProps) {
     const t = useTranslations('job_queue');
     const tCvMatch = useTranslations('cv_match');
     const [activeTab, setActiveTab] = useState<number | null>(null);
@@ -237,10 +238,14 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
     const [liveMatchResult, setLiveMatchResult] = useState<any | null>(null);
     const [optimisticStep, setOptimisticStep] = useState<number | null>(null);
     const [videoUnlocked, setVideoUnlocked] = useState(false);
+    const [isPendingApply, setIsPendingApply] = useState(false);
 
     // Gate-Check: Video Letter Tab only unlocked when QR-Token exists
+    // Re-runs on tab change so that generating a QR in CV Opt. immediately unlocks the tab
+    // without requiring a page refresh. Short-circuits on first unlock (no redundant fetches).
     useEffect(() => {
         if (!expanded) return;
+        if (videoUnlocked) return; // Already unlocked — no re-fetch needed
         const checkVideoStatus = async () => {
             try {
                 const res = await fetch(`/api/video/status?jobId=${job.id}`);
@@ -256,7 +261,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
             } catch { /* silent fail — tab stays locked */ }
         };
         checkVideoStatus();
-    }, [expanded, job.id]);
+    }, [expanded, job.id, activeTab, videoUnlocked]); // activeTab: re-check after QR generated in CV Opt.
 
 
     const displayTab = activeTab ?? 0;
@@ -311,6 +316,30 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                 </div>
 
                 <div className="flex-1" />
+
+                {onMarkApplied && (
+                    <button
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            if (isPendingApply) return;
+                            setIsPendingApply(true);
+                            try {
+                                await onMarkApplied(job.id);
+                            } finally {
+                                setIsPendingApply(false);
+                            }
+                        }}
+                        disabled={isPendingApply}
+                        aria-label={t('btn_mark_applied_row')}
+                        title={t('btn_mark_applied_row')}
+                        className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors shrink-0 disabled:opacity-50 disabled:cursor-wait"
+                    >
+                        {isPendingApply
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : <BriefcaseBusiness className="w-4 h-4" />
+                        }
+                    </button>
+                )}
 
                 <button
                     onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(true); }}
@@ -547,6 +576,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
                                 onComplete={() => {
                                     setOptimisticStep(prev => Math.max(prev ?? job.workflowStep, 100));
                                 }}
+                                onJobApplied={() => onMarkApplied?.(job.id)}
                             />
                             </div>
                         )}

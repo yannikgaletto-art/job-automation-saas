@@ -5,7 +5,7 @@ import type { HiringPersona } from '@/lib/services/hiring-manager-resolver';
 
 export type HookType = 'news' | 'value' | 'quote' | 'linkedin' | 'manual' | 'vision' | 'project' | 'funding';
 export type TonePreset = 'data-driven' | 'storytelling' | 'formal' | 'philosophisch';
-export type TargetLanguage = 'de' | 'en';
+export type TargetLanguage = 'de' | 'en' | 'es';
 
 // ─── Step A Output ────────────────────────────────────────────────
 export interface SelectedHook {
@@ -31,6 +31,11 @@ export interface SelectedCVStation {
     matchedRequirement: string;       // z.B. "5-7 Jahre Partnerships"
     intent: string;                   // z.B. "Beweis für strategische Kooperationen"
     bullets?: string[];               // Alle Bullet-Points der gewählten Station für Kontext
+
+    // Strategy 1: User-provided relevance context (optional, zero-friction)
+    // When filled, this becomes the HIGHEST-PRIORITY signal in the prompt.
+    // Pre-filled with auto-suggestions from CV bullets; user can edit or ignore.
+    userContext?: string;
 }
 
 // ─── Step C Output ────────────────────────────────────────────────
@@ -111,7 +116,8 @@ export interface SetupDataResponse {
         role: string;
         period: string;
         bullets: string[];
-        hint?: string;     // Server-generated hint based on CV Match analysis
+        hint?: string;               // Server-generated hint based on CV Match analysis
+        cvOptimizerContext?: string; // Auto-filled from CV Optimizer appliedChanges for this company/role
     }>;
     jobRequirements: string[];      // Top 3 aus job_queue.requirements
 

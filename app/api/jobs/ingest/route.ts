@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
             .from('job_queue')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', userId)
-            .in('status', ['pending', 'ready_for_review', 'ready_to_apply', 'submitted']);
+            .in('status', ['pending', 'ready_for_review', 'ready_to_apply']);
 
         if (!countError && (activeJobCount ?? 0) >= 5) {
             console.log(`[${requestId}] route=jobs/ingest step=limit_check blocked count=${activeJobCount}`);
@@ -148,7 +148,10 @@ export async function POST(request: NextRequest) {
                     qualifications: `string[] — qualifications (max 8), in ${languageName}`,
                     benefits: `string[] — TOP 6 most important benefits, max 3 words each (e.g. "30 Tage Urlaub", "Remote Work", "Betriebliche Altersvorsorge"). No full sentences. No copy-paste.`,
                     seniority: "'junior' | 'mid' | 'senior' | 'lead' | 'unknown'",
-                    buzzwords: "string[] — ATS/Robot-Keywords: tools, methods, frameworks (max 12)"
+                    buzzwords: `string[] — ATS keywords: MAXIMUM 15. ONLY include: software tools, frameworks, platforms, technical standards, certifications, and specific domain/methodology terms that an ATS robot would scan for.
+  ✅ INCLUDE: Python, Salesforce, SAP, Jira, ISO 26262, SCRUM, OKR, MEDDPICC, Machine Learning, M&A, Kartellrecht, IFRS, Power BI, ROI, ARR
+  ❌ EXCLUDE: generic verbs ("Implementierung", "Schulungen", "Analyse"), language names ("Deutsch", "Englisch", "Fließend"), company/product names that are the job focus ("Odoo"-role = not a keyword), adjectives ("Agile"), soft skills ("Kommunikation"), job titles ("Business Consultant")
+  Quality over quantity. 8–12 high-signal keywords is better than 20 weak ones.`
                 };
 
                 const response = await complete({

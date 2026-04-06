@@ -143,6 +143,15 @@ const INDUSTRY_SEGMENT_MAP: Record<string, string> = {
 // Banned authors for AI-generated quotes (polarizing/overused)
 const BANNED_THINKERS = ['elon musk', 'jeff bezos', 'mark zuckerberg'];
 
+// Overused authors — NOT banned, but the AI should avoid them for diversity.
+// These are brilliant thinkers, but they appear in almost every cover letter.
+// The AI prompt will say "avoid unless uniquely fitting".
+const OVERUSED_THINKERS = [
+    'peter drucker', 'steve jobs', 'simon sinek', 'brené brown',
+    'albert einstein', 'mahatma gandhi', 'nelson mandela',
+    'henry ford', 'warren buffett', 'richard branson',
+];
+
 // ─── Supabase Client (module-level singleton — created once per cold start) ──
 let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
@@ -411,11 +420,13 @@ Gib mir 3 echte, bekannte Vordenker mit je EINEM echten Zitat, das thematisch zu
 
 REGELN:
 1. VERBOTEN als Vordenker: ${BANNED_THINKERS.join(', ')}. Zu polarisierend.
-2. Das Zitat muss REAL sein — ein Zitat, das du sicher aus deinem Trainingswissen kennst.
-3. KEINE Paraphrasierungen, KEINE "attributed to"-Zitate.
-4. Wenn du dir bei einem Zitat NICHT 100% sicher bist, setze "confidence": "low".
-5. Max. 30 Wörter pro Zitat.
-6. ${langInstruction}
+2. VERMEIDE wenn möglich: ${OVERUSED_THINKERS.join(', ')}. Sie sind überrepräsentiert in Anschreiben. Wähle sie NUR, wenn kein anderer Vordenker thematisch passt.
+3. DIVERSITÄT: Bevorzuge Denker aus verschiedenen Epochen, Kulturen und Disziplinen. z.B. Philosophen, Wissenschaftler, Unternehmer, Autoren, Künstler, Aktivisten. Frauen und Persönlichkeiten aus nicht-westlichen Kulturen sind willkommen.
+4. Das Zitat muss REAL sein — ein Zitat, das du sicher aus deinem Trainingswissen kennst.
+5. KEINE Paraphrasierungen, KEINE "attributed to"-Zitate.
+6. Wenn du dir bei einem Zitat NICHT 100% sicher bist, setze "confidence": "low".
+7. Max. 30 Wörter pro Zitat.
+8. ${langInstruction}
 
 OUTPUT (JSON Array):
 [
@@ -450,6 +461,12 @@ OUTPUT (JSON Array):
                 return wordCount >= 8 && wordCount <= 30;
             })
             .filter(r => !BANNED_THINKERS.some(b => r.name.toLowerCase().includes(b)))
+            // Soft-deprioritize overused authors: if we have enough non-overused quotes, drop them
+            .sort((a, b) => {
+                const aOverused = OVERUSED_THINKERS.some(o => a.name.toLowerCase().includes(o)) ? 1 : 0;
+                const bOverused = OVERUSED_THINKERS.some(o => b.name.toLowerCase().includes(o)) ? 1 : 0;
+                return aOverused - bOverused; // non-overused first
+            })
             .slice(0, 3)
             .map(r => ({
                 quote: cleanQuoteText(r.quote),

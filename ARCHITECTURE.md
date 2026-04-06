@@ -96,9 +96,10 @@ Last Updated: 2026-03-09
 - `/api/certificates/generate` (POST — Zertifikats-Empfehlungen generieren)
 - `/api/certificates/[jobId]` (GET — Zertifikats-Empfehlungen abrufen)
 
-#### Video (7 Endpunkte)
+#### Video (8 Endpunkte)
 - `/api/video/create-token` (POST — Video Token erstellen)
 - `/api/video/status` (GET — Video Status abfragen)
+- `/api/video/delete` (POST — Video sicher löschen)
 - `/api/video/talking-points` (POST — Talking Points generieren, deprecated by scripts/generate)
 - `/api/video/upload` (POST — Video Upload + Confirm)
 - `/api/video/scripts` (GET — Script für Job laden)

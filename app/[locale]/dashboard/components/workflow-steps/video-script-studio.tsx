@@ -4,7 +4,7 @@ import { useReducer, useEffect, useCallback, useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Save, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { Save, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { Check } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ import { BlockEditor, type ScriptBlock } from './script-studio/block-editor';
 import { KeywordSidebar } from './script-studio/keyword-sidebar';
 import { ScriptPreview } from './script-studio/script-preview';
 import { PreGenerationModal, type PreGenParams } from './script-studio/pre-generation-modal';
+import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
 
 // --- Types ---
 
@@ -221,6 +222,7 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
     const locale = useLocale();
     const [state, dispatch] = useReducer(reducer, initialState);
     const [showPreGenModal, setShowPreGenModal] = useState(false);
+    const { showPaywall } = useCreditExhausted();
 
     // Initial load
     useEffect(() => {
@@ -307,6 +309,11 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
             });
             const data = await res.json();
             if (!res.ok || !data.success) {
+                if (res.status === 402 && data.error === 'CREDITS_EXHAUSTED') {
+                    showPaywall('credits', { remaining: data.remaining ?? 0 });
+                    dispatch({ type: 'SET_PHASE', phase: 'empty' });
+                    return;
+                }
                 throw new Error(data.error || t('error_generic'));
             }
 

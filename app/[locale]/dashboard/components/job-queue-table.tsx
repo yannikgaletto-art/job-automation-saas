@@ -13,6 +13,7 @@ interface JobQueueTableProps {
     onReanalyze?: (jobId: string) => void;
     onConfirm?: (jobId: string) => void;
     onDelete?: (jobId: string) => void;
+    onMarkApplied?: (jobId: string) => void;
     loading?: boolean;
     optimizingJobId?: string | null;
     /** Controlled expand state — lifted from parent */
@@ -22,7 +23,7 @@ interface JobQueueTableProps {
 }
 
 export function JobQueueTable({
-    jobs, className, onOptimize, onReanalyze, onConfirm, onDelete,
+    jobs, className, onOptimize, onReanalyze, onConfirm, onDelete, onMarkApplied,
     loading, optimizingJobId, expandedId, onToggle,
 }: JobQueueTableProps) {
     if (loading) {
@@ -50,6 +51,7 @@ export function JobQueueTable({
                         onReanalyze={onReanalyze}
                         onConfirm={onConfirm}
                         onDelete={onDelete}
+                        onMarkApplied={onMarkApplied}
                         isOptimizing={optimizingJobId === job.id}
                     />
                 ))}

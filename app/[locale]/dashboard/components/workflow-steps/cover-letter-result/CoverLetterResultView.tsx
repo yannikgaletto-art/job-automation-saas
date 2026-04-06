@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { LetterEditor } from "./LetterEditor"
 import { HiringManagerCritique } from "./HiringManagerCritique"
 import type { HiringManagerCritique as CritiqueType, CoverLetterSetupContext } from "@/types/cover-letter-setup"
 import { useTranslations, useLocale } from 'next-intl'
+import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context'
 
 interface GenerationResult {
     coverLetter: string
@@ -25,15 +26,27 @@ interface CoverLetterResultViewProps {
     companyName: string
     jobTitle: string
     setupContext?: CoverLetterSetupContext | null
+    onApplied?: () => void
 }
 
-export function CoverLetterResultView({ initialResult, userId, jobId, companyName, jobTitle, setupContext }: CoverLetterResultViewProps) {
+export function CoverLetterResultView({ initialResult, userId, jobId, companyName, jobTitle, setupContext, onApplied }: CoverLetterResultViewProps) {
     const t = useTranslations('cover_letter');
     const locale = useLocale();
+    const { showPaywall } = useCreditExhausted();
     const [currentLetter, setCurrentLetter] = useState(initialResult.coverLetter)
     const [fixingParagraphIndex, setFixingParagraphIndex] = useState<number | null>(null)
     const [isFixing, setIsFixing] = useState(false)
     const [isApplied, setIsApplied] = useState(false)
+    const [isApplyPending, setIsApplyPending] = useState(false)
+    const [isApplyError, setIsApplyError] = useState(false)
+    const applyErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // Cleanup timer on unmount to prevent state-update-on-unmounted-component
+    useEffect(() => {
+        return () => {
+            if (applyErrorTimerRef.current) clearTimeout(applyErrorTimerRef.current)
+        }
+    }, [])
 
     // ─── Hiring Manager Critique State ───────────────────────────────
     const [critique, setCritique] = useState<CritiqueType | null>(null)
@@ -56,7 +69,17 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
                         locale,
                     })
                 })
-                if (!res.ok) throw new Error('Critique fetch failed')
+                if (!res.ok) {
+                    if (res.status === 402) {
+                        const errData = await res.json().catch(() => ({}))
+                        if (errData.error === 'CREDITS_EXHAUSTED') {
+                            showPaywall('credits', { remaining: errData.remaining ?? 0 })
+                            setCritiqueLoading(false)
+                            return
+                        }
+                    }
+                    throw new Error('Critique fetch failed')
+                }
                 const data = await res.json()
                 setCritique(data.critique ?? null)
             } catch {
@@ -85,7 +108,16 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
                     currentLetter
                 })
             })
-            if (!response.ok) throw new Error('Fix fehlgeschlagen')
+            if (!response.ok) {
+                if (response.status === 402) {
+                    const errData = await response.json().catch(() => ({}))
+                    if (errData.error === 'CREDITS_EXHAUSTED') {
+                        showPaywall('credits', { remaining: errData.remaining ?? 0 })
+                        return
+                    }
+                }
+                throw new Error('Fix fehlgeschlagen')
+            }
             const data = await response.json()
             if (data.cover_letter) {
                 setCurrentLetter(data.cover_letter)
@@ -143,17 +175,22 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
     }
 
     const handleMarkApplied = async () => {
-        if (isApplied) return
+        if (isApplied || isApplyPending) return
+        setIsApplyPending(true)
+        setIsApplyError(false)
         try {
             const res = await fetch('/api/jobs/mark-applied', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId, userId })
+                body: JSON.stringify({ jobId })
             })
+            const resData = await res.json()
 
-            if (!res.ok) throw new Error()
+            // Check both HTTP status AND success flag — API may return 200 with success:false
+            if (!res.ok || !resData.success) throw new Error(resData.error || 'Failed')
 
             setIsApplied(true)
+            onApplied?.()
             import('canvas-confetti').then(({ default: confetti }) => {
                 confetti({
                     particleCount: 100,
@@ -162,7 +199,12 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
                 })
             })
         } catch {
-            // Error handled gracefully
+            setIsApplyError(true)
+            // Auto-clear error, store ref to cancel if component unmounts
+            if (applyErrorTimerRef.current) clearTimeout(applyErrorTimerRef.current)
+            applyErrorTimerRef.current = setTimeout(() => setIsApplyError(false), 4000)
+        } finally {
+            setIsApplyPending(false)
         }
     }
 
@@ -220,6 +262,12 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
 
                         <div className="flex-1" />
 
+                        {isApplyError && (
+                            <span className="text-xs text-red-500">
+                                {t('error_unknown')}
+                            </span>
+                        )}
+
                         {isApplied ? (
                             <div className="text-[#2e7d32] bg-[#e8f5e9] rounded px-3 py-2 text-sm font-medium flex items-center gap-2">
                                 {t('result_applied')}
@@ -227,7 +275,9 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
                         ) : (
                             <button
                                 onClick={handleMarkApplied}
-                                className="bg-[#002e7a] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#001f5c] transition-colors flex items-center gap-2"
+                                disabled={isApplyPending}
+                                aria-label={t('btn_mark_applied')}
+                                className="bg-[#002e7a] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#001f5c] transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-wait"
                             >
                                 {t('btn_mark_applied')}
                             </button>
@@ -243,7 +293,6 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
                         isError={critiqueError}
                         critiqueResolved={critiqueResolved}
                         onApplyFix={handleApplyCritiqueFix}
-                        onCustomFix={handleCustomFix}
                         isFixing={isFixing}
                     />
                 </div>

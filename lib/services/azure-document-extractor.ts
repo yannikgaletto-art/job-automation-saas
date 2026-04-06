@@ -35,9 +35,10 @@ const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 60_000; // 60s max wait
 
 // Y-coordinate tolerance for "same row" detection in multi-column layouts.
-// Azure polygon coordinates are in inches on the page. 
+// Azure polygon coordinates are in inches on the page.
 // 0.15 inches ≈ typical line height — safe for matching columns on the same line
 // without mixing adjacent rows (which could be as close as 0.18 inches apart).
+// Reverted to original tested value (was working before 2026-04-05 changes).
 const SAME_ROW_Y_TOLERANCE_INCHES = 0.15;
 
 /**

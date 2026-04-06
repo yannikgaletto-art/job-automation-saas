@@ -66,7 +66,7 @@ const s = StyleSheet.create({
     eduSubItem: { fontSize: 8.5, color: MUTED, lineHeight: 1.4, paddingLeft: 8 },
     skillCategoryLabel: {
         fontSize: 8.5, fontWeight: 700, color: DARK, textTransform: 'uppercase',
-        letterSpacing: 1.5, marginBottom: 2,
+        letterSpacing: 0, marginBottom: 2,
     },
 });
 

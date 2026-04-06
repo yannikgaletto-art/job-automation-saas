@@ -368,7 +368,7 @@ function CRMDrawer({
 // Main Component
 // ────────────────────────────────────────────────
 
-export function ApplicationHistory() {
+export function ApplicationHistory({ refreshKey }: { refreshKey?: number }) {
     const t = useTranslations("dashboard.application_history")
     const [data, setData] = useState<ApiResponse | null>(null)
     const [loading, setLoading] = useState(true)
@@ -378,7 +378,7 @@ export function ApplicationHistory() {
 
     useEffect(() => {
         fetchHistory(page)
-    }, [page])
+    }, [page, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchHistory = async (pageNum: number) => {
         setLoading(true)

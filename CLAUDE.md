@@ -114,6 +114,7 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **CV Match Pipeline (2026-03-26)** | **Local dev fix: `inngest dev` server must be running to process `cv-match/analyze` events. Frontend stale detection aligned with Backend (4min threshold) to prevent dead-zone where frontend looped but API rejected retries.** |
 | **CV Optimizer Reload Bug (2026-03-26)** | **Added missing `onComplete` callback in `OptimizerWizard` and bound it to `optimisticStep` in `UnifiedJobRow`. The Job Queue now instantly advances to "Cover Letter" visually after "Save" without requiring a page reload.** |
 | **Stripe Monetization V1 (2026-04-01)** | **Credit-basiertes System: Free(6)/Starter(€9,90/20)/Durchstarter(€19,90/50). Atomic `debit_credits()` RPC mit FOR UPDATE Lock. `withCreditGate()` API-Wrapper. Stripe Checkout/Webhook/Portal. Idempotent webhook via `processed_stripe_events`. Centralized `lib/supabase/admin.ts` singleton. `getUserCreditsForClient()` strips `stripeCustomerId`. Billing i18n (de/en/es, 45+ Keys). Feature-Silo §9 in FEATURE_COMPAT_MATRIX.md.** |
+| **UX & Video Pipeline Overhaul (2026-04-06)** | **Video UX: Confirm dialogs, preview tab links, Double-Assurance delete endpoint with stable QR tokens. Formality drift fixed via deep style constraints. Credit-loop bypass via Feedback UI integration. CV bullets fully synced to CLI context. Default Intro Scripts available in DE/EN/ES natively.** |
 
 ---
 

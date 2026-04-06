@@ -609,10 +609,11 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             </div>
 
             <div className="flex justify-between pt-2">
-                <button onClick={onBack} className="flex items-center gap-1 text-xs text-[#73726E] hover:text-[#37352F]">
+                <button type="button" onClick={onBack} className="flex items-center gap-1 text-xs text-[#73726E] hover:text-[#37352F]">
                     <ChevronLeft className="w-3.5 h-3.5" /> {t('btn_back')}
                 </button>
                 <button
+                    type="button"
                     onClick={onGenerate}
                     disabled={!canGenerate}
                     className={[

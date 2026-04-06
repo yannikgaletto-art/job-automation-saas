@@ -66,6 +66,12 @@ Die Reihenfolge der Textblöcke im Input entspricht NICHT zwingend der logischen
 Insbesondere bei zweispaltigen CVs können Daten, Firmennamen und Beschreibungen DURCHEINANDER stehen.
 Du MUSST daher den gesamten Text lesen und die Zuordnung SEMANTISCH vornehmen.
 
+**HÄUFIGSTES FEHLERMUSTER (2-Spalten-Layout):**
+Der OCR-Text enthält oft ERST einen Block aller Datumspaare und DANN einen Block aller Rollen/Firmen.
+Beispiel: "01.2020  06.2022  07.2018  12.2019  Firma A Senior Manager  Firma B Junior Analyst"
+→ FALSCH wäre: Firma A = 01.2020-06.2022 und Firma B = 07.2018-12.2019 (einfache textreihenfolge)
+→ Du musst stattdessen SEMANTISCH prüfen: Welche Aufgaben/Technologien passen zu welcher Firma UND welchem Zeitraum? Nutze Seniorität, Branchenwissen und logische Konsistenz.
+
 **2-PASS-STRATEGIE (PFLICHT):**
 PASS 1: Lies den GESAMTEN Text und sammle ALLE Datumsangaben, Firmennamen und Rollen.
 PASS 2: Ordne sie logisch zu — welche Firma gehört zu welchem Datumsbereich? Nutze inhaltliche Hinweise (z.B. Seniorität, Branche, Technologien) um korrekte Zuordnungen zu finden.

@@ -99,6 +99,19 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'Upload confirmation failed', requestId }, { status: 500 });
             }
 
+            // §1 Double-Assurance: Read-Back verification
+            const { data: verify } = await supabaseAdmin
+                .from('video_approaches')
+                .select('status, access_token')
+                .eq('user_id', userId)
+                .eq('job_id', jobId)
+                .single();
+
+            if (!verify || verify.status !== 'uploaded') {
+                log.error('Double-Assurance failed — status not uploaded after update');
+                return NextResponse.json({ error: 'Upload verification failed', requestId }, { status: 500 });
+            }
+
             // Fire Inngest scheduled deletion
             await inngest.send({
                 name: 'video/schedule-deletion',
@@ -111,6 +124,7 @@ export async function POST(request: NextRequest) {
                 success: true,
                 requestId,
                 expiresAt,
+                accessToken: verify.access_token,
             });
         }
 

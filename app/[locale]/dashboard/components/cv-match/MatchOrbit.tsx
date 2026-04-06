@@ -103,6 +103,31 @@ function getLevelKey(level: ScoreLevel): 'level_strong' | 'level_solid' | 'level
     }
 }
 
+/**
+ * Derive satellite level from requirementRow cards (Single Source of Truth).
+ * Worst-Case-Wins: if ANY card in the category is 'gap', satellite shows 'gap'.
+ * Fallback: if no cards exist for this category, use scoreBreakdown (prevents silent regression).
+ */
+function aggregateLevel(
+    rows: RequirementRow[],
+    category: OrbitCategory | string,
+    breakdownFallback?: ScoreCategory
+): ScoreLevel {
+    const filtered = rows
+        .map(normalizeRowToV2)
+        .filter(r => r.orbitCategory === category);
+
+    if (filtered.length === 0) {
+        // No cards for this category → use breakdown from AI output (backward compat)
+        return (breakdownFallback?.level as ScoreLevel) ?? 'solid';
+    }
+    if (filtered.some(r => r.level === 'gap')) return 'gap';
+    if (filtered.every(r => r.level === 'strong')) return 'strong';
+    return 'solid';
+}
+
+
+
 function polarToOffset(angleDeg: number, radius: number) {
     const rad = (angleDeg - 90) * (Math.PI / 180);
     return { x: Math.cos(rad) * radius, y: Math.sin(rad) * radius };
@@ -305,6 +330,43 @@ function renderBoldText(text: string) {
     });
 }
 
+/**
+ * Split overallRecommendation into paragraph chunks of 2-3 sentences.
+ * Splits on sentence-ending punctuation followed by a space.
+ */
+function splitIntoParagraphs(text: string, sentencesPerPara = 2): string[] {
+    // Split on sentence boundaries: '. ', '! ', '? ' but preserve the punctuation
+    const sentences = text.match(/[^.!?]+[.!?]+[\s]*/g) || [text];
+    const paragraphs: string[] = [];
+    for (let i = 0; i < sentences.length; i += sentencesPerPara) {
+        paragraphs.push(sentences.slice(i, i + sentencesPerPara).join('').trim());
+    }
+    return paragraphs.filter(Boolean);
+}
+
+/**
+ * Render a strength/potential item as stacked: label (bold top) + text (below).
+ * Input may be "Label; Text description" or just plain text.
+ */
+function StackedItem({ text, colorClass }: { text: string; colorClass: string }) {
+    const semicolonIdx = text.indexOf(';');
+    if (semicolonIdx !== -1) {
+        const label = text.slice(0, semicolonIdx).trim();
+        const description = text.slice(semicolonIdx + 1).trim();
+        return (
+            <div className={`rounded-lg px-3 py-2.5 border ${colorClass}`}>
+                <p className="text-[11.5px] font-semibold leading-tight mb-1">{renderBoldText(label)}</p>
+                <p className="text-[11px] leading-snug opacity-80">{renderBoldText(description)}</p>
+            </div>
+        );
+    }
+    return (
+        <div className={`rounded-lg px-3 py-2 border ${colorClass}`}>
+            <p className="text-[11.5px] leading-snug">{renderBoldText(text)}</p>
+        </div>
+    );
+}
+
 function SummaryCard({ summaryData, overallRecommendation, overallScore, t }: SummaryCardProps) {
     // Derive summaryLevel from overallScore (consistent with center label)
     const summaryLevel: ScoreLevel =
@@ -334,24 +396,26 @@ function SummaryCard({ summaryData, overallRecommendation, overallScore, t }: Su
                 </div>
 
                 <div className="px-4 pb-4 space-y-3">
-                    {/* Strengths — Green chips */}
+                    {/* Strengths — Stacked: Label oben, Text unten */}
                     {summaryData.strengths.length > 0 && (
                         <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-green-600 mb-1.5 flex items-center gap-1">
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-green-600 mb-2 flex items-center gap-1">
                                 <CheckCircle2 size={11} className="text-green-500" />
                                 {t('strengths')}
                             </p>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="space-y-1.5">
                                 {summaryData.strengths.slice(0, 3).map((s, i) => (
-                                    <span key={i} className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium bg-green-50 text-green-700 border border-green-100">
-                                        {renderBoldText(s)}
-                                    </span>
+                                    <StackedItem
+                                        key={i}
+                                        text={s}
+                                        colorClass="bg-green-50 border-green-100 text-green-800"
+                                    />
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    {/* Gaps — Red section */}
+                    {/* Gaps — Red bullet list (unchanged) */}
                     {summaryData.gaps.length > 0 && (
                         <div>
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-red-500 mb-1.5 flex items-center gap-1">
@@ -369,30 +433,38 @@ function SummaryCard({ summaryData, overallRecommendation, overallScore, t }: Su
                         </div>
                     )}
 
-                    {/* Potential Highlights — Amber recommendations */}
+                    {/* Potential Highlights — Stacked: Label oben, Text unten */}
                     {summaryData.potentialHighlights.length > 0 && (
                         <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-600 mb-1.5 flex items-center gap-1">
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-600 mb-2 flex items-center gap-1">
                                 <Sparkles size={11} className="text-amber-500" />
                                 {t('potential')}
                             </p>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="space-y-1.5">
                                 {summaryData.potentialHighlights.slice(0, 3).map((p, i) => (
-                                    <span key={i} className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-100">
-                                        {renderBoldText(p)}
-                                    </span>
+                                    <StackedItem
+                                        key={i}
+                                        text={p}
+                                        colorClass="bg-amber-50 border-amber-100 text-amber-800"
+                                    />
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    {/* Overall Recommendation — Context (after Potential as per user request) */}
+                    {/* Overall Recommendation — mit Absatzumbruch alle 2-3 Sätze */}
                     {overallRecommendation && (
                         <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
                                 {t('summary_overall')}
                             </p>
-                            <p className="text-xs text-slate-600 leading-relaxed">{renderBoldText(overallRecommendation)}</p>
+                            <div className="space-y-2">
+                                {splitIntoParagraphs(overallRecommendation, 2).map((para, i) => (
+                                    <p key={i} className="text-xs text-slate-600 leading-relaxed">
+                                        {renderBoldText(para)}
+                                    </p>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -458,13 +530,16 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, overallRecomm
             : 'gap';
 
     // 5 satellites — language removed (low signal), angles evenly distributed at 72° intervals
+    // Phase 1a: aggregateLevel() derives satellite level from cards (Single Source of Truth)
     const satellites: SatelliteConfig[] = [
-        { key: 'technical',  i18nKey: 'breakdown_technical',  angle: -72,  data: safe.technicalSkills  },
-        { key: 'soft',       i18nKey: 'breakdown_soft',       angle: 0,    data: safe.softSkills       },
-        { key: 'experience', i18nKey: 'breakdown_experience', angle: 72,   data: safe.experienceLevel  },
-        { key: 'domain',     i18nKey: 'breakdown_domain',     angle: 144,  data: safe.domainKnowledge  },
+        { key: 'technical',  i18nKey: 'breakdown_technical',  angle: -72,  data: { level: aggregateLevel(requirementRows, 'technical', safe.technicalSkills),   reasons: safe.technicalSkills.reasons  } },
+        { key: 'soft',       i18nKey: 'breakdown_soft',       angle: 0,    data: { level: aggregateLevel(requirementRows, 'soft', safe.softSkills),             reasons: safe.softSkills.reasons       } },
+        { key: 'experience', i18nKey: 'breakdown_experience', angle: 72,   data: { level: aggregateLevel(requirementRows, 'experience', safe.experienceLevel), reasons: safe.experienceLevel.reasons  } },
+        { key: 'domain',     i18nKey: 'breakdown_domain',     angle: 144,  data: { level: aggregateLevel(requirementRows, 'domain', safe.domainKnowledge),     reasons: safe.domainKnowledge.reasons  } },
         { key: 'summary',    i18nKey: 'breakdown_summary',    angle: -144, data: { level: summaryLevel, reasons: [] }, isSummary: true },
     ];
+
+
 
     // Filter requirement rows based on active satellite
     const filteredRows = useMemo(() => {
@@ -623,6 +698,7 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, overallRecomm
                             onClick={() => handleSatelliteClick(sat.key)}
                             aria-label={t(sat.i18nKey)}
                             aria-pressed={isActive}
+                            title={sat.data.level === 'gap' ? t('level_gap') : sat.data.level === 'strong' ? t('level_strong') : t('level_solid')}
                         >
                             <span className="text-[10px] font-medium text-[#37352F] leading-tight text-center px-2 w-full hyphens-auto">
                                 {t(sat.i18nKey)}
@@ -635,6 +711,7 @@ export function MatchOrbit({ overallScore, breakdown, summaryData, overallRecomm
                                     />
                                 ))}
                             </span>
+
                         </motion.button>
                     );
                 })}

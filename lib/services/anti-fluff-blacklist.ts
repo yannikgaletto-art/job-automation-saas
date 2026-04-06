@@ -154,6 +154,110 @@ export const BLACKLIST_PATTERNS: BlacklistPattern[] = [
         reason: 'Leere Doppel-Adjektiv-Floskel ohne Beweis',
         category: 'cliche',
     },
+    {
+        pattern: 'echte Partnerschaften',
+        reason: 'Subjektiver Begriff — was ist eine „echte" Partnerschaft? Konkret formulieren: Was wurde gemeinsam aufgebaut?',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'echte Verbindungen',
+        reason: 'Hohler Superlativ — was „echt" bedeutet, weiß nur der Leser selbst.',
+        category: 'ai_marker',
+    },
+
+    // ─── Allwissende Firmen-Sätze & Generische Kompetenz-Phrasen (2026-04-06) ──
+    {
+        pattern: 'genau an dieser Schnittstelle',
+        reason: 'Allwissender Firmenbezug — klingt wie KI-Analyse',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'Die Kombination aus',
+        reason: 'Generische Kompetenz-Aufzählung statt persönlicher Reflexion',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'Diese Kombination aus',
+        reason: 'Generische Kompetenz-Aufzählung statt persönlicher Reflexion',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'ermöglicht es mir',
+        reason: 'ChatGPT-typische Enabler-Phrase — ersetze durch persönliche Reflexion',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'nicht als isoliertes Thema, sondern als',
+        reason: 'Allwissende Firmenbeschreibung — Bewerber kann das nicht wissen',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'als integraler Bestandteil',
+        reason: 'Abstrakte Firmen-Analyse statt persönlicher Beobachtung',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'eine Denkweise, die',
+        reason: 'Meta-Reflexion statt konkreter Handlung',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'eine Erkenntnis, die perfekt',
+        reason: '"Perfekt zu X passt" ist generisch und anmaßend',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'bildet eine solide Grundlage',
+        reason: 'Kompetenz-Auflistung statt persönlicher Reflexion',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'und vor allem die Bereitschaft',
+        reason: 'Leere Behauptung ohne konkreten Beweis',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'Diese Erfahrung hat mir gezeigt, wie wichtig',
+        reason: 'AI-typische Reflexion ohne Substanz',
+        category: 'ai_marker',
+    },
+
+    // ─── Text 1 Audit (2026-04-06b): Omniscient Company + Broken Constructions ──
+    {
+        pattern: 'stellt sich ins Zentrum',
+        reason: 'Allwissende Firmenbeschreibung — Bewerber weiß nicht, was die Firma intern anstrebt',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'hat mich dieser Gedanke wieder eingeholt',
+        reason: 'Unklar und passiv — besser: "Dieser Gedanke prägte..."',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'Vielmehr als nur',
+        reason: 'Logisch gebrochene Satzkonstruktion — wirkt gestelzt',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'gestaltet gemeinsam mit Kunden',
+        reason: 'Allwissende Firmen-Innensicht — Bewerber kann das nicht wissen',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'steuert die nächste digitale',
+        reason: 'Marketing-Sprache der Firma — nicht die Perspektive des Bewerbers',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'Diese Haltung erinnert mich an',
+        reason: 'Generisch — die "Haltung" wird nicht konkretisiert, wirkt wie Platzhalter',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'hat mir gezeigt, wie wichtig es ist',
+        reason: 'AI-Reflexion ohne Substanz — stattdessen konkretes Ergebnis nennen',
+        category: 'ai_marker',
+    },
 ];
 
 export interface FluffScanResult {

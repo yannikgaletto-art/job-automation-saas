@@ -245,7 +245,9 @@
       "notify_confirmed": "Perfil confirmado",
       "notify_deleted": "Empleo eliminado",
       "notify_cv_optimized": "CV optimizado",
-      "optimizing": "Optimizando CV…"
+      "optimizing": "Optimizando CV…",
+      "notify_applied": "¡Solicitud guardada! 🎉",
+      "error_mark_applied": "Error — inténtalo de nuevo"
     },
     "application_history": {
       "col_job": "Puesto",
@@ -990,7 +992,8 @@
     "cta_finalize_application": "Finalizar solicitud",
     "cta_open": "Abrir",
     "badge_in_queue": "En Cola",
-    "tab_video_locked": "Activa primero el código QR en el CV Optimizer"
+    "tab_video_locked": "Activa primero el código QR en el CV Optimizer",
+    "btn_mark_applied_row": "Marcar como enviada"
   },
   "cv_match": {
     "title": "CV Match y Optimización",
@@ -1137,9 +1140,12 @@
     "intro_focus_desc_bold": "El otro se integra elegantemente en el cuerpo principal.",
     "focus_quote_label": "Cita en la introducción",
     "focus_quote_desc": "— Las noticias apoyan una estación del CV en el cuerpo",
+    "focus_quote_desc_no_hook": "— La cita abre la carta de presentación",
     "focus_quote_recommended": "Recomendado",
     "focus_hook_label": "Noticias en la introducción",
     "focus_hook_desc": "— La cita apoya una estación del CV en el cuerpo",
+    "focus_hook_label_no_hook": "Cita en una sección de carrera",
+    "focus_hook_desc_no_hook": "— La introducción comienza con una referencia a la empresa",
     "pingpong_title": "Muestra tu propia opinión",
     "pingpong_desc": "En lugar de solo estar de acuerdo con la cita, Claude construye una contra-perspectiva crítica — tesis, antítesis, síntesis.",
     "pingpong_desc_bold": "contra-perspectiva crítica",
@@ -1164,6 +1170,8 @@
     "stations_empty_cv": "Datos del CV no disponibles.",
     "top_requirements": "Requisitos principales",
     "stations_count": "{count}/3 estaciones seleccionadas",
+    "context_label": "¿Qué fue especialmente relevante de este puesto para esta vacante? (opcional, máx. 2 frases)",
+    "context_placeholder": "p.ej. Aquí aprendí a gestionar procesos complejos con múltiples stakeholders...",
     "btn_back": "Atrás",
     "btn_min_station": "Selecciona al menos 1 estación",
     "recommendation_match": "Coincidencia: Según la descripción del puesto y tu perfil, esta estación encaja muy bien.",
@@ -1214,7 +1222,7 @@
     "error_analyze": "Análisis fallido",
     "error_network": "Error de red — por favor, inténtalo de nuevo",
     "gen_title": "Generando carta de presentación...",
-    "gen_duration": "Esto tarda unos 20-40 segundos",
+    "gen_duration": "Esto tarda unos 30–60 segundos",
     "gen_step_1": "Recuperando datos de la empresa",
     "gen_step_2": "Analizando perfil y oferta de empleo",
     "gen_step_3": "Escribiendo carta de presentación",
@@ -1323,6 +1331,12 @@
     "done_description": "Tu vídeo es accesible a través del código QR en tu CV.",
     "done_expiry": "Disponible hasta {date}",
     "done_new_recording": "Grabar nuevo vídeo",
+    "done_preview_link": "Abrir vista previa del vídeo",
+    "done_delete_btn": "Eliminar vídeo",
+    "done_delete_confirm_title": "¿Eliminar el vídeo?",
+    "done_delete_confirm_body": "El código QR de tu CV permanece activo. Los reclutadores verán 'Vídeo en preparación' hasta que grabes uno nuevo.",
+    "done_delete_confirm_yes": "Sí, eliminar",
+    "done_delete_confirm_cancel": "Cancelar",
     "error_generic": "Ha ocurrido un error.",
     "error_unknown": "Ha ocurrido un error desconocido.",
     "error_retry": "Reintentar",
@@ -1340,7 +1354,7 @@
     "name_placeholder": "Tu nombre (opcional)",
     "submit_button": "Enviar →",
     "submitting": "Enviando…",
-    "success_message": "Gracias. Esto significa mucho para mí. — Yannik",
+    "success_message": "Gracias, {name}. Lo reviso enseguida.",
     "question_1": "¿Qué es lo que más te gusta de Pathly?",
     "question_2": "¿Qué te frustra o qué sientes que falta?",
     "question_3": "¿Tienes un consejo que debería aplicar de inmediato?",
@@ -1468,6 +1482,18 @@
     "coaching_label": "Coaching",
     "searches_label": "Búsquedas",
     "dismiss": "Más tarde",
-    "popular_badge": "Popular"
+    "popular_badge": "Popular",
+    "exhausted_title": "Tus créditos se han agotado",
+    "exhausted_thanks": "¡Gracias por probar Pathly! Has usado todos los {total} créditos gratuitos.",
+    "feedback_cta_title": "5 créditos por tu feedback",
+    "feedback_cta_desc": "Ayúdanos con tu opinión y recibe 5 créditos de bonificación.",
+    "feedback_rating_label": "¿Qué tan satisfecho estás con Pathly?",
+    "feedback_message_placeholder": "¿Qué podemos mejorar? (opcional)",
+    "feedback_submit": "Enviar feedback y obtener créditos",
+    "feedback_submitting": "Enviando…",
+    "feedback_success_title": "¡5 créditos de bonificación activados! 🎉",
+    "feedback_success_desc": "¡Gracias por tu feedback — sigamos adelante!",
+    "feedback_already_claimed": "Ya has recibido tus créditos de feedback.",
+    "feedback_error": "Error al enviar. Inténtalo de nuevo."
   }
 }

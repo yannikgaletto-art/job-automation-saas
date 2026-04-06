@@ -16,6 +16,7 @@ import { useNotification } from '@/hooks/use-notification';
 import { ApplicationHistory } from '@/app/[locale]/dashboard/components/application-history';
 import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
 import { useDashboardTour, type TourStep } from '../hooks/useDashboardTour';
+import { useCreditExhausted } from '../hooks/credit-exhausted-context';
 
 // ─── Toggle Section (Notion-style accordion) ───────────────────────────
 function ToggleSection({ title, count, defaultOpen = false, children }: {
@@ -66,6 +67,7 @@ export default function JobQueuePage() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isAddJobOpen, setIsAddJobOpen] = useState(false);
+    const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
     // ─── State-Lifted from JobQueueTable (for tour auto-expand) ──────
     const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -171,6 +173,7 @@ export default function JobQueuePage() {
     // Optimization State
     const notify = useNotification();
     const t = useTranslations('dashboard.job_queue');
+    const { showPaywall } = useCreditExhausted();
     const [showOptimization, setShowOptimization] = useState(false);
     const [optimizationResult, setOptimizationResult] = useState<CVOptimizationResult | null>(null);
     const [isOptimizing, setIsOptimizing] = useState(false);
@@ -317,6 +320,37 @@ export default function JobQueuePage() {
         }
     };
 
+    const handleMarkApplied = async (jobId: string) => {
+        try {
+            const res = await fetch('/api/jobs/mark-applied', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'Mark applied failed');
+
+            // Remove from active list — submitted jobs are filtered by /api/jobs/list
+            setJobs(prev => prev.filter(j => j.id !== jobId));
+            notify(t('notify_applied'));
+            // Trigger ApplicationHistory refresh (even if section is already open)
+            setHistoryRefreshKey(k => k + 1);
+
+            // Confetti celebration
+            import('canvas-confetti').then(({ default: confetti }) => {
+                confetti({
+                    particleCount: 80,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#002e7a', '#3b82f6', '#60a5fa', '#93c5fd'],
+                });
+            });
+        } catch (err) {
+            console.error('❌ [mark-applied] Failed:', err);
+            notify(t('error_mark_applied'));
+        }
+    };
+
     const handleOptimizeCV = async (jobId: string) => {
         setIsOptimizing(true);
         setCurrentJobId(jobId);
@@ -328,6 +362,10 @@ export default function JobQueuePage() {
             });
             if (!response.ok) {
                 const err = await response.json();
+                if (response.status === 402 && err.error === 'CREDITS_EXHAUSTED') {
+                    showPaywall('credits', { remaining: err.remaining ?? 0 });
+                    return;
+                }
                 throw new Error(err.error || 'Optimization failed');
             }
             const result = await response.json();
@@ -391,6 +429,7 @@ export default function JobQueuePage() {
                         onReanalyze={handleReanalyze}
                         onConfirm={handleConfirm}
                         onDelete={handleDelete}
+                        onMarkApplied={handleMarkApplied}
                         loading={isLoading}
                         optimizingJobId={isOptimizing ? currentJobId : null}
                         expandedId={expandedId}
@@ -404,7 +443,7 @@ export default function JobQueuePage() {
                 title={t('application_history')}
                 defaultOpen={false}
             >
-                <ApplicationHistory />
+                <ApplicationHistory refreshKey={historyRefreshKey} />
             </ToggleSection>
 
             {/* Optimization Modal */}

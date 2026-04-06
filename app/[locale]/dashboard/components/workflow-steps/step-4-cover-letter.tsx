@@ -11,12 +11,14 @@ import { createClient } from "@/lib/supabase/client"
 import { CoverLetterResultView } from "./cover-letter-result/CoverLetterResultView"
 import { useCoverLetterSetupStore } from "@/store/useCoverLetterSetupStore"
 import { useTranslations } from 'next-intl'
+import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context'
 
 interface Step4CoverLetterProps {
     jobId: string
     companyName: string
     jobTitle: string
     onComplete?: () => void
+    onJobApplied?: () => void
     initialData?: GenerationResult | null
 }
 
@@ -153,9 +155,11 @@ export function Step4CoverLetter({
     companyName,
     jobTitle,
     onComplete,
+    onJobApplied,
     initialData
 }: Step4CoverLetterProps) {
     const t = useTranslations('cover_letter');
+    const { showPaywall } = useCreditExhausted();
     const clSteps = useMemo(() => [
         t('gen_step_1'),
         t('gen_step_2'),
@@ -307,6 +311,10 @@ export function Step4CoverLetter({
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}))
+                if (response.status === 402 && errorData.error === 'CREDITS_EXHAUSTED') {
+                    showPaywall('credits', { remaining: errorData.remaining ?? 0 })
+                    return
+                }
                 throw new Error(errorData.error || t('error_generation_failed'))
             }
 
@@ -429,20 +437,33 @@ export function Step4CoverLetter({
         return (
             <div className="space-y-4 p-6 bg-[#FAFAF9]">
                 {/* 1D: Judge Warning Banner — covers both generation and targeted fix */}
-                {result.judgePassed === false && (
-                    <details className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                        <summary className="text-xs font-medium text-amber-700 cursor-pointer">
-                            ⚠️ {t('judge_warning')}
-                        </summary>
-                        {(result.judgeFailReasons?.length ?? 0) > 0 && (
+                {result.judgePassed === false && (() => {
+                    // Filter out pure-technical reasons (internal codes, not user-relevant)
+                    const INTERNAL_PREFIXES = [
+                        'JUDGE_UNAVAILABLE', 'BLACKLIST:', 'FIRMA:', 'LÄNGE:', 'LENGTH:', 'COMPANY:',
+                        'Forbidden phrase detected:',  // Validator-internal, not user-actionable
+                        'HARD_BLACKLIST:',              // Deterministic validator stop
+                    ];
+                    const userFacingReasons = (result.judgeFailReasons ?? [])
+                        .filter(r => !INTERNAL_PREFIXES.some(p => r.startsWith(p)));
+                    // If ALL reasons are internal (e.g. only JUDGE_UNAVAILABLE) → hide banner entirely
+                    if (userFacingReasons.length === 0) return null;
+                    return (
+                        <details className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                            <summary className="text-xs font-medium text-blue-700 cursor-pointer">
+                                {t('judge_warning')}
+                            </summary>
                             <ul className="mt-2 space-y-1">
-                                {result.judgeFailReasons!.map((reason, i) => (
-                                    <li key={i} className="text-xs text-amber-600">• {reason}</li>
+                                {userFacingReasons.map((reason, i) => (
+                                    <li key={i} className="text-xs text-blue-600">• {reason}</li>
                                 ))}
                             </ul>
-                        )}
-                    </details>
-                )}
+                            <p className="mt-2 text-[10px] text-blue-500">
+                                {t('editor_manual_hint')}
+                            </p>
+                        </details>
+                    );
+                })()}
 
                 {/* API Warnings Banner */}
                 {(result.warnings?.length ?? 0) > 0 && (
@@ -463,6 +484,7 @@ export function Step4CoverLetter({
                     companyName={companyName}
                     jobTitle={jobTitle}
                     setupContext={buildContextFromStore() ?? wizardContext}
+                    onApplied={onJobApplied}
                 />
             </div>
         )

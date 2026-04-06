@@ -30,9 +30,11 @@ export function SkillTag({ text }: { text: string }) {
  * New: all skills as "Python, Make, Bubble" in a single <Text> element.
  */
 export function SkillTagGroup({ items }: { items: string[] }) {
+    // Filter empty/whitespace-only entries so deleting a skill leaves no dangling comma
+    const filtered = items.filter(item => item.trim().length > 0);
     return (
         <Text style={{ fontSize: 9, color: '#0F172A', lineHeight: 1.5 }}>
-            {items.join(', ')}
+            {filtered.join(', ')}
         </Text>
     );
 }

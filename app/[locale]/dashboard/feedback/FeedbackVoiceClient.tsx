@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@/lib/supabase/client';
-import { Mic, MicOff, Send, Check, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Send, Check, Loader2, Gift } from 'lucide-react';
 
 type FormState = 'idle' | 'submitting' | 'done' | 'error';
 type RecordingState = 'idle' | 'recording' | 'transcribing';
@@ -18,13 +19,18 @@ const MAX_RECORDING_MS = 5 * 60 * 1000;
 
 export function FeedbackVoiceClient() {
     const t = useTranslations('feedback_voice');
+    const tBilling = useTranslations('billing');
     const locale = useLocale();
+    const searchParams = useSearchParams();
+    const isCreditMode = searchParams.get('credits') === 'true';
 
     const [formState, setFormState]         = useState<FormState>('idle');
     const [feedback, setFeedback]           = useState('');
     const [userName, setUserName]           = useState('');
     const [errorMsg, setErrorMsg]           = useState('');
     const [recordingState, setRecordingState] = useState<RecordingState>('idle');
+    const [creditsGranted, setCreditsGranted] = useState(false);
+    const [creditError, setCreditError]     = useState('');
 
     const mediaRecorderRef  = useRef<MediaRecorder | null>(null);
     const audioChunksRef    = useRef<Blob[]>([]);
@@ -82,6 +88,31 @@ export function FeedbackVoiceClient() {
                 return;
             }
 
+            // ── Credit Grant (if navigated from paywall modal) ───────────
+            if (isCreditMode) {
+                try {
+                    const creditRes = await fetch('/api/feedback/credit-grant', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            rating: 5, // Voice feedback = high engagement = 5 stars
+                            tags: ['voice_feedback'],
+                            message: feedback.trim().slice(0, 500),
+                            locale,
+                        }),
+                    });
+                    const creditData = await creditRes.json();
+                    if (creditRes.ok && creditData.success) {
+                        setCreditsGranted(true);
+                    } else if (creditRes.status === 409) {
+                        setCreditError(tBilling('feedback_already_claimed'));
+                    }
+                    // Non-blocking: if credit grant fails, feedback was still saved
+                } catch {
+                    console.warn('[FeedbackVoice] Credit grant failed (non-blocking)');
+                }
+            }
+
             // 🎉 Confetti
             import('canvas-confetti').then(({ default: confetti }) => {
                 confetti({ particleCount: 70, angle: 60,  spread: 55, origin: { x: 0, y: 0.8 }, colors: ['#012e7a', '#A8C4E6', '#00B870'] });
@@ -94,7 +125,7 @@ export function FeedbackVoiceClient() {
             setErrorMsg(t('error_generic'));
             setFormState('error');
         }
-    }, [feedback, userName, locale, formState, t]);
+    }, [feedback, userName, locale, formState, t, isCreditMode, tBilling]);
 
     // Keep the ref current so the auto-stop timer always sees the latest version
     useEffect(() => {
@@ -151,13 +182,8 @@ export function FeedbackVoiceClient() {
                         const { text } = await res.json();
                         if (text?.trim()) {
                             setFeedback(prev => prev ? `${prev} ${text.trim()}` : text.trim());
-                            inputRef.current?.focus();
-                            // Auto-submit after 5-min max recording
-                            // (the timer already fired, so submit right after transcription)
-                            if (autoStopTimerRef.current === null) {
-                                // Timer was already cleared → this was an auto-stop → submit now
-                                setTimeout(() => handleSubmitRef.current?.(), 400);
-                            }
+                            // Text lands in the input field — user reviews and sends manually
+                            setTimeout(() => inputRef.current?.focus(), 100);
                         }
                     }
                 } catch (err) {
@@ -208,8 +234,25 @@ export function FeedbackVoiceClient() {
                         <Check className="w-8 h-8 text-[#00B870]" strokeWidth={3} />
                     </div>
                     <p className="text-[1.5rem] font-semibold text-[#1C1917] max-w-[36ch] leading-snug">
-                        {t('success_message')}
+                        {t.rich('success_message', {
+                            name: userName || 'dir',
+                        })}
                     </p>
+                    {/* Credits banner */}
+                    {isCreditMode && creditsGranted && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                            className="mt-4 inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-700 px-4 py-2 rounded-full text-sm font-medium"
+                        >
+                            <Gift className="w-4 h-4" />
+                            {tBilling('feedback_success_title')}
+                        </motion.div>
+                    )}
+                    {isCreditMode && creditError && (
+                        <p className="mt-3 text-sm text-amber-600">{creditError}</p>
+                    )}
                 </motion.div>
             </div>
         );
@@ -219,6 +262,21 @@ export function FeedbackVoiceClient() {
     return (
         <div className="min-h-[calc(100vh-4rem)] bg-[#FAFAF8] flex justify-center pt-12 md:pt-20 px-6">
             <div className="max-w-2xl w-full flex flex-col">
+
+                {/* ── Credit Mode Banner ── */}
+                {isCreditMode && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4 }}
+                        className="mb-6 flex items-center gap-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-3"
+                    >
+                        <Gift className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                        <p className="text-sm text-emerald-800">
+                            {tBilling('feedback_cta_desc')}
+                        </p>
+                    </motion.div>
+                )}
 
                 {/* ── Header ── */}
                 <motion.div

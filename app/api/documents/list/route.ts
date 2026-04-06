@@ -16,6 +16,9 @@ export async function GET() {
             .from('documents')
             .select('id, document_type, created_at, file_url_encrypted, metadata')
             .eq('user_id', user.id)
+            // §Settings-Gate: Exclude AI-generated cover letters — they live exclusively
+            // in the Job Queue (step-4-cover-letter). Settings shows ONLY user-uploaded docs.
+            .neq('origin', 'generated')
             .order('created_at', { ascending: false });
 
         if (error) {

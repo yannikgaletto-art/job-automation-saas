@@ -28,6 +28,7 @@ interface SetupStore {
     setQuote: (quote: SelectedQuote | null) => void;
     setFetchedQuotes: (quotes: SelectedQuote[]) => void;
     toggleStation: (station: Omit<SelectedCVStation, 'stationIndex'>) => void;
+    setStationContext: (company: string, role: string, context: string) => void;
     setTone: (tone: ToneConfig) => void;
     setIntroFocus: (focus: 'quote' | 'hook') => void;
     setOptInModule: <K extends keyof OptInModules>(key: K, value: OptInModules[K]) => void;
@@ -107,6 +108,16 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 }
             },
 
+            setStationContext: (company, role, context) => {
+                set((state) => ({
+                    cvStations: state.cvStations.map(s =>
+                        s.company === company && s.role === role
+                            ? { ...s, userContext: context }
+                            : s
+                    ),
+                }));
+            },
+
             setTone: (tone) => {
                 set({ tone });
                 console.log(`✅ [WizardSetup] Tone set: ${tone.preset} / ${tone.targetLanguage}`);
@@ -149,7 +160,6 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
                 return false;
             },
 
-            canAutoFill: () => true, // Legacy — kept for backward compat but unused
 
             buildContext: (): CoverLetterSetupContext | null => {
                 const s = get();

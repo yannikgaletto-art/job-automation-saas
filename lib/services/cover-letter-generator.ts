@@ -239,6 +239,9 @@ REGELN:
         // Diese Tags MÜSSEN vor der Ausgabe entfernt werden.
         // Der Text INNERHALB der Tags bleibt erhalten (authentischer Bewerbungstext).
         fixedText = fixedText.replace(/\[VUL\](.*?)\[\/VUL\]/gs, '$1');
+        // Post-fix: Replace em-dashes with semicolons (QUALITY_CV_COVER_LETTER.md §3)
+        // EXCEPTION: Quote author attribution dashes are preserved (same logic as main loop).
+        fixedText = fixedText.replace(/(?<!["'\u201C\u201D\u201E\u00BB»]\s*)\s*[\u2013\u2014]\s*(?![\u201C\u201D"'])/g, '; ');
 
         // 1F: Minimum quality gate for targeted fixes (validator + fluff scan, no Judge call)
         const companyName = setupContext?.companyName || 'das Unternehmen';
@@ -319,6 +322,11 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
 
         generatedText = message.content[0].type === 'text' ? message.content[0].text : '';
         generatedText = generatedText.replace(/\*\*/g, '').replace(/\*/g, '').replace(/^#+\s/gm, '');
+        // Post-generation: Replace em-dashes with semicolons (QUALITY_CV_COVER_LETTER.md §3)
+        // EXCEPTION: em-dash used as quote author attribution (e.g. "Quote." — Author) is PRESERVED.
+        // Pattern: em-dash that is NOT preceded by a closing quote char (", ', ‟, „, ») stays as-is → semicolon.
+        // Em-dash directly after closing quote → keep as " —" (author attribution).
+        generatedText = generatedText.replace(/(?<!["'\u201C\u201D\u201E\u00BB»]\s*)\s*[\u2013\u2014]\s*(?![\u201C\u201D"'])/g, '; ');
 
         const words = generatedText.trim().split(/\s+/);
         lastWordCount = words.length;
@@ -388,7 +396,7 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
                 validation = best.validation;
                 console.log(`✅ Best-of-N: Iteration ${best.iteration} (Judge: ${judgePassed ? 'PASS' : 'FAIL'})`);
             } else {
-                console.error('❌ No valid cover letter after 3 iterations — returning last attempt.');
+                console.error(`❌ No valid cover letter after ${MAX_ITERATIONS} iterations — returning last attempt.`);
                 coverLetter = generatedText;
             }
         }

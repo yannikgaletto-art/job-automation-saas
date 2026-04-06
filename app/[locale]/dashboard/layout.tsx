@@ -16,6 +16,8 @@ import { useDashboardTour, type TourStep } from './hooks/useDashboardTour';
 import { useJobQueueCount } from '@/store/use-job-queue-count';
 import { useCalendarStore } from '@/store/use-calendar-store';
 import { createClient } from '@/lib/supabase/client';
+import { CreditExhaustedProvider, useCreditExhausted } from './hooks/credit-exhausted-context';
+import { PaywallModal } from '@/components/dashboard/paywall-modal';
 
 const ADMIN_EMAILS = ['galettoyannik7@gmail.com', 'yannik.galetto@gmail.com'];
 
@@ -66,7 +68,9 @@ export default function DashboardLayout({
 }) {
     return (
         <MoodCheckinProvider>
-            <DashboardLayoutInner>{children}</DashboardLayoutInner>
+            <CreditExhaustedProvider>
+                <DashboardLayoutInner>{children}</DashboardLayoutInner>
+            </CreditExhaustedProvider>
         </MoodCheckinProvider>
     );
 }
@@ -263,7 +267,24 @@ function DashboardLayoutInner({
                 />
             )}
 
+            {/* Global Paywall Modal — triggered from any component via useCreditExhausted() */}
+            <PaywallModalBridge />
+
         </>
+    );
+}
+
+// ── Paywall Modal Bridge — connects context to component ────────
+/** Reads the CreditExhaustedContext and renders the PaywallModal */
+function PaywallModalBridge() {
+    const { state, hidePaywall } = useCreditExhausted();
+    return (
+        <PaywallModal
+            open={state.open}
+            onOpenChange={(isOpen) => { if (!isOpen) hidePaywall(); }}
+            reason={state.reason}
+            remaining={state.remaining}
+        />
     );
 }
 

@@ -3,6 +3,16 @@
  *
  * Pass/Fail judge: Checks hard constraints only (no numeric scores).
  * Extracted from cover-letter-generator.ts for maintainability.
+ *
+ * Hard-Checks (jeder = fail → Re-Generation):
+ *  1. GPT-BLACKLIST: Verbotene Phrasen (KI-Tropen, Allwissens-Konstrukte, Doppelfehler)
+ *  2. FIRMENNENNUNG: Unternehmensname mindestens 1x
+ *  3. WORTLÄNGE: 150–500 Wörter
+ *  4. SUBJEKT-INTEGRITÄT: Keine allwissenden Firmen/Branchen-Statements
+ *  5. INTRO-ÖFFNUNG: Erster Absatz mit ICH-Perspektive + Firmenbezug
+ *  6. PING-PONG (optional, nur wenn Quote + PingPong aktiv)
+ *
+ * Fallback: pass: false — bei Haiku-Timeout kein ungeprüfter Text durchgelassen.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -23,6 +33,142 @@ interface JobData {
     [key: string]: unknown;
 }
 
+// ─── Blacklist Sections ───────────────────────────────────────────────────────
+const DE_BLACKLIST = `
+VERBOTENE PHRASEN — GPT-BLACKLIST (jeder Fund = fail):
+Allgemeine KI-Floskeln:
+- „Ich freue mich sehr darauf", „Ich bin überzeugt, dass", „meine Leidenschaft für"
+- „ideal auf diese Stelle", „Mit großer Begeisterung", „hiermit bewerbe ich mich"
+- „I am excited to apply", „I am confident that"
+
+Pathly-spezifische KI-Tropen (aus 3 Tagen Qualitätssitzungen destilliert):
+- „an der Schnittstelle zwischen" (nur diese Konstruktion — das Wort allein ist erlaubt)
+- „nicht nur ... sondern" (als rhetorisches Aufblasungs-Konstrukt: z.B. „nicht nur verkauft, sondern als ... begreift")
+- „echten Mehrwert" / „echter Mehrwert"
+- „Doch ich lernte schnell"
+- „echte Werte" (als Leerphrase ohne konkreten Inhalt)
+- „strategische Exzellenz" / „wissenschaftliche Exzellenz"
+- „stehen und fallen" (Allwissens-Konstrukt: „X steht und fällt damit, dass...")
+
+Verbotene Abschluss-Floskeln (sofort erkennbare KI-Schablone):
+- „...schnell den Sprung von [X] zur [Y] schaffe" (generisches Closing — immer templated)
+- „Ich bin zuversichtlich, dass ich durch eure/Ihre Expertise ... schnell den Sprung ... schaffe" (das vollständige Konstrukt)
+- „schnell den Sprung ... schaffe" — egal in welchem Kontext
+
+Strukturelle Ausdrucksfehler (KI-Verräter):
+- „dass ihr ... dass ihr" (Doppelkonstrukt im selben Satz/Absatz — gilt analog für „dass Sie ... dass Sie")
+- „möchte ich mich" — zweimal im selben Absatz
+- „Daher möchte ich mich bei euch kurz vorstellen" — wenn als allein stehender Schlusssatz eines Absatzes (ohne organische Einbettung)`;
+
+const EN_BLACKLIST = `
+FORBIDDEN PHRASES — GPT-BLACKLIST (each found = fail):
+General AI boilerplate:
+- "I am excited to apply", "I am confident that", "my passion for"
+- "ideal for this position", "With great enthusiasm", "I am writing to apply"
+- "Ich freue mich sehr darauf", "hiermit bewerbe ich mich"
+
+Pathly-specific AI tropes (distilled from quality sessions):
+- "at the intersection of X and Y" (only this construction — the word alone is fine)
+- "not only X but also Y" (as rhetorical filler: e.g., "not only sold, but understood as a strategic asset")
+- "real value" / "genuine value" (as empty phrase)
+- "But I quickly learned"
+- "genuine values" (as empty phrase)
+- "strategic excellence" / "scientific excellence"
+- "stand or fall" (omniscience construct: "X stands or falls on...")
+
+Forbidden closing boilerplate (immediately recognizable AI template):
+- "...quickly make the transition from [X] to [Y]" or "make the leap from... to..." as a closing sentence
+- "I am confident that through your expertise in [field] I will quickly make the transition" (the full construction)
+
+Structural expression errors (AI giveaways):
+- "that you ... that you" (double construct in same sentence/paragraph)
+- "I would like to" — twice in same paragraph
+- "Therefore I would like to briefly introduce myself" — when used as a standalone closing sentence of a paragraph`;
+
+const SUBJEKT_CHECK_DE = `
+4. SUBJEKT-INTEGRITÄT: Beschreibt der Bewerber Firmen- oder Branchen-Fakten als objektive Wahrheit (statt als eigene Beobachtung)?
+
+VERBOTEN (fail) — Allwissende Statements:
+❌ „E-Commerce-Plattformen stehen und fallen damit, dass..." (Branchen-Allwissen)
+❌ „In der heutigen Zeit steht die Branche vor..." (neutrales Branchen-Statement)
+❌ „Da ihr genau an dieser Stelle agiert..." (Bewerber beschreibt interne Firmen-Wahrheit)
+❌ „Dass Sicherheit bei euch kein isoliertes Thema ist..." (Allwissen über interne Kultur)
+❌ „[Firma] steht für Innovation" (Bewerber urteilt über Firm-Identität)
+
+ERLAUBT (pass) — Subjektive Beobachtung:
+✅ „Da ich auf eurer Website gelesen habe, dass ihr..." (eigene Recherche)
+✅ „Als ich euer Projekt sah, hat mich beeindruckt, dass..." (subjektive Reaktion)
+✅ „Euer Ansatz bei X hat mich angesprochen, weil..." (eigene Einschätzung)
+✅ „Dass ihr so stark auf X setzt, zeigt für mich, dass..." (eigene Interpretation)
+✅ „Ich habe die Erfahrung gemacht, dass..." (persönliche Beobachtung statt Branchen-These)
+
+Wenn ein klares allwissendes Statement gefunden → fail_reason: "SUBJEKT: [Fundstelle] — Bewerber formuliert Firmen/Branchen-Wahrheit statt eigene Beobachtung"`;
+
+const SUBJEKT_CHECK_EN = `
+4. SUBJECT-INTEGRITY: Does the applicant describe company/industry facts as objective truth (instead of their own observation)?
+
+FORBIDDEN (fail) — Omniscient statements:
+❌ "E-commerce platforms stand or fall on..." (industry omniscience)
+❌ "In today's world, the industry faces..." (neutral industry statement)
+❌ "Since you operate exactly at this point..." (applicant describes internal company truth)
+❌ "That security at your company is not an isolated topic..." (omniscience about internal culture)
+❌ "[Company] stands for innovation" (applicant judges firm identity)
+
+ALLOWED (pass) — Subjective observation:
+✅ "Since I read on your website that you..." (own research)
+✅ "When I saw your project, I was impressed that..." (subjective reaction)
+✅ "Your approach to X appealed to me because..." (own assessment)
+✅ "The fact that you focus so strongly on X shows me that..." (own interpretation)
+✅ "In my experience I have found that..." (personal observation, not industry claim)
+
+If a clear omniscient statement is found → fail_reason: "SUBJECT: [found passage] — applicant states company/industry truth instead of personal observation"`;
+
+const INTRO_CHECK_DE = `
+5. INTRO-ÖFFNUNG: Öffnet der ERSTE Absatz des Anschreibens mit einer ICH-Perspektive die einen direkten Firmenbezug enthält?
+
+BESTANDEN wenn der erste Absatz:
+✅ Ein Ich-Verb mit direktem Firmenbezug enthält (ich las, ich sah, ich recherchierte, ich beobachtete, mir fiel auf, mich begeisterte, mich sprach an)
+✅ ODER eine subjektive Einschätzung mit expliziter Ich-Rahmung: „Dass ihr so stark auf X setzt, zeigt für mich..."
+✅ ODER eine konkrete eigene Handlung als Anker: „Als ich eure Website las...", „Auf eurer Website sind mir eure Beiträge zu X aufgefallen..."
+
+SCHEITERT wenn der erste Absatz:
+❌ Mit einer objektiven Firmenbeschreibung ohne ICH-Rahmung öffnet
+❌ Mit einer Branchen-These oder Allgemeinaussage beginnt
+❌ Mit einem Zitat öffnet das dann KEIN Ich-Bezug zur Firma herstellt (Zitate sind erlaubt — aber danach muss eine ICH-Verbindung kommen)
+❌ Mit dem Namen der Firma als grammatikalisches Subjekt öffnet ohne Ich-Rahmung
+
+→ fail_reason: "INTRO: Erster Absatz öffnet ohne ICH-Perspektive + Firmenbezug. Bewerber beschreibt Firma statt eigene Beobachtung."`;
+
+const INTRO_CHECK_EN = `
+5. INTRO-OPENING: Does the FIRST paragraph of the cover letter open with an ICH-perspective that contains a direct company reference?
+
+PASSED if the first paragraph:
+✅ Contains an I-verb with direct company reference (I read, I saw, I researched, I noticed, I was impressed by, appealed to me)
+✅ OR a subjective assessment with explicit I-framing: "The fact that you focus so strongly on X shows me..."
+✅ OR a concrete personal action as anchor: "When I read your website...", "On your website I noticed your contributions to X..."
+
+FAILS if the first paragraph:
+❌ Opens with an objective company description without I-framing
+❌ Begins with an industry thesis or general claim
+❌ Opens with a quote that then establishes NO I-connection to the company
+❌ Opens with the company name as grammatical subject without I-framing
+
+→ fail_reason: "INTRO: First paragraph opens without I-perspective + company reference."`;
+
+const WEAKNESS_HINTS_DE = `
+Optionale Verbesserungshinweise (max. 2 weaknesses — nur wenn aufgefallen):
+Achte besonders auf:
+(a) Passive Stations-Übergänge: „ist meine Erfahrung bei X relevant" → besser: „kann ich mit meiner Zeit bei X anknüpfen" / „möchte ich mein Projekt bei X beleuchten"
+(b) Generisches Closing: Wenn der Abschluss wie ein Verkaufs-Pitch klingt → besser: „Ich hoffe, ihr konntet einen kleinen Eindruck von mir gewinnen. Ich bin die nächsten Wochen flexibel und freue mich darauf, euch kennenzulernen."
+(c) Wiederholte Lernkurven-Phrase: Wenn im Text mehrfach dieselbe Lernkurven-Formulierung auftaucht → besser: Variiere aus Pool: „Mir wurde klar, dass..." / „Ich wurde eines Besseren belehrt:" / „Rückblickend erkenne ich:" / „Erst durch [Event] verstand ich:"`;
+
+const WEAKNESS_HINTS_EN = `
+Optional improvement suggestions (max. 2 weaknesses — only if noticed):
+Watch especially for:
+(a) Passive station transitions: "my experience at X is relevant" → better: "I can build on my time at X" / "I would like to highlight my project at X"
+(b) Generic closing: If the closing reads like a sales pitch → better: "I hope this gave you a small impression of who I am. I'm flexible over the coming weeks and look forward to meeting you."
+(c) Repeated learning-curve phrase: If the same learning-curve formulation appears multiple times → better: vary from pool: "I realized that..." / "I was proven wrong:" / "Looking back, I recognize:" / "It was only through [Event] that I understood:"`;
+
 // ─── Judge ────────────────────────────────────────────────────────────────────
 export async function judgeCoverLetter(
     text: string,
@@ -30,14 +176,15 @@ export async function judgeCoverLetter(
     setupContext: CoverLetterSetupContext | undefined,
     style: StyleAnalysis | null
 ): Promise<JudgeResult> {
+    // FALLBACK: pass: false — bei Ausfall kein ungeprüfter Text
     const FALLBACK: JudgeResult = {
-        pass: true,
-        failReasons: [],
+        pass: false,
+        failReasons: ['JUDGE_UNAVAILABLE: Qualitätsprüfung konnte nicht durchgeführt werden — Re-Generation wird ausgelöst'],
         weaknesses: []
     };
 
     if (!process.env.ANTHROPIC_API_KEY) {
-        console.warn('⚠️ [Judge] No API Key — returning fallback (pass)');
+        console.warn('⚠️ [Judge] No API Key — returning fallback (fail, triggers retry)');
         return FALLBACK;
     }
 
@@ -48,8 +195,20 @@ export async function judgeCoverLetter(
     const enablePingPong = setupContext?.optInModules?.pingPong ?? setupContext?.enablePingPong ?? false;
     const hasQuote = !!setupContext?.selectedQuote?.quote;
 
+    const pingPongCheckDE = enablePingPong && hasQuote
+        ? `\n6. PING-PONG: Enthält die Einleitung eine ECHTE Antithese — eine frühere andere Perspektive des Kandidaten?
+   Pseudo-Kontrast (SCHEITERT): „Ich sah das genauso", „immer schon", „noch überzeugter"
+   Wenn kein echter Kontrast → fail_reason: "PING-PONG: Kein echter Perspektiv-Wechsel in der Einleitung"`
+        : '';
+
+    const pingPongCheckEN = enablePingPong && hasQuote
+        ? `\n6. PING-PONG: Does the introduction contain a REAL antithesis — an earlier different perspective of the candidate?
+   Pseudo-contrast (FAILS): "I saw it the same way", "always have", "even more convinced"
+   If no real contrast → fail_reason: "PING-PONG: No real perspective shift in the introduction"`
+        : '';
+
     const judgePrompt = isEnglish
-        ? `You are a strict cover letter quality checker. Check ONLY hard constraints.
+        ? `You are a strict cover letter quality checker. Check ONLY the hard constraints below.
 
 COVER LETTER:
 ***
@@ -59,22 +218,19 @@ ${text}
 HARD CONSTRAINT CHECKS (each violation = fail):
 
 1. GPT-BLACKLIST: Does the text contain any of these forbidden phrases?
-   - "I am excited to apply", "I am confident that", "my passion for"
-   - "ideal for this position", "With great enthusiasm", "I am writing to apply"
-   - "Ich freue mich sehr darauf", "hiermit bewerbe ich mich"
+${EN_BLACKLIST}
    If YES → fail_reason: "BLACKLIST: [found phrase]"
 
-2. COMPANY MENTION: Is "${companyName}" (or a recognizable variant) mentioned at least once in the text?
+2. COMPANY MENTION: Is "${companyName}" (or a recognizable variant) mentioned at least once?
    If NO → fail_reason: "COMPANY: Company name missing from text"
 
 3. WORD COUNT: Does the text have between 150 and 500 words?
    If NO → fail_reason: "LENGTH: Text has [N] words (allowed: 150-500)"
-${enablePingPong && hasQuote ? `
-4. PING-PONG: Does the introduction contain a REAL antithesis — an earlier different perspective of the candidate?
-   Pseudo-contrast (FAILS): "I saw it the same way", "always have", "even more convinced"
-   If no real contrast → fail_reason: "PING-PONG: No real perspective shift in the introduction"` : ''}
+${SUBJEKT_CHECK_EN}
+${INTRO_CHECK_EN}
+${pingPongCheckEN}
 
-Additionally: Name at most 2 optional improvement suggestions (weaknesses), if you notice anything.
+${WEAKNESS_HINTS_EN}
 
 Respond ONLY as valid JSON:
 {
@@ -82,7 +238,7 @@ Respond ONLY as valid JSON:
   "fail_reasons": ["..."],
   "weaknesses": ["..."]
 }`
-        : `Du bist ein strenger Anschreiben-Qualitätsprüfer. Prüfe NUR harte Constraints.
+        : `Du bist ein strenger Anschreiben-Qualitätsprüfer. Prüfe NUR die harten Constraints unten.
 
 ANSCHREIBEN:
 ***
@@ -92,9 +248,7 @@ ${text}
 HARTE CONSTRAINT-CHECKS (jeder Verstoß = fail):
 
 1. GPT-BLACKLIST: Enthält der Text eine dieser verbotenen Phrasen?
-   - "Ich freue mich sehr darauf", "Ich bin überzeugt, dass", "meine Leidenschaft für"
-   - "ideal auf diese Stelle", "Mit großer Begeisterung", "hiermit bewerbe ich mich"
-   - "I am excited to apply", "I am confident that"
+${DE_BLACKLIST}
    Wenn JA → fail_reason: "BLACKLIST: [gefundene Phrase]"
 
 2. FIRMENNENNUNG: Wird "${companyName}" (oder eine erkennbare Variante) mindestens 1x im Text erwähnt?
@@ -102,12 +256,11 @@ HARTE CONSTRAINT-CHECKS (jeder Verstoß = fail):
 
 3. WORTLÄNGE: Hat der Text zwischen 150 und 500 Wörter?
    Wenn NEIN → fail_reason: "LÄNGE: Text hat [N] Wörter (erlaubt: 150-500)"
-${enablePingPong && hasQuote ? `
-4. PING-PONG: Enthält die Einleitung eine ECHTE Antithese — eine frühere andere Perspektive des Kandidaten?
-   Pseudo-Kontrast (SCHEITERT): "Ich sah das genauso", "immer schon", "noch überzeugter"
-   Wenn kein echter Kontrast → fail_reason: "PING-PONG: Kein echter Perspektiv-Wechsel in der Einleitung"` : ''}
+${SUBJEKT_CHECK_DE}
+${INTRO_CHECK_DE}
+${pingPongCheckDE}
 
-Zusätzlich: Nenne maximal 2 optionale Verbesserungsvorschläge (weaknesses), falls dir etwas auffällt.
+${WEAKNESS_HINTS_DE}
 
 Antworte NUR als valides JSON:
 {
@@ -117,13 +270,13 @@ Antworte NUR als valides JSON:
 }`;
 
     try {
-        console.log('🔍 [Judge] Calling Haiku for Pass/Fail check...');
+        console.log('🔍 [Judge] Calling Haiku for Pass/Fail check (5 hard constraints)...');
 
         const message = await anthropic.messages.create({
             model: 'claude-haiku-4-5-20251001',
-            max_tokens: 200,
+            max_tokens: 400,
             temperature: 0.1,
-            system: 'You are a strict cover letter constraint checker. Respond only with valid JSON.',
+            system: 'You are a strict cover letter constraint checker. Respond only with valid JSON. No explanations outside JSON.',
             messages: [{ role: 'user', content: judgePrompt }]
         });
 
@@ -138,17 +291,24 @@ Antworte NUR als valides JSON:
             parsed = JSON.parse(match[0]);
         }
 
-        const pass = parsed.pass ?? true;
+        // Safety: if Claude returns pass:true but has fail_reasons → treat as fail
         const failReasons = parsed.fail_reasons || [];
+        const pass = failReasons.length === 0 ? (parsed.pass ?? false) : false;
         const weaknesses = parsed.weaknesses || [];
 
         console.log(`${pass ? '✅' : '❌'} [Judge] pass=${pass} failReasons=${failReasons.length} weaknesses=${weaknesses.length}`);
+        if (failReasons.length > 0) {
+            console.log(`  ❌ Fail reasons: ${failReasons.join(' | ')}`);
+        }
+        if (weaknesses.length > 0) {
+            console.log(`  ⚠️  Weaknesses: ${weaknesses.join(' | ')}`);
+        }
 
         return { pass, failReasons, weaknesses };
 
     } catch (err) {
         console.error('❌ [Judge] Failed to parse judge response:', err);
-        console.warn('⚠️ [Judge] Using fallback (pass)');
+        console.warn('⚠️ [Judge] Using fallback (fail) — will trigger re-generation');
         return FALLBACK;
     }
 }
