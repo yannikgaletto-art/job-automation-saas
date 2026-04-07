@@ -21,15 +21,21 @@ import { createHash } from 'crypto';
  *
  * Normalization:
  *   - Trim + lowercase + collapse whitespace → prevents hash drift from formatting changes
- *   - Requirements sorted alphabetically → prevents hash drift from ordering changes
+ *   - Requirements + buzzwords sorted alphabetically → prevents hash drift from ordering changes
  *   - Joined with '|||' separator → prevents collision between fields
  *   - Truncated to 32 hex chars (128 bits) → sufficient for dedup, compact for JSONB storage
+ *
+ * ⚠️ CHANGE LOG:
+ *   2026-04-07: Added buzzwords (4th param). Without this, two jobs with identical
+ *   description but different ATS keywords would share a cache — producing wrong results.
+ *   This invalidates all existing hashes (safe: causes one-time cache-miss → re-analysis).
  */
-export function computeInputHash(cvText: string, jobDescription: string, requirements: string[]): string {
+export function computeInputHash(cvText: string, jobDescription: string, requirements: string[], buzzwords: string[] = []): string {
     const normalized = [
         cvText.trim().toLowerCase().replace(/\s+/g, ' '),
         jobDescription.trim().toLowerCase().replace(/\s+/g, ' '),
         [...requirements].sort().join('|').toLowerCase(),
+        [...buzzwords].sort().join('|').toLowerCase(),
     ].join('|||');
     return createHash('sha256').update(normalized).digest('hex').slice(0, 32);
 }

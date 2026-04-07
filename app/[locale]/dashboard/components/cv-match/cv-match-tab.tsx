@@ -553,23 +553,17 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                 </div>
 
                 {/* ── Next Step ── */}
-                <div className="bg-blue-50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between border border-blue-100">
-                    <div>
-                        <h4 className="font-semibold text-[#002e7a] text-sm">{t('next_step_title')}</h4>
-                        <p className="text-xs text-[#002e7a]/70 mt-0.5">{t('next_step_desc')}</p>
-                    </div>
-                    <div className="flex gap-3 mt-3 sm:mt-0">
-                        <button
-                            onClick={() => runAnalysis(undefined, true)}
-                            className="text-xs text-slate-400 hover:text-[#002e7a] transition-colors py-1.5 px-3"
-                            title={t('btn_reanalyze_tooltip')}
-                        >
-                            {t('btn_reanalyze')}
-                        </button>
-                        <Button variant="primary" onClick={() => onNextStep?.()} className="shadow-sm text-sm">
-                            {t('next_step_btn')}
-                        </Button>
-                    </div>
+                <div className="flex items-center justify-end gap-3 pt-1">
+                    <button
+                        onClick={() => runAnalysis(undefined, true)}
+                        className="text-xs text-slate-400 hover:text-[#002e7a] transition-colors py-1.5 px-3"
+                        title={t('btn_reanalyze_tooltip')}
+                    >
+                        {t('btn_reanalyze')}
+                    </button>
+                    <Button variant="primary" onClick={() => onNextStep?.()} className="shadow-sm text-sm">
+                        {t('next_step_btn')}
+                    </Button>
                 </div>
 
             </div>

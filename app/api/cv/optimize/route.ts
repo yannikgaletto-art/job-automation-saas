@@ -632,11 +632,12 @@ This is a layout correction — not an optimization round.
         const validated = parseResult.data;
 
         // Store the proposal in DB (§3: user-scoped write)
+        // Layout-fix: preserve existing user_decisions so reload stays on Step 2
         const { error: dbError } = await supabaseAdmin
             .from('job_queue')
             .update({
                 cv_optimization_proposal: validated,
-                cv_optimization_user_decisions: null // reset if any
+                ...(isLayoutFixRequest ? {} : { cv_optimization_user_decisions: null }),
             })
             .eq('id', job_id)
             .eq('user_id', user_id);

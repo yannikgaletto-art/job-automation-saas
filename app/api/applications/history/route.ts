@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { updateApplicationCRM, type ApplicationStatus } from "@/lib/services/application-history"
+import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
@@ -144,6 +145,53 @@ export async function PATCH(request: Request) {
 
     } catch (error: any) {
         console.error("Error in PATCH /api/applications/history:", error)
+        return NextResponse.json(
+            { error: error.message || "Internal Server Error" },
+            { status: 500 }
+        )
+    }
+}
+
+// ────────────────────────────────────────────────
+// DELETE: Remove an application from history
+// Security: RLS enforced via user_id — user can only delete their own records
+// ────────────────────────────────────────────────
+
+export async function DELETE(request: Request) {
+    const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get("id")
+
+    // Validate UUID format to prevent injection attacks
+    const idSchema = z.string().uuid()
+    const parsed = idSchema.safeParse(id)
+    if (!parsed.success) {
+        return NextResponse.json({ error: "Invalid id" }, { status: 400 })
+    }
+
+    try {
+        const admin = getSupabaseAdmin()
+
+        // Ownership enforced: user can only delete THEIR OWN records
+        const { error } = await admin
+            .from("application_history")
+            .delete()
+            .eq("id", parsed.data)
+            .eq("user_id", user.id) // ← CRITICAL: cross-user deletion prevention
+
+        if (error) throw error
+
+        // 204 No Content — REST convention for successful delete
+        return new NextResponse(null, { status: 204 })
+
+    } catch (error: any) {
+        console.error("Error in DELETE /api/applications/history:", error)
         return NextResponse.json(
             { error: error.message || "Internal Server Error" },
             { status: 500 }

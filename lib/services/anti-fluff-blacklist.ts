@@ -258,6 +258,64 @@ export const BLACKLIST_PATTERNS: BlacklistPattern[] = [
         reason: 'AI-Reflexion ohne Substanz — stattdessen konkretes Ergebnis nennen',
         category: 'ai_marker',
     },
+
+    // ─── Intro-Doppelpunkt-Pattern (2026-04-07: Defect #1 — T1 Audit) ──────────
+    {
+        pattern: 'fiel mir auf:',
+        reason: 'Doppelpunkt nach Beobachtung ist ein KI-Marker. Stattdessen: vollständiger Aussagesatz mit "dass"',
+        category: 'ai_marker',
+    },
+
+    // ─── Exzellenz-Compounds (2026-04-07: Defect #3 — nur Compounds, nicht das Einzelwort) ──
+    {
+        pattern: 'technische Exzellenz',
+        reason: 'Pompöse KI-Trope — nicht authentisch',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'wissenschaftliche Exzellenz',
+        reason: 'Pompöse KI-Trope — nicht authentisch',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'strategische Exzellenz',
+        reason: 'Pompöse KI-Trope — nicht authentisch',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'operative Exzellenz',
+        reason: 'Pompöse KI-Trope — nicht authentisch',
+        category: 'ai_marker',
+    },
+
+    // ─── Meta-Opener verboten (2026-04-07: Defect #5 — "Weil Sie jemanden suchen") ──
+    {
+        pattern: 'Weil Sie jemanden suchen',
+        reason: 'Meta-Formulierung statt konkretem Aufgabenbezug — zitiere stattdessen eine konkrete Aufgabe aus der Stelle',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'Weil ihr jemanden sucht',
+        reason: 'Meta-Formulierung (Du-Form) statt konkretem Aufgabenbezug',
+        category: 'ai_marker',
+    },
+
+    // ─── Generische Absatz-Enden (2026-04-07: Defect #6 — KI-Reflexions-Varianten) ──
+    {
+        pattern: 'schärfte meinen Blick dafür',
+        reason: 'KI-generische Reflexion am Absatzende — stattdessen konkretes Ergebnis oder Überzeugung',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'öffnete mir die Augen für',
+        reason: 'KI-generische Reflexion — abgegriffen',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'hat mein Verständnis dafür geprägt',
+        reason: 'KI-generische Reflexion — substanzlos',
+        category: 'ai_marker',
+    },
 ];
 
 export interface FluffScanResult {

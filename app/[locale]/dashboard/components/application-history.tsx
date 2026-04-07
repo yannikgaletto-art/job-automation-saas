@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { TableSkeleton } from "@/components/skeletons/table-skeleton"
-import { ChevronLeft, ChevronRight, ChevronDown, ExternalLink, X, Plus } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronDown, ExternalLink, Trash2, X, Plus } from "lucide-react"
 import { formatAppliedDate } from "@/lib/utils/date-formatting"
 import { motion, AnimatePresence } from "framer-motion"
 import { EmptyApplicationHistory } from "@/components/empty-states/empty-application-history"
 import { cn } from "@/lib/utils"
 import { useTranslations } from "next-intl"
+import { CustomDialog } from "@/components/ui/custom-dialog"
+import { Button } from "@/components/motion/button"
 
 // ────────────────────────────────────────────────
 // Types
@@ -375,6 +377,8 @@ export function ApplicationHistory({ refreshKey }: { refreshKey?: number }) {
     const [error, setError] = useState<string | null>(null)
     const [page, setPage] = useState(1)
     const [expandedId, setExpandedId] = useState<string | null>(null)
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+    const [deleteTarget, setDeleteTarget] = useState<{ id: string; companyName: string; jobTitle: string } | null>(null)
 
     useEffect(() => {
         fetchHistory(page)
@@ -453,6 +457,34 @@ export function ApplicationHistory({ refreshKey }: { refreshKey?: number }) {
         })
     }, [])
 
+    // ── Delete Application ──
+    const handleDeleteApplication = useCallback(async (id: string) => {
+        // Optimistic removal for instant feedback
+        setData(prev => {
+            if (!prev) return prev
+            return {
+                ...prev,
+                applications: prev.applications.filter(app => app.id !== id),
+                pagination: { ...prev.pagination, total: Math.max(0, prev.pagination.total - 1) }
+            }
+        })
+
+        try {
+            const res = await fetch(`/api/applications/history?id=${encodeURIComponent(id)}`, {
+                method: 'DELETE',
+            })
+            // 204 No Content is a success — res.ok covers this
+            if (!res.ok) {
+                // Rollback: re-fetch if API fails
+                console.error('[ApplicationHistory] Delete failed, re-fetching')
+                await fetchHistory(page)
+            }
+        } catch (err) {
+            console.error('[ApplicationHistory] Delete network error:', err)
+            await fetchHistory(page)
+        }
+    }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
+
     // ── Overdue check ──
     const isOverdue = (app: Application) => {
         if (!app.nextActionDate) return false
@@ -460,16 +492,20 @@ export function ApplicationHistory({ refreshKey }: { refreshKey?: number }) {
         return new Date(app.nextActionDate) < new Date()
     }
 
-    // ── Next Action Label ──
+    // ── Next Action Label (date only — column header already says "Follow-up") ──
     const formatNextAction = (app: Application): string => {
         if (!app.nextActionDate) return '–'
+        if (TERMINAL_STATUSES.includes(app.status)) return '–'
         const d = new Date(app.nextActionDate)
         const now = new Date()
         const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
         if (diffDays < 0) return t('overdue_hint')
         if (diffDays === 0) return t('followup_today')
         if (diffDays === 1) return t('followup_tomorrow')
-        return d.toLocaleDateString()
+
+        // Just the date — "13. Apr." not "Follow-up am 13. Apr."
+        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
     }
 
     // ── Render States ──
@@ -494,14 +530,15 @@ export function ApplicationHistory({ refreshKey }: { refreshKey?: number }) {
     const isEmpty = !data || data.applications.length === 0
 
     return (
-        <div>
+        <>
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_1fr_140px_120px_100px] gap-4 px-5 py-2.5 text-xs font-medium text-[#73726E] uppercase tracking-wider border-b border-[#E7E7E5]">
+            <div className="grid grid-cols-[2fr_1.5fr_150px_160px_110px_28px] gap-4 px-5 py-2.5 text-xs font-medium text-[#73726E] uppercase tracking-wider border-b border-[#E7E7E5]">
                 <span>{t('col_job')}</span>
                 <span>{t('col_company')}</span>
                 <span>{t('col_status')}</span>
                 <span>{t('col_next_action')}</span>
                 <span>{t('col_date')}</span>
+                <span />
             </div>
 
             {isEmpty ? (
@@ -523,15 +560,22 @@ export function ApplicationHistory({ refreshKey }: { refreshKey?: number }) {
                                         animate={{ opacity: 1 }}
                                         onClick={() => setExpandedId(expanded ? null : app.id)}
                                         className={cn(
-                                            "grid grid-cols-[1fr_1fr_140px_120px_100px] gap-4 px-5 py-3.5 items-center border-b border-[#E7E7E5] last:border-b-0 transition-colors cursor-pointer select-none",
+                                            "grid grid-cols-[2fr_1.5fr_150px_160px_110px_28px] gap-4 px-5 py-3.5 items-center border-b border-[#E7E7E5] last:border-b-0 transition-colors cursor-pointer select-none",
                                             overdue && "border-l-2 border-l-amber-400",
                                             expanded ? "bg-[#FAFAF9]" : "hover:bg-[#FAFAF9]"
                                         )}
                                     >
-                                        {/* Job Title + External Link */}
+                                        {/* Job Title (no link — link is on company) */}
                                         <div className="flex items-center gap-1.5 min-w-0">
                                             <span className="text-sm text-[#37352F] truncate" title={app.jobTitle}>
                                                 {app.jobTitle || "–"}
+                                            </span>
+                                        </div>
+
+                                        {/* Company + External Link (link belongs on company, not job title) */}
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="text-sm font-medium text-[#37352F] truncate" title={app.companyName}>
+                                                {app.companyName}
                                             </span>
                                             {app.jobUrl && (
                                                 <a
@@ -545,11 +589,6 @@ export function ApplicationHistory({ refreshKey }: { refreshKey?: number }) {
                                                     <ExternalLink className="w-3.5 h-3.5" />
                                                 </a>
                                             )}
-                                        </div>
-
-                                        {/* Company */}
-                                        <div className="text-sm font-medium text-[#37352F] truncate" title={app.companyName}>
-                                            {app.companyName}
                                         </div>
 
                                         {/* Status Badge */}
@@ -568,11 +607,24 @@ export function ApplicationHistory({ refreshKey }: { refreshKey?: number }) {
                                             {formatNextAction(app)}
                                         </div>
 
-                                        {/* Date + Expand Indicator */}
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-[#73726E]">
-                                                {formatAppliedDate(app.appliedAt)}
-                                            </span>
+                                        {/* Date */}
+                                        <div className="text-sm text-[#73726E]">
+                                            {formatAppliedDate(app.appliedAt)}
+                                        </div>
+
+                                        {/* Delete + Expand (own grid column) */}
+                                        <div className="flex items-center justify-end gap-1">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setDeleteTarget({ id: app.id, companyName: app.companyName, jobTitle: app.jobTitle })
+                                                }}
+                                                className="p-1 rounded text-[#C8C5C1] hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                title={t('delete_btn')}
+                                                aria-label={t('delete_btn')}
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
                                             <ChevronDown className={cn(
                                                 "w-4 h-4 text-[#B8B8B5] transition-transform duration-200",
                                                 expanded && "rotate-180"
@@ -624,6 +676,42 @@ export function ApplicationHistory({ refreshKey }: { refreshKey?: number }) {
                     )}
                 </>
             )}
-        </div>
+
+            {/* Delete Confirmation Dialog — same pattern as job-row.tsx */}
+            <CustomDialog
+                isOpen={deleteTarget !== null}
+                onClose={() => setDeleteTarget(null)}
+                title={t('delete_btn')}
+            >
+                <div className="p-6">
+                    <p className="text-slate-500 mb-6 text-center">
+                        {t('delete_confirm')}
+                        {deleteTarget && (
+                            <span className="block mt-1 font-semibold text-[#37352F]">
+                                {deleteTarget.jobTitle} @ {deleteTarget.companyName}
+                            </span>
+                        )}
+                    </p>
+                    <div className="flex justify-end gap-3 mt-6">
+                        <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+                            {t('delete_confirm_no')}
+                        </Button>
+                        <Button
+                            variant="primary"
+                            className="bg-red-600 hover:bg-red-700 text-white border-transparent shadow-sm"
+                            onClick={() => {
+                                if (deleteTarget) {
+                                    handleDeleteApplication(deleteTarget.id)
+                                }
+                                setDeleteTarget(null)
+                            }}
+                        >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            {t('delete_confirm_yes')}
+                        </Button>
+                    </div>
+                </div>
+            </CustomDialog>
+        </>
     )
 }

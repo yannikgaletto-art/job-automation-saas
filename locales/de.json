@@ -238,7 +238,7 @@
       "add_job": "Add Job",
       "max_jobs": "Max. 5 aktive Jobs erreicht",
       "current_jobs": "Aktuelle Jobs",
-      "application_history": "Application History",
+      "application_history": "Bewerbungs-Journey",
       "review_cv": "Review Optimized CV",
       "notify_added": "Job zur Queue hinzugefügt",
       "notify_steckbrief": "Steckbrief erstellt",
@@ -253,8 +253,8 @@
       "col_job": "Job",
       "col_company": "Unternehmen",
       "col_status": "Status",
-      "col_next_action": "Nächste Aktion",
-      "col_date": "Fertiggestellt am",
+      "col_next_action": "Follow-up",
+      "col_date": "Beworben am",
       "status_applied": "Beworben",
       "status_follow_up_sent": "Follow-up gesendet",
       "status_interviewing": "Im Gespräch",
@@ -288,7 +288,11 @@
       "pagination_label": "Seite {page} von {total}",
       "empty_title": "Noch keine Bewerbungen",
       "empty_description": "Deine Bewerbungshistorie erscheint hier, sobald du dich auf Jobs bewirbst.",
-      "open_posting": "Zur Stellenanzeige"
+      "open_posting": "Zur Stellenanzeige",
+      "delete_btn": "Eintrag entfernen",
+      "delete_confirm": "Diesen Eintrag wirklich aus der Bewerbungs-Journey entfernen?",
+      "delete_confirm_yes": "Löschen",
+      "delete_confirm_no": "Abbrechen"
     },
     "analytics": {
       "title": "Performance Center",
@@ -946,7 +950,10 @@
     "ats_modal_char_limit": "{n}/200",
     "ats_modal_preview_label": "Formulierter Stichpunkt (bearbeitbar)",
     "ats_modal_edit_hint": "Du kannst den Text anpassen, bevor du ihn hinzufügst.",
-    "ats_modal_add_btn": "Zum Lebenslauf hinzufügen"
+    "ats_modal_add_btn": "Zum Lebenslauf hinzufügen",
+    "edit_after_hint": "Klicken zum Bearbeiten",
+    "editing_active": "wird bearbeitet",
+    "edit_reset_tooltip": "Original wiederherstellen"
   },
   "command_palette": {
     "placeholder": "Was möchtest du tun?",
@@ -1022,9 +1029,7 @@
     "ats_subtitle": "(Applicant Tracking System)",
     "ats_desc": "In der Regel ist die erste Instanz, die deinen Lebenslauf prüft, ein <strong>Algorithmus</strong>. Die Applicant Tracking Systems (ATS) suchen gezielt nach <strong>Keywords</strong>, die für die Stelle relevant sind. Fehlen diese Begriffe, wird deine Bewerbung oft automatisch aussortiert. Wir empfehlen dir daher, die Schlagworte aus der Stellenanzeige direkt in deinen Lebenslauf zu <strong>integrieren</strong>.",
     "ats_empty": "Keine expliziten Keywords analysiert.",
-    "next_step_title": "Zur Erstellung deines Lebenslaufs",
-    "next_step_desc": "Gehe zum nächsten Schritt, um deinen Lebenslauf basierend auf dieser Analyse zu aktualisieren.",
-    "next_step_btn": "Weiter zur Erstellung",
+    "next_step_btn": "CV Optimierung",
     "no_cv_title": "Kein Lebenslauf gefunden",
     "no_cv_desc": "Um den CV Match zu starten, musst du zuerst deinen Lebenslauf hochladen. Das dauert nur 30 Sekunden.",
     "no_cv_cta": "CV in Einstellungen hochladen →",

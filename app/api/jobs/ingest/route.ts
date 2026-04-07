@@ -130,10 +130,72 @@ export async function POST(request: NextRequest) {
         console.log(`[${requestId}] route=jobs/ingest step=locale locale=${locale}`);
 
         // ================================================================
-        // STEP 2: Extract requirements with LLM (with timeout)
+        // STEP 1.9: Description-Level Extraction Cache
+        // Before calling Mistral, check if we've already extracted fields
+        // from this exact job description text (by SHA-256 hash).
+        // This guarantees deterministic buzzwords across repeated ingests
+        // of the same posting — even after the user deletes and re-adds a job.
         // ================================================================
-        let extractedData: any = {};
+        const descriptionHash = crypto
+            .createHash('sha256')
+            .update(enrichedDescription.trim().toLowerCase())
+            .digest('hex')
+            .slice(0, 32);
 
+        let cachedExtraction: {
+            buzzwords: string[];
+            summary: string | null;
+            qualifications: string[];
+            responsibilities: string[];
+            benefits: string[];
+            seniority: string;
+            location: string | null;
+        } | null = null;
+
+        try {
+            // Scan user's recent jobs for a prior extraction of identical content.
+            // Max ~50 jobs per user → no index required, O(50) is fine.
+            const { data: priorJobs } = await supabaseAdmin
+                .from('job_queue')
+                .select('buzzwords, summary, requirements, responsibilities, benefits, seniority, location, metadata')
+                .eq('user_id', userId)
+                .not('buzzwords', 'is', null)
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            if (priorJobs) {
+                const matchingJob = priorJobs.find((j: any) => {
+                    const meta = (j.metadata || {}) as Record<string, unknown>;
+                    return meta.description_hash === descriptionHash && Array.isArray(j.buzzwords) && j.buzzwords.length > 0;
+                });
+
+                if (matchingJob) {
+                    cachedExtraction = {
+                        buzzwords: matchingJob.buzzwords,
+                        summary: matchingJob.summary || null,
+                        qualifications: Array.isArray(matchingJob.requirements) ? matchingJob.requirements : [],
+                        responsibilities: Array.isArray(matchingJob.responsibilities) ? matchingJob.responsibilities : [],
+                        benefits: Array.isArray(matchingJob.benefits) ? matchingJob.benefits : [],
+                        seniority: matchingJob.seniority || 'unknown',
+                        location: matchingJob.location || null,
+                    };
+                    console.log(`[${requestId}] route=jobs/ingest step=description_cache HIT — reusing ${matchingJob.buzzwords.length} buzzwords (hash: ${descriptionHash.slice(0, 8)}…)`);
+                }
+            }
+        } catch (cacheErr: any) {
+            // Non-blocking — cache failure falls through to LLM extraction
+            console.warn(`[${requestId}] route=jobs/ingest step=description_cache error (non-blocking): ${cacheErr?.message}`);
+        }
+
+        // ================================================================
+        // STEP 2: Extract requirements with LLM (with timeout)
+        // Skipped if description_cache HIT — reuse prior extraction instead.
+        // ================================================================
+        let extractedData: any = cachedExtraction ?? {};
+
+        if (cachedExtraction) {
+            console.log(`[${requestId}] route=jobs/ingest step=ai_parse_requirements SKIPPED — using cached extraction`);
+        } else {
         try {
             console.log(`[${requestId}] route=jobs/ingest step=ai_parse_requirements`);
 
@@ -196,6 +258,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
             console.warn(`[${requestId}] route=jobs/ingest step=ai_parse error=${aiError.message}`);
             // Proceed with empty extraction rather than failing the ingest
         }
+        } // end if (!cachedExtraction)
 
         // ================================================================
         // STEP 3: Check if user_profiles row exists (required FK)
@@ -213,6 +276,28 @@ Schema: ${JSON.stringify(extractionSchema)}`,
                 onboarding_completed: false,
             });
             console.log(`[${requestId}] route=jobs/ingest step=ensure_profile created`);
+        }
+
+        // ================================================================
+        // STEP 3.5: Normalize buzzwords (determinism guarantee)
+        // Sort + dedup ensures identical descriptions produce identical keyword lists.
+        // Without this, Claude's non-deterministic token order causes hash drift.
+        // ================================================================
+        if (Array.isArray(extractedData.buzzwords) && extractedData.buzzwords.length > 0) {
+            const raw: string[] = extractedData.buzzwords;
+            const seen = new Set<string>();
+            const normalized: string[] = [];
+            for (const kw of raw) {
+                const key = kw.trim().toLowerCase();
+                if (key.length >= 2 && !seen.has(key)) {
+                    seen.add(key);
+                    normalized.push(kw.trim()); // preserve original casing
+                }
+            }
+            extractedData.buzzwords = normalized.sort((a, b) =>
+                a.toLowerCase().localeCompare(b.toLowerCase())
+            );
+            console.log(`[${requestId}] route=jobs/ingest step=normalize_buzzwords count=${extractedData.buzzwords.length}`);
         }
 
         // ================================================================
@@ -274,18 +359,32 @@ Schema: ${JSON.stringify(extractionSchema)}`,
         // ================================================================
         try {
             // Only set the flag if we actually ran sync extraction successfully
-            const hasSyncData = extractedData && Object.keys(extractedData).length > 0 && extractedData.summary;
+            // Also store description_hash so STEP 1.9 can find this job in future ingests
+            const hasSyncData = extractedData && Object.keys(extractedData).length > 0 && (extractedData.summary || cachedExtraction);
             if (hasSyncData) {
+                // JSONB Read-Modify-Write: read current metadata first to avoid wiping other fields
+                // (defensive pattern — metadata is null at this point for new jobs, but safe for all futures)
+                const { data: currentJobMeta } = await supabaseAdmin
+                    .from('job_queue')
+                    .select('metadata')
+                    .eq('id', job.id)
+                    .eq('user_id', userId)
+                    .single();
+                const existingMeta = (currentJobMeta?.metadata as Record<string, unknown>) || {};
+
                 await supabaseAdmin
                     .from('job_queue')
                     .update({
                         metadata: {
+                            ...existingMeta,
                             sync_extracted_at: new Date().toISOString(),
+                            description_hash: descriptionHash,
+                            description_cache_hit: !!cachedExtraction,
                         },
                     })
                     .eq('id', job.id)
                     .eq('user_id', userId);
-                console.log(`[${requestId}] route=jobs/ingest step=set_sync_flag job_id=${job.id}`);
+                console.log(`[${requestId}] route=jobs/ingest step=set_sync_flag job_id=${job.id} description_hash=${descriptionHash.slice(0, 8)}… cache_hit=${!!cachedExtraction}`);
             }
 
             await inngest.send({

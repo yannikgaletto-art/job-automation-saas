@@ -344,13 +344,14 @@ RULES:
 - Every keyword in CONFIRMED FOUND MUST appear in keywordsFound.
 - Every keyword in CONFIRMED MISSING MUST appear in keywordsMissing.
 - Do NOT move keywords between the two lists.
-- If additional ATS keywords exist that are NOT listed above, classify them based on your own analysis of the CV text.
+- ⛔ CLOSED SET: Only classify the keywords listed above. NEVER add keywords from the CV text or job description that are not in this list.
 ` : `
 Classify EVERY provided ATS keyword as either "found" or "missing".
 Every keyword from the input list MUST appear in either keywordsFound or keywordsMissing.
 - "found": The keyword, a direct synonym, or a clearly documented related activity appears in ${cvRef}.
 - "missing": The keyword does NOT appear in ${cvRef} — not even implicitly.
 STRICT: Do NOT infer. Using "make.com" does NOT mean "Sales Automation". "Project Management" does NOT mean "Enterprise Sales". Match literally or by direct synonym only.
+⛔ CLOSED SET (MANDATORY): keywordsFound and keywordsMissing MUST together contain EXACTLY the same keywords as the ATS Keywords input list above — no more, no less. Adding ANY keyword that was not in the input list is a critical error.
 `}
 ***
 
@@ -384,6 +385,7 @@ Before writing the final JSON, silently check:
 7. HALLUCINATION CHECK: Does every card title and gap reference a requirement EXPLICITLY in the JD? If not → REMOVE it.
 8. DOCUMENT CHECK: Does every gap/context sentence reference the CV document? If it judges the person directly → REWRITE.
 9. ATS STRICT CHECK: Is every "found" keyword actually in the CV text? If uncertain → mark as "missing".
+   CLOSED-SET CHECK: Do keywordsFound + keywordsMissing contain ONLY keywords from the input ATS list? Any invented keyword that was NOT in the input → REMOVE it immediately.
 Silently fix and output.
 
 **OUTPUT FORMAT:**
@@ -458,6 +460,43 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
         // Log for audit trail
         const jobCategory = (firstResult as any)._jobCategory ?? 'N/A';
         console.log(`📊 [CV Match] Category: ${jobCategory}, Score: ${firstResult.overallScore}, MajorGaps: ${gapCensus?.majorGaps ?? 'n/a'}, MinorGaps: ${gapCensus?.minorGaps ?? 'n/a'}`);
+
+        // SICHERHEITSARCHITEKTUR §Golden Rule — Defense-in-Depth: ATS Closed-Set Enforcement
+        // The prompt instructs the LLM not to invent keywords. This code layer GUARANTEES it.
+        // Any keyword in the output that was not in the input atsKeywords list is silently removed.
+        if (req.atsKeywords.length > 0) {
+            const inputKeywordsLower = new Set(req.atsKeywords.map(k => k.trim().toLowerCase()));
+
+            const originalFoundCount = firstResult.keywordsFound?.length ?? 0;
+            const originalMissingCount = firstResult.keywordsMissing?.length ?? 0;
+
+            firstResult.keywordsFound = (firstResult.keywordsFound || []).filter(
+                k => inputKeywordsLower.has(k.trim().toLowerCase())
+            );
+            firstResult.keywordsMissing = (firstResult.keywordsMissing || []).filter(
+                k => inputKeywordsLower.has(k.trim().toLowerCase())
+            );
+
+            const removedFound = originalFoundCount - firstResult.keywordsFound.length;
+            const removedMissing = originalMissingCount - firstResult.keywordsMissing.length;
+
+            if (removedFound > 0 || removedMissing > 0) {
+                console.warn(`🛡️ [CV Match] Closed-set filter removed ${removedFound} invented found-keywords and ${removedMissing} invented missing-keywords (LLM hallucination corrected)`);
+            }
+
+            // Ensure every input keyword appears in exactly one of the two lists
+            // (handles edge case where LLM drops a keyword entirely)
+            const classifiedLower = new Set([
+                ...firstResult.keywordsFound.map(k => k.trim().toLowerCase()),
+                ...firstResult.keywordsMissing.map(k => k.trim().toLowerCase()),
+            ]);
+            const droppedKeywords = req.atsKeywords.filter(k => !classifiedLower.has(k.trim().toLowerCase()));
+            if (droppedKeywords.length > 0) {
+                // Conservatively add dropped keywords to missing (fail-safe: better to show as missing than disappear)
+                firstResult.keywordsMissing.push(...droppedKeywords);
+                console.warn(`🛡️ [CV Match] Closed-set fill: added ${droppedKeywords.length} dropped keyword(s) to missing: ${droppedKeywords.join(', ')}`);
+            }
+        }
 
 
         const { error: logError } = await supabaseAdmin.from('generation_logs').insert({

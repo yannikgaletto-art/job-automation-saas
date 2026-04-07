@@ -238,7 +238,7 @@
       "add_job": "Añadir empleo",
       "max_jobs": "Máximo de 5 empleos activos alcanzado",
       "current_jobs": "Empleos actuales",
-      "application_history": "Historial de solicitudes",
+      "application_history": "Mi Journey",
       "review_cv": "Revisar CV optimizado",
       "notify_added": "Empleo añadido a la cola",
       "notify_steckbrief": "Perfil creado",
@@ -253,8 +253,8 @@
       "col_job": "Puesto",
       "col_company": "Empresa",
       "col_status": "Estado",
-      "col_next_action": "Próxima acción",
-      "col_date": "Fecha",
+      "col_next_action": "Follow-up",
+      "col_date": "Enviado el",
       "status_applied": "Enviada",
       "status_follow_up_sent": "Seguimiento enviado",
       "status_interviewing": "En entrevistas",
@@ -288,7 +288,11 @@
       "pagination_label": "Página {page} de {total}",
       "empty_title": "Sin solicitudes aún",
       "empty_description": "Tu historial aparecerá aquí cuando empieces a postularte.",
-      "open_posting": "Ver oferta"
+      "open_posting": "Ver oferta",
+      "delete_btn": "Eliminar entrada",
+      "delete_confirm": "¿Eliminar esta solicitud de tu Journey?",
+      "delete_confirm_yes": "Eliminar",
+      "delete_confirm_no": "Cancelar"
     },
     "analytics": {
       "title": "Centro de rendimiento",
@@ -946,7 +950,10 @@
     "ats_modal_char_limit": "{n}/200",
     "ats_modal_preview_label": "Punto formulado (editable)",
     "ats_modal_edit_hint": "Puedes editar el texto antes de añadirlo.",
-    "ats_modal_add_btn": "Añadir al CV"
+    "ats_modal_add_btn": "Añadir al CV",
+    "edit_after_hint": "Clic para editar",
+    "editing_active": "editando",
+    "edit_reset_tooltip": "Restaurar original"
   },
   "command_palette": {
     "placeholder": "¿Qué quieres hacer?",
@@ -1022,9 +1029,7 @@
     "ats_subtitle": "(Applicant Tracking System)",
     "ats_desc": "Por lo general, la primera instancia que revisa tu CV es un <strong>algoritmo</strong>. Los sistemas de seguimiento de candidatos (ATS) buscan específicamente <strong>palabras clave</strong> relevantes para el puesto. Si faltan estos términos, tu candidatura suele ser descartada automáticamente. Te recomendamos integrar las palabras clave del anuncio de empleo directamente en tu CV.",
     "ats_empty": "No se analizaron palabras clave explícitas.",
-    "next_step_title": "Optimizar tu CV",
-    "next_step_desc": "Continúa al siguiente paso para actualizar tu CV basado en este análisis.",
-    "next_step_btn": "Continuar con la optimización",
+    "next_step_btn": "Optimización CV",
     "no_cv_title": "No se encontró CV",
     "no_cv_desc": "Para iniciar CV Match, necesitas subir tu CV primero. Solo tarda 30 segundos.",
     "no_cv_cta": "Subir CV en Ajustes →",

@@ -18,7 +18,10 @@ export async function GET() {
             .eq('user_id', user.id)
             // §Settings-Gate: Exclude AI-generated cover letters — they live exclusively
             // in the Job Queue (step-4-cover-letter). Settings shows ONLY user-uploaded docs.
-            .neq('origin', 'generated')
+            // NULL-safe: .neq() in Supabase/Postgres evaluates NULL != 'generated' as NULL (not TRUE),
+            // which silently drops all rows where origin IS NULL (= all uploaded CVs).
+            // Fix: explicitly include rows where origin is NULL (uploaded docs) OR not 'generated'.
+            .or('origin.is.null,origin.neq.generated')
             .order('created_at', { ascending: false });
 
         if (error) {

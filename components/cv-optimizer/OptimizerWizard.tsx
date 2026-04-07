@@ -415,11 +415,16 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
         setIsLayoutFixing(true);
         setLayoutFixError(null);
         try {
+            // BUG-FIX: Send the user's ACTUAL current CV, not the raw original.
+            // editablePdfData = InlineCvEditor state (includes manual edits)
+            // finalCv = after DiffReview optimizations (pre-display-filter)
+            // cvData = raw original (last resort fallback)
+            const currentCv = editablePdfData ?? finalCv ?? cvData;
             const res = await fetch('/api/cv/optimize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    cv_structured_data: cvData,
+                    cv_structured_data: currentCv,
                     cv_match_result: jobData?.metadata?.cv_match,
                     template_id: templateId,
                     job_id: jobId,
@@ -447,10 +452,16 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                 return;
             }
             if (data.proposal) {
-                setProposal(data.proposal);
-                setFreeRetryUsed(true);
-                setStep(1); // Back to diff-review with new proposal
-            }
+                    // BUG-FIX: Use proposal.optimized directly — the backend already
+                    // computes the final result via applyCvChanges(). Re-applying old
+                    // decisions on a new base fails silently when the KI removes bullets
+                    // that the old decision IDs reference (zero-update bug).
+                    const fixedFinalCv = data.proposal.optimized ?? data.proposal.translated ?? cvData;
+                    setFinalCv(fixedFinalCv);
+                    setProposal(data.proposal);
+                    setFreeRetryUsed(true);
+                    // Stay on step 2 — user sees the updated preview immediately, no review loop
+                }
         } catch {
             setLayoutFixError(t('error_failed'));
         } finally {

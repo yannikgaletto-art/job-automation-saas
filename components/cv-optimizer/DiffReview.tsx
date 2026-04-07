@@ -6,7 +6,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useTranslations } from 'next-intl'
 import { useLocale } from 'next-intl'
 import { motion, AnimatePresence } from "framer-motion"
-import { Check, X, ArrowRight, ChevronRight, Plus, Loader2 } from "lucide-react"
+import { Check, X, ArrowRight, ChevronRight, Plus, Loader2, RotateCcw } from "lucide-react"
 import { CvChange, CvOptimizationProposal, CvStructuredData } from "@/types/cv"
 import { applyOptimizations } from "@/lib/utils/cv-merger"
 import { cn } from "@/lib/utils"
@@ -116,7 +116,8 @@ function groupChangesByStation(
  */
 function computeKeywordHits(
     group: StationGroup,
-    atsKeywords: string[]
+    atsKeywords: string[],
+    overrides: Record<string, string>
 ): { count: number; matched: string[] } {
     if (!atsKeywords?.length) return { count: 0, matched: [] };
 
@@ -124,8 +125,10 @@ function computeKeywordHits(
     const lowerKeywords = atsKeywords.map(k => k.toLowerCase());
 
     for (const change of group.changes) {
-        if (!change.after) continue;
-        const afterLower = change.after.toLowerCase();
+        // Use override if available, else original after
+        const effectiveAfter = overrides[change.id] !== undefined ? overrides[change.id] : (change.after ?? '');
+        if (!effectiveAfter) continue;
+        const afterLower = effectiveAfter.toLowerCase();
         const beforeLower = change.before?.toLowerCase() || '';
 
         for (let i = 0; i < lowerKeywords.length; i++) {
@@ -161,16 +164,55 @@ function ChangeRow({
     change,
     decision,
     onDecide,
+    onOverride,
+    currentOverride,
     t,
 }: {
     change: CvChange;
     decision: 'accepted' | 'rejected' | undefined;
     onDecide: (id: string, d: 'accepted' | 'rejected') => void;
+    onOverride: (id: string, newAfter: string | null) => void;
+    currentOverride: string | undefined;
     t: ReturnType<typeof useTranslations>;
 }) {
     const [open, setOpen] = useState(false);
+    // null = view mode, string = edit mode (value is the editable text)
+    const [editedAfter, setEditedAfter] = useState<string | null>(null);
     const isRejected = decision === 'rejected';
     const isAccepted = decision === 'accepted';
+    const isEditing = editedAfter !== null;
+    // The text to DISPLAY in view mode (override or original)
+    const displayAfter = currentOverride !== undefined ? currentOverride : (change.after ?? '');
+    const hasOverride = currentOverride !== undefined;
+
+    const handleStartEdit = () => {
+        setEditedAfter(displayAfter);
+    };
+
+    const handleEditChange = (val: string) => {
+        setEditedAfter(val);
+        // Live-update parent — even empty string is valid (guard in parent if needed)
+        if (val.trim()) {
+            onOverride(change.id, val);
+        }
+    };
+
+    const handleEditBlur = () => {
+        // If empty after blur, reset to original
+        if (editedAfter !== null && !editedAfter.trim()) {
+            setEditedAfter(null);
+            onOverride(change.id, null);
+        } else if (editedAfter !== null) {
+            onOverride(change.id, editedAfter);
+            setEditedAfter(null); // Exit edit mode, keep override in parent
+        }
+    };
+
+    const handleReset = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditedAfter(null);
+        onOverride(change.id, null);
+    };
 
     return (
         <div className={cn(
@@ -255,14 +297,51 @@ function ChangeRow({
                                         </p>
                                     </div>
                                 )}
-                                {/* After block — primary text, keywords underlined */}
+                                {/* After block — inline-editable */}
                                 <div className="border-l-2 border-[#012e7a]/30 pl-3 py-2">
-                                    <p className="text-xs text-[#012e7a] font-medium mb-1">{t('col_after')}</p>
-                                    <p className="text-sm text-[#37352F] leading-relaxed">
-                                        {change.before
-                                            ? highlightNew(change.before, change.after || "")
-                                            : <span className="text-[#012e7a] font-medium">{change.after}</span>}
-                                    </p>
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <p className="text-xs text-[#012e7a] font-medium">{t('col_after')}</p>
+                                        {!isEditing && (
+                                            <span className="text-[9px] text-[#012e7a]/35 font-normal">
+                                                {hasOverride ? `✎ ${t('editing_active')}` : t('edit_after_hint')}
+                                            </span>
+                                        )}
+                                        {isEditing && (
+                                            <span className="text-[9px] text-[#012e7a]/50 font-normal italic">
+                                                {t('editing_active')}
+                                            </span>
+                                        )}
+                                        {/* Reset button — only shown if there's an override and not currently editing */}
+                                        {hasOverride && !isEditing && (
+                                            <button
+                                                onClick={handleReset}
+                                                title={t('edit_reset_tooltip')}
+                                                className="ml-auto flex items-center gap-0.5 text-[9px] text-gray-400 hover:text-[#012e7a] transition-colors"
+                                            >
+                                                <RotateCcw className="w-2.5 h-2.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                    {isEditing ? (
+                                        <textarea
+                                            autoFocus
+                                            value={editedAfter}
+                                            onChange={e => handleEditChange(e.target.value)}
+                                            onBlur={handleEditBlur}
+                                            rows={Math.max(2, (editedAfter || '').split('\n').length + 1)}
+                                            className="w-full text-sm text-[#37352F] leading-relaxed bg-[#012e7a]/[0.02] border border-[#012e7a]/20 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-[#012e7a]/30"
+                                        />
+                                    ) : (
+                                        <p
+                                            className="text-sm text-[#37352F] leading-relaxed cursor-text hover:bg-[#012e7a]/[0.03] rounded px-1 -ml-1 transition-colors"
+                                            onClick={e => { e.stopPropagation(); handleStartEdit(); }}
+                                            title={t('edit_after_hint')}
+                                        >
+                                            {change.before
+                                                ? highlightNew(change.before, displayAfter)
+                                                : <span className="text-[#012e7a] font-medium">{displayAfter}</span>}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -276,15 +355,19 @@ function ChangeRow({
 function StationGroupComponent({
     group,
     decisions,
+    overrides,
     onDecide,
     onBulkDecide,
+    onOverride,
     defaultOpen,
     t,
 }: {
     group: StationGroup;
     decisions: Record<string, 'accepted' | 'rejected'>;
+    overrides: Record<string, string>;
     onDecide: (id: string, d: 'accepted' | 'rejected') => void;
     onBulkDecide: (ids: string[], d: 'accepted' | 'rejected') => void;
+    onOverride: (id: string, newAfter: string | null) => void;
     defaultOpen: boolean;
     t: ReturnType<typeof useTranslations>;
 }) {
@@ -377,6 +460,8 @@ function StationGroupComponent({
                                                     change={change}
                                                     decision={decisions[change.id]}
                                                     onDecide={onDecide}
+                                                    onOverride={onOverride}
+                                                    currentOverride={overrides[change.id]}
                                                     t={t}
                                                 />
                                             ))}
@@ -391,6 +476,8 @@ function StationGroupComponent({
                                         change={change}
                                         decision={decisions[change.id]}
                                         onDecide={onDecide}
+                                        onOverride={onOverride}
+                                        currentOverride={overrides[change.id]}
                                         t={t}
                                     />
                                 ))
@@ -695,7 +782,7 @@ export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, o
     // Survives tab navigation (component unmount/remount in job-row.tsx).
     const SESSION_KEY = `diff-review-state-${jobId}`;
 
-    function loadPersistedState(): { localProposal: CvOptimizationProposal; decisions: Record<string, 'accepted' | 'rejected'> } | null {
+    function loadPersistedState(): { localProposal: CvOptimizationProposal; decisions: Record<string, 'accepted' | 'rejected'>; overrides: Record<string, string> } | null {
         try {
             const raw = sessionStorage.getItem(SESSION_KEY);
             if (!raw) return null;
@@ -715,6 +802,10 @@ export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, o
 
     const [decisions, setDecisions] = useState<Record<string, 'accepted' | 'rejected'>>(
         persisted?.decisions ?? {}
+    );
+    // overrides: changeId → user-edited after text (null = restore original)
+    const [overrides, setOverrides] = useState<Record<string, string>>(
+        persisted?.overrides ?? {}
     );
     const [showConfirmPopup, setShowConfirmPopup] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
@@ -744,14 +835,26 @@ export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, o
         });
     };
 
+    // Handle inline override: null = remove override (reset to original)
+    const handleOverride = useCallback((id: string, newAfter: string | null) => {
+        setOverrides(prev => {
+            if (newAfter === null) {
+                const next = { ...prev };
+                delete next[id];
+                return next;
+            }
+            return { ...prev, [id]: newAfter };
+        });
+    }, []);
+
     // ── Persist state to sessionStorage on every relevant change ─────────
     useEffect(() => {
         try {
-            sessionStorage.setItem(SESSION_KEY, JSON.stringify({ localProposal, decisions }));
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify({ localProposal, decisions, overrides }));
         } catch {
             // sessionStorage may be full or unavailable in some browsers — silently ignore
         }
-    }, [localProposal, decisions, SESSION_KEY]);
+    }, [localProposal, decisions, overrides, SESSION_KEY]);
 
     // Handler for injecting AI-generated bullet from AtsKeywordModal
     const handleBulletGenerated = useCallback((newChange: CvChange, _stationId: string) => {
@@ -763,13 +866,25 @@ export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, o
         setDecisions(prev => ({ ...prev, [newChange.id]: 'accepted' }));
     }, []);
 
+    /**
+     * Apply overrides to a list of changes before saving.
+     * Returns a new array where each change.after is replaced by its override (if any).
+     */
+    const applyOverridesToChanges = useCallback((changes: CvChange[]): CvChange[] => {
+        return changes.map(c =>
+            overrides[c.id] !== undefined
+                ? { ...c, after: overrides[c.id] }
+                : c
+        );
+    }, [overrides]);
+
     // Station-based grouping with ATS keyword impact scoring
     const stationGroups = useMemo(() => {
         const groups = groupChangesByStation(localProposal.changes, originalCv);
 
-        // Compute keyword hits for each group (delta-impact)
+        // Compute keyword hits for each group (delta-impact) — aware of overrides
         for (const group of groups) {
-            group.keywordHits = computeKeywordHits(group, atsKeywords);
+            group.keywordHits = computeKeywordHits(group, atsKeywords, overrides);
         }
 
         // Sort: keyword hits desc → change count desc
@@ -784,21 +899,21 @@ export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, o
         });
 
         return groups;
-    }, [localProposal.changes, originalCv, atsKeywords]);
+    }, [localProposal.changes, originalCv, atsKeywords, overrides]);
 
     // First group ID (highest impact) for default-open
     const firstGroupId = stationGroups[0]?.id || '';
 
-    // Reactive ATS keyword coverage — updates as user accepts/rejects changes
+    // Reactive ATS keyword coverage — updates as user accepts/rejects/overrides changes
     // Uses partial-token matching: multi-word keywords match if ≥2/3 of tokens appear
     const keywordCoverage = useMemo(() => {
         if (!atsKeywords?.length) return { covered: 0, set: new Set<string>() };
 
         const coveredSet = new Set<string>();
         const activeChanges = localProposal.changes.filter(c => decisions[c.id] !== 'rejected');
-        // Collect all active after-texts into one corpus for efficient matching
+        // Collect all active after-texts into one corpus — use override if available
         const corpus = activeChanges
-            .map(c => c.after?.toLowerCase() ?? '')
+            .map(c => (overrides[c.id] !== undefined ? overrides[c.id] : (c.after ?? '')).toLowerCase())
             .join(' ');
 
         for (const kw of atsKeywords) {
@@ -816,7 +931,7 @@ export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, o
         }
 
         return { covered: coveredSet.size, set: coveredSet };
-    }, [atsKeywords, localProposal.changes, decisions]);
+    }, [atsKeywords, localProposal.changes, decisions, overrides]);
 
     const totalCount = localProposal.changes.length;
     const acceptedCount = localProposal.changes.filter(c => decisions[c.id] === 'accepted').length;
@@ -828,6 +943,7 @@ export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, o
      * proposal.optimized contains ALL changes applied — using it ignores rejections
      * until page reload. Instead, we use applyOptimizations() with the translated
      * base CV and only the accepted changes.
+     * Overrides are merged in before applyOptimizations runs.
      */
     const handleFinalize = () => {
         const noneReviewed = acceptedCount === 0 && rejectedCount === 0;
@@ -837,13 +953,14 @@ export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, o
         }
         // Undecided changes are accepted by default
         const accepted = localProposal.changes.filter(c => decisions[c.id] !== 'rejected');
+        const acceptedWithOverrides = applyOverridesToChanges(accepted);
         const choices: Record<string, 'accepted'> = {};
-        accepted.forEach(c => { choices[c.id] = 'accepted'; });
+        acceptedWithOverrides.forEach(c => { choices[c.id] = 'accepted'; });
         const baseCv = localProposal.translated ?? originalCv;
-        const finalCv = applyOptimizations(baseCv, { choices, appliedChanges: accepted });
+        const finalCv = applyOptimizations(baseCv, { choices, appliedChanges: acceptedWithOverrides });
         // Clear persisted state on successful save — user is done
         try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
-        onSave(finalCv, accepted);
+        onSave(finalCv, acceptedWithOverrides);
     };
 
     const handleCancel = () => {
@@ -856,13 +973,14 @@ export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, o
         setShowConfirmPopup(false);
         handleBulkDecide(localProposal.changes.map(c => c.id), 'accepted');
         const accepted = localProposal.changes;
+        const acceptedWithOverrides = applyOverridesToChanges(accepted);
         const choices: Record<string, 'accepted'> = {};
-        accepted.forEach(c => { choices[c.id] = 'accepted'; });
+        acceptedWithOverrides.forEach(c => { choices[c.id] = 'accepted'; });
         const baseCv = localProposal.translated ?? originalCv;
-        const finalCv = applyOptimizations(baseCv, { choices, appliedChanges: accepted });
+        const finalCv = applyOptimizations(baseCv, { choices, appliedChanges: acceptedWithOverrides });
         // Clear persisted state — user accepted all and is done
         try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
-        onSave(finalCv, accepted);
+        onSave(finalCv, acceptedWithOverrides);
     };
 
     const handleAcceptAll = () => handleBulkDecide(localProposal.changes.map(c => c.id), 'accepted');
@@ -964,8 +1082,10 @@ export function DiffReview({ jobId, originalCv, proposal, atsKeywords, onSave, o
                                 key={group.id}
                                 group={group}
                                 decisions={decisions}
+                                overrides={overrides}
                                 onDecide={handleDecide}
                                 onBulkDecide={handleBulkDecide}
+                                onOverride={handleOverride}
                                 defaultOpen={group.id === firstGroupId}
                                 t={t}
                             />

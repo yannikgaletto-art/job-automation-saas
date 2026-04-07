@@ -337,32 +337,41 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
   → ROTER FADEN (PFLICHT für JEDEN Stations-Absatz):
     Beginne JEDEN Stations-Absatz mit einer Verknüpfung, die dem Recruiter erklärt WARUM diese Erfahrung relevant ist.
 
-    §POSITIONSBASIERTE OPENER (wähle passend zur Position, nie denselben zweimal):
-    → ERSTER Stations-Absatz:
-      - "Da ${isDuForm ? 'ihr' : 'Sie'} [Bezug aus Stellenanzeige] ${isDuForm ? 'sucht' : 'suchen'}, kann ich mit meiner Zeit bei [Firma] anknüpfen."
-      - "Weil [Firmenfakt aus Analyse] für ${isDuForm ? 'euch' : 'Sie'} zentral ist, möchte ich zeigen, wie ich bei [Firma]..."
-      - "Zudem habe ich mich in [AUFGABE AUS DER STELLENBESCHREIBUNG] sehr wiedergefunden, da es zu meiner täglichen Arbeit bei [Firma] gehörte."
-    → ZWEITER Stations-Absatz:
-      - "Zudem habe ich bei [Firma] genau das gemacht, was ihr mit [AUFGABE AUS STELLENBESCHREIBUNG] sucht."
-      - "Ebenso zeigte mir meine Zeit bei [Firma], dass [konkreter Inhalt zur Job-Anforderung]."
-      - "Auch in meiner Rolle bei [Firma] habe ich [AUFGABE AUS STELLENBESCHREIBUNG] direkt umgesetzt."
-      ❌ VERBOTEN: "Zudem kann ich mit meiner Zeit bei [Firma] anknüpfen." alleine — dieser Satz macht keinen Sinn ohne einen inhaltlichen Bezug danach. IMMER ein "da/weil/was" mit konkretem Inhalt anhängen.
-    → LETZTER Stations-Absatz (wenn 3+ Stationen):
-      - "Schließlich möchte ich auch meine Erfahrung bei [Firma] erwähnen."
-      - "Was ich noch einbringen kann, ist meine Erfahrung bei [Firma]."
-      - "Abschließend zeigt meine Zeit bei [Firma]..."
-      ❌ VERBOTEN für letzten Block: "Als ich die Stellenbeschreibung las..." — das ist ein Intro-Opener.
+    §POSITIONSBASIERTE OPENER (waehle passend zur Position, nie denselben zweimal):
 
-    ❌ ABSOLUTE VERBOTE für Station-Opener:
-    - "Möchte ich mein Projekt bei [Firma] beleuchten" — grammatikalisch falscher Aussagesatz.
-    - "Möchte ich..."/"Kann ich hier anmerken..."/"Darf ich erwähnen..." als Satzanfang — invertierte Modalsätze sind als Aussagesatz verboten.
+    PFLICHT-MUSTER — AUFGABEN-FRAGMENTE ZITIEREN:
+    Wenn Kernaufgaben aus der Stelle extrahiert wurden (siehe STELLEN-ANFORDERUNGEN unten),
+    zitiere eine KONKRETE AUFGABE woertlich in „..." als Bruecke zur CV-Station:
+    → ERSTER Stations-Absatz:
+      - "„[Kernaufgabe aus Stelle]", genau an diesem Thema habe ich bei [Firma] taeglich gearbeitet."
+      - "„[Kernaufgabe aus Stelle]" habe ich bei [Firma] direkt umgesetzt, als ich..."
+      - "Zudem habe ich mich in der „[Aufgabe aus Stellenbeschreibung]" sehr wiedergefunden, da es zu meiner taeglichen Arbeit bei [Firma] gehoerte."
+    → ZWEITER Stations-Absatz:
+      - "Zudem habe ich bei [Firma] genau das gemacht, was ${isDuForm ? 'ihr' : 'Sie'} mit „[Aufgabe aus Stellenbeschreibung]" ${isDuForm ? 'beschreibt' : 'beschreiben'}."
+      - "Ebenso zeigte mir meine Zeit bei [Firma], dass [konkreter Inhalt zur Job-Anforderung]."
+      - "Auch in meiner Rolle bei [Firma] habe ich „[Aufgabe aus Stellenbeschreibung]" direkt umgesetzt."
+      ❌ VERBOTEN: "Zudem kann ich mit meiner Zeit bei [Firma] anknuepfen." alleine — IMMER ein "da/weil/was" mit konkretem Inhalt anhaengen.
+    → LETZTER Stations-Absatz (wenn 3+ Stationen):
+      - "Schliesslich moechte ich auch meine Erfahrung bei [Firma] erwaehnen."
+      - "Was ich noch einbringen kann, ist meine Erfahrung bei [Firma]."
+      - "Abschliessend zeigt meine Zeit bei [Firma]..."
+      ❌ VERBOTEN fuer letzten Block: "Als ich die Stellenbeschreibung las..." — das ist ein Intro-Opener.
+
+    FALLBACK (wenn KEINE Kernaufgaben extrahiert wurden):
+      - "Da ${isDuForm ? 'eure' : 'Ihre'} Ausschreibung besonders [Thema] betont, kann ich mit meiner Zeit bei [Firma] anknuepfen."
+
+    ❌ ABSOLUTE VERBOTE fuer Station-Opener:
+    - "Weil ${isDuForm ? 'ihr jemanden sucht' : 'Sie jemanden suchen'}" — Meta-Formulierung. Zitiere stattdessen die KONKRETE AUFGABE.
+    - "Da ${isDuForm ? 'ihr' : 'Sie'} jemanden ${isDuForm ? 'sucht' : 'suchen'}, der..." — ebenfalls Meta, nicht Aufgaben-spezifisch.
+    - "Moechte ich mein Projekt bei [Firma] beleuchten" — grammatikalisch falscher Aussagesatz.
+    - "Moechte ich..."/"Kann ich hier anmerken..."/"Darf ich erwaehnen..." als Satzanfang — invertierte Modalsaetze sind als Aussagesatz verboten.
     - "Als ich die Stellenbeschreibung las, fielen mir Parallelen zu..." — generisch, kein CV-Bezug.
 
-    INHALTLICHE KOHÄRENZ (ABSOLUT PFLICHT):
-    Der gewählte Opener MUSS inhaltlich zur tatsächlichen Stationsarbeit passen!
-    ❌ FALSCH: "Da ihr Beratung sucht, kann ich mit meiner Zeit bei Ingrano anknüpfen." → Dann aber CRM/Sales-Bullets.
-    ✅ RICHTIG: "Da ihr Beratung sucht, kann ich mit meiner Zeit bei Fraunhofer anknüpfen." → Dann konkrete Beratungsinhalte, die das tatsächlich belegen.
-    WENN die Station die genannte Anforderung NICHT belegt: Wähle eine andere Anforderung die wirklich passt — oder steige ohne falschen Bezug direkt ein.
+    INHALTLICHE KOHAERENZ (ABSOLUT PFLICHT):
+    Der gewaehlte Opener MUSS inhaltlich zur tatsaechlichen Stationsarbeit passen!
+    ❌ FALSCH: "Da ihr Beratung sucht, kann ich mit meiner Zeit bei Ingrano anknuepfen." → Dann aber CRM/Sales-Bullets.
+    ✅ RICHTIG: "Da ihr Beratung sucht, kann ich mit meiner Zeit bei Fraunhofer anknuepfen." → Dann konkrete Beratungsinhalte.
+    WENN die Station die genannte Anforderung NICHT belegt: Waehle eine andere Anforderung die wirklich passt — oder steige ohne falschen Bezug direkt ein.
     ❌ VERBOTEN: Den Stations-Absatz mit "Bei [Firma] habe ich..." starten OHNE Bezug zum WARUM.`;
         }).join('\n');
     } else {
@@ -397,34 +406,30 @@ Es muss BUCHSTÄBLICH und WORTWÖRTLICH in der Sprache übernommen werden, in de
 Egal ob das Anschreiben auf Deutsch oder einer anderen Sprache verfasst wird — das Zitat bleibt unverändert.
 
 FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
-- Leite das Zitat mit einer KONKRETEN SITUATION ein (1-2 Sätze — kürzer ist besser).
-  Wähle EINE der folgenden Varianten — nicht immer dieselbe:
+- Leite das Zitat mit einer KONKRETEN SITUATION ein (1-2 Saetze — kuerzer ist besser).
+  Waehle EINE der folgenden Varianten — nicht immer dieselbe:
 
   VARIANTE A — Eigenes Erlebnis (am authentischsten):
-  "Als ich bei [Firma] zum ersten Mal [konkretes Erlebnis], fiel mir auf: [Erkenntnis]."
-  "Beim Aufbau von [Projekt/Firma] ist mir klargeworden: [Erkenntnis]."
+  "Als ich bei [Firma] zum ersten Mal [konkretes Erlebnis], wurde mir klar, dass [Erkenntnis]."
+  "Beim Aufbau von [Projekt/Firma] habe ich verstanden, dass [Erkenntnis]."
 
-  VARIANTE B — Unternehmensbeobachtung (kürzer, direkt):
-  "Als ich euer Projekt sah..." / "Als ich eure Website las..." / "Als ich mich mit eurem Artikel beschäftigte..."
+  VARIANTE B — Unternehmensbeobachtung (kuerzer, direkt):
+  "Als ich euer Projekt sah..." / "Als ich eure Website las..." / "Als ich mich mit eurem Artikel beschaeftigte..."
   ❌ VERBOTEN dabei: Mehr als 1 Satz — diese Variante ist kurz und knapp!
 
-  VARIANTE C — Kombination (Erlebnis + externe Beobachtung):
-  "Als ich bei [Firma] [Situation], fiel mir auf: [Erkenntnis]. Und als ich dann [Unternehmensbeobachtung], wurde dieser Gedanke bestätigt."
+  ❌ VERBOTEN IN ALLEN VARIANTEN: "fiel mir auf:" mit Doppelpunkt — sofort erkennbarer KI-Marker.
+  ❌ VERBOTEN: "ist mir klargeworden:" mit Doppelpunkt — Einleitungssaetze enden IMMER mit "dass [Inhalt]." als vollstaendiger Aussagesatz.
+  ❌ VERBOTEN: "Als ich ueber [Thema] nachdachte..." — zu abstrakt.
+  ❌ VERBOTEN: "Ich habe mich schon immer fuer [Thema] interessiert" — generisch.
+  ❌ VERBOTEN: Mehr als 2 Saetze vor dem Zitat — Komm schnell auf den Punkt.
+- Das Zitat MUSS auf einer EIGENEN Zeile stehen, in Anfuehrungszeichen.
 
-  ❌ VERBOTEN IN ALLEN VARIANTEN: "Als ich über [Thema] nachdachte..." — zu abstrakt.
-  ❌ VERBOTEN: "Ich habe mich schon immer für [Thema] interessiert" — generisch.
-  ❌ VERBOTEN: Mehr als 2 Sätze vor dem Zitat — Komm schnell auf den Punkt.
-- Das Zitat MUSS auf einer EIGENEN Zeile stehen, in Anführungszeichen.
-
-AUTOR-NENNUNG (WICHTIG — NUR EINMAL!):
-Der Autor (${ctx!.selectedQuote!.author}) darf NUR AN EINER STELLE genannt werden:
-  Variante A: Im Einleitungssatz den Autor nennen → Zitat OHNE Signatur danach.
-    Beispiel: "...erinnerte ich mich an einen Satz von ${ctx!.selectedQuote!.author}:"
-    "${ctx!.selectedQuote!.quote}"
-  Variante B: Neutrale Einleitung ohne Autorennamen → Zitat MIT Signatur.
-    Beispiel: "Da kam mir ein Gedanke in den Sinn:"
-    "${ctx!.selectedQuote!.quote}" – ${ctx!.selectedQuote!.author}
-Wähle frei zwischen A und B, aber NIEMALS den Autor an BEIDEN Stellen nennen!
+AUTOR-NENNUNG (PFLICHT — eine einzige Form, keine Alternative):
+Das Zitat MUSS IMMER mit Autor-Signatur formatiert werden:
+"${ctx!.selectedQuote!.quote}"
+– ${ctx!.selectedQuote!.author}
+Diese Signatur-Zeile ist VERPFLICHTEND. Keine Ausnahme.
+Der Autor darf ZUSAETZLICH im Einleitungssatz vorkommen (z.B. "...erinnerte ich mich an ${ctx!.selectedQuote!.author}"), aber die Signatur unter dem Zitat bleibt IMMER stehen.
 
   [Lernkurve nach dem Zitat]
 
@@ -824,6 +829,18 @@ RICHTIG: "schärfte meinen Blick dafür, dass X nur dann Y, wenn..."
 VERBOTEN: "erkenne ich, wie wichtig..." → RICHTIG: "erkenne ich, dass..."
 REGEL: Nach "erkennen/verstehen/zeigen/wissen/schärfen" + Nebensatz → immer "dass", nie "wie" (wenn eine Aussage folgt, keine Art-und-Weise-Beschreibung).
 
+[ABSATZ-ENDEN — ANTI-GENERIK (PFLICHT)]
+Beende Stations-Absätze NICHT mit generischen Erkenntnissätzen.
+❌ VERBOTEN: "Diese Erfahrung schärfte meinen Blick dafür, dass..."
+❌ VERBOTEN: "Das öffnete mir die Augen für..."
+❌ VERBOTEN: "Diese Erfahrung hat mein Verständnis dafür geprägt, dass..."
+❌ VERBOTEN: "Das hat mich gelehrt, dass..."
+STATTDESSEN — Konkreter Schluss oder Zuversicht:
+✅ "Daher gehe ich zuversichtlich an diese Aufgabe."
+✅ "Deshalb freue ich mich darauf, diese Erfahrung bei ${companyName} einzubringen."
+✅ [Konkretes Ergebnis oder Zahl nennen statt abstrakte Reflexion]
+LOGIK: Der letzte Satz eines Absatzes soll dem Recruiter zeigen, was du MITBRINGST — nicht was du ERKANNT hast.
+
 === SEKTION 3: AUFHÄNGER (KURZ & PRÄGNANT) ===
 ${introGuidance || t(
     `INTRO-PFLICHT (kein Aufhaenger gewaehlt — ICH-Perspektive erzwingen):
@@ -871,9 +888,9 @@ ${introGuidance && hasQuote && focus === 'quote'
             : 'Der gesamte erste Absatz (Aufhänger + Motivation) darf MAXIMAL 2 SÄTZE lang sein! Keine generischen Abhandlungen über Innovation. Kurz, knackig, direkt zum Punkt.'
         }
 
-[MANDATORY — TRANSITION SENTENCE]: ${introGuidance && hasQuote && focus === 'quote' ? (isEnglish ? 'The INTRODUCTION (after the quote and the bridging sentence)' : 'Die EINLEITUNG (nach dem Zitat und dem Begründungssatz)') : (isEnglish ? 'The FIRST paragraph' : 'Der ERSTE Absatz')} MUST end with this exact sentence:
-${isEnglish ? '"That is why I would like to briefly introduce myself."' : isSpanish ? '"Por eso me gustaría presentarme brevemente."' : isDuForm ? '"Daher möchte ich mich bei euch kurz vorstellen."' : '"Daher möchte ich mich bei Ihnen kurz vorstellen."'}
-This sentence is NOT optional. It bridges to the main body.
+[MANDATORY — TRANSITION SENTENCE]: ${introGuidance && hasQuote && focus === 'quote' ? (isEnglish ? 'The INTRODUCTION (after the quote and the bridging sentence)' : 'Die EINLEITUNG (nach dem Zitat und dem Begründungssatz)') : (isEnglish ? 'The FIRST paragraph' : 'Der ERSTE Absatz')} MUST end with a sentence that bridges to the main body AND mentions the job title.
+${isEnglish ? `Choose one: "That is why I would like to briefly introduce myself as ${jobTitle}." or "...and that is why I am applying as ${jobTitle}."` : isSpanish ? `Elige una: "Por eso me gustaría presentarme brevemente como ${jobTitle}." o "...y por eso me postulo como ${jobTitle}."` : isDuForm ? `Wähle eine: "Daher möchte ich mich als ${jobTitle} bei euch kurz vorstellen." oder "...und genau deshalb bewerbe ich mich als ${jobTitle}."` : `Wähle eine: "Daher möchte ich mich als ${jobTitle} bei Ihnen kurz vorstellen." oder "...und genau deshalb bewerbe ich mich als ${jobTitle}."`}
+This sentence is NOT optional. It bridges to the main body AND anchors the reader on the specific position.
 
 ${newsSection}
 
@@ -887,10 +904,13 @@ ${resp.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 
 PFLICHT: Mindestens 2 dieser Kernaufgaben MÜSSEN sich im Anschreiben EXPLIZIT widerspiegeln.
 METHODE: Zeige, dass du diese Aufgabe bereits aus deiner Karriere kennst.
-BEISPIEL-MUSTER ("Wiederfinden-Pattern"):
-✅ "Zudem habe ich mich in der [AUFGABE AUS STELLE] sehr wiedergefunden, da es zu meiner täglichen Arbeit bei [Firma] gehörte."
-✅ "Da Sie jemanden suchen, der [AUFGABE AUS STELLE] verantwortet, kann ich direkt anknüpfen: Bei [Firma] habe ich [konkreter Beweis]."
-❌ VERBOTEN: Die Aufgabe 1:1 kopieren. Zeige stattdessen, dass du sie inhaltlich LEBST.`;
+BEISPIEL-MUSTER („Wiederfinden-Pattern“):
+✅ "Zudem habe ich mich in der „[AUFGABE AUS STELLE]“ sehr wiedergefunden, da es zu meiner täglichen Arbeit bei [Firma] gehörte."
+✅ "„[AUFGABE AUS STELLE]“, genau daran habe ich bei [Firma] gearbeitet: [konkreter Beweis]."
+❌ VERBOTEN: "Da Sie jemanden suchen, der..." / "Weil Sie jemanden suchen" — Meta-Formulierung.
+❌ VERBOTEN: Die Aufgabe 1:1 kopieren OHNE Anführungszeichen. Zeige stattdessen, dass du sie inhaltlich LEBST.
+
+${t('[STELLENANZEIGE-ZITIERUNG (PFLICHT)]\nWenn du eine Aufgabe oder Anforderung aus der Stellenanzeige im Fließtext verwendest, setze das Fragment IMMER in „...“ (deutsche Anführungszeichen). Das macht für den Leser transparent, dass du die Stellenanzeige gelesen hast, und zeigt Smart Mirroring.\nBeispiel: "Zudem habe ich mich in der „Erstellung von Strategien“ wiedergefunden..."', '[JOB AD QUOTING (MANDATORY)]\nWhen you use a task or requirement from the job ad in the body text, ALWAYS put the fragment in "..." (quotation marks). This makes it transparent to the reader that you have read the job posting, showing Smart Mirroring.\nExample: "I strongly identified with the task of \'developing strategies\'..."', '[CITAS DE LA OFERTA (OBLIGATORIO)]\nCuando uses una tarea o requisito del anuncio de trabajo en el texto, SIEMPRE ponlo entre «...» (comillas). Esto muestra al lector que has leído la oferta.\nEjemplo: "Me identifiqué mucho con la tarea de «desarrollar estrategias»..."')}`;
     }
     // Fallback: wenn responsibilities leer — job.summary nutzen falls vorhanden
     const summaryHint = (job as any)?.summary

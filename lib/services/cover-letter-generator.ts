@@ -379,6 +379,13 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
             feedback.push(...judgment.weaknesses.map(w => `QUALITÄT: ${w}`));
         }
 
+        // §Fix Defect #2 (position-corrected): Author check AFTER feedback reset so hint survives into next iteration
+        const selectedAuthor = setupContext?.selectedQuote?.author;
+        if (selectedAuthor && !generatedText.includes(selectedAuthor)) {
+            feedback.push(`QUOTE_AUTHOR_MISSING: Das Zitat-Autor "${selectedAuthor}" fehlt im generierten Text. Das Zitat MUSS IMMER mit der Signatur "– ${selectedAuthor}" unter dem Zitat formatiert werden. Füge die Autor-Signatur hinzu.`);
+            console.warn(`⚠️ [MasterPrompt] Quote author "${selectedAuthor}" not found — adding to feedback for next iteration`);
+        }
+
         iteration++;
 
         if (iteration === MAX_ITERATIONS) {

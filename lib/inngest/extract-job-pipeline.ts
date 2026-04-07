@@ -96,10 +96,10 @@ export const extractJob = inngest.createFunction(
         // already populated these fields. Uses metadata flag (set BEFORE Inngest trigger)
         // to avoid race condition where Inngest starts before sync extraction finishes.
         const extracted = await step.run('claude-extract', async () => {
-            // Re-read job including metadata flag
+            // Re-read job including metadata flag + buzzwords for skip-guard
             const { data: currentJob } = await supabaseAdmin
                 .from('job_queue')
-                .select('summary, requirements, responsibilities, metadata')
+                .select('summary, requirements, responsibilities, buzzwords, metadata')
                 .eq('id', jobId)
                 .eq('user_id', userId)
                 .single();
@@ -112,9 +112,10 @@ export const extractJob = inngest.createFunction(
             // Also verify the data itself is present (defense in depth)
             const hasSummary = !!currentJob?.summary && currentJob.summary.length > 10;
             const hasRequirements = Array.isArray(currentJob?.requirements) && currentJob.requirements.length > 0;
+            const hasBuzzwords = Array.isArray(currentJob?.buzzwords) && currentJob.buzzwords.length > 0;
 
-            if (hasSyncFlag && hasSummary && hasRequirements) {
-                console.log(`✅ [Extract] Job ${jobId} sync_extracted_at=${syncExtractedAt} — skipping redundant LLM call`);
+            if (hasSyncFlag && hasSummary && hasRequirements && hasBuzzwords) {
+                console.log(`✅ [Extract] Job ${jobId} sync_extracted_at=${syncExtractedAt} — skipping redundant LLM call (buzzwords protected)`);
                 return {
                     summary: currentJob.summary,
                     qualifications: currentJob.requirements,
@@ -151,31 +152,69 @@ IMPORTANT for benefits:
         // Skip if sync extraction already populated the data (no new LLM data to write)
         if (!(extracted as any)._skipped) {
             await step.run('write-results', async () => {
-                const currentMetadata = (job.metadata as Record<string, unknown>) || {};
+                // Re-read CURRENT state to check if sync ingest already wrote buzzwords
+                // (Race Condition Guard: Inngest may start before sync ingest finishes writing)
+                const { data: currentJob } = await supabaseAdmin
+                    .from('job_queue')
+                    .select('buzzwords, metadata')
+                    .eq('id', jobId)
+                    .eq('user_id', userId)
+                    .single();
+
+                const currentMetadata = (currentJob?.metadata as Record<string, unknown>) || {};
+                const existingBuzzwords = Array.isArray(currentJob?.buzzwords) && currentJob.buzzwords.length > 0;
+                let newBuzzwords = Array.isArray((extracted as any).buzzwords) ? (extracted as any).buzzwords as string[] : null;
+
+                // Normalize buzzwords: sort + dedup (mirrors ingest/route.ts STEP 3.5)
+                if (newBuzzwords && newBuzzwords.length > 0) {
+                    const seen = new Set<string>();
+                    const normalized: string[] = [];
+                    for (const kw of newBuzzwords) {
+                        const key = kw.trim().toLowerCase();
+                        if (key.length >= 2 && !seen.has(key)) {
+                            seen.add(key);
+                            normalized.push(kw.trim());
+                        }
+                    }
+                    newBuzzwords = normalized.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+                }
+
+                // Buzzword-Schutz: Only write if DB has no buzzwords yet.
+                // Prevents the async extract from overwriting the sync ingest's buzzwords.
+                const buzzwordsToWrite = existingBuzzwords ? undefined : newBuzzwords;
+                if (existingBuzzwords) {
+                    console.log(`🛡️ [Extract] Job ${jobId} — preserving ${currentJob!.buzzwords.length} existing buzzwords (sync ingest already set them)`);
+                }
+
+                const updatePayload: Record<string, unknown> = {
+                    summary: (extracted.summary as string) || null,
+                    responsibilities: Array.isArray(extracted.responsibilities) && extracted.responsibilities.length > 0
+                        ? extracted.responsibilities : null,
+                    requirements: Array.isArray(extracted.qualifications) && (extracted.qualifications as unknown[]).length > 0
+                        ? extracted.qualifications : null,
+                    benefits: Array.isArray((extracted as any).benefits) ? (extracted as any).benefits : [],
+                    location: ((extracted as any).location as string) || null,
+                    seniority: ((extracted as any).seniority as string) || 'unknown',
+                    // JSONB Merge: preserve existing metadata, clear extract_error
+                    metadata: {
+                        ...currentMetadata,
+                        extract_error: null,
+                        extract_completed_at: new Date().toISOString(),
+                    },
+                };
+
+                // Only include buzzwords in UPDATE if they need writing
+                if (buzzwordsToWrite !== undefined) {
+                    updatePayload.buzzwords = buzzwordsToWrite;
+                }
 
                 await supabaseAdmin
                     .from('job_queue')
-                    .update({
-                        summary: (extracted.summary as string) || null,
-                        responsibilities: Array.isArray(extracted.responsibilities) && extracted.responsibilities.length > 0
-                            ? extracted.responsibilities : null,
-                        requirements: Array.isArray(extracted.qualifications) && (extracted.qualifications as unknown[]).length > 0
-                            ? extracted.qualifications : null,
-                        benefits: Array.isArray((extracted as any).benefits) ? (extracted as any).benefits : [],
-                        location: ((extracted as any).location as string) || null,
-                        seniority: ((extracted as any).seniority as string) || 'unknown',
-                        buzzwords: Array.isArray((extracted as any).buzzwords) ? (extracted as any).buzzwords : null,
-                        // JSONB Merge: preserve existing metadata, clear extract_error
-                        metadata: {
-                            ...currentMetadata,
-                            extract_error: null,
-                            extract_completed_at: new Date().toISOString(),
-                        },
-                    })
+                    .update(updatePayload)
                     .eq('id', jobId)
                     .eq('user_id', userId); // §3
 
-                console.log(`✅ [Extract] Job ${jobId} extracted successfully`);
+                console.log(`✅ [Extract] Job ${jobId} extracted successfully${existingBuzzwords ? ' (buzzwords preserved)' : ''}`);
             });
         } else {
             console.log(`✅ [Extract] Job ${jobId} — write step skipped (sync data already in DB)`);

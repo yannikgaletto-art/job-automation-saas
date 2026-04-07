@@ -83,44 +83,6 @@ const RenderBullet = ({ text }: { text: string }) => {
     return <Text style={s.bulletText}>{text}</Text>;
 };
 
-/**
- * V3 Skills: Full-width section with internal multi-column grid.
- * Each skill category (Programming, Adobe CC, etc.) gets equal flex space.
- * ATS reads linearly: "SKILLS" heading → then each category block in sequence.
- */
-const SkillsSection = ({ skills, label }: { skills: CvStructuredData['skills']; label: string }) => (
-    <View style={s.sectionContainer}>
-        <Text style={s.sectionTitle}>{label}</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {skills.map((g) => (
-                <View key={g.id} style={{ width: skills.length >= 3 ? '33.33%' : '50%', paddingRight: 10, marginBottom: 6 }}>
-                    {g.category && <Text style={s.skillCategoryLabel}>{g.category}</Text>}
-                    <SkillTagGroup items={g.items} />
-                </View>
-            ))}
-        </View>
-    </View>
-);
-
-/**
- * V3 Languages: Full-width section with 2-column grid.
- * ATS-safe plaintext: "German – Native Speaker".
- */
-const LanguagesSection = ({ languages, label }: { languages: CvStructuredData['languages']; label: string }) => (
-    <View style={s.sectionContainer}>
-        <Text style={s.sectionTitle}>{label}</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {languages.map((l) => (
-                <View key={l.id} style={{ width: '50%', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 9, color: DARK, lineHeight: 1.4 }}>
-                        <Text style={{ fontWeight: 700 }}>{l.language || ''}</Text>
-                        {l.proficiency ? ` \u2013 ${l.proficiency}` : ''}
-                    </Text>
-                </View>
-            ))}
-        </View>
-    </View>
-);
 
 export function ValleyTemplate({ data, qrBase64, labels }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels }) {
     const pi = data.personalInfo;
@@ -176,7 +138,7 @@ export function ValleyTemplate({ data, qrBase64, labels }: { data: CvStructuredD
 
                 {/* ===== EXPERIENCE ===== */}
                 {data.experience.length > 0 && (
-                    <View style={s.sectionContainer}>
+                    <View style={s.sectionContainer} minPresenceAhead={60}>
                         <Text style={s.sectionTitle}>{labels.experience}</Text>
                         {data.experience.map((exp) => (
                             <View key={exp.id} style={s.expBlock} wrap={false}>
@@ -236,14 +198,40 @@ export function ValleyTemplate({ data, qrBase64, labels }: { data: CvStructuredD
                 )}
 
                 {/* ===== SKILLS (full-width, internal multi-col grid) ===== */}
-                {hasSkills && <SkillsSection skills={data.skills} label={labels.skills} />}
+                {hasSkills && (
+                    <View style={s.sectionContainer} minPresenceAhead={40}>
+                        <Text style={s.sectionTitle}>{labels.skills}</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                            {data.skills.map((g) => (
+                                <View key={g.id} style={{ width: data.skills.length >= 3 ? '33.33%' : '50%', paddingRight: 10, marginBottom: 6 }}>
+                                    {g.category && <Text style={s.skillCategoryLabel}>{g.category}</Text>}
+                                    <SkillTagGroup items={g.items} />
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
 
                 {/* ===== LANGUAGES (full-width, internal 2-col grid) ===== */}
-                {hasLanguages && <LanguagesSection languages={data.languages} label={labels.languages} />}
+                {hasLanguages && (
+                    <View style={s.sectionContainer} minPresenceAhead={40}>
+                        <Text style={s.sectionTitle}>{labels.languages}</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                            {data.languages.map((l) => (
+                                <View key={l.id} style={{ width: '50%', marginBottom: 4 }}>
+                                    <Text style={{ fontSize: 9, color: DARK, lineHeight: 1.4 }}>
+                                        <Text style={{ fontWeight: 700 }}>{l.language || ''}</Text>
+                                        {l.proficiency ? ` \u2013 ${l.proficiency}` : ''}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
 
                 {/* ===== CERTIFICATES (full-width, CertGrid 2-col) ===== */}
                 {hasCerts && (
-                    <View style={s.sectionContainer}>
+                    <View style={s.sectionContainer} minPresenceAhead={40}>
                         <Text style={s.sectionTitle}>{labels.certificates}</Text>
                         <CertGrid certs={data.certifications!} maxColumns={2} />
                     </View>

@@ -64,11 +64,11 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://tally.so",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://js.stripe.com https://tally.so",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://logo.clearbit.com https://*.supabase.co",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://api.anthropic.com https://api.openai.com https://api.mistral.ai https://api.perplexity.ai https://serpapi.com https://r.jina.ai https://api.firecrawl.dev https://*.sentry.io https://*.ingest.sentry.io https://*.inngest.com",
+              "connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://api.anthropic.com https://api.openai.com https://api.mistral.ai https://api.perplexity.ai https://serpapi.com https://r.jina.ai https://api.firecrawl.dev https://*.sentry.io https://*.ingest.sentry.io https://*.inngest.com",
               "frame-src 'self' blob: https://js.stripe.com https://tally.so",
               "worker-src 'self' blob:",
               "media-src 'self' blob:",

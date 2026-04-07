@@ -238,7 +238,7 @@
       "add_job": "Add Job",
       "max_jobs": "Maximum of 5 active jobs reached",
       "current_jobs": "Current Jobs",
-      "application_history": "Application History",
+      "application_history": "Application Journey",
       "review_cv": "Review Optimized CV",
       "notify_added": "Job added to queue",
       "notify_steckbrief": "Profile created",
@@ -253,8 +253,8 @@
       "col_job": "Job",
       "col_company": "Company",
       "col_status": "Status",
-      "col_next_action": "Next Action",
-      "col_date": "Date Completed",
+      "col_next_action": "Follow-up",
+      "col_date": "Applied On",
       "status_applied": "Applied",
       "status_follow_up_sent": "Follow-up sent",
       "status_interviewing": "Interviewing",
@@ -288,7 +288,11 @@
       "pagination_label": "Page {page} of {total}",
       "empty_title": "No applications yet",
       "empty_description": "Your application history will appear here once you start applying.",
-      "open_posting": "View posting"
+      "open_posting": "View posting",
+      "delete_btn": "Remove entry",
+      "delete_confirm": "Remove this application from your Journey?",
+      "delete_confirm_yes": "Delete",
+      "delete_confirm_no": "Cancel"
     },
     "analytics": {
       "title": "Performance Center",
@@ -946,7 +950,10 @@
     "ats_modal_char_limit": "{n}/200",
     "ats_modal_preview_label": "Formulated bullet (editable)",
     "ats_modal_edit_hint": "You can edit the text before adding it.",
-    "ats_modal_add_btn": "Add to CV"
+    "ats_modal_add_btn": "Add to CV",
+    "edit_after_hint": "Click to edit",
+    "editing_active": "editing",
+    "edit_reset_tooltip": "Restore original"
   },
   "command_palette": {
     "placeholder": "What would you like to do?",
@@ -1022,9 +1029,7 @@
     "ats_subtitle": "(Applicant Tracking System)",
     "ats_desc": "Usually, the first to review your CV is an <strong>algorithm</strong>. Applicant Tracking Systems (ATS) specifically look for <strong>keywords</strong> relevant to the position. If these terms are missing, your application is often automatically filtered out. We recommend integrating the keywords from the job posting directly into your CV.",
     "ats_empty": "No explicit keywords analyzed.",
-    "next_step_title": "Optimize your CV",
-    "next_step_desc": "Proceed to the next step to update your CV based on this analysis.",
-    "next_step_btn": "Continue to optimization",
+    "next_step_btn": "CV Optimization",
     "no_cv_title": "No CV found",
     "no_cv_desc": "To start CV Match, you need to upload your CV first. It only takes 30 seconds.",
     "no_cv_cta": "Upload CV in Settings →",

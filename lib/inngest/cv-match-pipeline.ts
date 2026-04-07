@@ -14,6 +14,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { getCVText } from '@/lib/services/cv-text-retriever';
 import { runCVMatchAnalysis } from '@/lib/services/cv-match-analyzer';
 import { computeInputHash } from '@/lib/services/cv-match-hash';
+import { preMatchKeywords } from '@/lib/services/pre-match-keywords';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -118,140 +119,10 @@ export const analyzeCVMatch = inngest.createFunction(
         });
 
         // Step 2.5: Deterministic ATS keyword pre-match (Stufe 2)
-        // Reads structured CV skills from user_profiles.cv_structured_data
-        // and matches against job.buzzwords BEFORE the LLM call.
+        // Uses shared utility — same logic in DEV and PROD pipelines
         const preMatchedKeywords = await step.run('pre-match-keywords', async () => {
             const buzzwords = Array.isArray(job.buzzwords) ? job.buzzwords : [];
-            if (buzzwords.length === 0) {
-                console.log('[pre-match] No buzzwords to match — skipping');
-                return null;
-            }
-
-            // Load structured CV data
-            let cvData: any = null;
-            try {
-                const { data: profile, error: profileErr } = await supabaseAdmin
-                    .from('user_profiles')
-                    .select('cv_structured_data')
-                    .eq('id', userId)
-                    .single();
-
-                if (profileErr) {
-                    console.warn('[pre-match] Supabase query failed — LLM-only fallback:', profileErr.message);
-                    return null;
-                }
-                cvData = profile?.cv_structured_data;
-            } catch (dbErr: any) {
-                console.warn('[pre-match] Unexpected DB error — LLM-only fallback:', dbErr?.message);
-                return null;
-            }
-
-            if (!cvData?.skills || !Array.isArray(cvData.skills)) {
-                console.log('[pre-match] No cv_structured_data.skills found — LLM-only fallback');
-                return null;
-            }
-
-            // Hobby/personal skill categories to EXCLUDE from ATS matching
-            // ATS = professional skills (CRM, Python, Project Management), NOT hobbies (Gitarre, Kochen)
-            const EXCLUDED_CATEGORIES = new Set([
-                'hobbies', 'hobby', 'interests', 'interessen', 'personal', 'persönlich',
-                'freizeit', 'leisure', 'sonstige', 'other', 'sonstiges',
-            ]);
-
-            // Flatten all professional skills into a single lowercase array
-            const cvSkillsFlat: string[] = [];
-
-            for (const group of cvData.skills) {
-                const cat = (group.category || '').toLowerCase().trim();
-                if (EXCLUDED_CATEGORIES.has(cat)) continue; // Skip hobbies
-
-                if (Array.isArray(group.items)) {
-                    for (const item of group.items) {
-                        if (typeof item === 'string' && item.trim().length >= 2) {
-                            cvSkillsFlat.push(item.trim().toLowerCase());
-                        }
-                    }
-                }
-            }
-
-            // Also include: job titles from experience (e.g. "Business Development Manager")
-            if (Array.isArray(cvData.experience)) {
-                for (const exp of cvData.experience) {
-                    if (exp.role && typeof exp.role === 'string') {
-                        cvSkillsFlat.push(exp.role.trim().toLowerCase());
-                    }
-                }
-            }
-
-            // Also include: language names
-            if (Array.isArray(cvData.languages)) {
-                for (const lang of cvData.languages) {
-                    if (lang.language && typeof lang.language === 'string') {
-                        cvSkillsFlat.push(lang.language.trim().toLowerCase());
-                    }
-                }
-            }
-
-            // Also include: certification names
-            if (Array.isArray(cvData.certifications)) {
-                for (const cert of cvData.certifications) {
-                    if (cert.name && typeof cert.name === 'string') {
-                        cvSkillsFlat.push(cert.name.trim().toLowerCase());
-                    }
-                }
-            }
-
-            // Deduplicate
-            const uniqueSkills = [...new Set(cvSkillsFlat)];
-
-            // Match each buzzword against CV skills
-            const found: string[] = [];
-            const missing: string[] = [];
-
-            for (const keyword of buzzwords) {
-                const kw = keyword.trim().toLowerCase();
-                if (kw.length < 2) continue;
-
-                // Word-boundary-safe matching: prevent "AI" matching "Email"
-                // For short keywords (<=3 chars), require exact match or start/end of skill
-                const isShort = kw.length <= 3;
-
-                const isFound = uniqueSkills.some(skill => {
-                    if (isShort) {
-                        // Exact match only for short terms
-                        return skill === kw
-                            || skill.startsWith(kw + ' ')
-                            || skill.startsWith(kw + '.')
-                            || skill.endsWith(' ' + kw)
-                            || skill.includes('(' + kw + ')')
-                            || skill.includes(' ' + kw + ' ');
-                    }
-                    // Longer keywords: substring match (case-insensitive)
-                    // skill.includes(kw): e.g. skill="b2b sales" matches kw="sales" ✅
-                    // kw.includes(skill): e.g. skill="crm" matches kw="crm software" ✅
-                    // BUT: skill="java" must NOT match kw="javascript" ❌
-                    // Guard: for kw.includes(skill), require skill is a whole word in kw
-                    if (skill.includes(kw)) return true;
-                    if (kw.includes(skill)) {
-                        // Word-boundary check: skill must be surrounded by spaces, start, or end
-                        const wordBoundaryRegex = new RegExp(`(^|[\\s\\-\/])${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[\\s\\-\/])`);
-                        return wordBoundaryRegex.test(kw);
-                    }
-                    return false;
-                });
-
-                if (isFound) {
-                    found.push(keyword); // preserve original casing
-                } else {
-                    missing.push(keyword);
-                }
-            }
-
-            console.log(`[pre-match] Matched ${found.length}/${buzzwords.length} keywords deterministically. CV skills index: ${uniqueSkills.length} entries.`);
-            if (found.length > 0) console.log(`[pre-match] Found: ${found.join(', ')}`);
-            if (missing.length > 0) console.log(`[pre-match] Missing: ${missing.join(', ')}`);
-
-            return { found, missing };
+            return preMatchKeywords(userId, buzzwords);
         });
 
         // Step 3: Run CV Match Analysis (the heavy LLM work)
@@ -284,7 +155,8 @@ export const analyzeCVMatch = inngest.createFunction(
         const inputHashForStorage = computeInputHash(
             cvData.text,
             job.description || '',
-            Array.isArray(job.requirements) ? job.requirements : []
+            Array.isArray(job.requirements) ? job.requirements : [],
+            Array.isArray(job.buzzwords) ? job.buzzwords : []
         );
 
         // Step 4: Save result to DB (JSONB Merge! + Status → cv_matched per DB constraint)

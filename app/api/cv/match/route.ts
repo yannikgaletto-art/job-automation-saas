@@ -10,6 +10,7 @@ import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
 import { runCVMatchAnalysis } from '@/lib/services/cv-match-analyzer';
 import { computeInputHash } from '@/lib/services/cv-match-hash';
+import { preMatchKeywords } from '@/lib/services/pre-match-keywords';
 
 // Rate limit: 5 CV match requests per minute per user
 const cvMatchLimiter = createRateLimiter({ maxRequests: 5, windowMs: 60_000 });
@@ -88,7 +89,8 @@ export async function POST(req: NextRequest) {
                 const currentHash = computeInputHash(
                     cvData.text,
                     job.description || '',
-                    (job.requirements as string[]) || []
+                    (job.requirements as string[]) || [],
+                    (job.buzzwords as string[]) || []
                 );
                 if (currentHash === existingHash) {
                     // Identical input — serve cached result (no LLM call, no credit debit)
@@ -141,6 +143,10 @@ export async function POST(req: NextRequest) {
                     CREDIT_COSTS.cv_match,
                     'cv_match',
                     async () => {
+                        // DEV: Deterministic pre-match (mirrors Inngest Step 2.5)
+                        const buzzwords = Array.isArray(job.buzzwords) ? job.buzzwords as string[] : [];
+                        const preMatchedKeywords = await preMatchKeywords(user.id, buzzwords);
+
                         // Run the LLM analysis directly
                         const matchResult = await runCVMatchAnalysis({
                             userId: user.id,
@@ -150,9 +156,10 @@ export async function POST(req: NextRequest) {
                             company: job.company_name || 'Unknown Company',
                             jobDescription: job.description || '',
                             requirements: job.requirements || [],
-                            atsKeywords: job.buzzwords || [],
+                            atsKeywords: buzzwords,
                             level: job.seniority || '',
                             locale: (userLocale as any) || 'de',
+                            preMatchedKeywords: preMatchedKeywords ?? undefined,
                         });
 
                         // Save result to DB (mirrors cv-match-pipeline.ts Step 4)
@@ -181,7 +188,8 @@ export async function POST(req: NextRequest) {
                         const devInputHash = computeInputHash(
                             cvData.text,
                             job.description || '',
-                            (job.requirements as string[]) || []
+                            (job.requirements as string[]) || [],
+                            (job.buzzwords as string[]) || []
                         );
 
                         await supabaseAdmin
