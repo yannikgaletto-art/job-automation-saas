@@ -554,13 +554,6 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
 
                 {/* ── Next Step ── */}
                 <div className="flex items-center justify-end gap-3 pt-1">
-                    <button
-                        onClick={() => runAnalysis(undefined, true)}
-                        className="text-xs text-slate-400 hover:text-[#002e7a] transition-colors py-1.5 px-3"
-                        title={t('btn_reanalyze_tooltip')}
-                    >
-                        {t('btn_reanalyze')}
-                    </button>
                     <Button variant="primary" onClick={() => onNextStep?.()} className="shadow-sm text-sm">
                         {t('next_step_btn')}
                     </Button>

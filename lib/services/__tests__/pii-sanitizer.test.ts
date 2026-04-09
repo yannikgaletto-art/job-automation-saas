@@ -89,3 +89,50 @@ test('buildContentHash: returns consistent SHA256 hex string', () => {
     expect(hash1).not.toBe(hashDiff);
     expect(hash1).toMatch(/^[a-f0-9]{64}$/); // SHA256 = 64 hex chars
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// REGRESSION TESTS — PII Hardening (2026-04-09)
+// ═══════════════════════════════════════════════════════════════════
+
+// Test 7 — Name at start of line (Satzanfang-Bug fix)
+test('sanitizeForAI: detects name at start of line', () => {
+    const input = 'Max Mustermann bewirbt sich auf die Stelle.';
+    const { sanitized, warningFlags } = sanitizeForAI(input);
+
+    expect(warningFlags).toContain('NAME');
+    expect(sanitized).toContain('__NAME_0__');
+    expect(sanitized).not.toContain('Max Mustermann');
+});
+
+// Test 7b — Name at start of multiline text
+test('sanitizeForAI: detects name at start of text', () => {
+    const input = 'Anna Schmidt\nBerlinstraße 42\n10115 Berlin';
+    const { sanitized, warningFlags } = sanitizeForAI(input);
+
+    expect(warningFlags).toContain('NAME');
+    expect(sanitized).toContain('__NAME_0__');
+    expect(sanitized).not.toContain('Anna Schmidt');
+});
+
+// Test 8 — Multiple PII types in a single text
+test('sanitizeForAI: detects multiple PII types in one text', () => {
+    const input = 'Ich bin Max Mustermann, erreichbar unter max@example.com oder +49 170 12345678.';
+    const { sanitized, warningFlags, restore } = sanitizeForAI(input);
+
+    expect(warningFlags).toContain('NAME');
+    expect(warningFlags).toContain('EMAIL');
+    expect(warningFlags).toContain('PHONE');
+    expect(sanitized).not.toContain('Max Mustermann');
+    expect(sanitized).not.toContain('max@example.com');
+    // Restore roundtrip
+    expect(restore(sanitized)).toBe(input);
+});
+
+// Test 9 — Multiple occurrences of the same name
+test('sanitizeForAI: handles same name appearing multiple times', () => {
+    const input = 'Max Mustermann hat Erfahrung. Kontakt: Max Mustermann.';
+    const { sanitized } = sanitizeForAI(input);
+
+    // Both occurrences should be tokenized (may have different indices)
+    expect(sanitized).not.toContain('Max Mustermann');
+});

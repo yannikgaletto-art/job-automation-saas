@@ -2,42 +2,33 @@
  * Inngest Function: cover-letter/polish
  * Asynchronous polish pipeline — runs AFTER the synchronous cover letter generation.
  *
- * Steps:
- *   1. Anti-Fluff Re-Gen (if fluff found during sync scan)
- *   2. Claude Haiku Language Judge (if ANTHROPIC_API_KEY available)
- *   3. JSONB Merge-Update on documents.metadata
+ * Steps (post-refactoring 2026-04-09):
+ *   1. JSONB Merge-Update on documents.metadata (polish_status, audit trail)
  *
- * Perplexity Fact Check removed (2026-03-30 Phase 2).
+ * REMOVED Steps:
+ *   - Anti-Fluff Re-Gen: Moved to sync-loop feedback (cover-letter-generator.ts)
+ *   - Multi-Agent Pipeline: Deprecated — Haiku overwriting Sonnet = quality regression
+ *   - Perplexity Fact Check: Removed 2026-03-30 (Phase 2)
  *
- * Reference: Implementation Plan Phase 2.2
+ * CRITICAL K2-FIX: This job NEVER overwrites `generated_content`.
+ * The user may have edited the letter between generation and polish completion.
+ * Overwriting would silently destroy user edits (Lost Edit bug).
+ *
+ * Reference: Implementation Plan Phase 1b (K2-Fix)
  * Contract: §ARCHITECTURE 3.1 (Inngest Resilience)
  */
 
 import { inngest } from './client';
 import { NonRetriableError } from 'inngest';
-import { createClient } from '@supabase/supabase-js';
-import { scanForFluff } from '@/lib/services/anti-fluff-blacklist';
-import { runMultiAgentPipeline } from '@/lib/services/multi-agent-pipeline';
-import Anthropic from '@anthropic-ai/sdk';
-import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 
-// ─── Supabase Admin (per-call, not module-level — §QA Audit M4) ──────────
-function getSupabase() {
-    return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-}
-
-// ─── Event Type ──────────────────────────────────────────────────────────
+// ─── Event Type (simplified — no longer needs full coverLetter/companyResearch) ──
 interface PolishEventData {
     draftId: string;
     userId: string;
-    coverLetter: string;
     fluffFound: boolean;
-    jobData?: { job_title?: string; company_name?: string; requirements?: string[]; [key: string]: unknown };
-    companyResearch?: { company_values?: string[]; tech_stack?: string[]; [key: string]: unknown };
-    setupContext?: CoverLetterSetupContext;
+    locale?: string;
+    // coverLetter and companyResearch removed — polish no longer processes content
 }
 
 
@@ -54,19 +45,11 @@ export const polishCoverLetter = inngest.createFunction(
         const {
             draftId,
             userId,
-            coverLetter: originalText,
             fluffFound,
-            jobData,
-            companyResearch,
-            setupContext,
         } = event.data as PolishEventData;
 
-        const supabase = getSupabase();
-        let currentText = originalText;
-        let polishImproved = false;
+        const supabase = getSupabaseAdmin();
         const polishWarnings: string[] = [];
-        const isEnglish = setupContext?.tone?.targetLanguage === 'en';
-        const t = (de: string, en: string) => isEnglish ? en : de;
 
         console.log(`[Polish] Starting for draft=${draftId} user=${userId.substring(0, 8)}…`);
 
@@ -82,114 +65,21 @@ export const polishCoverLetter = inngest.createFunction(
             throw new NonRetriableError(`Draft ${draftId} not found for user — aborting polish`);
         }
 
+        // Note on removed steps:
+        // Step 1 (Anti-Fluff Re-Gen): Fluff feedback is now injected into the sync-loop
+        // in cover-letter-generator.ts. If the validator detects fluff AND the judge fails,
+        // the fluff matches go into the feedback[] array for the next iteration.
+        //
+        // Step 2 (Multi-Agent Pipeline): Deprecated. The Haiku language judge was
+        // overwriting Sonnet-quality text with Haiku-quality rewrites = quality regression.
+        // The sync-loop Judge already catches all hard-constraint violations.
 
-        // ── Step 1: Anti-Fluff Re-Gen ────────────────────────────────
-        if (fluffFound && process.env.ANTHROPIC_API_KEY) {
-            currentText = await step.run('anti-fluff-regen', async () => {
-                const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
-                const fluffScan = scanForFluff(currentText);
-
-                if (!fluffScan.found) {
-                    console.log('[Polish:Fluff] No fluff found on re-scan — skipping');
-                    return currentText;
-                }
-
-                const fluffFeedback = fluffScan.matches.map(
-                    m => `${t('BLACKLIST-TREFFER', 'BLACKLIST HIT')}: "${m.pattern}" — ${t('Ersetze durch konkrete, belegbare Aussage.', 'Replace with a specific, evidence-based statement.')}`
-                );
-
-                const fixPrompt = t(
-                    `Du bist ein Senior-Karriereberater. Das folgende Anschreiben enthält generische KI-Phrasen.
-
-AKTUELLES ANSCHREIBEN:
----
-${currentText}
----
-
-ERKANNTE PROBLEME:
-${fluffFeedback.join('\n')}
-
-AUFGABE: Ersetze ALLE markierten Passagen durch konkrete, belegbare Aussagen. Behalte Struktur und Länge bei.
-GIB NUR DEN ÜBERARBEITETEN TEXT ZURÜCK! Keine Einleitungen, kein Markdown, keine Kommentare.`,
-                    `You are a senior career advisor. The following cover letter contains generic AI phrases.
-
-CURRENT COVER LETTER:
----
-${currentText}
----
-
-DETECTED ISSUES:
-${fluffFeedback.join('\n')}
-
-TASK: Replace ALL flagged passages with specific, evidence-based statements. Maintain structure and length.
-RETURN ONLY THE REVISED TEXT! No introductions, no markdown, no comments.`
-                );
-
-                try {
-                    const message = await anthropic.messages.create({
-                        model: 'claude-sonnet-4-5-20250929',
-                        max_tokens: 2000,
-                        temperature: 0.5,
-                        messages: [{ role: 'user', content: fixPrompt }]
-                    });
-
-                    const fixedText = message.content[0].type === 'text'
-                        ? message.content[0].text.trim()
-                        : currentText;
-
-                    const reScan = scanForFluff(fixedText);
-                    if (!reScan.found) {
-                        console.log('[Polish:Fluff] ✅ Clean after re-gen');
-                        polishImproved = true;
-                        return fixedText;
-                    } else {
-                        console.warn(`[Polish:Fluff] ⚠️ ${reScan.matches.length} patterns remain after re-gen`);
-                        polishWarnings.push(`Anti-Fluff: ${reScan.matches.length} Muster nach Re-Gen übrig`);
-                        polishImproved = true;
-                        return fixedText;
-                    }
-                } catch (err: unknown) {
-                    const errMsg = err instanceof Error ? err.message : String(err);
-                    console.error('[Polish:Fluff] Re-gen failed:', errMsg);
-                    polishWarnings.push(`Anti-Fluff Re-Gen fehlgeschlagen: ${errMsg}`);
-                    return currentText;
-                }
-            });
+        if (fluffFound) {
+            polishWarnings.push('Fluff-Patterns erkannt — wurden im Sync-Loop adressiert.');
         }
 
-        // ── Step 2: Multi-Agent Pipeline (Claude Haiku Language Judge) ─────
-        if (currentText.length > 0) {
-            currentText = await step.run('multi-agent-pipeline', async () => {
-                try {
-                    const pipelineResult = await runMultiAgentPipeline(
-                        currentText,
-                        jobData,
-                        companyResearch,
-                        setupContext?.tone?.targetLanguage,
-                    );
-
-                    if (pipelineResult.pipelineImproved) {
-                        polishImproved = true;
-                    }
-                    if (pipelineResult.pipelineWarnings.length > 0) {
-                        polishWarnings.push(...pipelineResult.pipelineWarnings);
-                    }
-
-                    return pipelineResult.finalText;
-                } catch (pipelineErr: unknown) {
-                    const errMsg = pipelineErr instanceof Error ? pipelineErr.message : String(pipelineErr);
-                    console.error('[Polish:Pipeline] Failed:', errMsg);
-                    polishWarnings.push(`Multi-Agent-Pipeline fehlgeschlagen: ${errMsg}`);
-                    return currentText;
-                }
-            });
-        }
-
-
-        // Steps 3+4 (Perplexity Fact Check, Quote Injection) — removed 2026-03-30 (Phase 2 simplification)
-
-        // ── Step 3: JSONB Merge-Update on documents.metadata ─────────
-        await step.run('save-polished-draft', async () => {
+        // ── JSONB Merge-Update on documents.metadata ─────────────────
+        await step.run('save-polish-metadata', async () => {
             // Read current metadata first (JSONB merge, not overwrite)
             const { data: currentDoc } = await supabase
                 .from('documents')
@@ -204,14 +94,15 @@ RETURN ONLY THE REVISED TEXT! No introductions, no markdown, no comments.`
 
             const existingMeta = (currentDoc.metadata || {}) as Record<string, unknown>;
 
+            // K2-FIX: NEVER write generated_content here.
+            // The user may have edited the letter between generation and this async job.
+            // Overwriting would silently destroy user edits.
             const updatedMeta = {
                 ...existingMeta,
-                // Only overwrite generated_content if polish actually improved it
-                ...(polishImproved ? { generated_content: currentText } : {}),
                 polish_status: 'done',
-                polish_improved: polishImproved,
+                polish_improved: false, // No content changes — just audit trail
                 polish_warnings: polishWarnings.length > 0 ? polishWarnings : undefined,
-                pipeline_improved: polishImproved,
+                pipeline_improved: false,
                 pipeline_warnings: polishWarnings.length > 0 ? polishWarnings : undefined,
                 polished_at: new Date().toISOString(),
             };
@@ -226,13 +117,13 @@ RETURN ONLY THE REVISED TEXT! No introductions, no markdown, no comments.`
                 throw new Error(`Failed to save polished draft: ${updateErr.message}`);
             }
 
-            console.log(`[Polish] ✅ Draft ${draftId} updated — improved=${polishImproved}, warnings=${polishWarnings.length}`);
+            console.log(`[Polish] ✅ Draft ${draftId} updated — metadata only, no content overwrite`);
         });
 
         return {
             success: true,
             draftId,
-            polishImproved,
+            polishImproved: false,
             polishWarnings,
         };
     }

@@ -86,7 +86,7 @@ Last Updated: 2026-03-09
 - `/api/cover-letter/drafts` (GET/POST — Draft Management)
 - `/api/cover-letter/drafts/[id]` (GET/PUT/DELETE — Single Draft)
 - `/api/cover-letter/resolve-personas` (POST — Hiring Manager Personas)
-- `/api/cover-letter/kill-fluff` (POST — Anti-Fluff-Processing)
+- `/api/cover-letter/kill-fluff` (POST — Scan-Only Fluff Detection, no AI call)
 
 #### CV
 - `/api/cv/match` (POST → Inngest `cv-match/analyze`)

@@ -1,13 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { BLACKLIST_PATTERNS } from './anti-fluff-blacklist';
-
-// ─── Supabase Admin (per-call, not module-level — §QA Audit: Serverless Hygiene) ──
-function getSupabase() {
-    return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-}
 
 export interface ValidationResult {
     isValid: boolean;
@@ -71,39 +63,21 @@ export function validateCoverLetter(
         warnings.push(`Company name only mentioned once (recommend: 2-3 times)`);
     }
 
-    // 3. FORBIDDEN PHRASES CHECK (centralized via BLACKLIST_PATTERNS)
+    // 3. FORBIDDEN PHRASES CHECK (centralized via BLACKLIST_PATTERNS — Single Source of Truth)
+    // Patterns with a `feedback` field are hard-stop phrases that have been observed to survive
+    // the LLM Judge across MAX_ITERATIONS. Their feedback strings provide explicit re-generation
+    // guidance to the sync-loop (§Fix F — Deterministic pre-delivery stop).
     let forbiddenCount = 0;
     const lowerText = coverLetter.toLowerCase();
 
-    for (const { pattern, reason } of BLACKLIST_PATTERNS) {
+    for (const { pattern, reason, feedback } of BLACKLIST_PATTERNS) {
         if (lowerText.includes(pattern.toLowerCase())) {
-            errors.push(`Forbidden phrase detected: "${pattern}" - ${reason}`);
-            forbiddenCount++;
-        }
-    }
-
-    // 3b. HARD PHRASE BLACKLIST — Deterministic pre-delivery stop (§Fix F)
-    // These phrases have been observed to survive the LLM Judge across MAX_ITERATIONS.
-    // Unlike BLACKLIST_PATTERNS (which are guidance to Claude), these are hard stops
-    // that produce explicit feedback strings for the re-generation loop.
-    const HARD_PHRASE_BLACKLIST: Array<{ phrase: string; feedback: string }> = [
-        {
-            phrase: 'Vielmehr als nur',
-            feedback: 'Entferne sofort den Ausdruck "Vielmehr als nur" — er ist logisch gebrochen (korrekt wäre "Mehr als nur", aber auch das ist gestelzt). Formuliere den Satz komplett um.',
-        },
-        {
-            phrase: 'Möchte ich mein Projekt',
-            feedback: 'Der Satz beginnt mit einem invertierten Modalsatz ("Möchte ich..."), der als Aussagesatz grammatikalisch falsch ist. Schreibe: "Zudem habe ich bei [Firma]..." oder "Auch meine Zeit bei [Firma] zeigt...".',
-        },
-        {
-            phrase: 'schnell den Sprung von',
-            feedback: 'Entferne das "Sprung von X zur Y"-Konstrukt — es ist eine erkennbare KI-Schablone. Formuliere stattdessen konkret, was du einbringen willst.',
-        },
-    ];
-
-    for (const { phrase, feedback } of HARD_PHRASE_BLACKLIST) {
-        if (lowerText.includes(phrase.toLowerCase())) {
-            errors.push(`HARD_BLACKLIST: "${phrase}" — ${feedback}`);
+            if (feedback) {
+                // Hard-stop phrase with explicit feedback → high-priority error
+                errors.push(`HARD_BLACKLIST: "${pattern}" — ${feedback}`);
+            } else {
+                errors.push(`Forbidden phrase detected: "${pattern}" - ${reason}`);
+            }
             forbiddenCount++;
         }
     }
@@ -122,6 +96,26 @@ export function validateCoverLetter(
     const shortParagraphs = paragraphs.filter(p => p.split(/\s+/).length < 20);
     if (shortParagraphs.length > 1) {
         warnings.push(`${shortParagraphs.length} paragraphs are very short (< 20 words)`);
+    }
+
+    // 5. JD CITATION FRAGMENT LENGTH CHECK (Anti-Halluzination)
+    // Detects when Claude quotes full sentences from the job ad instead of 2-5 word fragments.
+    // German quotation marks: „..." (U+201E / U+201C) or regular "..."
+    // EXCLUSION: Quoted phrases followed by an author attribution (– Author) are inspirational
+    // quotes — NOT JD fragments. Threshold: 10 words (quotes can be 8-9 words without being JD hallucinations).
+    const fragmentPattern = /[\u201e\u201c"](.*?)[\u201c\u201d"]/g;
+    let fragmentMatch;
+    while ((fragmentMatch = fragmentPattern.exec(coverLetter)) !== null) {
+        const fragment = fragmentMatch[1].trim();
+        const fragmentWords = fragment.split(/\s+/).length;
+        if (fragmentWords > 10) {
+            // Exclude quote attributions: text after closing quote starts with – Author
+            const afterQuote = coverLetter.slice(fragmentMatch.index + fragmentMatch[0].length, fragmentMatch.index + fragmentMatch[0].length + 80);
+            const isQuoteAttribution = /^\s*[\u2013\u2014\-]{1,2}\s*\w+/.test(afterQuote);
+            if (!isQuoteAttribution) {
+                warnings.push(`JD citation too long (${fragmentWords} words): "${fragment.slice(0, 60)}${fragment.length > 60 ? '...' : ''}" — max 5 words. Possibly hallucinated full-sentence quote.`);
+            }
+        }
     }
 
     return {
@@ -147,7 +141,7 @@ export async function logValidation(
     validation: ValidationResult
 ) {
     try {
-        await getSupabase().from('validation_logs').insert({
+        await getSupabaseAdmin().from('validation_logs').insert({
             job_id: jobId,
             user_id: userId,
             iteration,

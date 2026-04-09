@@ -34,7 +34,20 @@ const supabaseAdmin = createAdminClient(
 
 export async function POST(req: NextRequest) {
     try {
-        const { jobId, cvDocumentId, forceRestart } = await req.json();
+        // §PARSE: req.json() MUST be inside try/catch — if body is missing or malformed,
+        // Next.js would otherwise return an HTML error page instead of JSON.
+        let jobId: string | undefined;
+        let cvDocumentId: string | undefined;
+        let forceRestart: boolean | undefined;
+        try {
+            const body = await req.json();
+            jobId = body?.jobId;
+            cvDocumentId = body?.cvDocumentId;
+            forceRestart = body?.forceRestart;
+        } catch {
+            return NextResponse.json({ error: 'Invalid or missing request body (expected JSON)' }, { status: 400 });
+        }
+
         if (!jobId) {
             return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
         }
@@ -98,6 +111,56 @@ export async function POST(req: NextRequest) {
                     return NextResponse.json({ success: true, status: 'done_cached' });
                 }
                 console.log(`🔄 [CV Match] Cache MISS — input changed (hash: ${currentHash.slice(0, 8)}… vs ${existingHash.slice(0, 8)}…). Re-analyzing.`);
+            }
+        }
+
+        // ── Persistent Result Cache (survives job deletes) ────────────────
+        // If job_queue.metadata is empty (post-delete + re-add), check the
+        // persistent cv_match_result_cache. On HIT: restore metadata, skip LLM,
+        // skip credit debit. This is the second line of defense.
+        if (!forceRestart && existingStatus !== 'done') {
+            const persistentHash = computeInputHash(
+                cvData.text,
+                job.description || '',
+                (job.requirements as string[]) || [],
+                (job.buzzwords as string[]) || []
+            );
+            try {
+                const { data: cached } = await supabaseAdmin
+                    .from('cv_match_result_cache')
+                    .select('result')
+                    .eq('user_id', user.id)
+                    .eq('input_hash', persistentHash)
+                    .maybeSingle();
+
+                if (cached?.result && typeof cached.result === 'object') {
+                    console.log(`✅ [CV Match] Persistent cache HIT — restoring from cv_match_result_cache (hash: ${persistentHash.slice(0, 8)}…)`);
+
+                    // Restore cached result to job_queue.metadata (mirrors Inngest save-results)
+                    await supabaseAdmin
+                        .from('job_queue')
+                        .update({
+                            metadata: {
+                                ...currentMetadata,
+                                cv_match: {
+                                    analyzed_at: new Date().toISOString(),
+                                    cv_document_id: cvData.documentId,
+                                    input_hash: persistentHash,
+                                    ...(cached.result as Record<string, unknown>),
+                                },
+                                cv_match_error: null,
+                                cv_match_status: 'done',
+                            },
+                            status: 'cv_matched',
+                        })
+                        .eq('id', jobId)
+                        .eq('user_id', user.id);
+
+                    return NextResponse.json({ success: true, status: 'done_cached' });
+                }
+            } catch (cacheErr: any) {
+                // Non-blocking — fall through to LLM path
+                console.warn(`⚠️ [CV Match] Persistent cache lookup error (non-blocking): ${cacheErr?.message}`);
             }
         }
 
@@ -212,6 +275,23 @@ export async function POST(req: NextRequest) {
                             .eq('user_id', user.id);
 
                         console.log(`✅ [CV Match] DEV sync complete for job ${jobId}`);
+
+                        // Write to persistent cache (mirrors Inngest Step 4.5)
+                        try {
+                            await supabaseAdmin
+                                .from('cv_match_result_cache')
+                                .upsert({
+                                    user_id: user.id,
+                                    input_hash: devInputHash,
+                                    result: safeResult,
+                                }, {
+                                    onConflict: 'user_id,input_hash',
+                                });
+                            console.log(`✅ [CV Match] DEV result cached (hash: ${devInputHash.slice(0, 8)}…)`);
+                        } catch (cacheWriteErr: any) {
+                            console.warn(`⚠️ [CV Match] DEV cache write error (non-blocking): ${cacheWriteErr?.message}`);
+                        }
+
                         return matchResult;
                     },
                     jobId

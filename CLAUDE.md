@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 3.6
-**Last Updated:** 2026-04-01
+**Version:** 3.7
+**Last Updated:** 2026-04-09
 
 ---
 
@@ -81,6 +81,7 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | Credit Service | @/lib/services/credit-service |
 | Credit Gate Middleware | @/lib/middleware/credit-gate |
 | Stripe Service | @/lib/services/stripe-service |
+| PII Sanitizer | @/lib/services/pii-sanitizer |
 
 ---
 
@@ -115,6 +116,9 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **CV Optimizer Reload Bug (2026-03-26)** | **Added missing `onComplete` callback in `OptimizerWizard` and bound it to `optimisticStep` in `UnifiedJobRow`. The Job Queue now instantly advances to "Cover Letter" visually after "Save" without requiring a page reload.** |
 | **Stripe Monetization V1 (2026-04-01)** | **Credit-basiertes System: Free(6)/Starter(€9,90/20)/Durchstarter(€19,90/50). Atomic `debit_credits()` RPC mit FOR UPDATE Lock. `withCreditGate()` API-Wrapper. Stripe Checkout/Webhook/Portal. Idempotent webhook via `processed_stripe_events`. Centralized `lib/supabase/admin.ts` singleton. `getUserCreditsForClient()` strips `stripeCustomerId`. Billing i18n (de/en/es, 45+ Keys). Feature-Silo §9 in FEATURE_COMPAT_MATRIX.md.** |
 | **UX & Video Pipeline Overhaul (2026-04-06)** | **Video UX: Confirm dialogs, preview tab links, Double-Assurance delete endpoint with stable QR tokens. Formality drift fixed via deep style constraints. Credit-loop bypass via Feedback UI integration. CV bullets fully synced to CLI context. Default Intro Scripts available in DE/EN/ES natively.** |
+| **CL Pipeline Hardening (2026-04-09)** | **K1: PII personalInfo stripped from CV JSON before prompt. K2: Inngest polish writes metadata ONLY (no content overwrite — Lost Edit Prevention). K3: Multi-Agent Pipeline deprecated (Haiku→Sonnet regression). Blacklist consolidated: 4 lists → 1 SSOT (~74 patterns). Fluff feedback injected into sync-loop. kill-fluff degraded to scan-only (cost=$0). Em-dash utility extracted.** |
+| **CL Structural Hardening & Quotes (2026-04-09)** | **Quote-Bridge reformiert ("wurde mir klar" → "Dieser Gedanke begleitete mich"). JD-Zitat Logik repariert (Max 5 Wörter Fragment, Thema statt Organisationsform). Fragment-Validator Check + False-Positive Exclusion für Attributions. Kritischer Prompt Unicode-Escape Bug (escaped `\u201e`) gefixt. Anti-Fluff System 100% test-gesichert.** |
+
 
 ---
 
@@ -568,6 +572,7 @@ const fillApplication = async () => {
 - [ ] Environment variables set
 - [ ] RLS policies enabled
 - [ ] No console.logs with PII
+- [ ] **PII sanitized before external AI calls** (see SICHERHEITSARCHITEKTUR.md §14; exceptions: CV Optimize, CV Match)
 - [ ] Visual verification complete
 - [ ] **Cross-Feature-Compatibility verified** (FEATURE_COMPAT_MATRIX.md checked)
 

@@ -55,7 +55,6 @@ export async function GET() {
                     preview: typeof meta?.generated_content === 'string'
                         ? (meta.generated_content as string).slice(0, 150) + '...'
                         : null,
-                    xray_annotations: meta?.xray_annotations ?? null,    // B4.1
                     pipeline_warnings: meta?.pipeline_warnings ?? [],    // B4.1
                     pipeline_improved: meta?.pipeline_improved ?? false, // B4.1
                 };

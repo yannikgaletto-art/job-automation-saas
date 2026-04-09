@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { generateCoverLetterWithQuality } from '@/lib/services/cover-letter-generator';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
 import { logger } from '@/lib/logging';
 import { inngest } from '@/lib/inngest/client';
@@ -18,10 +18,7 @@ export const maxDuration = 120; // Vercel timeout — frontend client waits 180s
 const coverLetterLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
 
 // Admin client for DB writes (used after Auth Guard verification)
-const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabaseAdmin = getSupabaseAdmin();
 export async function POST(request: NextRequest) {
     const requestId = crypto.randomUUID();
 
@@ -142,7 +139,9 @@ export async function POST(request: NextRequest) {
             console.warn(`[${requestId}] ⚠️ Failed to update job_queue status: ${statusError.message}`);
         }
 
-        // ─── Dispatch Inngest cover-letter/polish for async improvements ────────
+        // ─── Dispatch Inngest cover-letter/polish for async metadata update ────────
+        // Polish no longer processes content (K2-Fix: Lost Edit Prevention).
+        // It only writes polish_status + audit trail to documents.metadata.
         if (draftId && fixMode !== 'targeted') {
             try {
                 await inngest.send({
@@ -151,20 +150,18 @@ export async function POST(request: NextRequest) {
                         draftId,
                         userId,
                         locale: await getUserLocale(userId),
-                        coverLetter: result.coverLetter,
                         fluffFound: result.fluffWarning ?? false,
-                        jobData: undefined, // Job data already in DB — polish job reads it
-                        companyResearch: undefined,
-                        setupContext: setupContext ?? undefined,
                     },
                 });
                 console.log(`[${requestId}] ✅ Polish job dispatched for draft ${draftId}`);
             } catch (inngestErr) {
-                // Non-fatal: polish is best-effort improvement
+                // Non-fatal: polish is best-effort metadata update
                 console.warn(`[${requestId}] ⚠️ Failed to dispatch polish job:`, inngestErr);
             }
         }
 
+        // polish_status removed from response (2026-04-09): Was never consumed by frontend.
+        // DB field still exists for Inngest audit trail (metadata.polish_status).
         return NextResponse.json({
             success: true,
             requestId,
@@ -176,7 +173,6 @@ export async function POST(request: NextRequest) {
             iterations: result.iterations,
             iteration_log: result.iterationLog,
             fluff_warning: result.fluffWarning ?? false,
-            polish_status: draftId ? 'pending' : null, // Frontend uses this to show polish banner
             warnings, // Transparent fallback communication to frontend
         });
 

@@ -2,23 +2,22 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { BLACKLIST_PATTERNS, scanForFluff } from '@/lib/services/anti-fluff-blacklist';
-import { complete } from '@/lib/ai/model-router';
-import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
-import { CREDIT_COSTS } from '@/lib/services/credit-types';
+import { scanForFluff } from '@/lib/services/anti-fluff-blacklist';
 
 /**
  * POST /api/cover-letter/kill-fluff
- * On-demand fluff removal using Claude 4.5 Sonnet (or local fallback).
+ * Scan-Only fluff detection endpoint (no AI-Call — zero cost).
+ *
+ * Refactored 2026-04-09: AI-powered rewrite removed.
+ * Rationale: Fluff feedback is now injected into the sync-loop in cover-letter-generator.ts.
+ * This endpoint is retained for on-demand client-side scanning only.
  *
  * Input: { coverLetterText: string, jobId: string }
- * Output: { cleanedText: string, removedPhrases: string[], changeCount: number }
+ * Output: { cleanedText: string (unchanged), removedPhrases: string[], changeCount: 0 }
  *
  * Auth: Required (401 without session)
- * Security: jobId must belong to user (403 if foreign — Yannik Correction #4)
- * Cost: ~$0.003-0.005 per call
- *
- * MIGRATION NOTE (2026-03-28): Replaced GPT-4o with Claude Sonnet via model-router
+ * Security: jobId must belong to user (403 if foreign)
+ * Cost: $0.00 (no AI call)
  */
 export async function POST(request: NextRequest) {
     try {
@@ -44,7 +43,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Security: Verify jobId belongs to this user (Yannik Correction #4)
+        // Security: Verify jobId belongs to this user
         const { data: job, error: jobError } = await supabase
             .from('job_queue')
             .select('id')
@@ -59,70 +58,25 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Step 1: Local scan to identify fluff
+        // Scan-Only: Identify fluff via centralized BLACKLIST_PATTERNS
         const localScan = scanForFluff(coverLetterText);
         const removedPhrases: string[] = localScan.matches.map(m => m.pattern);
 
-        // Step 2: Claude Sonnet cleanup (if API key available + fluff found)
-        if (process.env.ANTHROPIC_API_KEY && localScan.found) {
-            try {
-                const blacklistSection = BLACKLIST_PATTERNS.map(p => `- "${p.pattern}" (${p.reason})`).join('\n');
-
-                // §BILLING: Credit Gate — debit 0.5 credits, auto-refund on AI failure
-                const cleanedText = await withCreditGate(
-                    user.id,
-                    CREDIT_COSTS.cover_letter,
-                    'cover_letter',
-                    async () => {
-                        const response = await complete({
-                            taskType: 'kill_fluff',
-                            systemPrompt: `Du bist ein Fluff-Killer für Anschreiben. Ersetze alle generischen KI-Phrasen durch konkrete, authentische Formulierungen.
-
-BLACKLIST (MUSS entfernt/ersetzt werden):
-${blacklistSection}
-
-ZUSÄTZLICH ENTFERNEN:
-- Kalenderspruch-artige Weisheiten
-- Sätze über 30 Wörter ohne Komma
-- Alles was bei einem Personaler den Verdacht "KI-generiert" auslöst
-
-REGELN:
-- Behalte Struktur, Länge und Fakten bei
-- Ersetze Fluff durch konkrete, belegbare Aussagen
-- Gib NUR den bereinigten Text zurück, kein JSON, kein Markdown`,
-                            prompt: coverLetterText,
-                            temperature: 0.3,
-                            maxTokens: 2500,
-                        });
-                        return response.text.trim();
-                    },
-                    jobId
-                );
-
-                return NextResponse.json({
-                    success: true,
-                    cleanedText,
-                    removedPhrases,
-                    changeCount: removedPhrases.length,
-                });
-            } catch (error) {
-                const billingResponse = handleBillingError(error);
-                if (billingResponse) return billingResponse;
-                console.error('❌ [KillFluff] Claude Sonnet failed, falling back to local scan:', error);
-            }
-        }
-
-        // Fallback: Return original text with identified phrases (no AI improvement)
         return NextResponse.json({
             success: true,
-            cleanedText: coverLetterText,
+            cleanedText: coverLetterText, // Unchanged — no AI rewrite
             removedPhrases,
-            changeCount: 0, // No actual changes made without Claude
-            warning: !process.env.ANTHROPIC_API_KEY
-                ? 'Claude Sonnet nicht verfügbar (ANTHROPIC_API_KEY fehlt). Nur Scan, keine Verbesserung.'
-                : localScan.found
-                    ? 'Claude Sonnet Verbesserung fehlgeschlagen. Nur lokaler Scan.'
-                    : 'Kein Fluff gefunden — Text ist sauber.',
+            changeCount: 0, // No actual changes made (scan-only)
+            fluffFound: localScan.found,
+            matches: localScan.matches.map(m => ({
+                pattern: m.pattern,
+                reason: m.reason,
+                category: m.category,
+                feedback: m.feedback,
+            })),
+            info: localScan.found
+                ? `${localScan.matches.length} Fluff-Pattern(s) erkannt. Nutze "Korrektur"-Funktion des Editors für gezielte Verbesserungen.`
+                : 'Kein Fluff gefunden — Text ist sauber.',
         });
 
     } catch (error: unknown) {
@@ -133,4 +87,3 @@ REGELN:
         );
     }
 }
-

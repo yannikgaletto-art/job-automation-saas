@@ -18,6 +18,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import type { StyleAnalysis } from './writing-style-analyzer';
+import { buildJudgeBlacklistSection } from './anti-fluff-blacklist';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface JudgeResult {
@@ -33,57 +34,7 @@ interface JobData {
     [key: string]: unknown;
 }
 
-// ─── Blacklist Sections ───────────────────────────────────────────────────────
-const DE_BLACKLIST = `
-VERBOTENE PHRASEN — GPT-BLACKLIST (jeder Fund = fail):
-Allgemeine KI-Floskeln:
-- „Ich freue mich sehr darauf", „Ich bin überzeugt, dass", „meine Leidenschaft für"
-- „ideal auf diese Stelle", „Mit großer Begeisterung", „hiermit bewerbe ich mich"
-- „I am excited to apply", „I am confident that"
 
-Pathly-spezifische KI-Tropen (aus 3 Tagen Qualitätssitzungen destilliert):
-- „an der Schnittstelle zwischen" (nur diese Konstruktion — das Wort allein ist erlaubt)
-- „nicht nur ... sondern" (als rhetorisches Aufblasungs-Konstrukt: z.B. „nicht nur verkauft, sondern als ... begreift")
-- „echten Mehrwert" / „echter Mehrwert"
-- „Doch ich lernte schnell"
-- „echte Werte" (als Leerphrase ohne konkreten Inhalt)
-- „strategische Exzellenz" / „wissenschaftliche Exzellenz"
-- „stehen und fallen" (Allwissens-Konstrukt: „X steht und fällt damit, dass...")
-
-Verbotene Abschluss-Floskeln (sofort erkennbare KI-Schablone):
-- „...schnell den Sprung von [X] zur [Y] schaffe" (generisches Closing — immer templated)
-- „Ich bin zuversichtlich, dass ich durch eure/Ihre Expertise ... schnell den Sprung ... schaffe" (das vollständige Konstrukt)
-- „schnell den Sprung ... schaffe" — egal in welchem Kontext
-
-Strukturelle Ausdrucksfehler (KI-Verräter):
-- „dass ihr ... dass ihr" (Doppelkonstrukt im selben Satz/Absatz — gilt analog für „dass Sie ... dass Sie")
-- „möchte ich mich" — zweimal im selben Absatz
-- „Daher möchte ich mich bei euch kurz vorstellen" — wenn als allein stehender Schlusssatz eines Absatzes (ohne organische Einbettung)`;
-
-const EN_BLACKLIST = `
-FORBIDDEN PHRASES — GPT-BLACKLIST (each found = fail):
-General AI boilerplate:
-- "I am excited to apply", "I am confident that", "my passion for"
-- "ideal for this position", "With great enthusiasm", "I am writing to apply"
-- "Ich freue mich sehr darauf", "hiermit bewerbe ich mich"
-
-Pathly-specific AI tropes (distilled from quality sessions):
-- "at the intersection of X and Y" (only this construction — the word alone is fine)
-- "not only X but also Y" (as rhetorical filler: e.g., "not only sold, but understood as a strategic asset")
-- "real value" / "genuine value" (as empty phrase)
-- "But I quickly learned"
-- "genuine values" (as empty phrase)
-- "strategic excellence" / "scientific excellence"
-- "stand or fall" (omniscience construct: "X stands or falls on...")
-
-Forbidden closing boilerplate (immediately recognizable AI template):
-- "...quickly make the transition from [X] to [Y]" or "make the leap from... to..." as a closing sentence
-- "I am confident that through your expertise in [field] I will quickly make the transition" (the full construction)
-
-Structural expression errors (AI giveaways):
-- "that you ... that you" (double construct in same sentence/paragraph)
-- "I would like to" — twice in same paragraph
-- "Therefore I would like to briefly introduce myself" — when used as a standalone closing sentence of a paragraph`;
 
 const SUBJEKT_CHECK_DE = `
 4. SUBJEKT-INTEGRITÄT: Beschreibt der Bewerber Firmen- oder Branchen-Fakten als objektive Wahrheit (statt als eigene Beobachtung)?
@@ -218,7 +169,7 @@ ${text}
 HARD CONSTRAINT CHECKS (each violation = fail):
 
 1. GPT-BLACKLIST: Does the text contain any of these forbidden phrases?
-${EN_BLACKLIST}
+${buildJudgeBlacklistSection('en')}
    If YES → fail_reason: "BLACKLIST: [found phrase]"
 
 2. COMPANY MENTION: Is "${companyName}" (or a recognizable variant) mentioned at least once?
@@ -248,7 +199,7 @@ ${text}
 HARTE CONSTRAINT-CHECKS (jeder Verstoß = fail):
 
 1. GPT-BLACKLIST: Enthält der Text eine dieser verbotenen Phrasen?
-${DE_BLACKLIST}
+${buildJudgeBlacklistSection('de')}
    Wenn JA → fail_reason: "BLACKLIST: [gefundene Phrase]"
 
 2. FIRMENNENNUNG: Wird "${companyName}" (oder eine erkennbare Variante) mindestens 1x im Text erwähnt?

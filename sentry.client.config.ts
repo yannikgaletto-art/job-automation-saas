@@ -15,6 +15,7 @@ Sentry.init({
         if (event.user) {
             delete event.user.email
             delete event.user.ip_address
+            delete event.user.username // Supabase may set username = email (DSGVO)
         }
         return event
     },

@@ -214,7 +214,33 @@ export async function complete(
             outputTokens: response.usage.output_tokens,
         };
     } else if (model.provider === 'mistral') {
-        result = await completeMistral(request, model.id);
+        // Resilience: If MISTRAL_API_KEY is missing, fall back to Haiku.
+        // This prevents silent extraction failures in misconfigured environments.
+        const mistralKey = process.env.MISTRAL_API_KEY;
+        if (!mistralKey) {
+            console.warn(`⚠️ [ModelRouter] MISTRAL_API_KEY missing — falling back to Haiku for task="${request.taskType}". Configure MISTRAL_API_KEY for cost-optimal routing.`);
+            // Re-route to Haiku via anthropic path
+            const haiku = MODELS.CLAUDE_HAIKU;
+            const client = getAnthropicClient();
+            const fallbackResponse = await client.messages.create({
+                model: haiku.id,
+                max_tokens: request.maxTokens ?? 4096,
+                temperature: request.temperature ?? 0,
+                system: request.systemPrompt,
+                messages: [{ role: 'user', content: request.prompt }],
+            });
+            const fallbackText = fallbackResponse.content
+                .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+                .map((block) => block.text)
+                .join('\n');
+            result = {
+                text: fallbackText,
+                inputTokens: fallbackResponse.usage.input_tokens,
+                outputTokens: fallbackResponse.usage.output_tokens,
+            };
+        } else {
+            result = await completeMistral(request, model.id);
+        }
     } else {
         throw new Error(`Unsupported provider: ${(model as any).provider}. Supported: anthropic, mistral.`);
     }
@@ -223,7 +249,7 @@ export async function complete(
     const tokensUsed = result.inputTokens + result.outputTokens;
     const costCents = Math.ceil(
         ((result.inputTokens / 1_000_000) * model.cost_input_per_1m +
-         (result.outputTokens / 1_000_000) * model.cost_output_per_1m) * 100
+            (result.outputTokens / 1_000_000) * model.cost_output_per_1m) * 100
     );
 
     // Track costs in memory (dev convenience — resets on serverless cold starts!)

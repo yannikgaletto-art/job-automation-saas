@@ -52,7 +52,6 @@ export async function GET(
                 generated_content: meta?.generated_content ?? null,
                 quality_scores: meta?.quality_scores ?? null,
                 fluff_warning: meta?.fluff_warning ?? false,
-                xray_annotations: meta?.xray_annotations ?? null,
                 pipeline_warnings: meta?.pipeline_warnings ?? [],
                 pipeline_improved: meta?.pipeline_improved ?? false,
                 setup_context: meta?.setup_context ?? null,

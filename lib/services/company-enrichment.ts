@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 // Upstash ratelimit removed (2026-03-30 Phase 2) — was only used for Perplexity API
 import { recordCacheHit, recordCacheMiss } from './cache-monitor';
+import { sanitizeForAI } from './pii-sanitizer';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -208,7 +209,8 @@ async function fetchViaJinaAndClaude(
         const { complete } = await import('@/lib/ai/model-router');
 
         // Truncate to ~8000 chars to stay within token limits
-        const truncatedContent = scrapedMarkdown.substring(0, 8000);
+        // PII sanitization: website scrapes may contain employee names/contact info (DSGVO Art. 25)
+        const truncatedContent = sanitizeForAI(scrapedMarkdown.substring(0, 8000)).sanitized;
 
         const prompt = `Du bist ein Unternehmens-Analyst. Extrahiere strukturierte Informationen aus dem folgenden Website-Inhalt von "${companyName}" (${websiteUrl}).
 

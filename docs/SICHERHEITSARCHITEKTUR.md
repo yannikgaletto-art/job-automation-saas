@@ -529,3 +529,42 @@ Kein Job aus Job Search darf direkt in die Queue ohne User-Bestätigung.
 2. `pending_review` Jobs erscheinen NICHT in der Job Queue und zählen NICHT gegen das 5-Job-Limit.
 3. "Abbrechen" im Preview löscht den `pending_review`-Job (kein Zombie).
 4. `confirm/route.ts` akzeptiert nur whitelisted Edits: `tasks`, `hard_requirements`, `ats_keywords`, `benefits`. Keine beliebigen Felder.
+
+---
+
+## §14 PII SANITIZER CONTRACT (Stand 2026-04-09)
+
+### Pflicht: `sanitizeForAI()` vor externen AI-Calls
+
+Jeder Datenpfad, der **User-Content an externe AI-Provider** (Anthropic US, Mistral EU) sendet, MUSS `sanitizeForAI()` aus `@/lib/services/pii-sanitizer` aufrufen.
+
+**Kanonischer Import:**
+```typescript
+import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
+```
+
+### Aktive Integrationen
+
+| Pfad | Datei | Status |
+|---|---|---|
+| **Coaching** | `lib/services/coaching-service.ts` | ✅ Aktiv (sanitize → restore) |
+| **Job Ingest** | `app/api/jobs/ingest/route.ts` | ✅ Aktiv (sanitize, kein restore) |
+| **Job Extract (Inngest)** | `lib/inngest/extract-job-pipeline.ts` | ✅ Aktiv (sanitize, kein restore) |
+| **Company Enrichment** | `lib/services/company-enrichment.ts` | ✅ Aktiv (sanitize, kein restore) |
+
+### Bewusste Ausnahmen
+
+| Pfad | Begründung |
+|---|---|
+| **CV Optimize** | `personalInfo` (Name, E-Mail, Telefon) wird für das Diff-System benötigt. User-Directive: Name bleibt im CV. |
+| **CV Match** | Analysiert Skills/Requirements — `personalInfo` wird nie in den Prompt injiziert. Kein PII-Risiko. |
+| **Cover Letter** | `sanitizeForAI()` NICHT geeignet — Pseudonymisierungs-Tokens (`[PII_1]`) würden von Claude reformuliert und im Output erscheinen. Stattdessen: chirurgische `delete personalInfo` / `delete personal_info` aus `cv_structured_data` in `cover-letter-prompt-builder.ts` (2026-04-09 K1-Fix). Claude sieht nur Karriere-Daten (Stationen, Skills), nie Name/Adresse/Telefon. |
+| **Document Processor (PII-Extraktion)** | Self-Referential: Claude muss PII sehen um sie zu extrahieren. Datentransfer-Minimierung via Text-Slice (3000 chars) statt Sanitizer. |
+
+### Neue Features — Checkliste
+
+Beim Hinzufügen neuer AI-Features MUSS geprüft werden:
+1. Geht User-Content (Freitext, CV-Daten, Coaching-Nachrichten) an einen externen AI-Provider?
+2. Falls ja: `sanitizeForAI()` → AI-Call → ggf. `restore()` implementieren.
+3. Entry in dieser Tabelle dokumentieren.
+

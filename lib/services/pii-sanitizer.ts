@@ -26,11 +26,16 @@ export interface SanitizeResult {
 const EMAIL_REGEX = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
 const PHONE_REGEX = /\+?[0-9][\d\s\-/()]{7,19}/g;
 const IBAN_REGEX = /[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}[A-Z0-9]{0,16}/g;
+// SAFETY NOTE: These /g regexes are module-level constants.
+// String.prototype.replace() always resets lastIndex after each call — SAFE for shared use.
+// ⚠️ NEVER call .test() or .exec() on these regexes — those retain lastIndex between calls
+// and would produce incorrect results on subsequent invocations (concurrency bug).
 
-// Name heuristic: Two consecutive capitalized words NOT at start of sentence.
+// Name heuristic: Two consecutive capitalized words.
 // Supports: hyphenated names (Anna-Lena), accented chars (García, José)
 // Guard: Single capitalized words (Berlin, JavaScript) are NOT matched.
-const NAME_REGEX = /(?<![.!?]\s)(?<!^)([A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+(?:-[A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+)?)\s+([A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+(?:-[A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+)?)/gm;
+// Note: (?<![.!?]\s) prevents matching after sentence-end punctuation (reduces false positives on capitalized sentence starts like "Berlin ist…")
+const NAME_REGEX = /(?<![.!?]\s)([A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+(?:-[A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+)?)\s+([A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+(?:-[A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+)?)/gm;
 
 // Common words that look like names but aren't (tech terms, cities, companies)
 const FALSE_POSITIVE_GUARD = new Set([

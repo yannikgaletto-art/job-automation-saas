@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
         // ================================================================
         // CV Upload + Processing (only when a CV file is provided)
         // ================================================================
-        let processedCv: { encryptedPii: Record<string, unknown>; metadata: Record<string, unknown>; sanitizedText: string } | null = null;
+        let processedCv: { encryptedPii: Record<string, unknown>; metadata: Record<string, unknown>; extractedText: string } | null = null;
         let cvDocId: string | null = null;
         let cvUploadPath: string | null = null;
 
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
                         file_url_encrypted: cvUploadData.path,
                         metadata: {
                             ...processedCv.metadata,
-                            extracted_text: processedCv.sanitizedText,
+                            extracted_text: processedCv.extractedText,
                             original_name: cvFile.name // ✅ SICHERHEITSARCHITEKTUR.md Section 2
                         },
                         pii_encrypted: processedCv.encryptedPii
@@ -202,11 +202,11 @@ export async function POST(req: NextRequest) {
                     console.log(`[${requestId}] route=documents/upload step=db_insert_cv success`);
 
                     // 1.5 Parse the unstructured text to strict JSON SSoT immediately
-                    if (processedCv.sanitizedText) {
+                    if (processedCv.extractedText) {
                         try {
                             console.log(`[${requestId}] route=documents/upload step=parse_cv_json...`);
                             const { parseCvTextToJson } = await import('@/lib/services/cv-parser');
-                            const structuredCv = await parseCvTextToJson(processedCv.sanitizedText);
+                            const structuredCv = await parseCvTextToJson(processedCv.extractedText);
 
                             const { error: profileErr } = await supabaseAdmin
                                 .from('user_profiles')
@@ -282,11 +282,11 @@ export async function POST(req: NextRequest) {
                     const processedCl = await processDocument(clBuffer, file.type, 'cover_letter');
                     clMetadata = {
                         ...processedCl.metadata,
-                        extracted_text: processedCl.sanitizedText,
+                        extracted_text: processedCl.extractedText,
                         original_name: file.name,
                     };
                     clPii = processedCl.encryptedPii;
-                    console.log(`[${requestId}] route=documents/upload step=process_cl success chars=${processedCl.sanitizedText.length}`);
+                    console.log(`[${requestId}] route=documents/upload step=process_cl success chars=${processedCl.extractedText.length}`);
                 } catch (clProcErr) {
                     const msg = clProcErr instanceof Error ? clProcErr.message : String(clProcErr);
                     console.warn(`[${requestId}] route=documents/upload step=process_cl failed (non-blocking): ${msg}`);

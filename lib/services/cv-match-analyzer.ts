@@ -439,22 +439,53 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
         const firstResult: CVMatchResult = safeParseJson(jsonMatch[0]);
 
         // SICHERHEITSARCHITEKTUR §Golden Rule: keine falschen Responses.
-        // Post-Parse Consistency Check: Gap Census vs. Score must be consistent.
+        // ⚡ DETERMINISTIC SCORE OVERRIDE — Full Gap Census Enforcement
+        //
+        // The LLM score is DISCARDED. The final score is computed from the
+        // _gapCensus the LLM counted. This eliminates all score variance
+        // for identical inputs — the only variable is the gap count, which
+        // Haiku counts reliably at temperature=0 when inputs are stable.
+        //
+        // Score bands (fixed midpoints for maximum label stability):
+        //   0 major, 0 minor  → 92 (Starker Fit)
+        //   0 major, 1-2 minor → 77 (Starker Fit)
+        //   0 major, 3+ minor  → 72 (Starker Fit — minimal)
+        //   1 major, 0 minor   → 62 (Teilweise Fit)
+        //   1 major, 1+ minor  → 55 (Teilweise Fit)
+        //   2+ major           → 32 (Wenig passend)
+        //   Fundamental mismatch → 15 (Wenig passend)
         const gapCensus = (firstResult as any)._gapCensus;
         if (gapCensus && typeof gapCensus.majorGaps === 'number') {
             const major = gapCensus.majorGaps;
             const minor = gapCensus.minorGaps ?? 0;
+            const llmRawScore = firstResult.overallScore;
 
-            if (major >= 2 && firstResult.overallScore > 39) {
-                console.warn(`⚠️ [CV Match] Gap Census inconsistency: majorGaps=${major} but score=${firstResult.overallScore} — capping to 39`);
-                firstResult.overallScore = 39;
-            } else if (major >= 1 && minor >= 1 && firstResult.overallScore > 54) {
-                console.warn(`⚠️ [CV Match] Gap Census inconsistency: majorGaps=${major}, minorGaps=${minor} but score=${firstResult.overallScore} — capping to 54`);
-                firstResult.overallScore = 54;
-            } else if (major >= 1 && firstResult.overallScore > 69) {
-                console.warn(`⚠️ [CV Match] Gap Census inconsistency: majorGaps=${major} but score=${firstResult.overallScore} — capping to 69`);
-                firstResult.overallScore = 69;
+            let deterministicScore: number;
+            if (major === 0 && minor === 0) {
+                deterministicScore = 92;
+            } else if (major === 0 && minor <= 2) {
+                deterministicScore = 77;
+            } else if (major === 0 && minor >= 3) {
+                deterministicScore = 72;
+            } else if (major === 1 && minor === 0) {
+                deterministicScore = 62;
+            } else if (major === 1 && minor >= 1) {
+                deterministicScore = 55;
+            } else if (llmRawScore <= 24) {
+                deterministicScore = 15;
+            } else {
+                deterministicScore = 32;
             }
+
+            if (deterministicScore !== llmRawScore) {
+                console.log(`📊 [CV Match] DETERMINISTIC OVERRIDE: LLM score ${llmRawScore} → ${deterministicScore} (majorGaps=${major}, minorGaps=${minor})`);
+            }
+            firstResult.overallScore = deterministicScore;
+        } else {
+            // No gap census → Safety fallback. "Teilweise Fit" is the safest default:
+            // not misleadingly positive, not unfairly negative.
+            console.warn(`⚠️ [CV Match] No _gapCensus in LLM output — forcing safety fallback score=50`);
+            firstResult.overallScore = 50;
         }
 
         // Log for audit trail

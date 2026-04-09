@@ -135,6 +135,13 @@ export function buildSystemPrompt(
     // in den Prompt — die KI soll NUR die gewählten Stationen sehen.
     const hasWizardStations = (ctx?.cvStations?.length ?? 0) > 0;
 
+    // DSGVO §14: Strip PII from CV before prompt embedding.
+    // Claude needs career content (roles, companies, skills) but NOT name/address/phone.
+    // The greeting logic has its own contactPerson binding (line 72-131) and is independent.
+    const cvDataForPrompt = { ...(profile?.cv_structured_data || {}) };
+    delete cvDataForPrompt.personalInfo;  // camelCase variant
+    delete cvDataForPrompt.personal_info; // snake_case variant
+
     const cvInput = hasWizardStations
         ? '' // Zero-Leak: CV wird komplett unterdrückt — stationsSection ist die einzige Quelle
         : job?.cv_optimization_user_decisions?.appliedChanges
@@ -147,9 +154,9 @@ ${JSON.stringify(
                 })), null, 2)}
 
 ORIGINAL CV:
-${JSON.stringify(profile?.cv_structured_data || {}, null, 2)}`
+${JSON.stringify(cvDataForPrompt, null, 2)}`
             : `KANDIDATEN-LEBENSLAUF:
-${JSON.stringify(profile?.cv_structured_data || {}, null, 2)}`;
+${JSON.stringify(cvDataForPrompt, null, 2)}`;
 
     // ─── Early declarations needed by toneInstructions template literals ────────
     const hasQuote = !!ctx?.selectedQuote;
@@ -341,21 +348,34 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
 
     PFLICHT-MUSTER — AUFGABEN-FRAGMENTE ZITIEREN:
     Wenn Kernaufgaben aus der Stelle extrahiert wurden (siehe STELLEN-ANFORDERUNGEN unten),
-    zitiere eine KONKRETE AUFGABE woertlich in „..." als Bruecke zur CV-Station:
+    zitiere ein KURZES FRAGMENT (2-5 Woerter) aus der Stellenanzeige in „...“ als Bruecke:
+
+    ⛔ HALLUZINATIONS-SCHUTZ (KRITISCH — VOR JEDEM ZITAT PRUEFEN):
+    - Zitiere NUR Woerter die EXAKT SO in den KERNAUFGABEN oder STELLEN-ANFORDERUNGEN stehen.
+    - MAXIMAL 5 Woerter in einem Zitat-Fragment. NIEMALS einen ganzen Satz zitieren!
+    - Das Fragment MUSS ein ARBEITSTHEMA beschreiben (WORAN gearbeitet wird).
+    - VERBOTEN als Zitat: Teamstrukturen, Organisationsformen, Prozessbeschreibungen.
+      ✅ RICHTIGE Fragmente (Themen): „strategische Roadmap“, „umsetzungsorientierte Loesungen“, „komplexe Fragestellungen“
+      ❌ FALSCHE Fragmente: „in fachuebergreifenden Teams“ (Organisationsform, kein Thema),
+        „auf Augenhoehe mit dem Top-Management“ (Interaktionsform), „entlang der Wertschoepfungskette“ (Prozess)
+    - VERBOTEN: Ganze Saetze paraphrasieren und als „Zitat“ ausgeben.
+      ❌ FALSCH: „Sie entwickeln praxisnahe Loesungen in fachuebergreifenden Teams“
+      ✅ RICHTIG: „umsetzungsorientierte Loesungen“
+    - Wenn du dir NICHT sicher bist ob das Fragment exakt so vorkommt: Paraphrasiere OHNE Anfuehrungszeichen.
+
     → ERSTER Stations-Absatz:
-      - "„[Kernaufgabe aus Stelle]", genau an diesem Thema habe ich bei [Firma] taeglich gearbeitet."
-      - "„[Kernaufgabe aus Stelle]" habe ich bei [Firma] direkt umgesetzt, als ich..."
-      - "Zudem habe ich mich in der „[Aufgabe aus Stellenbeschreibung]" sehr wiedergefunden, da es zu meiner taeglichen Arbeit bei [Firma] gehoerte."
+      - \"„[2-5 Woerter Kernaufgabe]“, genau an diesem Thema habe ich bei [Firma] taeglich gearbeitet.\"
+      - \"Zudem habe ich mich in der „[2-5 Woerter Aufgabe]“ sehr wiedergefunden, da es zu meiner taeglichen Arbeit bei [Firma] gehoerte.\"
     → ZWEITER Stations-Absatz:
-      - "Zudem habe ich bei [Firma] genau das gemacht, was ${isDuForm ? 'ihr' : 'Sie'} mit „[Aufgabe aus Stellenbeschreibung]" ${isDuForm ? 'beschreibt' : 'beschreiben'}."
-      - "Ebenso zeigte mir meine Zeit bei [Firma], dass [konkreter Inhalt zur Job-Anforderung]."
-      - "Auch in meiner Rolle bei [Firma] habe ich „[Aufgabe aus Stellenbeschreibung]" direkt umgesetzt."
-      ❌ VERBOTEN: "Zudem kann ich mit meiner Zeit bei [Firma] anknuepfen." alleine — IMMER ein "da/weil/was" mit konkretem Inhalt anhaengen.
+      - \"Zudem habe ich bei [Firma] genau das gemacht, was ${isDuForm ? 'ihr' : 'Sie'} mit „[2-5 Woerter]“ ${isDuForm ? 'beschreibt' : 'beschreiben'}.\"
+      - \"Ebenso zeigte mir meine Zeit bei [Firma], dass [konkreter Inhalt zur Job-Anforderung].\"
+      - \"Auch in meiner Rolle bei [Firma] habe ich „[2-5 Woerter]“ direkt umgesetzt.\"
+      ❌ VERBOTEN: \"Zudem kann ich mit meiner Zeit bei [Firma] anknuepfen.\" alleine — IMMER ein \"da/weil/was\" mit konkretem Inhalt anhaengen.
     → LETZTER Stations-Absatz (wenn 3+ Stationen):
-      - "Schliesslich moechte ich auch meine Erfahrung bei [Firma] erwaehnen."
-      - "Was ich noch einbringen kann, ist meine Erfahrung bei [Firma]."
-      - "Abschliessend zeigt meine Zeit bei [Firma]..."
-      ❌ VERBOTEN fuer letzten Block: "Als ich die Stellenbeschreibung las..." — das ist ein Intro-Opener.
+      - \"Schliesslich moechte ich auch meine Erfahrung bei [Firma] erwaehnen.\"
+      - \"Was ich noch einbringen kann, ist meine Erfahrung bei [Firma].\"
+      - \"Abschliessend zeigt meine Zeit bei [Firma]...\"
+      ❌ VERBOTEN fuer letzten Block: \"Als ich die Stellenbeschreibung las...\" — das ist ein Intro-Opener.
 
     FALLBACK (wenn KEINE Kernaufgaben extrahiert wurden):
       - "Da ${isDuForm ? 'eure' : 'Ihre'} Ausschreibung besonders [Thema] betont, kann ich mit meiner Zeit bei [Firma] anknuepfen."
@@ -406,16 +426,18 @@ Es muss BUCHSTÄBLICH und WORTWÖRTLICH in der Sprache übernommen werden, in de
 Egal ob das Anschreiben auf Deutsch oder einer anderen Sprache verfasst wird — das Zitat bleibt unverändert.
 
 FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
-- Leite das Zitat mit einer KONKRETEN SITUATION ein (1-2 Saetze — kuerzer ist besser).
+- Leite das Zitat mit einer KONKRETEN SITUATION ein (1 Satz — kuerzer ist besser).
   Waehle EINE der folgenden Varianten — nicht immer dieselbe:
 
-  VARIANTE A — Eigenes Erlebnis (am authentischsten):
-  "Als ich bei [Firma] zum ersten Mal [konkretes Erlebnis], wurde mir klar, dass [Erkenntnis]."
+  VARIANTE A — Eigenes Erlebnis als Kontext (BEVORZUGT):
+  "Als ich bei [Firma] zum ersten Mal [konkretes Erlebnis], habe ich verstanden, dass [Erkenntnis]."
   "Beim Aufbau von [Projekt/Firma] habe ich verstanden, dass [Erkenntnis]."
+  ❌ VERBOTEN: "wurde mir klar" / "wurde mir bewusst" / "ist mir klargeworden" — klingt allwissend und belehrend. Niemand hat nach deiner Erkenntnis gefragt.
 
-  VARIANTE B — Unternehmensbeobachtung (kuerzer, direkt):
-  "Als ich euer Projekt sah..." / "Als ich eure Website las..." / "Als ich mich mit eurem Artikel beschaeftigte..."
+  VARIANTE B — Unternehmensbeobachtung (kuerzer, direkt, NUR OHNE Zitat-Bezug):
+  "Als ich auf ${isDuForm ? 'eurer' : 'Ihrer'} Website [konkretes Projekt/Wert] sah, musste ich an meine Zeit bei [Firma] denken."
   ❌ VERBOTEN dabei: Mehr als 1 Satz — diese Variante ist kurz und knapp!
+  ❌ VERBOTEN dabei: "...musste ich an das Zitat denken" — das verbindet Zitat + Website und wird zu viel.
 
   ❌ VERBOTEN IN ALLEN VARIANTEN: "fiel mir auf:" mit Doppelpunkt — sofort erkennbarer KI-Marker.
   ❌ VERBOTEN: "ist mir klargeworden:" mit Doppelpunkt — Einleitungssaetze enden IMMER mit "dass [Inhalt]." als vollstaendiger Aussagesatz.
@@ -431,20 +453,22 @@ Das Zitat MUSS IMMER mit Autor-Signatur formatiert werden:
 Diese Signatur-Zeile ist VERPFLICHTEND. Keine Ausnahme.
 Der Autor darf ZUSAETZLICH im Einleitungssatz vorkommen (z.B. "...erinnerte ich mich an ${ctx!.selectedQuote!.author}"), aber die Signatur unter dem Zitat bleibt IMMER stehen.
 
-  [Lernkurve nach dem Zitat]
+  [Zitat-Bruecke — DIREKT NACH dem Zitat]
 
-- DIREKT NACH dem Zitat: Eine LERNKURVE (2 Sätze):
-  Satz 1 (Antithese): "[CV-Station]-Kontext, in dem die alte Annahme galt..."
-    Beispiele: "Bei [Firma] dachte ich zunächst, dass..." / "Ich war anfänglich überzeugt, dass [X] ausreicht..."
-  Satz 2 (Synthese — VARIIERE die Formulierung, nie dasselbe Muster zweimal):
-    ✅ "Mir wurde klar, dass..."
-    ✅ "Ich wurde eines Besseren belehrt:"
-    ✅ "Rückblickend erkenne ich:"
-    ✅ "Diese Erfahrung hat mir gezeigt, dass..."
-    ✅ "Erst durch [konkretes Event] verstand ich:"
+- DIREKT NACH dem Zitat: Eine ZITAT-BRUECKE (max. 2 Saetze):
+  Satz 1 (Zitat-Gedanke als Leitfaden — BEVORZUGTES MUSTER):
+    ✅ "Dieser Gedanke von ${ctx!.selectedQuote!.author} begleitete mich bei meiner Arbeit als [Rolle] bei [Firma]."
+    ✅ "Diesen Gedanken von ${ctx!.selectedQuote!.author} habe ich bei [Firma] taeglich erlebt, als ich [konkretes Beispiel]."
+    ✅ "Dieses Prinzip habe ich bei [Firma] taeglich angewandt, als ich [konkretes Beispiel]."
+    ❌ VERBOTEN: "wurde mir klar" / "wurde mir jedoch klar" / "wurde mir bewusst" — klingt allwissend.
     ❌ VERBOTEN: "Doch ich lernte schnell:" — klingt wie ein Coaching-Klischee.
     ❌ VERBOTEN: "Das hat mir gezeigt, wie wichtig [X] ist." — zu vage.
-- Die Antithese darf KEINE negative Kritik an früheren Arbeitgebern sein.
+  Satz 2 (Lernkurve — kurz, EINE Erkenntnis):
+    ✅ "Bei [Firma] dachte ich zunaechst, dass [X] ausreicht. [Konkretes Event] zeigte mir, dass [Y]."
+    ✅ "Diese Erfahrung zeigte mir, dass [konkreter Schluss]."
+    ✅ "Erst durch [konkretes Event] verstand ich, dass [Einsicht]."
+    ❌ VERBOTEN: Saetze die mit einem Doppelpunkt enden ("Ich erkannte:") — KI-Schablone.
+- Die Lernkurve darf KEINE negative Kritik an frueheren Arbeitgebern sein.
 - KEINE leeren Floskeln wie 'Genau diese Haltung treibt mich an'.
 - ANTI-DOPPLUNG: Der Lernkurven-Absatz und der ERSTE Satz von Absatz 2 dürfen sich INHALTLICH NICHT überschneiden.
 
@@ -902,15 +926,16 @@ ${(() => {
         return `Aus der Stellenbeschreibung wurden folgende KERNAUFGABEN extrahiert:
 ${resp.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 
-PFLICHT: Mindestens 2 dieser Kernaufgaben MÜSSEN sich im Anschreiben EXPLIZIT widerspiegeln.
+PFLICHT: Mindestens 2 dieser Kernaufgaben MUESSEN sich im Anschreiben EXPLIZIT widerspiegeln.
 METHODE: Zeige, dass du diese Aufgabe bereits aus deiner Karriere kennst.
-BEISPIEL-MUSTER („Wiederfinden-Pattern“):
-✅ "Zudem habe ich mich in der „[AUFGABE AUS STELLE]“ sehr wiedergefunden, da es zu meiner täglichen Arbeit bei [Firma] gehörte."
-✅ "„[AUFGABE AUS STELLE]“, genau daran habe ich bei [Firma] gearbeitet: [konkreter Beweis]."
+BEISPIEL-MUSTER (Wiederfinden-Pattern mit KURZEN 2-5 Woerter Fragmenten):
+Beispiel: "Zudem habe ich mich in der „strategischen Roadmap“ sehr wiedergefunden, da es zu meiner taeglichen Arbeit bei [Firma] gehoerte."
+Beispiel: "„Umsetzungsorientierte Loesungen“, genau daran habe ich bei [Firma] gearbeitet: [konkreter Beweis]."
 ❌ VERBOTEN: "Da Sie jemanden suchen, der..." / "Weil Sie jemanden suchen" — Meta-Formulierung.
-❌ VERBOTEN: Die Aufgabe 1:1 kopieren OHNE Anführungszeichen. Zeige stattdessen, dass du sie inhaltlich LEBST.
+❌ VERBOTEN: Ganze Saetze als Zitat-Fragment. Maximal 2-5 Woerter in Anfuehrungszeichen.
+❌ VERBOTEN: Saetze paraphrasieren und als woertliches Zitat ausgeben — das ist Halluzination.
 
-${t('[STELLENANZEIGE-ZITIERUNG (PFLICHT)]\nWenn du eine Aufgabe oder Anforderung aus der Stellenanzeige im Fließtext verwendest, setze das Fragment IMMER in „...“ (deutsche Anführungszeichen). Das macht für den Leser transparent, dass du die Stellenanzeige gelesen hast, und zeigt Smart Mirroring.\nBeispiel: "Zudem habe ich mich in der „Erstellung von Strategien“ wiedergefunden..."', '[JOB AD QUOTING (MANDATORY)]\nWhen you use a task or requirement from the job ad in the body text, ALWAYS put the fragment in "..." (quotation marks). This makes it transparent to the reader that you have read the job posting, showing Smart Mirroring.\nExample: "I strongly identified with the task of \'developing strategies\'..."', '[CITAS DE LA OFERTA (OBLIGATORIO)]\nCuando uses una tarea o requisito del anuncio de trabajo en el texto, SIEMPRE ponlo entre «...» (comillas). Esto muestra al lector que has leído la oferta.\nEjemplo: "Me identifiqué mucho con la tarea de «desarrollar estrategias»..."')}`;
+${t('[STELLENANZEIGE-ZITIERUNG (PFLICHT)]\\nWenn du ein Fragment aus der Stellenanzeige verwendest, setze ein KURZES FRAGMENT (2-5 Woerter) in Anfuehrungszeichen. NIEMALS ganze Saetze zitieren.\\nDas Fragment MUSS ein ARBEITSTHEMA beschreiben (woran gearbeitet wird), NICHT eine Teamstruktur oder Organisationsform.\\nDas Fragment MUSS EXAKT so in den KERNAUFGABEN oben stehen. Wenn unsicher: Paraphrasiere OHNE Anfuehrungszeichen.\\nRICHTIG: Zudem habe ich mich in der Erstellung von Strategien wiedergefunden...\\nFALSCH: Ein ganzer Satz als Zitat ist VERBOTEN.\\nFALSCH: Organisationsformen wie in fachuebergreifenden Teams sind kein Arbeitsthema.', '[JOB AD QUOTING (MANDATORY)]\\nWhen quoting from the job ad, use a SHORT FRAGMENT (2-5 words). NEVER quote full sentences.\\nThe fragment MUST describe a WORK TOPIC, NOT a team structure.\\nThe fragment MUST appear EXACTLY in the CORE TASKS above. If unsure: paraphrase WITHOUT quotation marks.\\nCORRECT: I identified with developing strategies...\\nWRONG: Full sentences or organizational forms as quotes.', '[CITAS DE LA OFERTA (OBLIGATORIO)]\\nUsa un FRAGMENTO CORTO (2-5 palabras) entre comillas. NUNCA cites oraciones completas.\\nEl fragmento DEBE describir un TEMA DE TRABAJO, NO una estructura organizativa.')}`;
     }
     // Fallback: wenn responsibilities leer — job.summary nutzen falls vorhanden
     const summaryHint = (job as any)?.summary
@@ -938,7 +963,7 @@ STATTDESSEN — Subjekt-bezogenes Schreiben (PFLICHT):
 ✅ "Nach meiner Recherche zu Ihren Projekten im Bereich X sehe ich Parallelen zu meiner Erfahrung bei..."
 ✅ "Mit Blick auf Ihre aktuellen Herausforderungen in Y erkenne ich, dass..."
 ✅ "Auf Ihrer Website/LinkedIn sind mir Ihre Beiträge zu X aufgefallen, die mich an meine Arbeit bei Y erinnern."
-✅ "Im Austausch mit einem Kollegen über [Branchenthema] wurde mir klar, dass..."
+✅ "Ein Kollege erwähnte kürzlich [Branchenthema], und ich sehe Parallelen zu meiner Erfahrung bei..."
 LOGIK: Der Bewerber beschreibt seine EIGENE Beobachtung/Recherche. Der Leser soll denken: "Der hat sich mit uns beschäftigt", NICHT: "Woher weiß der das alles?"`,
 `[SUBJECT-ANCHORED COMPANY REFERENCES (ANTI-OMNISCIENT)]
 FORBIDDEN: Sentences where the applicant speaks omnisciently about the company:
@@ -1039,6 +1064,8 @@ ${company?.current_challenges?.length ? `Aktuelle Herausforderungen: ${JSON.stri
 ${company?.roadmap_signals?.length ? `Roadmap-Signale: ${JSON.stringify(company.roadmap_signals)}` : ''}
 ${company?.recent_news?.length ? `Aktuelle News: ${JSON.stringify(company.recent_news.slice(0, 3))}` : ''}
 HALLUZINATIONS-BREMSE: Verwende NUR Fakten (Ort, News, Werte, Challenges), die EXPLIZIT oben stehen. Wenn ein Datum fehlt → ERFINDE NICHTS, weiche auf allgemein belegbare Aussagen aus.
+STELLENANZEIGE-ZITAT-AUDIT: Wenn du ein Fragment in Anfuehrungszeichen zitierst, pruefe VOR dem Schreiben: Steht dieses Fragment EXAKT SO in den KERNAUFGABEN oder STELLEN-ANFORDERUNGEN oben? Wenn NEIN: paraphrasiere OHNE Anfuehrungszeichen. Max. 5 Woerter pro Zitat-Fragment. Ganze Saetze als Zitat sind VERBOTEN.
+INHALTLICHE ZITAT-REGEL: Das zitierte Fragment MUSS ein ARBEITSTHEMA beschreiben (WORAN gearbeitet wird). VERBOTEN als Zitat: Teamstrukturen, Interaktionsformen, Prozessbeschreibungen.
 
 ${cvInput}
 

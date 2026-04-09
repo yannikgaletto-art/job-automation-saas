@@ -3,7 +3,7 @@ export const maxDuration = 60; // Required for Vercel Pro — pipeline can take 
 
 /**
  * POST /api/jobs/search/process
- * Deep pipeline: Firecrawl → Claude Haiku Harvester → Claude Judge
+ * Deep pipeline: Jina Reader → Claude Haiku Harvester → Claude Judge
  * Processes a single job and saves to job_queue.
  */
 
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
             source_url: serpApiJob.apply_link || null,
             apply_link: serpApiJob.apply_link || null,
             serpapi_raw: serpApiJob.raw || null,
-            firecrawl_markdown: jinaMarkdown,
+            firecrawl_markdown: jinaMarkdown, // Legacy column name — now stores Jina Reader output (renamed too risky)
             salary_range: harvested?.salary_range || serpApiJob.detected_extensions?.salary || null,
             status: 'pending_review', // §12.5: User must confirm Steckbrief before queue
             snapshot_at: new Date().toISOString(),

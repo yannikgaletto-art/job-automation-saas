@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/jobs/search
  * Quick SerpAPI search — returns results in ~2s for immediate UI display.
- * Does NOT run the deep pipeline (Firecrawl/Harvester/Judge).
+ * Does NOT run the deep pipeline (Jina/Harvester/Judge).
  */
 
 import { NextRequest, NextResponse } from 'next/server';

@@ -1,4 +1,4 @@
-export const maxDuration = 60; // Vercel timeout protection — Firecrawl + Haiku can take 20-30s
+export const maxDuration = 60; // Vercel timeout protection — Jina scrape + Mistral extraction can take 20-30s
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
@@ -9,6 +9,7 @@ import { deepScrapeJob } from '@/lib/services/job-search-pipeline';
 import { inngest } from '@/lib/inngest/client';
 import { complete } from '@/lib/ai/model-router';
 import { getUserLocale, getLanguageName } from '@/lib/i18n/get-user-locale';
+import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,14 +18,28 @@ const supabaseAdmin = createAdminClient(
 );
 
 // AI extraction handled by Model Router (lib/ai/model-router.ts)
+// extract_job_fields → MISTRAL_SMALL (EU-native, ~5× cheaper than Haiku)
+
+// Module-level utility — pure function, no closures needed
+function normalizeSortDedup(items: string[]): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const item of items) {
+        const key = item.trim().toLowerCase();
+        if (key.length >= 2 && !seen.has(key)) {
+            seen.add(key);
+            out.push(item.trim());
+        }
+    }
+    return out.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
 
 const IngestRequestSchema = z.object({
     company: z.string().min(2, 'Company name must be at least 2 characters'),
     jobTitle: z.string().min(2, 'Job title must be at least 2 characters'),
     jobDescription: z.string().min(10, 'Mindestens 10 Zeichen').max(10000, 'Maximal 10.000 Zeichen'),
     companyWebsite: z.string().min(1).optional().or(z.literal('')),
-    // URL to the job posting (for Firecrawl deep scrape)
-    // Relaxed from z.string().url() — SerpAPI share_links contain fragments/special chars that fail strict URL validation
+    // URL to the job posting (for Jina deep scrape)
     source_url: z.string().min(1).optional().or(z.literal('')),
     source: z.string().optional(),
     location: z.string().optional(),
@@ -95,7 +110,8 @@ export async function POST(request: NextRequest) {
         console.log(`[${requestId}] route=jobs/ingest step=validate title="${jobTitle}" company="${company}"`);
 
         // ================================================================
-        // STEP 1.5: Firecrawl deep scrape for richer Steckbrief data
+        // STEP 1.5: Jina deep scrape for richer Steckbrief data
+        // deepScrapeJob() uses Jina Reader internally (Firecrawl removed 2026-03-30).
         // Skip for manual_entry — user already supplied the full description
         // and the URL is the company website, not a job posting.
         // ================================================================
@@ -104,22 +120,22 @@ export async function POST(request: NextRequest) {
 
         if (!isManualEntry && normalizedSourceUrl && !normalizedSourceUrl.includes('linkedin.com')) {
             try {
-                console.log(`[${requestId}] route=jobs/ingest step=firecrawl_scrape url=${normalizedSourceUrl}`);
+                console.log(`[${requestId}] route=jobs/ingest step=jina_scrape url=${normalizedSourceUrl}`);
                 const scraped = await Promise.race([
                     deepScrapeJob(normalizedSourceUrl),
                     new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000))
                 ]);
                 if (scraped && scraped.length >= 200) {
-                    enrichedDescription = scraped.slice(0, 8000); // Cap for Haiku token limit
-                    console.log(`[${requestId}] route=jobs/ingest step=firecrawl_scrape chars=${scraped.length} using_scraped=true`);
+                    enrichedDescription = scraped.slice(0, 8000); // Cap for token limit
+                    console.log(`[${requestId}] route=jobs/ingest step=jina_scrape chars=${scraped.length} using_scraped=true`);
                 } else {
-                    console.log(`[${requestId}] route=jobs/ingest step=firecrawl_scrape fallback=short_text`);
+                    console.log(`[${requestId}] route=jobs/ingest step=jina_scrape fallback=short_text`);
                 }
             } catch (err) {
-                console.warn(`[${requestId}] route=jobs/ingest step=firecrawl_scrape error fallback=original_description`);
+                console.warn(`[${requestId}] route=jobs/ingest step=jina_scrape error fallback=original_description`);
             }
         } else if (isManualEntry) {
-            console.log(`[${requestId}] route=jobs/ingest step=firecrawl_scrape skipped=manual_entry desc_len=${jobDescription.length}`);
+            console.log(`[${requestId}] route=jobs/ingest step=jina_scrape skipped=manual_entry desc_len=${jobDescription.length}`);
         }
 
         // ================================================================
@@ -130,15 +146,15 @@ export async function POST(request: NextRequest) {
         console.log(`[${requestId}] route=jobs/ingest step=locale locale=${locale}`);
 
         // ================================================================
-        // STEP 1.9: Description-Level Extraction Cache
-        // Before calling Mistral, check if we've already extracted fields
-        // from this exact job description text (by SHA-256 hash).
-        // This guarantees deterministic buzzwords across repeated ingests
-        // of the same posting — even after the user deletes and re-adds a job.
+        // STEP 1.9: Description-Level Extraction Cache (Persistent)
+        // Before calling Mistral, check job_extraction_cache for a prior
+        // extraction of this exact description (by SHA-256 hash).
+        // This table survives job deletes — unlike the old job_queue scan.
+        // Guarantees: delete + re-add = identical buzzwords + requirements.
         // ================================================================
         const descriptionHash = crypto
             .createHash('sha256')
-            .update(enrichedDescription.trim().toLowerCase())
+            .update(enrichedDescription.trim().toLowerCase().replace(/\s+/g, ' '))
             .digest('hex')
             .slice(0, 32);
 
@@ -153,38 +169,29 @@ export async function POST(request: NextRequest) {
         } | null = null;
 
         try {
-            // Scan user's recent jobs for a prior extraction of identical content.
-            // Max ~50 jobs per user → no index required, O(50) is fine.
-            const { data: priorJobs } = await supabaseAdmin
-                .from('job_queue')
-                .select('buzzwords, summary, requirements, responsibilities, benefits, seniority, location, metadata')
+            // Single-row lookup via unique index (user_id, description_hash)
+            const { data: cached, error: cacheErr } = await supabaseAdmin
+                .from('job_extraction_cache')
+                .select('buzzwords, requirements, responsibilities, benefits, summary, seniority, location')
                 .eq('user_id', userId)
-                .not('buzzwords', 'is', null)
-                .order('created_at', { ascending: false })
-                .limit(50);
+                .eq('description_hash', descriptionHash)
+                .maybeSingle();
 
-            if (priorJobs) {
-                const matchingJob = priorJobs.find((j: any) => {
-                    const meta = (j.metadata || {}) as Record<string, unknown>;
-                    return meta.description_hash === descriptionHash && Array.isArray(j.buzzwords) && j.buzzwords.length > 0;
-                });
-
-                if (matchingJob) {
-                    cachedExtraction = {
-                        buzzwords: matchingJob.buzzwords,
-                        summary: matchingJob.summary || null,
-                        qualifications: Array.isArray(matchingJob.requirements) ? matchingJob.requirements : [],
-                        responsibilities: Array.isArray(matchingJob.responsibilities) ? matchingJob.responsibilities : [],
-                        benefits: Array.isArray(matchingJob.benefits) ? matchingJob.benefits : [],
-                        seniority: matchingJob.seniority || 'unknown',
-                        location: matchingJob.location || null,
-                    };
-                    console.log(`[${requestId}] route=jobs/ingest step=description_cache HIT — reusing ${matchingJob.buzzwords.length} buzzwords (hash: ${descriptionHash.slice(0, 8)}…)`);
-                }
+            if (!cacheErr && cached && Array.isArray(cached.buzzwords) && cached.buzzwords.length > 0) {
+                cachedExtraction = {
+                    buzzwords: cached.buzzwords,
+                    summary: cached.summary || null,
+                    qualifications: Array.isArray(cached.requirements) ? cached.requirements : [],
+                    responsibilities: Array.isArray(cached.responsibilities) ? cached.responsibilities : [],
+                    benefits: Array.isArray(cached.benefits) ? cached.benefits : [],
+                    seniority: cached.seniority || 'unknown',
+                    location: cached.location || null,
+                };
+                console.log(`[${requestId}] route=jobs/ingest step=extraction_cache HIT — reusing ${cached.buzzwords.length} buzzwords (hash: ${descriptionHash.slice(0, 8)}…)`);
             }
         } catch (cacheErr: any) {
             // Non-blocking — cache failure falls through to LLM extraction
-            console.warn(`[${requestId}] route=jobs/ingest step=description_cache error (non-blocking): ${cacheErr?.message}`);
+            console.warn(`[${requestId}] route=jobs/ingest step=extraction_cache error (non-blocking): ${cacheErr?.message}`);
         }
 
         // ================================================================
@@ -199,7 +206,11 @@ export async function POST(request: NextRequest) {
         try {
             console.log(`[${requestId}] route=jobs/ingest step=ai_parse_requirements`);
 
-            if (process.env.ANTHROPIC_API_KEY) {
+            // STEP 2 runs with Mistral (extract_job_fields → MISTRAL_SMALL via model-router).
+            // Guard checks MISTRAL_API_KEY. If missing, we still attempt extraction.
+            // complete() will throw, aiError catch below falls through to empty extraction.
+            // Inngest extract-job-pipeline (STEP 4.5 trigger) will fill the gap in the background.
+            if (process.env.MISTRAL_API_KEY || process.env.ANTHROPIC_API_KEY) {
                 const extractionSchema = {
                     company: "string — company name",
                     jobTitle: "string — exact job title",
@@ -230,7 +241,7 @@ IMPORTANT for benefits:
 - Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
 Schema: ${JSON.stringify(extractionSchema)}`,
-                    prompt: enrichedDescription,
+                    prompt: sanitizeForAI(enrichedDescription).sanitized,
                     temperature: 0,
                     maxTokens: 2000,
                 });
@@ -279,25 +290,16 @@ Schema: ${JSON.stringify(extractionSchema)}`,
         }
 
         // ================================================================
-        // STEP 3.5: Normalize buzzwords (determinism guarantee)
+        // STEP 3.5: Normalize buzzwords + requirements (determinism guarantee)
         // Sort + dedup ensures identical descriptions produce identical keyword lists.
-        // Without this, Claude's non-deterministic token order causes hash drift.
         // ================================================================
         if (Array.isArray(extractedData.buzzwords) && extractedData.buzzwords.length > 0) {
-            const raw: string[] = extractedData.buzzwords;
-            const seen = new Set<string>();
-            const normalized: string[] = [];
-            for (const kw of raw) {
-                const key = kw.trim().toLowerCase();
-                if (key.length >= 2 && !seen.has(key)) {
-                    seen.add(key);
-                    normalized.push(kw.trim()); // preserve original casing
-                }
-            }
-            extractedData.buzzwords = normalized.sort((a, b) =>
-                a.toLowerCase().localeCompare(b.toLowerCase())
-            );
+            extractedData.buzzwords = normalizeSortDedup(extractedData.buzzwords);
             console.log(`[${requestId}] route=jobs/ingest step=normalize_buzzwords count=${extractedData.buzzwords.length}`);
+        }
+        if (Array.isArray(extractedData.qualifications) && extractedData.qualifications.length > 0) {
+            extractedData.qualifications = normalizeSortDedup(extractedData.qualifications);
+            console.log(`[${requestId}] route=jobs/ingest step=normalize_requirements count=${extractedData.qualifications.length}`);
         }
 
         // ================================================================
@@ -353,17 +355,15 @@ Schema: ${JSON.stringify(extractionSchema)}`,
 
         // ================================================================
         // STEP 4.5: Trigger strong extraction pipeline (Lazy Extraction)
-        // Non-blocking: Haiku data is already saved as fallback
+        // Non-blocking: Mistral data is already saved as fallback.
         // OPTIMIZATION: Set sync_extracted_at flag BEFORE triggering Inngest
         // so the background job can reliably skip its redundant LLM call.
         // ================================================================
         try {
             // Only set the flag if we actually ran sync extraction successfully
-            // Also store description_hash so STEP 1.9 can find this job in future ingests
             const hasSyncData = extractedData && Object.keys(extractedData).length > 0 && (extractedData.summary || cachedExtraction);
             if (hasSyncData) {
                 // JSONB Read-Modify-Write: read current metadata first to avoid wiping other fields
-                // (defensive pattern — metadata is null at this point for new jobs, but safe for all futures)
                 const { data: currentJobMeta } = await supabaseAdmin
                     .from('job_queue')
                     .select('metadata')
@@ -385,6 +385,38 @@ Schema: ${JSON.stringify(extractionSchema)}`,
                     .eq('id', job.id)
                     .eq('user_id', userId);
                 console.log(`[${requestId}] route=jobs/ingest step=set_sync_flag job_id=${job.id} description_hash=${descriptionHash.slice(0, 8)}… cache_hit=${!!cachedExtraction}`);
+            }
+
+            // ================================================================
+            // STEP 4.6: Persist extraction to job_extraction_cache
+            // Ensures buzzwords + requirements survive job deletes.
+            // Only writes on MISS (when Mistral ran). Cache HITs skip this.
+            // Uses upsert: if hash already exists (shouldn't happen on MISS),
+            // update the existing row defensively.
+            // ================================================================
+            if (!cachedExtraction && Array.isArray(extractedData.buzzwords) && extractedData.buzzwords.length > 0) {
+                try {
+                    await supabaseAdmin
+                        .from('job_extraction_cache')
+                        .upsert({
+                            user_id: userId,
+                            description_hash: descriptionHash,
+                            buzzwords: extractedData.buzzwords || [],
+                            requirements: extractedData.qualifications || [],
+                            responsibilities: extractedData.responsibilities || [],
+                            benefits: extractedData.benefits || [],
+                            summary: extractedData.summary || null,
+                            seniority: extractedData.seniority || 'unknown',
+                            location: extractedData.location || null,
+                            updated_at: new Date().toISOString(),
+                        }, {
+                            onConflict: 'user_id,description_hash',
+                        });
+                    console.log(`[${requestId}] route=jobs/ingest step=extraction_cache_write hash=${descriptionHash.slice(0, 8)}… buzzwords=${extractedData.buzzwords.length}`);
+                } catch (cacheWriteErr: any) {
+                    // Non-blocking — extraction already saved to job_queue row
+                    console.warn(`[${requestId}] route=jobs/ingest step=extraction_cache_write error (non-blocking): ${cacheWriteErr?.message}`);
+                }
             }
 
             await inngest.send({

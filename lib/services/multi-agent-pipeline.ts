@@ -2,13 +2,14 @@
  * Multi-Agent Pipeline — Pathly V2.0
  * Claude Haiku (Language Judge)
  *
- * Reference: QUALITY_CV_COVER_LETTER.md B2.1
+ * @deprecated 2026-04-09 — DEPRECATED.
+ * Haiku Language Judge was overwriting Sonnet-quality text with Haiku-quality rewrites,
+ * causing quality regression. All hard-constraint checks are now in the synchronous
+ * Judge loop (cover-letter-judge.ts) and Validator (cover-letter-validator.ts).
+ * The Inngest polish job no longer calls this pipeline.
+ * Kept for potential future reactivation — do NOT delete (FEATURE_COMPAT_MATRIX §0.1).
  *
- * Design:
- * - Sequential: Claude already ran in generator loop
- * - Claude Haiku checks language quality, blacklist violations, sentence length
- * - Graceful Degradation: Missing API keys → warning, CL delivered anyway
- * - No second Judge call after pipeline (Yannik Correction #1)
+ * Reference: QUALITY_CV_COVER_LETTER.md B2.1
  *
  * COST OPTIMIZATION (2026-03-30):
  * - Language Judge downgraded from Sonnet → Haiku (pattern matching, not creative)

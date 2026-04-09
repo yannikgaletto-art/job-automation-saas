@@ -27,7 +27,7 @@ async function test() {
 
     console.log('\n--- Result ---');
     console.log('Raw Text (snippet):', result.rawText.slice(0, 100).replace(/\n/g, ' '));
-    console.log('Sanitized Text (snapshot):', result.sanitizedText);
+    console.log('Extracted Text (snapshot):', result.extractedText);
 
     console.log('\n--- Metadata ---');
     console.log(JSON.stringify(result.metadata, null, 2));
@@ -42,7 +42,7 @@ async function test() {
             console.log(`${key}: ${decrypted} (✅ Decrypted successfully)`);
 
             // Verify masking
-            if (!result.sanitizedText.includes(`[${key.toUpperCase()}]`)) {
+            if (!result.extractedText.includes(`[${key.toUpperCase()}]`)) {
                 // Note: Masking might fail if regex escaping isn't perfect or case differs, 
                 // but for this simple test it should work if logic is correct.
                 // Also "Name: John Doe" -> "Name: [NAME]"

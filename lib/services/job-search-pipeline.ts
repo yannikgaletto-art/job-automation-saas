@@ -1,5 +1,5 @@
 /**
- * Job Search Pipeline — SerpAPI → Firecrawl → Claude Haiku Harvester → Claude Sonnet Judge
+ * Job Search Pipeline — SerpAPI → Jina Reader → Claude Haiku Harvester → Claude Haiku Judge
  * 
  * Implements the full pipeline from JOB_SEARCH_SPEC.md.
  * Each step is independent and testable.
@@ -291,7 +291,7 @@ function deduplicateRawJobs(jobs: any[]): any[] {
     });
 }
 
-// ─── Step 2: Deep Scrape (Jina Reader primary, Firecrawl fallback) ─
+// ─── Step 2: Deep Scrape (Jina Reader) ────────────────────────────────────
 
 // §12.3 Expired job detection — precise sentence-level patterns (avoids false positives)
 const EXPIRED_PATTERNS = [
@@ -409,8 +409,7 @@ async function scrapeWithJina(url: string): Promise<string | null> {
     }
 }
 
-// scrapeWithFirecrawl removed (2026-03-30): Dead code — replaced by scrapeWithJina.
-// Firecrawl import/env var can be fully removed from project if FIRECRAWL_API_KEY is unused elsewhere.
+// Firecrawl fully removed (2026-03-30): Replaced by Jina Reader.
 
 
 // ─── Step 3a: Claude Haiku Harvester ─────────────────────────────

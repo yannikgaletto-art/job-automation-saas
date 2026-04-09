@@ -125,8 +125,42 @@ export const analyzeCVMatch = inngest.createFunction(
             return preMatchKeywords(userId, buzzwords);
         });
 
+        // Compute input hash BEFORE LLM call — needed for cache lookup AND storage
+        const inputHashForStorage = computeInputHash(
+            cvData.text,
+            job.description || '',
+            Array.isArray(job.requirements) ? job.requirements : [],
+            Array.isArray(job.buzzwords) ? job.buzzwords : []
+        );
+
+        // Step 2.9: Check cv_match_result_cache (survives job deletes)
+        // Key: (user_id, input_hash) — Multi-CV safe: different CVs = different hashes
+        const cachedMatchResult = await step.run('check-result-cache', async () => {
+            try {
+                const { data: cached, error: cacheErr } = await supabaseAdmin
+                    .from('cv_match_result_cache')
+                    .select('result')
+                    .eq('user_id', userId)
+                    .eq('input_hash', inputHashForStorage)
+                    .maybeSingle();
+
+                if (!cacheErr && cached?.result && typeof cached.result === 'object') {
+                    console.log(`✅ [CV Match] Result cache HIT — reusing cached analysis (hash: ${inputHashForStorage.slice(0, 8)}…)`);
+                    return cached.result as Record<string, unknown>;
+                }
+                return null;
+            } catch (err: any) {
+                // Non-blocking — cache failure falls through to LLM
+                console.warn(`⚠️ [CV Match] Result cache lookup error (non-blocking): ${err?.message}`);
+                return null;
+            }
+        });
+
         // Step 3: Run CV Match Analysis (the heavy LLM work)
-        const matchResult = await step.run('analyze-match', async () => {
+        // SKIPPED if result cache HIT — identical inputs always produce identical output
+        const matchResult = cachedMatchResult
+            ? (cachedMatchResult as unknown as import('@/lib/services/cv-match-analyzer').CVMatchResult)
+            : await step.run('analyze-match', async () => {
             try {
                 const result = await runCVMatchAnalysis({
                     userId,
@@ -150,14 +184,6 @@ export const analyzeCVMatch = inngest.createFunction(
                 throw err;
             }
         });
-
-        // Compute input hash for cache storage (deterministic, no LLM involvement)
-        const inputHashForStorage = computeInputHash(
-            cvData.text,
-            job.description || '',
-            Array.isArray(job.requirements) ? job.requirements : [],
-            Array.isArray(job.buzzwords) ? job.buzzwords : []
-        );
 
         // Step 4: Save result to DB (JSONB Merge! + Status → cv_matched per DB constraint)
         await step.run('save-results', async () => {
@@ -268,6 +294,26 @@ export const analyzeCVMatch = inngest.createFunction(
             }
 
             console.log(`✅ [CV Match] Job ${jobId} analyzed successfully`);
+
+            // Step 4.5: Persist result to cv_match_result_cache (survives job deletes)
+            // Only write on cache MISS (when LLM actually ran). Cache HITs skip this.
+            if (!cachedMatchResult) {
+                try {
+                    await supabaseAdmin
+                        .from('cv_match_result_cache')
+                        .upsert({
+                            user_id: userId,
+                            input_hash: inputHashForStorage,
+                            result: safeResult,
+                        }, {
+                            onConflict: 'user_id,input_hash',
+                        });
+                    console.log(`✅ [CV Match] Result cached (hash: ${inputHashForStorage.slice(0, 8)}…)`);
+                } catch (cacheWriteErr: any) {
+                    // Non-blocking — result already saved to job_queue.metadata
+                    console.warn(`⚠️ [CV Match] Result cache write error (non-blocking): ${cacheWriteErr?.message}`);
+                }
+            }
         });
 
         // Step 5: Sync user_profiles.cv_structured_data if user selected a specific CV

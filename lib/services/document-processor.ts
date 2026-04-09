@@ -11,7 +11,7 @@ const anthropic = new Anthropic({
 
 export interface ProcessedDocument {
     rawText: string;
-    sanitizedText: string;
+    extractedText: string;
     encryptedPii: Record<string, string>; // key -> encrypted_value
     metadata: {
         skills: string[];
@@ -55,10 +55,11 @@ export async function processDocument(
 
     // ================================================================
     // Step 2: AI Metadata Extraction (PII + Skills)
-    // Still uses Claude Haiku — this is metadata only, not full CV text
-    // The PII is immediately encrypted after this step.
+    // Uses Claude Haiku for metadata only. PII is immediately encrypted after.
+    // Data Minimization (DSGVO Art. 25): PII sits in the CV header (~first 3000 chars).
+    // Sending full 15k chars is unnecessary for PII+Skills extraction.
     // ================================================================
-    const textToAnalyze = rawText.slice(0, 15000);
+    const textToAnalyze = rawText.slice(0, 3000);
 
     let analysisResult: any;
 
@@ -120,28 +121,15 @@ export async function processDocument(
     const encryptedPii: Record<string, string> = {};
     const pii = analysisResult.pii || {};
 
-    // TODO: Improve PII replacement to be consistent (e.g. replace all occurrences, case-insensitive)
-    let sanitizedText = rawText;
-
     for (const [key, value] of Object.entries(pii)) {
         if (value && typeof value === 'string') {
-            // Encrypt
             encryptedPii[key] = encrypt(value);
-
-            // Sanitize (Simple string replacement - robust version would use regex escaping)
-            // We only replace if the value is somewhat unique (len > 2) to avoid replacing common syllables
-            if (value.length > 2) {
-                // To display correct names in PDF, we disable physical redaction of the text for now
-                // Global replace, case insensitive
-                // const regex = new RegExp(escapeRegExp(value), 'gi');
-                // sanitizedText = sanitizedText.replace(regex, `[${key.toUpperCase()}]`);
-            }
         }
     }
 
     return {
         rawText,
-        sanitizedText,
+        extractedText: rawText, // Full text for PDF rendering & CV parsing (name stays per User-Directive)
         encryptedPii,
         metadata: {
             ...analysisResult.metadata || { skills: [], experienceYears: 0 },
@@ -149,11 +137,6 @@ export async function processDocument(
             style_analysis: styleAnalysis // Only present for cover letters
         }
     };
-}
-
-// Utility to escape string for Regex
-function escapeRegExp(string: string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Fallback Mock Extraction (regex based)

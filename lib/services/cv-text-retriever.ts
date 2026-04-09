@@ -75,7 +75,7 @@ export async function getCVText(userId: string, documentId?: string): Promise<{
             const { processDocument } = await import('@/lib/services/document-processor');
             const processed = await processDocument(buffer, 'application/pdf');
 
-            text = processed.sanitizedText;
+            text = processed.extractedText;
             console.log(`🤖 [Self-Healing] Extraction complete: ${text.length} chars`);
 
             // Save extracted text back to DB for next time

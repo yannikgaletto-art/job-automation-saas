@@ -2,12 +2,13 @@
  * Cover Letter Generator — Orchestrator
  *
  * Slim orchestrator: DB fetch → Claude generation loop → Fluff scan → VUL enforcement → Return.
- * Heavy async work (Multi-Agent Pipeline, Audit Trail) moved to Inngest cover-letter/polish.
+ * Async polish job (Inngest) writes metadata ONLY (no content overwrite — K2-Fix).
  * buildSystemPrompt() and judgeCoverLetter() are extracted to their own services.
+ * Multi-Agent Pipeline: DEPRECATED (2026-04-09) — Haiku overwriting Sonnet = quality regression.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { validateCoverLetter, logValidation } from './cover-letter-validator';
 import { enrichCompany, linkEnrichmentToJob } from './company-enrichment';
 import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
@@ -19,10 +20,15 @@ import { judgeCoverLetter, type JudgeResult } from './cover-letter-judge';
 // ─── Clients ──────────────────────────────────────────────────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
 
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabaseAdmin = getSupabaseAdmin();
+
+/**
+ * Replace em-dashes (–/—) with semicolons, preserving quote author attribution.
+ * QUALITY_CV_COVER_LETTER.md §3.
+ */
+function replaceEmDashes(text: string): string {
+    return text.replace(/(?<!["'\u201C\u201D\u201E\u00BB»]\s*)\s*[\u2013\u2014]\s*(?![\u201C\u201D"'])/g, '; ');
+}
 
 // ─── Public Interfaces ────────────────────────────────────────────────────────
 export interface CoverLetterGenerationParams {
@@ -239,9 +245,7 @@ REGELN:
         // Diese Tags MÜSSEN vor der Ausgabe entfernt werden.
         // Der Text INNERHALB der Tags bleibt erhalten (authentischer Bewerbungstext).
         fixedText = fixedText.replace(/\[VUL\](.*?)\[\/VUL\]/gs, '$1');
-        // Post-fix: Replace em-dashes with semicolons (QUALITY_CV_COVER_LETTER.md §3)
-        // EXCEPTION: Quote author attribution dashes are preserved (same logic as main loop).
-        fixedText = fixedText.replace(/(?<!["'\u201C\u201D\u201E\u00BB»]\s*)\s*[\u2013\u2014]\s*(?![\u201C\u201D"'])/g, '; ');
+        fixedText = replaceEmDashes(fixedText);
 
         // 1F: Minimum quality gate for targeted fixes (validator + fluff scan, no Judge call)
         const companyName = setupContext?.companyName || 'das Unternehmen';
@@ -322,11 +326,7 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
 
         generatedText = message.content[0].type === 'text' ? message.content[0].text : '';
         generatedText = generatedText.replace(/\*\*/g, '').replace(/\*/g, '').replace(/^#+\s/gm, '');
-        // Post-generation: Replace em-dashes with semicolons (QUALITY_CV_COVER_LETTER.md §3)
-        // EXCEPTION: em-dash used as quote author attribution (e.g. "Quote." — Author) is PRESERVED.
-        // Pattern: em-dash that is NOT preceded by a closing quote char (", ', ‟, „, ») stays as-is → semicolon.
-        // Em-dash directly after closing quote → keep as " —" (author attribution).
-        generatedText = generatedText.replace(/(?<!["'\u201C\u201D\u201E\u00BB»]\s*)\s*[\u2013\u2014]\s*(?![\u201C\u201D"'])/g, '; ');
+        generatedText = replaceEmDashes(generatedText);
 
         const words = generatedText.trim().split(/\s+/);
         lastWordCount = words.length;
@@ -379,6 +379,17 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
             feedback.push(...judgment.weaknesses.map(w => `QUALITÄT: ${w}`));
         }
 
+        // R1: Fluff-Feedback injected into iteration loop (moved from async Inngest)
+        // Runs BEFORE the next generation so Claude can correct in-place.
+        const iterFluff = scanForFluff(generatedText);
+        if (iterFluff.found) {
+            for (const m of iterFluff.matches) {
+                const msg = m.feedback ?? `Entferne die Phrase "${m.pattern}" — ${m.reason}`;
+                feedback.push(`FLUFF: ${msg}`);
+            }
+            console.warn(`⚠️ [Anti-Fluff] ${iterFluff.matches.length} pattern(s) found in iteration ${iteration + 1} — injecting feedback`);
+        }
+
         // §Fix Defect #2 (position-corrected): Author check AFTER feedback reset so hint survives into next iteration
         const selectedAuthor = setupContext?.selectedQuote?.author;
         if (selectedAuthor && !generatedText.includes(selectedAuthor)) {
@@ -409,11 +420,11 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
         }
     }
 
-    // ─── Post-Generation Fluff Scan (B1.2 — scan only, re-gen moved to Inngest polish) ──
+    // ─── Post-Generation Fluff Scan (final audit, fluff was also checked in-loop) ──
     const fluffScan = scanForFluff(coverLetter);
     const fluffWarning = fluffScan.found;
     if (fluffWarning) {
-        console.warn(`⚠️ [Anti-Fluff] ${fluffScan.matches.length} patterns found — will be fixed by async polish job`);
+        console.warn(`⚠️ [Anti-Fluff] ${fluffScan.matches.length} patterns survived ${MAX_ITERATIONS} iterations`);
     }
 
     // ─── VUL-Tag Stripper (UNCONDITIONAL — always strip before output) ──────

@@ -142,12 +142,7 @@ export default async function PrivacyPolicyPage() {
                                     <td className="p-3 text-[#73726E]">{t('s4_azure_data')}</td>
                                     <td className="p-3 text-[#73726E]">EU (West Europe)</td>
                                 </tr>
-                                <tr>
-                                    <td className="p-3 font-medium">Firecrawl</td>
-                                    <td className="p-3 text-[#73726E]">{t('s4_firecrawl_purpose')}</td>
-                                    <td className="p-3 text-[#73726E]">{t('s4_firecrawl_data')}</td>
-                                    <td className="p-3 text-[#73726E]">USA</td>
-                                </tr>
+
                                 <tr>
                                     <td className="p-3 font-medium">Jina AI (Reader)</td>
                                     <td className="p-3 text-[#73726E]">{t('s4_jina_purpose')}</td>
