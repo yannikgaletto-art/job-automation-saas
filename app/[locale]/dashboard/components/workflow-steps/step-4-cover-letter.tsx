@@ -436,35 +436,6 @@ export function Step4CoverLetter({
     if (result && userId) {
         return (
             <div className="space-y-4 p-6 bg-[#FAFAF9]">
-                {/* 1D: Judge Warning Banner — covers both generation and targeted fix */}
-                {result.judgePassed === false && (() => {
-                    // Filter out pure-technical reasons (internal codes, not user-relevant)
-                    const INTERNAL_PREFIXES = [
-                        'JUDGE_UNAVAILABLE', 'BLACKLIST:', 'FIRMA:', 'LÄNGE:', 'LENGTH:', 'COMPANY:',
-                        'Forbidden phrase detected:',  // Validator-internal, not user-actionable
-                        'HARD_BLACKLIST:',              // Deterministic validator stop
-                    ];
-                    const userFacingReasons = (result.judgeFailReasons ?? [])
-                        .filter(r => !INTERNAL_PREFIXES.some(p => r.startsWith(p)));
-                    // If ALL reasons are internal (e.g. only JUDGE_UNAVAILABLE) → hide banner entirely
-                    if (userFacingReasons.length === 0) return null;
-                    return (
-                        <details className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
-                            <summary className="text-xs font-medium text-blue-700 cursor-pointer">
-                                {t('judge_warning')}
-                            </summary>
-                            <ul className="mt-2 space-y-1">
-                                {userFacingReasons.map((reason, i) => (
-                                    <li key={i} className="text-xs text-blue-600">• {reason}</li>
-                                ))}
-                            </ul>
-                            <p className="mt-2 text-[10px] text-blue-500">
-                                {t('editor_manual_hint')}
-                            </p>
-                        </details>
-                    );
-                })()}
-
                 {/* API Warnings Banner */}
                 {(result.warnings?.length ?? 0) > 0 && (
                     <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">

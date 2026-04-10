@@ -3,6 +3,7 @@
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { CountUp } from '@/components/motion/count-up';
 import { motion } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 
 interface Session {
     started_at: string;
@@ -10,6 +11,8 @@ interface Session {
 }
 
 export function MomentumScore({ score, sessions }: { score: number; sessions: Session[] }) {
+    const t = useTranslations('dashboard.analytics');
+
     // Group sessions by date for sparkline
     const dailyMap = new Map<string, number>();
     sessions.forEach(s => {
@@ -50,11 +53,11 @@ export function MomentumScore({ score, sessions }: { score: number; sessions: Se
                     </LineChart>
                 </ResponsiveContainer>
             ) : (
-                <p className="text-xs text-stone-400">Mehr Sessions nötig für den Trend-Graphen.</p>
+                <p className="text-xs text-stone-400">{t('momentum_more_sessions')}</p>
             )}
 
             <p className="text-[10px] text-stone-400">
-                Gewichtung: 40% Completion Rate · 25% Energielevel · 20% Bewerbungen · 15% Match Score
+                {t('momentum_subtitle')}
             </p>
         </div>
     );

@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { CountUp } from '@/components/motion/count-up';
+import { useTranslations } from 'next-intl';
 
 interface Session {
     completed: boolean;
@@ -9,6 +10,7 @@ interface Session {
 }
 
 export function StatsRow({ sessions }: { sessions: Session[] }) {
+    const t = useTranslations('dashboard.analytics');
     const total = sessions.length;
     const completed = sessions.filter(s => s.completed).length;
     const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -21,9 +23,9 @@ export function StatsRow({ sessions }: { sessions: Session[] }) {
     const moonIcon = avgEnergy > 0 ? MOON[Math.round(avgEnergy)] : '—';
 
     const stats = [
-        { label: 'Sessions', value: total, suffix: '' },
-        { label: 'Completion Rate', value: completionPct, suffix: '%' },
-        { label: 'Ø Energie', value: avgEnergy, suffix: ` ${moonIcon}`, isDecimal: true },
+        { label: t('stats_sessions'), value: total, suffix: '' },
+        { label: t('stats_completion'), value: completionPct, suffix: '%' },
+        { label: t('stats_energy'), value: avgEnergy, suffix: ` ${moonIcon}`, isDecimal: true },
     ];
 
     return (

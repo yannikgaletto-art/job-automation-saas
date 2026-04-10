@@ -47,25 +47,39 @@ export function calcMomentumScore(sessions: PomodoroSession[], jobs: Job[]): num
     return Math.min(score, 100);
 }
 
-// ─── Peak Insight ────────────────────────────────────────────────
+// ─── Peak Insight (structured data — i18n rendering in component) ─
 
-export function generatePeakInsight(
+export interface PeakInsightData {
+    dayIndex: number;
+    startHour: number;
+    endHour: number;
+    factor: string;
+}
+
+export function generatePeakInsightData(
     peak: { day: number; startHour: number; count: number },
     totalSessions: number
-): string | null {
+): PeakInsightData | null {
     if (totalSessions === 0 || peak.count === 0) return null;
 
-    const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
     const dayAvg = totalSessions / 7;
     const factor = dayAvg > 0 ? (peak.count / dayAvg).toFixed(1) : '—';
 
-    return `Du bist ${days[peak.day]}s zwischen ${peak.startHour}:00 und ${peak.startHour + 3}:00 Uhr am produktivsten. ` +
-        `${factor}× mehr Sessions als dein Wochendurchschnitt.`;
+    return {
+        dayIndex: peak.day,
+        startHour: peak.startHour,
+        endHour: peak.startHour + 3,
+        factor,
+    };
 }
 
-// ─── Energy Insight ──────────────────────────────────────────────
+// ─── Energy Insight (structured data — i18n rendering in component) ─
 
-export function generateEnergyInsight(sessions: PomodoroSession[]): string | null {
+export interface EnergyInsightData {
+    factor: string;
+}
+
+export function generateEnergyInsightData(sessions: PomodoroSession[]): EnergyInsightData | null {
     const highEnergy = sessions.filter(s => (s.energy_level ?? 0) >= 4);
     const lowEnergy = sessions.filter(s => (s.energy_level ?? 0) <= 2 && s.energy_level !== null);
 
@@ -75,12 +89,18 @@ export function generateEnergyInsight(sessions: PomodoroSession[]): string | nul
     const lowRate = lowEnergy.filter(s => s.completed).length / lowEnergy.length;
     const factor = lowRate > 0 ? (highRate / lowRate).toFixed(1) : '—';
 
-    return `An 🌕-Tagen schließt du ${factor}× mehr Sessions ab als an 🌑-Tagen.`;
+    return { factor };
 }
 
-// ─── Funnel Insight ──────────────────────────────────────────────
+// ─── Funnel Insight (structured data — i18n rendering in component) ─
 
-export function generateFunnelInsight(jobs: Job[]): string | null {
+export interface FunnelInsightData {
+    dropPct: number;
+    fromStageIndex: number; // 0-3
+    toStageIndex: number;   // 1-4
+}
+
+export function generateFunnelInsightData(jobs: Job[]): FunnelInsightData | null {
     const STATUS_ORDER = ['pending', 'processing', 'ready_for_review', 'ready_to_apply', 'submitted'];
     const cumulative: number[] = [];
 
@@ -106,8 +126,11 @@ export function generateFunnelInsight(jobs: Job[]): string | null {
 
     if (biggestDrop < 0.05) return null;
 
-    const LABELS = ['Analysierung', 'CV-Optimierung', 'CL-Generierung', 'Bewerbung'];
-    return `Du verlierst ${Math.round(biggestDrop * 100)}% zwischen ${LABELS[biggestDropStep - 1]} und ${LABELS[biggestDropStep] ?? 'Bewerbung'}. Hier liegt dein Bottleneck.`;
+    return {
+        dropPct: Math.round(biggestDrop * 100),
+        fromStageIndex: biggestDropStep - 1,
+        toStageIndex: biggestDropStep,
+    };
 }
 
 // ─── Streak Calculator ──────────────────────────────────────────

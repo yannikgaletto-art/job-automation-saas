@@ -1,6 +1,7 @@
 'use client';
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useTranslations } from 'next-intl';
 
 const MOON_LABELS = ['', '🌑', '🌒', '🌓', '🌔', '🌕'];
 const BAR_COLORS = ['#d6d6d6', '#d6d6d6', '#93c5fd', '#1a4a9a', '#002e7a'];
@@ -8,6 +9,8 @@ const BAR_COLORS = ['#d6d6d6', '#d6d6d6', '#93c5fd', '#1a4a9a', '#002e7a'];
 interface Session { energy_level: number | null; completed: boolean; }
 
 export function EnergyResonanceChart({ sessions }: { sessions: Session[] }) {
+    const t = useTranslations('dashboard.analytics');
+
     const data = [1, 2, 3, 4, 5].map(level => {
         const atLevel = sessions.filter(s => s.energy_level === level);
         const rate = atLevel.length > 0
@@ -21,9 +24,9 @@ export function EnergyResonanceChart({ sessions }: { sessions: Session[] }) {
         const d = payload[0].payload;
         return (
             <div className="bg-white border border-[#d6d6d6] rounded-lg p-2 text-xs shadow-sm">
-                <p className="font-medium">{d.level} Energie-Level</p>
-                <p className="text-[#002e7a]">{d.rate}% Completion Rate</p>
-                <p className="text-stone-400">{d.count} Session{d.count !== 1 ? 's' : ''}</p>
+                <p className="font-medium">{t('energy_tooltip_level', { emoji: d.level })}</p>
+                <p className="text-[#002e7a]">{t('energy_tooltip_rate', { rate: d.rate })}</p>
+                <p className="text-stone-400">{t('energy_tooltip_count', { count: d.count })}</p>
             </div>
         );
     };

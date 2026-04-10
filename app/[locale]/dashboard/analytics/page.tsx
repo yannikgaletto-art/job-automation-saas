@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Analytics Page — Performance Center
+ * Analytics Page — Mein Fortschritt / My Progress / Mi Progreso
  * Combines Flow State (Pomodoro), Coaching Performance, and Actionable Insights.
  * Client component with two independent data fetches (flow + coaching).
  */
@@ -17,13 +17,16 @@ import { MomentumScore } from './components/momentum-score';
 import { InsightBox } from './components/insight-box';
 import { CoachingPerformance } from './components/coaching-performance';
 import { NextBestAction } from './components/next-best-action';
+import { ToggleSection } from './components/toggle-section';
 import { buildHeatmapGrid, findPeakWindow } from '@/lib/analytics/heatmap-utils';
 import {
     calcMomentumScore,
-    generatePeakInsight,
-    generateEnergyInsight,
+    generatePeakInsightData,
+    generateEnergyInsightData,
     calcStreak,
 } from '@/lib/analytics/insights';
+
+type DayKey = 'day_0' | 'day_1' | 'day_2' | 'day_3' | 'day_4' | 'day_5' | 'day_6';
 
 interface AnalyticsData {
     heatmap: any[];
@@ -93,15 +96,29 @@ export default function AnalyticsPage() {
             .finally(() => setCoachingLoading(false));
 
         return () => controller.abort();
-    }, []);;
+    }, []);
 
-    // Compute insights
+    // Compute insights (structured data — i18n rendering below)
     const grid = data ? buildHeatmapGrid(data.heatmap) : [];
     const peak = grid.length > 0 ? findPeakWindow(grid) : { day: 0, startHour: 8, count: 0 };
-    const peakText = data ? generatePeakInsight(peak, data.momentum.length) : null;
-    const energyText = data ? generateEnergyInsight(data.energyTimeline) : null;
+    const peakData = data ? generatePeakInsightData(peak, data.momentum.length) : null;
+    const energyData = data ? generateEnergyInsightData(data.energyTimeline) : null;
     const momentumScore = data ? calcMomentumScore(data.momentum, data.funnel) : 0;
     const streak = data ? calcStreak(data.momentum) : 0;
+
+    // Render insight texts via i18n
+    const peakText = peakData
+        ? t('peak_insight', {
+            day: t(`day_${peakData.dayIndex}` as DayKey),
+            start: peakData.startHour,
+            end: peakData.endHour,
+            factor: peakData.factor,
+        })
+        : null;
+
+    const energyText = energyData
+        ? t('energy_insight', { factor: energyData.factor })
+        : null;
 
     // Check if user has a Pomodoro session today
     const todayStr = new Date().toISOString().split('T')[0];
@@ -111,13 +128,16 @@ export default function AnalyticsPage() {
 
     const hasFlowData = data && (data.momentum.length > 0 || data.heatmap.length > 0);
 
+    // Badge counts for toggle headers
+    const completedCoaching = coachingSessions.filter(s => s.session_status === 'completed').length;
+
     return (
         <div className="space-y-8 pb-12">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-semibold text-[#37352F]">
-                        Performance Center
+                        {t('title')}
                     </h1>
                     <p className="text-[#73726E] mt-1">
                         {t('subtitle')}
@@ -157,113 +177,119 @@ export default function AnalyticsPage() {
                         streak={streak}
                     />
 
-                    {/* ── Coaching Performance ─────────────────────────────── */}
-                    {coachingLoading ? (
-                        <div className="bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm h-32 animate-pulse" />
-                    ) : (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.1 }}
-                        >
+                    {/* ── Coaching Performance (Toggle) ─────────────────────── */}
+                    <ToggleSection
+                        id="coaching"
+                        title={t('section_coaching')}
+                        badge={completedCoaching > 0 ? completedCoaching : undefined}
+                    >
+                        {coachingLoading ? (
+                            <div className="bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm h-32 animate-pulse" />
+                        ) : (
                             <CoachingPerformance sessions={coachingSessions} />
-                        </motion.div>
-                    )}
+                        )}
+                    </ToggleSection>
 
-                    {/* ── Flow State Section (Pomodoro-dependent) ──────────── */}
-                    {!hasFlowData ? (
-                        /* Pomodoro Empty State */
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
-                            className="bg-white rounded-xl border border-[#d6d6d6] p-12 text-center shadow-sm"
-                        >
-                            <p className="text-4xl mb-4">—</p>
-                            <h2 className="text-lg font-semibold text-[#37352F] mb-2">
-                                {t('empty_title')}
-                            </h2>
-                            <p className="text-sm text-[#73726E] max-w-md mx-auto">
-                                {t('empty_desc')}
-                            </p>
-                        </motion.div>
-                    ) : (
-                        <>
-                            {/* Stat Cards */}
-                            <StatsRow sessions={data!.momentum} />
+                    {/* ── Flow State Section (Toggle) ───────────────────────── */}
+                    <ToggleSection
+                        id="flow"
+                        title={t('section_flow')}
+                        badge={hasFlowData ? data?.momentum.length : undefined}
+                    >
+                        {!hasFlowData ? (
+                            /* Pomodoro Empty State */
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.2 }}
+                                className="bg-white rounded-xl border border-[#d6d6d6] p-12 text-center shadow-sm"
+                            >
+                                <p className="text-4xl mb-4">—</p>
+                                <h2 className="text-lg font-semibold text-[#37352F] mb-2">
+                                    {t('empty_title')}
+                                </h2>
+                                <p className="text-sm text-[#73726E] max-w-md mx-auto">
+                                    {t('empty_desc')}
+                                </p>
+                            </motion.div>
+                        ) : (
+                            <>
+                                {/* Stat Cards */}
+                                <StatsRow sessions={data!.momentum} />
 
-                            {/* Streak banner */}
-                            {streak >= 3 && (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center gap-3"
-                                >
-                                    <span className="text-2xl font-bold text-[#002e7a]">{t('streak_label')}</span>
-                                    <p className="text-sm text-amber-800">
-                                        <strong>{t('streak_text', { count: streak })}</strong>
-                                    </p>
-                                </motion.div>
-                            )}
+                                {/* Streak banner */}
+                                {streak >= 3 && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center gap-3"
+                                    >
+                                        <span className="text-2xl font-bold text-[#002e7a]">{t('streak_label')}</span>
+                                        <p className="text-sm text-amber-800">
+                                            <strong>{t('streak_text', { count: streak })}</strong>
+                                        </p>
+                                    </motion.div>
+                                )}
 
-                            {/* Heatmap + Clock */}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Heatmap + Clock */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.1 }}
+                                        className="lg:col-span-2 bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm space-y-4"
+                                    >
+                                        <h2 className="text-sm font-semibold text-[#002e7a] uppercase tracking-wider">
+                                            {t('heatmap_title')}
+                                        </h2>
+                                        <p className="text-xs text-[#73726E]">{t('heatmap_subtitle')}</p>
+                                        <FlowHeatmap cells={data!.heatmap} />
+                                        {peakText && <InsightBox text={peakText} icon="" />}
+                                    </motion.div>
+
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.2 }}
+                                        className="bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm flex flex-col items-center justify-center gap-4"
+                                    >
+                                        <h2 className="text-sm font-semibold text-[#002e7a] uppercase tracking-wider self-start">
+                                            {t('golden_hours')}
+                                        </h2>
+                                        <GoldenHoursClock cells={data!.heatmap} />
+                                    </motion.div>
+                                </div>
+
+                                {/* Energy Resonance */}
                                 <motion.div
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.1 }}
-                                    className="lg:col-span-2 bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm space-y-4"
+                                    transition={{ delay: 0.3 }}
+                                    className="bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm space-y-4"
                                 >
                                     <h2 className="text-sm font-semibold text-[#002e7a] uppercase tracking-wider">
-                                        {t('heatmap_title')}
+                                        {t('energy')}
                                     </h2>
-                                    <p className="text-xs text-[#73726E]">{t('heatmap_subtitle')}</p>
-                                    <FlowHeatmap cells={data!.heatmap} />
-                                    {peakText && <InsightBox text={peakText} icon="" />}
+                                    <p className="text-xs text-[#73726E]">{t('energy_subtitle')}</p>
+                                    <EnergyResonanceChart sessions={data!.energyTimeline} />
+                                    {energyText && <InsightBox text={energyText} icon="" />}
                                 </motion.div>
 
+                                {/* Momentum */}
                                 <motion.div
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.2 }}
-                                    className="bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm flex flex-col items-center justify-center gap-4"
+                                    transition={{ delay: 0.4 }}
+                                    className="bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm space-y-4"
                                 >
-                                    <h2 className="text-sm font-semibold text-[#002e7a] uppercase tracking-wider self-start">
-                                        {t('golden_hours')}
+                                    <h2 className="text-sm font-semibold text-[#002e7a] uppercase tracking-wider">
+                                        {t('momentum')}
                                     </h2>
-                                    <GoldenHoursClock cells={data!.heatmap} />
+                                    <MomentumScore score={momentumScore} sessions={data!.momentum} />
                                 </motion.div>
-                            </div>
-
-                            {/* Energy Resonance */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.3 }}
-                                className="bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm space-y-4"
-                            >
-                                <h2 className="text-sm font-semibold text-[#002e7a] uppercase tracking-wider">
-                                    {t('energy')}
-                                </h2>
-                                <p className="text-xs text-[#73726E]">{t('energy_subtitle')}</p>
-                                <EnergyResonanceChart sessions={data!.energyTimeline} />
-                                {energyText && <InsightBox text={energyText} icon="" />}
-                            </motion.div>
-
-                            {/* Momentum */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.4 }}
-                                className="bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm space-y-4"
-                            >
-                                <h2 className="text-sm font-semibold text-[#002e7a] uppercase tracking-wider">
-                                    {t('momentum')}
-                                </h2>
-                                <MomentumScore score={momentumScore} sessions={data!.momentum} />
-                            </motion.div>
-                        </>
-                    )}
+                            </>
+                        )}
+                    </ToggleSection>
                 </>
             )}
         </div>

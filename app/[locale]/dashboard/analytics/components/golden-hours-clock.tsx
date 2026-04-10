@@ -2,8 +2,11 @@
 
 import { useMemo } from 'react';
 import type { HeatmapCell } from '@/lib/analytics/heatmap-utils';
+import { useTranslations } from 'next-intl';
 
 export function GoldenHoursClock({ cells }: { cells: HeatmapCell[] }) {
+    const t = useTranslations('dashboard.analytics');
+
     const hourCounts = useMemo(() => {
         const map = new Array(24).fill(0);
         cells.forEach(c => { map[c.hour_of_day] = (map[c.hour_of_day] ?? 0) + c.session_count; });
@@ -58,7 +61,7 @@ export function GoldenHoursClock({ cells }: { cells: HeatmapCell[] }) {
                             stroke="white"
                             strokeWidth="0.5"
                         >
-                            <title>{hour}:00 — {count} Sessions</title>
+                            <title>{t('golden_tooltip', { hour, count })}</title>
                         </path>
                     );
                 })}
@@ -91,7 +94,7 @@ export function GoldenHoursClock({ cells }: { cells: HeatmapCell[] }) {
                 </text>
             </svg>
             <p className="text-xs text-stone-500 text-center">
-                Peak: <strong className="text-[#002e7a]">{peakHour}:00 – {(peakHour + 2) % 24}:00 Uhr</strong>
+                {t('golden_peak_text', { start: peakHour, end: (peakHour + 2) % 24 })}
             </p>
         </div>
     );

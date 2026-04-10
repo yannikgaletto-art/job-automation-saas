@@ -94,10 +94,6 @@ export function CoachingPerformance({ sessions }: { sessions: CoachingSession[] 
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-xl border border-[#d6d6d6] p-6 shadow-sm space-y-4"
         >
-            <h2 className="text-sm font-semibold text-[#002e7a] uppercase tracking-wider">
-                {t('coaching_title')}
-            </h2>
-
             <div className="flex items-end gap-4">
                 {/* Latest score */}
                 {latestScore !== null && (

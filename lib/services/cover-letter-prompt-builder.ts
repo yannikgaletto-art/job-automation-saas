@@ -427,18 +427,29 @@ Egal ob das Anschreiben auf Deutsch oder einer anderen Sprache verfasst wird —
 
 FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
 - Leite das Zitat mit einer KONKRETEN SITUATION ein (1 Satz — kuerzer ist besser).
+
+  PFLICHT — FIRMA ZUERST (NICHT VERHANDELBAR):
+  Der Einleitungssatz VOR dem Zitat MUSS einen konkreten Bezug zu ${companyName} oder zur Stellenanzeige enthalten.
+  Ein reines CV-Erlebnis OHNE Bezug zur Ziel-Firma ist als Einleitungssatz VERBOTEN.
+  Reihenfolge: Firmenbezug → Zitat → CV-Bruecke. NICHT: CV → Zitat → Firma.
+
   Waehle EINE der folgenden Varianten — nicht immer dieselbe:
 
-  VARIANTE A — Eigenes Erlebnis als Kontext (BEVORZUGT):
-  "Als ich bei [Firma] zum ersten Mal [konkretes Erlebnis], habe ich verstanden, dass [Erkenntnis]."
-  "Beim Aufbau von [Projekt/Firma] habe ich verstanden, dass [Erkenntnis]."
-  ❌ VERBOTEN: "wurde mir klar" / "wurde mir bewusst" / "ist mir klargeworden" — klingt allwissend und belehrend. Niemand hat nach deiner Erkenntnis gefragt.
+  VARIANTE A — Firmenbeobachtung fuehrt zum Zitat (BEVORZUGT):
+  "Als ich ${isDuForm ? 'euer' : 'Ihr'} Projekt [konkreter Fakt aus Unternehmensanalyse oder Stellenanzeige] sah, musste ich an ${ctx!.selectedQuote!.author} denken:"
+  "${isDuForm ? 'Eure' : 'Ihre'} Arbeit an [konkretem Thema aus Analyse] erinnerte mich an einen Gedanken von ${ctx!.selectedQuote!.author}:"
+  "Seit ich gelesen habe, dass ${companyName} [konkreter Fakt aus Analyse], begleitet mich ein Zitat von ${ctx!.selectedQuote!.author}:"
+  PFLICHT: Der [konkrete Firmenbezug] MUSS aus einer der folgenden Quellen stammen (Priorität absteigend):
+  1. Unternehmensanalyse (Werte, Projekte, News, Challenges) — BEVORZUGT
+  2. Stellenanzeige (Kernaufgaben, Anforderungen, Teamkontext)
+  3. FALLBACK (nur wenn 1 und 2 leer): Subjektiver Bezug auf die Stelle selbst — z.B. "Als ich die Ausschreibung als [Jobtitel] bei ${companyName} gelesen habe..." oder "Da mir die Position bei ${companyName} aufgefallen ist..." — ICH-Perspektive, ehrlich, ohne erfundene Fakten.
+  NIEMALS: Firmenfakten erfinden, die oben im Prompt nicht stehen.
 
-  VARIANTE B — Unternehmensbeobachtung (kuerzer, direkt, NUR OHNE Zitat-Bezug):
-  "Als ich auf ${isDuForm ? 'eurer' : 'Ihrer'} Website [konkretes Projekt/Wert] sah, musste ich an meine Zeit bei [Firma] denken."
-  ❌ VERBOTEN dabei: Mehr als 1 Satz — diese Variante ist kurz und knapp!
-  ❌ VERBOTEN dabei: "...musste ich an das Zitat denken" — das verbindet Zitat + Website und wird zu viel.
+  VARIANTE B — CV-Erlebnis mit expliziter Firmen-Verknuepfung (Fallback wenn Analyse-Daten duenn):
+  "Bei [CV-Firma] lernte ich [konkretes Erlebnis]; eine Erfahrung, die ich direkt mit ${companyName}s Fokus auf [Thema aus Stelle] verbinde."
+  PFLICHT: Das CV-Erlebnis MUSS explizit mit ${companyName} oder der Stellenanzeige verknuepft sein. Allein stehend = VERBOTEN.
 
+  ❌ VERBOTEN: "wurde mir klar" / "wurde mir bewusst" / "ist mir klargeworden" — klingt allwissend und belehrend.
   ❌ VERBOTEN IN ALLEN VARIANTEN: "fiel mir auf:" mit Doppelpunkt — sofort erkennbarer KI-Marker.
   ❌ VERBOTEN: "ist mir klargeworden:" mit Doppelpunkt — Einleitungssaetze enden IMMER mit "dass [Inhalt]." als vollstaendiger Aussagesatz.
   ❌ VERBOTEN: "Als ich ueber [Thema] nachdachte..." — zu abstrakt.

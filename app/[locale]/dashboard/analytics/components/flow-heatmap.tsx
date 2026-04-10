@@ -2,11 +2,20 @@
 
 import { useMemo } from 'react';
 import { buildHeatmapGrid, findPeakWindow, type HeatmapCell } from '@/lib/analytics/heatmap-utils';
+import { useTranslations } from 'next-intl';
 
-const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
+type HeatmapDayKey = 'heatmap_day_0' | 'heatmap_day_1' | 'heatmap_day_2' | 'heatmap_day_3' | 'heatmap_day_4' | 'heatmap_day_5' | 'heatmap_day_6';
+
 export function FlowHeatmap({ cells }: { cells: HeatmapCell[] }) {
+    const t = useTranslations('dashboard.analytics');
+
+    // i18n day abbreviations
+    const DAYS = useMemo(() =>
+        Array.from({ length: 7 }, (_, i) => t(`heatmap_day_${i}` as HeatmapDayKey)),
+    [t]);
+
     const grid = useMemo(() => buildHeatmapGrid(cells), [cells]);
     const max = useMemo(() => Math.max(...grid.flat(), 1), [grid]);
     const peak = useMemo(() => findPeakWindow(grid, 3), [grid]);
@@ -42,7 +51,7 @@ export function FlowHeatmap({ cells }: { cells: HeatmapCell[] }) {
                             return (
                                 <div
                                     key={`${di}-${h}`}
-                                    title={`${DAYS[di]} ${h}:00 — ${count} Session${count !== 1 ? 's' : ''}`}
+                                    title={t('heatmap_tooltip', { day: DAYS[di], hour: h, count })}
                                     className={`aspect-square rounded-sm transition-all duration-200 cursor-default
                     ${isPeak ? 'ring-1 ring-offset-0 ring-[#002e7a]/40' : ''}`}
                                     style={{ backgroundColor: toColor(count) }}
@@ -61,15 +70,15 @@ export function FlowHeatmap({ cells }: { cells: HeatmapCell[] }) {
                 </div>
                 <div className="flex items-center gap-1">
                     <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(0,46,122,0.25)' }} />
-                    <span>niedrig</span>
+                    <span>{t('heatmap_legend_low')}</span>
                 </div>
                 <div className="flex items-center gap-1">
                     <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(0,46,122,0.65)' }} />
-                    <span>mittel</span>
+                    <span>{t('heatmap_legend_medium')}</span>
                 </div>
                 <div className="flex items-center gap-1">
                     <div className="w-3 h-3 rounded-sm bg-[#002e7a]" />
-                    <span>peak</span>
+                    <span>{t('heatmap_legend_high')}</span>
                 </div>
             </div>
         </div>
