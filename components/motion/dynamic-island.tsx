@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { useNotificationStore } from '@/store/notification-store';
 
 // ============================================================================
