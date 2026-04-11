@@ -94,13 +94,14 @@ export default function ExtensionAuthCallback() {
                     <div className="text-red-400 bg-red-900/20 rounded-lg p-4">
                         <p className="mb-3">❌ {error}</p>
                         <a
-                            href="/de/login"
+                            href="/login"
                             className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors"
                         >
                             Zum Login →
                         </a>
                     </div>
                 )}
+
             </div>
         </div>
     )

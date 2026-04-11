@@ -13,6 +13,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { complete } from '@/lib/ai/model-router';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
+import { deepScrapeJob } from '@/lib/services/job-search-pipeline';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -78,19 +79,73 @@ export const extractJob = inngest.createFunction(
         const languageName = getLanguageName(locale);
 
         // Step 1: Read job description (§3 — user-scoped)
+        // BLOCKER 6+7 FIX (2026-04-11): Extension imports often have null/short descriptions
+        // because the SPA DOM hasn't fully rendered by the time the content script scrapes.
+        // Instead of hard-throwing (which causes permanent Inngest failure), we attempt a
+        // Jina Reader scrape from the stored job_url as a fallback before giving up.
         const job = await step.run('read-job', async () => {
             const { data } = await supabaseAdmin
                 .from('job_queue')
-                .select('id, description, metadata')
+                .select('id, job_url, description, metadata, source')
                 .eq('id', jobId)
                 .eq('user_id', userId) // §3: user-scoped
                 .single();
 
-            if (!data?.description || data.description.length < 100) {
-                throw new Error('Beschreibung zu kurz oder nicht gefunden');
+            if (!data) throw new Error('Job not found');
+
+            // Fast path: description is sufficient — proceed directly
+            if (data.description && data.description.length >= 100) {
+                return data;
             }
-            return data;
+
+            // Slow path: description is missing/short — attempt Jina Reader enrichment
+            // Only for extension-sourced jobs that have a job_url to scrape
+            console.log(`⚡ [Extract] Job ${jobId} beschreibung zu kurz (${data.description?.length ?? 0} chars) — versuche Jina Reader fallback`);
+
+            if (data.job_url && !data.job_url.includes('linkedin.com')) {
+                try {
+                    const scraped = await deepScrapeJob(data.job_url);
+                    if (scraped && scraped !== '__EXPIRED__' && scraped.length >= 100) {
+                        // Write enriched description back so future runs benefit too
+                        await supabaseAdmin
+                            .from('job_queue')
+                            .update({ description: scraped.slice(0, 5000) })
+                            .eq('id', jobId)
+                            .eq('user_id', userId);
+                        console.log(`✅ [Extract] Jina enrichment: ${scraped.length} chars — Job ${jobId}`);
+                        return { ...data, description: scraped.slice(0, 5000) };
+                    } else if (scraped === '__EXPIRED__') {
+                        console.warn(`⚠️ [Extract] Job ${jobId} — expired job URL (Jina detected expiry marker)`);
+                    }
+                } catch (jinaErr) {
+                    console.warn(`⚠️ [Extract] Jina scrape failed for Job ${jobId}:`, jinaErr);
+                }
+            } else if (data.job_url?.includes('linkedin.com')) {
+                console.log(`⚠️ [Extract] Job ${jobId} — LinkedIn URL skipped for Jina (bot protection)`);
+            }
+
+            // Graceful skip: mark job with metadata instead of throwing and retrying forever
+            await supabaseAdmin
+                .from('job_queue')
+                .update({
+                    metadata: {
+                        ...((data.metadata as Record<string, unknown>) || {}),
+                        extraction_skipped_reason: 'description_too_short_no_fallback',
+                        extraction_skipped_at: new Date().toISOString(),
+                    }
+                })
+                .eq('id', jobId)
+                .eq('user_id', userId);
+
+            // Return sentinel object — the next step will detect _skipExtraction and exit early
+            return { ...data, _skipExtraction: true as const };
         });
+
+        // If description was too short and no fallback succeeded, exit cleanly without retrying
+        if ((job as any)._skipExtraction) {
+            console.log(`⚠️ [Extract] Job ${jobId} — skipping extraction (no usable description). Job remains in queue for manual review.`);
+            return { success: true, jobId, skipped: true };
+        }
 
         // Step 2: Claude analysis via Model Router
         // OPTIMIZATION (2026-03-30): Skip if synchronous extraction in ingest/route.ts
