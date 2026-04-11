@@ -23,7 +23,7 @@ const ImportRequestSchema = z.object({
     company: z.string().min(1).max(200),
     location: z.string().max(200).optional().nullable(),
     platform: z.enum([
-        'linkedin', 'indeed', 'stepstone', 'xing',
+        'linkedin', 'indeed', 'stepstone',
         'greenhouse', 'lever', 'workday', 'taleo',
         'company_website', 'unknown'
     ]),
