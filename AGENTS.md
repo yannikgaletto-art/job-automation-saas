@@ -31,6 +31,7 @@
 | **Avatar Picker** | `components/motion/sidebar.tsx` | Animal avatar stored in `user_profiles.avatar_animal`, Pathly brand colors |
 | **Mood Check-in V2** | `app/[locale]/dashboard/hooks/useMoodCheckIn.tsx` + `app/api/mood/checkin/route.ts` | Adaptive Tag/Nacht-Symbole, Progressive Reduction (5× Skip → auto-hide), `MoodCheckinContext`, `CheckinSettingsCard` in Settings, i18n (de/en/es), `lib/mood/mood-symbols.ts` |
 | **Guided Tours** | `components/dashboard/guided-tour-overlay.tsx` | Onboarding tooltips, `useDashboardTour` hook, target-rect syncing, auto-clamp viewports, localStorage state |
+| **Onboarding Flow** | `app/[locale]/onboarding/page.tsx` | UI Sequence with Notion-style goal toggle, SlideToActionButton, and write-read-verify consent logic (`api/onboarding/complete/route.ts`) |
 | **Stripe Billing** | `app/api/stripe/webhook/route.ts` | Credit system (Free/Starter/Durchstarter), atomic `debit_credits()` RPC, `withCreditGate()` middleware, Stripe Checkout/Portal, idempotent webhook, `lib/supabase/admin.ts` singleton |
 | **Product Analytics** | `lib/posthog/client.ts`, `server.ts` | PostHog (EU DSGVO). Next.js browser pageviews + 5 core server events (onboarding_completed, etc.). Storage mode: localStorage (no cookies), maskAllInputs: true. |
 | **Rate Limiting** | `lib/api/rate-limit-upstash.ts` | Upstash Redis. Distributed window limiter. Gracefully degrades to pass-through in local dev (if URL is missing) to prevent dev blockages. Protects 11 API routes against cost spikes. |
@@ -110,6 +111,7 @@ Pathly besteht aus **zwei getrennten Projekten** die unabhängig deployt werden:
 | `lib/constants.ts` | Single Source of Truth für alle Texte (REGEL 7) |
 | `next.config.mjs` | Security Headers + CSP (Tally.so erlaubt) |
 | `app/globals.css` | Design-Tokens, CSS-Variablen, hero-fade-in + marker + `typewriter-cursor` + `cursor-blink-7` Keyframes |
+| `app/icon.png` / `apple-icon.png` | Einheitliches Favicon (Pathly P), identisch zu SaaS, automatisch von Next.js geladen |
 | `tailwind.config.ts` | Design-System-Tokens (navy, muted, border etc.) |
 | `DESIGN.md` | Design-System-Dokumentation |
 | `public/og-image.png` | Open Graph / Twitter Card Bild (1200×630) |
