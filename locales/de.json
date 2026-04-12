@@ -543,7 +543,7 @@
       "goal_personalization": "Ich glaube an die Kraft der Personalisierung",
       "goal_exploring": "Ich schaue mich nur um",
       "goal_interview": "Ich will mich auf Gespräche vorbereiten",
-      "button": "Los geht's →"
+      "button": "Schritt 2"
     },
     "step2": {
       "title": "Deine Daten. Deine Kontrolle.",
@@ -551,12 +551,12 @@
       "trust_1_title": "Dein Name wird vor jedem KI-Call pseudonymisiert.",
       "trust_1_detail": "Die KI sieht niemals deinen echten Namen.",
       "trust_2_title": "Deine Daten werden nicht für KI-Training genutzt.",
-      "trust_2_detail": "Anthropic & OpenAI löschen jede Anfrage sofort nach der Verarbeitung — nichts wird auf deren Seite gespeichert.",
+      "trust_2_detail": "Anthropic löscht jede Anfrage sofort nach der Verarbeitung — nichts wird auf deren Seite gespeichert.",
       "trust_3_title": "Deine Daten werden auf europäischen Servern gespeichert.",
       "trust_3_detail": "Alle Details in unserer Datenschutzerklärung.",
       "privacy_label": "Ich habe die <privacyLink>Datenschutzerklärung</privacyLink> gelesen und stimme zu.",
       "ai_label": "Ich stimme der Verarbeitung meiner Daten durch <aiLink>KI-Dienste</aiLink> zu. (Ohne diese Zustimmung kann Pathly nicht genutzt werden.)",
-      "submit": "Pathly starten →",
+      "submit": "Pathly starten",
       "submitting": "Wird gespeichert…",
       "error_save": "Speichern fehlgeschlagen. Bitte erneut versuchen.",
       "error_network": "Netzwerkfehler. Bitte versuche es erneut."

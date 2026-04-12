@@ -543,7 +543,7 @@
       "goal_personalization": "Creo en el poder de la personalización",
       "goal_exploring": "Solo estoy explorando",
       "goal_interview": "Quiero prepararme para entrevistas",
-      "button": "¡Vamos! →"
+      "button": "Paso 2"
     },
     "step2": {
       "title": "Tus datos. Tu control.",
@@ -551,12 +551,12 @@
       "trust_1_title": "Tu nombre se pseudonimiza antes de cada llamada a la IA.",
       "trust_1_detail": "La IA nunca ve tu nombre real.",
       "trust_2_title": "Tus datos no se usan para entrenar la IA.",
-      "trust_2_detail": "Anthropic y OpenAI eliminan cada solicitud inmediatamente después del procesamiento — nada se almacena en su lado.",
+      "trust_2_detail": "Anthropic elimina cada solicitud inmediatamente después del procesamiento — nada se almacena en su lado.",
       "trust_3_title": "Tus datos se almacenan en servidores europeos.",
       "trust_3_detail": "Todos los detalles en nuestra Política de Privacidad.",
       "privacy_label": "He leído la <privacyLink>Política de Privacidad</privacyLink> y estoy de acuerdo.",
       "ai_label": "Acepto el procesamiento de mis datos por <aiLink>servicios de IA</aiLink>. (Sin este consentimiento, Pathly no puede utilizarse.)",
-      "submit": "Iniciar Pathly →",
+      "submit": "Iniciar Pathly",
       "submitting": "Guardando…",
       "error_save": "Error al guardar. Por favor, inténtalo de nuevo.",
       "error_network": "Error de red. Por favor, inténtalo de nuevo."

@@ -543,7 +543,7 @@
       "goal_personalization": "I believe in the power of personalization",
       "goal_exploring": "I'm just looking around",
       "goal_interview": "I want to prepare for interviews",
-      "button": "Let's go →"
+      "button": "Step 2"
     },
     "step2": {
       "title": "Your data. Your control.",
@@ -551,12 +551,12 @@
       "trust_1_title": "Your name is pseudonymized before every AI call.",
       "trust_1_detail": "The AI never sees your real name.",
       "trust_2_title": "Your data is never used for AI training.",
-      "trust_2_detail": "Anthropic & OpenAI delete every request immediately after processing — nothing is stored on their side.",
+      "trust_2_detail": "Anthropic deletes every request immediately after processing — nothing is stored on their side.",
       "trust_3_title": "Your data is stored on European servers.",
       "trust_3_detail": "Full details in our Privacy Policy.",
       "privacy_label": "I have read the <privacyLink>Privacy Policy</privacyLink> and agree.",
       "ai_label": "I consent to the processing of my data by <aiLink>AI services</aiLink>. (Without this consent, Pathly cannot be used.)",
-      "submit": "Start Pathly →",
+      "submit": "Start Pathly",
       "submitting": "Saving…",
       "error_save": "Saving failed. Please try again.",
       "error_network": "Network error. Please try again."

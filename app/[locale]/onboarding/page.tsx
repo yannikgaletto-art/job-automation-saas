@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SlideToActionButton } from '@/components/motion/slide-action-button';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -17,20 +18,20 @@ const GOAL_OPTIONS = [
 ] as const;
 
 // Animation sequence timing (ms from start):
-// [0]  label_before                              →     0ms
-// [1]  Line a (before_1)                        →   600ms  (+0.6s)
-// [2]  Line b (before_2)                        →  2600ms  (+2s)
-// [3]  Line c (before_3)                        →  3600ms  (+1s)
-// [4]  label_after                               →  8600ms  (+5s pause ← user request)
-// [5]  Line d (after_1)                         →  9100ms  (+0.5s)
-// [6]  Line e (after_2)                         →  9600ms  (+0.5s)
-// [7]  Line f (after_3)                         → 10100ms  (+0.5s)
-// [8]  Question toggle                           → 13100ms  (+3s pause)
-// [9]  Goal 1                                    → 13400ms
-// [10] Goal 2                                    → 13700ms
-// [11] Goal 3                                    → 14000ms
-// [12] Goal 4                                    → 14300ms
-const SEQUENCE_DELAYS = [0, 600, 2600, 3600, 8600, 9100, 9600, 10100, 13100, 13400, 13700, 14000, 14300];
+// [0]  label_before + all 3 before lines         →     0ms  (Teil 1 appears together)
+// [1]  (same as 0)                               →     0ms
+// [2]  (same as 0)                               →     0ms
+// [3]  (same as 0)                               →     0ms
+// [4]  label_after + all 3 after lines           →  3000ms  (+3s pause ← user request)
+// [5]  (same as 4)                               →  3000ms
+// [6]  (same as 4)                               →  3000ms
+// [7]  (same as 4)                               →  3000ms
+// [8]  Question toggle                           →  6000ms  (+3s pause)
+// [9]  Goal 1                                    →  6300ms
+// [10] Goal 2                                    →  6600ms
+// [11] Goal 3                                    →  6900ms
+// [12] Goal 4                                    →  7200ms
+const SEQUENCE_DELAYS = [0, 0, 0, 0, 3000, 3000, 3000, 3000, 6000, 6300, 6600, 6900, 7200];
 const TOTAL_SEQUENCE_ITEMS = SEQUENCE_DELAYS.length;
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
@@ -140,12 +141,8 @@ export default function OnboardingPage() {
 
     return (
         <div className="min-h-screen bg-[#FAFAF9] flex flex-col">
-            {/* Header */}
-            <header className="px-8 pt-6 pb-2">
-                <div className="text-[#37352F] font-bold text-xl tracking-tight">
-                    Pathly
-                </div>
-            </header>
+            {/* Header — intentionally empty (brand removed per design) */}
+            <header className="px-8 pt-6 pb-2" />
 
             {/* Progress indicator */}
             <StepIndicator current={step} />
@@ -520,10 +517,12 @@ function Step2Consent({
                 </label>
             </div>
 
-            {/* CTA */}
-            <StepButton onClick={onComplete} disabled={!allAccepted || completing}>
-                {completing ? t('submitting') : t('submit')}
-            </StepButton>
+            {/* CTA — Slide-to-action for premium feel */}
+            <SlideToActionButton
+                text={completing ? t('submitting') : t('submit')}
+                disabled={!allAccepted || completing}
+                onAction={onComplete}
+            />
             {error && (
                 <p className="mt-3 text-sm text-red-500 text-center">{error}</p>
             )}
