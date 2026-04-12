@@ -113,6 +113,31 @@ export default function SignupPage() {
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
             <div className="max-w-md w-full bg-white p-8 rounded-xl border border-[#E7E7E5] shadow-sm">
+
+                {signupSuccess ? (
+                    <div className="text-center space-y-5 py-4">
+                        <div className="w-16 h-16 rounded-2xl bg-[#012e7a]/10 border border-[#012e7a]/20 flex items-center justify-center mx-auto">
+                            <svg className="w-8 h-8 text-[#012e7a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-[#37352F]">{t('success_title')}</h3>
+                        <div className="flex items-center justify-center gap-2">
+                            <div className="w-2 h-2 bg-[#012e7a] rounded-full animate-pulse" />
+                            <p className="text-sm text-[#73726E]">{t('waiting_confirmation')}</p>
+                        </div>
+                        <p className="text-xs text-[#9B9A97] mt-4">
+                            {t('success_no_email')}{" "}
+                            <button
+                                onClick={() => setSignupSuccess(false)}
+                                className="text-[#012e7a] hover:underline font-medium"
+                            >
+                                {t('success_retry')}
+                            </button>.
+                        </p>
+                    </div>
+                ) : (
+                    <>
                 <div className="mb-8">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
@@ -156,30 +181,6 @@ export default function SignupPage() {
                     </div>
                     <h2 className="text-2xl font-semibold text-[#37352F]">{t('title')}</h2>
                 </div>
-
-                {signupSuccess ? (
-                    <div className="text-center space-y-4">
-                        <div className="w-16 h-16 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center mx-auto">
-                            <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
-                        </div>
-                        <h3 className="text-lg font-semibold text-[#37352F]">{t('success_title')}</h3>
-                        <div className="flex items-center justify-center gap-2">
-                            <div className="w-2 h-2 bg-[#012e7a] rounded-full animate-pulse" />
-                            <p className="text-sm text-[#73726E]">{t('waiting_confirmation')}</p>
-                        </div>
-                        <p className="text-xs text-[#9B9A97] mt-4">
-                            {t('success_no_email')}{" "}
-                            <button
-                                onClick={() => setSignupSuccess(false)}
-                                className="text-[#012e7a] hover:underline font-medium"
-                            >
-                                {t('success_retry')}
-                            </button>.
-                        </p>
-                    </div>
-                ) : (
                     <form onSubmit={handleSignup} className="space-y-4">
                         {/* Name fields — side by side */}
                         <div className="grid grid-cols-2 gap-3">
@@ -243,7 +244,6 @@ export default function SignupPage() {
                             {loading ? t('submitting') : t('submit')}
                         </Button>
                     </form>
-                )}
 
                 <p className="mt-6 text-sm text-center text-[#73726E]">
                     {t('has_account')}{" "}
@@ -251,6 +251,8 @@ export default function SignupPage() {
                         {t('sign_in')}
                     </Link>
                 </p>
+                    </>
+                )}
             </div >
         </div >
     )

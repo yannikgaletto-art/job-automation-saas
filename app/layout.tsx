@@ -8,8 +8,8 @@ import { PostHogProvider } from '@/components/providers/posthog-provider';
 const inter = Inter({ subsets: ['latin', 'latin-ext'] });
 
 export const metadata = {
-  title: 'Pathly V2.0 - Intelligent Job Application SaaS',
-  description: 'DSGVO & NIS2 Compliant AI-Powered Job Application Platform',
+  title: 'Pathly',
+  description: 'Dein intelligenter Bewerbungsassistent — DSGVO-konform',
 };
 
 export default function RootLayout({

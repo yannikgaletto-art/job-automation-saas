@@ -15,6 +15,12 @@ export function initPostHog(): typeof posthog {
     if (typeof window === 'undefined') return posthog;
     if (initialized) return posthog;
 
+    // Skip PostHog in local development — avoids "Failed to fetch" noise
+    // from the EU endpoint being blocked. No analytics needed locally.
+    if (process.env.NODE_ENV !== 'production') {
+        return posthog;
+    }
+
     const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
     const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com';
 
@@ -33,12 +39,8 @@ export function initPostHog(): typeof posthog {
             maskAllInputs: true,       // DSGVO: mask form inputs
             maskTextSelector: '*',     // Mask all text in recordings
         },
-        loaded: (ph) => {
-            // In dev, enable debug mode for console logging
-            if (process.env.NODE_ENV === 'development') {
-                ph.debug();
-            }
-        },
+        // Note: no ph.debug() — that escalates RemoteConfig network errors to
+        // unhandled Next.js errors which pollute the error overlay.
     });
 
     initialized = true;

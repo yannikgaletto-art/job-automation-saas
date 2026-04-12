@@ -107,11 +107,48 @@ export async function DELETE(request: Request) {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Delete related data first (user_settings, documents)
-    await adminClient.from('user_settings').delete().eq('user_id', userId);
-    await adminClient.from('documents').delete().eq('user_id', userId);
+    // --- CASCADE DELETE: all user-scoped tables (ordered: leaf tables first) ---
+    // These must all be cleaned before deleting the auth user to avoid FK constraint errors.
+    const tables = [
+        'credit_events',
+        'processed_stripe_events',
+        'generation_logs',
+        'coaching_sessions',
+        'job_certificates',
+        'validation_logs',
+        'video_scripts',
+        'video_approaches',
+        'script_block_templates',
+        'mood_checkins',
+        'daily_energy',
+        'daily_briefings',
+        'pomodoro_sessions',
+        'tasks',
+        'community_upvotes',
+        'community_comments',
+        'community_posts',
+        'volunteering_bookmarks',
+        'volunteering_votes',
+        'application_history',
+        'company_research',
+        'saved_job_searches',
+        'job_queue',
+        'documents',
+        'user_credits',
+        'user_profiles',
+        'user_values',
+        'user_settings',
+    ] as const;
 
-    // Delete the auth user
+    for (const table of tables) {
+        const { error: delErr } = await adminClient.from(table).delete().eq('user_id', userId);
+        if (delErr) {
+            // Log but continue — table may not exist yet or may have no rows
+            console.warn(`[admin/users] cascade delete warn (${table}):`, delErr.message);
+        }
+    }
+
+    // Delete the auth user (only after all FK refs are gone)
     const { error } = await adminClient.auth.admin.deleteUser(userId);
 
     if (error) {

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { isAdmin } from '@/lib/admin';
-import { Users, Trash2, RotateCcw, CheckCircle, XCircle, Shield, Loader2, Mail, Clock, Briefcase, FileText, Inbox } from 'lucide-react';
+import { Users, Trash2, RotateCcw, CheckCircle, XCircle, Shield, Loader2, Mail, Clock, Briefcase, FileText, Inbox, AlertTriangle } from 'lucide-react';
 
 type AdminUser = {
     id: string;
@@ -56,6 +56,9 @@ export default function AdminPage() {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    // Inline delete confirmation state
+    const [confirmDelete, setConfirmDelete] = useState<{ id: string; email: string; type: 'user' | 'lead' } | null>(null);
 
     // Waitlist
     const [leads, setLeads] = useState<WaitlistLead[]>([]);
@@ -113,48 +116,56 @@ export default function AdminPage() {
     };
 
     const handleDeleteLead = async (leadId: string, email: string) => {
-        if (!confirm(`Lead „${email}" wirklich löschen?`)) return;
-
-        // Remember confirmed status BEFORE removing from local state
-        const wasConfirmed = leads.find(l => l.id === leadId)?.confirmed_at != null;
-
-        setActionLoading(leadId);
-        try {
-            const res = await fetch('/api/admin/waitlist', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ leadId }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                setLeads(prev => prev.filter(l => l.id !== leadId));
-                setLeadsTotal(prev => prev - 1);
-                if (wasConfirmed) setLeadsConfirmed(prev => prev - 1);
-            } else {
-                alert(data.error || 'Löschen fehlgeschlagen');
-            }
-        } finally {
-            setActionLoading(null);
-        }
+        setConfirmDelete({ id: leadId, email, type: 'lead' });
     };
 
     const handleDelete = async (userId: string, email: string) => {
-        if (!confirm(`User "${email}" wirklich löschen? Alle Daten werden gelöscht.`)) return;
+        setConfirmDelete({ id: userId, email, type: 'user' });
+    };
 
-        setActionLoading(userId);
+    const executeDelete = async () => {
+        if (!confirmDelete) return;
+        const { id, type } = confirmDelete;
+        setConfirmDelete(null);
+        setErrorMsg(null);
+        setActionLoading(id);
+
         try {
-            const res = await fetch('/api/admin/users', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                setUsers(prev => prev.filter(u => u.id !== userId));
-                setTotal(prev => prev - 1);
+            if (type === 'user') {
+                const res = await fetch('/api/admin/users', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: id }),
+                });
+                const data = await res.json();
+                console.log('[admin] deleteUser response:', res.status, data);
+                if (data.success) {
+                    setUsers(prev => prev.filter(u => u.id !== id));
+                    setTotal(prev => prev - 1);
+                } else {
+                    setErrorMsg(data.error || `Fehler ${res.status}: Löschen fehlgeschlagen`);
+                }
             } else {
-                alert(data.error || 'Löschen fehlgeschlagen');
+                // Remember confirmed status BEFORE removing from local state
+                const wasConfirmed = leads.find(l => l.id === id)?.confirmed_at != null;
+                const res = await fetch('/api/admin/waitlist', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ leadId: id }),
+                });
+                const data = await res.json();
+                console.log('[admin] deleteLead response:', res.status, data);
+                if (data.success) {
+                    setLeads(prev => prev.filter(l => l.id !== id));
+                    setLeadsTotal(prev => prev - 1);
+                    if (wasConfirmed) setLeadsConfirmed(prev => prev - 1);
+                } else {
+                    setErrorMsg(data.error || `Fehler ${res.status}: Löschen fehlgeschlagen`);
+                }
             }
+        } catch (err) {
+            console.error('[admin] deleteError:', err);
+            setErrorMsg('Netzwerkfehler. Bitte erneut versuchen.');
         } finally {
             setActionLoading(null);
         }
@@ -189,6 +200,52 @@ export default function AdminPage() {
 
     return (
         <div className="p-8 max-w-6xl mx-auto">
+
+            {/* Inline Delete Confirmation Modal */}
+            {confirmDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4 border border-[#E7E7E5]">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 bg-red-50 rounded-xl">
+                                <AlertTriangle className="w-5 h-5 text-red-500" />
+                            </div>
+                            <h3 className="font-semibold text-[#37352F]">
+                                {confirmDelete.type === 'user' ? 'User löschen?' : 'Lead löschen?'}
+                            </h3>
+                        </div>
+                        <p className="text-sm text-[#73726E] mb-6">
+                            <span className="font-medium text-[#37352F]">{confirmDelete.email}</span> wirklich unwiderruflich löschen?
+                            {confirmDelete.type === 'user' && ' Alle Daten werden gelöscht.'}
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setConfirmDelete(null)}
+                                className="flex-1 py-2 px-4 rounded-lg border border-[#E7E7E5] text-sm font-medium text-[#37352F] hover:bg-[#FAFAF9] transition-colors"
+                            >
+                                Abbrechen
+                            </button>
+                            <button
+                                onClick={executeDelete}
+                                className="flex-1 py-2 px-4 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
+                            >
+                                Löschen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Error Banner */}
+            {errorMsg && (
+                <div className="mb-6 flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                    <XCircle className="w-4 h-4 shrink-0" />
+                    <span>{errorMsg}</span>
+                    <button onClick={() => setErrorMsg(null)} className="ml-auto text-red-400 hover:text-red-600">
+                        <XCircle className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex items-center gap-3 mb-8">
                 <div className="p-2.5 bg-gradient-to-br from-red-500/10 to-orange-500/10 rounded-xl">
