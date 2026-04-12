@@ -659,26 +659,6 @@ export function ActiveCVCard() {
                                 </div>
                             </div>
 
-                            {/* Example box */}
-                            <div className="bg-[#FAFAF9] border border-[#E7E7E5] rounded-xl p-4 mb-5">
-                                <p className="text-xs font-semibold text-[#37352F] mb-2 uppercase tracking-wide">
-                                    {t('cl_hint_example_label')}
-                                </p>
-                                <ul className="space-y-1.5">
-                                    <li className="text-xs text-[#73726E] flex items-start gap-1.5">
-                                        <span className="text-[#012e7a] mt-0.5 shrink-0">•</span>
-                                        {t('cl_hint_bullet_1')}
-                                    </li>
-                                    <li className="text-xs text-[#73726E] flex items-start gap-1.5">
-                                        <span className="text-[#012e7a] mt-0.5 shrink-0">•</span>
-                                        {t('cl_hint_bullet_2')}
-                                    </li>
-                                    <li className="text-xs text-[#73726E] flex items-start gap-1.5">
-                                        <span className="text-[#012e7a] mt-0.5 shrink-0">•</span>
-                                        {t('cl_hint_bullet_3')}
-                                    </li>
-                                </ul>
-                            </div>
 
                             {/* Actions */}
                             <div className="flex flex-col gap-3">
