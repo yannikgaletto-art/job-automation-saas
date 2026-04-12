@@ -1431,7 +1431,15 @@
     "cv_hint_bullet_2": "Analyse qualitativer Daten und Erstellung von Handlungsempfehlungen",
     "cv_hint_bullet_3": "Reduktion der Fehlerquote um 34% durch iteratives Prototyping",
     "cv_hint_continue": "Lebenslauf hochladen",
-    "cv_hint_dismiss": "Habe ich gelesen"
+    "cv_hint_dismiss": "Habe ich gelesen",
+    "cl_hint_title": "Kurzer Hinweis zu deinem Anschreiben",
+    "cl_hint_description": "Lade dein bestes Anschreiben hoch — das, was am meisten nach dir klingt. So lernt Pathly deinen Ausdruck, Stil und Aufbau kennen und passt das neue Anschreiben direkt daran an.",
+    "cl_hint_example_label": "Welches Anschreiben passt?",
+    "cl_hint_bullet_1": "Das Anschreiben, das du selbst am besten findest",
+    "cl_hint_bullet_2": "Das, das am authentischsten klingt — nicht das perfekteste",
+    "cl_hint_bullet_3": "Am besten eines, das zu einer Stelle gepasst hat, die du möchtest",
+    "cl_hint_continue": "Anschreiben hochladen",
+    "cl_hint_dismiss": "Habe ich gelesen"
   },
   "tour": {
     "step1_title": "Deine Tagesziele",

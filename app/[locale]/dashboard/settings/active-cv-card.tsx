@@ -34,6 +34,7 @@ type CategoryMap = Record<string, string[]>; // categoryName → [documentId, ..
 const STORAGE_KEY = 'pathly_cl_categories';
 const COLLAPSED_KEY = 'pathly_cl_collapsed';
 const CV_HINT_DISMISSED_KEY = 'pathly_cv_hint_dismissed';
+const CL_HINT_DISMISSED_KEY = 'pathly_cl_hint_dismissed';
 
 function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("de-DE", {
@@ -91,9 +92,16 @@ export function ActiveCVCard() {
     const [pendingCvFile, setPendingCvFile] = useState<File | null>(null);
     const cvHintDismissedRef = useRef(false);
 
+    // CL upload hint dialog
+    const [showClHint, setShowClHint] = useState(false);
+    const [isClDismissing, setIsClDismissing] = useState(false);
+    const [pendingClFile, setPendingClFile] = useState<File | null>(null);
+    const clHintDismissedRef = useRef(false);
+
     useEffect(() => {
         try {
             cvHintDismissedRef.current = localStorage.getItem(CV_HINT_DISMISSED_KEY) === 'true';
+            clHintDismissedRef.current = localStorage.getItem(CL_HINT_DISMISSED_KEY) === 'true';
         } catch {}
     }, []);
 
@@ -140,6 +148,52 @@ export function ActiveCVCard() {
         } else {
             setPendingCvFile(file);
             setShowCvHint(true);
+        }
+    };
+
+    // ── CL Hint handlers ──────────────────────────────────────────────────────
+    const handleClUploadClick = () => {
+        if (clHintDismissedRef.current) {
+            clRef.current?.click();
+        } else {
+            setShowClHint(true);
+        }
+    };
+
+    const handleClHintContinue = () => {
+        setShowClHint(false);
+        if (pendingClFile) {
+            handleUpload(pendingClFile, 'cover_letter');
+            setPendingClFile(null);
+        } else {
+            clRef.current?.click();
+        }
+    };
+
+    const handleClHintDismissForever = () => {
+        if (isClDismissing) return;
+        setIsClDismissing(true);
+        try { localStorage.setItem(CL_HINT_DISMISSED_KEY, 'true'); } catch {}
+        clHintDismissedRef.current = true;
+        const pending = pendingClFile;
+        setPendingClFile(null);
+        setTimeout(() => {
+            setShowClHint(false);
+            setIsClDismissing(false);
+            if (pending) {
+                handleUpload(pending, 'cover_letter');
+            } else {
+                clRef.current?.click();
+            }
+        }, 1000);
+    };
+
+    const handleClFileSelect = (file: File) => {
+        if (clHintDismissedRef.current) {
+            handleUpload(file, 'cover_letter');
+        } else {
+            setPendingClFile(file);
+            setShowClHint(true);
         }
     };
 
@@ -449,7 +503,7 @@ export function ActiveCVCard() {
                         <Button
                             variant="secondary"
                             className="text-xs h-8"
-                            onClick={() => clRef.current?.click()}
+                            onClick={handleClUploadClick}
                             disabled={!!uploading || clDocs.length >= 3}
                             title={clDocs.length >= 3 ? 'Bitte lösche erst ein bestehendes Anschreiben' : undefined}
                         >
@@ -578,9 +632,86 @@ export function ActiveCVCard() {
                     </div>
                 )}
                 <input ref={clRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) { handleUpload(f, 'cover_letter'); e.target.value = ''; } }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { handleClFileSelect(f); e.target.value = ''; } }}
                 />
             </div>
+            {/* CL Upload Hint Dialog */}
+            {showClHint && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+                        onClick={() => { if (!isClDismissing) { setShowClHint(false); setPendingClFile(null); } }}
+                    />
+                    <div className="relative bg-white rounded-2xl shadow-2xl border border-[#E7E7E5] w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-6">
+                            {/* Icon + Title */}
+                            <div className="flex items-start gap-3 mb-4">
+                                <div className="p-2 bg-[#012e7a]/10 rounded-xl shrink-0">
+                                    <FileText className="w-5 h-5 text-[#012e7a]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-semibold text-[#37352F] leading-snug">
+                                        {t('cl_hint_title')}
+                                    </h3>
+                                    <p className="text-sm text-[#73726E] mt-1">
+                                        {t('cl_hint_description')}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Example box */}
+                            <div className="bg-[#FAFAF9] border border-[#E7E7E5] rounded-xl p-4 mb-5">
+                                <p className="text-xs font-semibold text-[#37352F] mb-2 uppercase tracking-wide">
+                                    {t('cl_hint_example_label')}
+                                </p>
+                                <ul className="space-y-1.5">
+                                    <li className="text-xs text-[#73726E] flex items-start gap-1.5">
+                                        <span className="text-[#012e7a] mt-0.5 shrink-0">•</span>
+                                        {t('cl_hint_bullet_1')}
+                                    </li>
+                                    <li className="text-xs text-[#73726E] flex items-start gap-1.5">
+                                        <span className="text-[#012e7a] mt-0.5 shrink-0">•</span>
+                                        {t('cl_hint_bullet_2')}
+                                    </li>
+                                    <li className="text-xs text-[#73726E] flex items-start gap-1.5">
+                                        <span className="text-[#012e7a] mt-0.5 shrink-0">•</span>
+                                        {t('cl_hint_bullet_3')}
+                                    </li>
+                                </ul>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={handleClHintContinue}
+                                    className="w-full px-4 py-2.5 bg-[#012e7a] text-white text-sm font-medium rounded-lg hover:bg-[#011f5e] transition-colors"
+                                >
+                                    {t('cl_hint_continue')}
+                                </button>
+                                <button
+                                    onClick={handleClHintDismissForever}
+                                    className="flex items-center justify-center gap-2 w-full py-1"
+                                    disabled={isClDismissing}
+                                >
+                                    <span className={`relative w-7 h-4 rounded-full flex-shrink-0 transition-colors duration-300 ${
+                                        isClDismissing ? 'bg-[#012e7a]' : 'bg-[#E7E7E5]'
+                                    }`}>
+                                        <span className={`absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300 ${
+                                            isClDismissing ? 'left-3.5 bg-white' : 'left-0.5 bg-[#A8A29E]'
+                                        }`} />
+                                    </span>
+                                    <span className={`text-xs transition-colors duration-300 ${
+                                        isClDismissing ? 'text-[#012e7a] font-medium' : 'text-[#A8A29E]'
+                                    }`}>
+                                        {t('cl_hint_dismiss')}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
             {/* CV Upload Hint Dialog */}
             {showCvHint && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center">

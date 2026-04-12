@@ -1431,7 +1431,15 @@
     "cv_hint_bullet_2": "Análisis de datos cualitativos y elaboración de recomendaciones",
     "cv_hint_bullet_3": "Reducción del 34% en la tasa de errores mediante prototipado iterativo",
     "cv_hint_continue": "Subir CV",
-    "cv_hint_dismiss": "Lo he leído"
+    "cv_hint_dismiss": "Lo he leído",
+    "cl_hint_title": "Una nota rápida sobre tu carta",
+    "cl_hint_description": "Sube tu mejor carta de presentación — la que más suena como tú. Pathly la usa para aprender tu estilo, expresión y estructura, y luego lo refleja en cada nueva carta que genera.",
+    "cl_hint_example_label": "¿Qué carta elegir?",
+    "cl_hint_bullet_1": "La carta de la que más orgulloso estás",
+    "cl_hint_bullet_2": "La que suena más auténtica — no la más pulida",
+    "cl_hint_bullet_3": "Preferiblemente una escrita para un puesto que realmente querías",
+    "cl_hint_continue": "Subir carta de presentación",
+    "cl_hint_dismiss": "Lo he leído"
   },
   "tour": {
     "step1_title": "Tus objetivos del día",
