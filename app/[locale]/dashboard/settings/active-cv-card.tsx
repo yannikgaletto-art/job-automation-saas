@@ -653,7 +653,11 @@ export function ActiveCVCard() {
                                     <h3 className="text-base font-semibold text-[#37352F] leading-snug">
                                         {t('cl_hint_title')}
                                     </h3>
-                                    <p className="text-sm text-[#73726E] mt-1" dangerouslySetInnerHTML={{ __html: t('cl_hint_description') }} />
+                                    <p className="text-sm text-[#73726E] mt-1">
+                                        {t.rich('cl_hint_description', {
+                                            strong: (chunks) => <strong className="font-semibold text-[#37352F]">{chunks}</strong>
+                                        })}
+                                    </p>
                                 </div>
                             </div>
 
