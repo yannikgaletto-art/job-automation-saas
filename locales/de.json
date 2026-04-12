@@ -1433,7 +1433,7 @@
     "cv_hint_continue": "Lebenslauf hochladen",
     "cv_hint_dismiss": "Habe ich gelesen",
     "cl_hint_title": "Kurzer Hinweis zu deinem Anschreiben",
-    "cl_hint_description": "Lade dein bestes Anschreiben hoch — das, was am meisten nach dir klingt. So lernt Pathly deinen Ausdruck, Stil und Aufbau kennen und passt das neue Anschreiben direkt daran an.",
+    "cl_hint_description": "Lade dein <strong>bestes Anschreiben</strong> hoch, das, was am meisten nach dir klingt. So lernt Pathly deinen <strong>Ausdruck</strong>, <strong>Stil</strong> und <strong>Aufbau</strong> kennen und passt das neue Anschreiben direkt daran an.",
     "cl_hint_example_label": "Welches Anschreiben passt?",
     "cl_hint_bullet_1": "Das Anschreiben, das du selbst am besten findest",
     "cl_hint_bullet_2": "Das, das am authentischsten klingt — nicht das perfekteste",

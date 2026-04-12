@@ -1433,7 +1433,7 @@
     "cv_hint_continue": "Upload CV",
     "cv_hint_dismiss": "I've read this",
     "cl_hint_title": "A quick note about your cover letter",
-    "cl_hint_description": "Upload your best cover letter — the one that sounds most like you. Pathly uses it to learn your voice, style, and structure, then mirrors it in every new letter it generates.",
+    "cl_hint_description": "Upload your <strong>best cover letter</strong>, the one that sounds most like you. Pathly uses it to learn your <strong>voice</strong>, <strong>style</strong>, and <strong>structure</strong>, then mirrors it in every new letter it generates.",
     "cl_hint_example_label": "Which cover letter fits?",
     "cl_hint_bullet_1": "The cover letter you're most proud of",
     "cl_hint_bullet_2": "The one that sounds most authentic — not the most polished",
