@@ -7,6 +7,9 @@
  * FALLBACK: When UPSTASH_REDIS_URL is not set (local dev), all rate checks
  * pass through with a console warning — matching old in-memory behavior.
  *
+ * LAZY INIT: Redis connection and rate limiters are created on first use,
+ * not at module import time — prevents Vercel build failures.
+ *
  * Usage:
  *   import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
  *   const blocked = await checkUpstashLimit(rateLimiters.coverLetter, user.id);
@@ -16,25 +19,39 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
-// ── Guard: Only create Redis if env vars present ───────────────────────────
-const hasRedis = !!(process.env.UPSTASH_REDIS_URL?.trim() && process.env.UPSTASH_REDIS_TOKEN?.trim());
+// ── Lazy Singleton — created on first access ──────────────────────────────
+let _redis: Redis | null | undefined;
+let _limiters: Record<string, Ratelimit | null> | undefined;
 
-if (!hasRedis && process.env.NODE_ENV !== 'test') {
-    console.warn(
-        '[rate-limit-upstash] ⚠️ UPSTASH_REDIS_URL/TOKEN not set — rate limiting DISABLED. ' +
-        'This is OK for local dev but MUST be configured on Vercel.'
-    );
+/** Strip accidental quotes from env var values (common copy-paste error) */
+function cleanEnv(val: string | undefined): string {
+    return (val ?? '').trim().replace(/^["']|["']$/g, '');
 }
 
-const redis = hasRedis
-    ? new Redis({
-        url: process.env.UPSTASH_REDIS_URL!,
-        token: process.env.UPSTASH_REDIS_TOKEN!,
-    })
-    : null;
+function getRedis(): Redis | null {
+    if (_redis !== undefined) return _redis;
+
+    const url = cleanEnv(process.env.UPSTASH_REDIS_URL);
+    const token = cleanEnv(process.env.UPSTASH_REDIS_TOKEN);
+
+    if (!url || !token) {
+        if (process.env.NODE_ENV !== 'test') {
+            console.warn(
+                '[rate-limit-upstash] ⚠️ UPSTASH_REDIS_URL/TOKEN not set — rate limiting DISABLED. ' +
+                'This is OK for local dev but MUST be configured on Vercel.'
+            );
+        }
+        _redis = null;
+        return null;
+    }
+
+    _redis = new Redis({ url, token });
+    return _redis;
+}
 
 // ── Rate Limiter Factory ───────────────────────────────────────────────────
 function createLimiter(prefix: string, requests: number, window: string): Ratelimit | null {
+    const redis = getRedis();
     if (!redis) return null;
     return new Ratelimit({
         redis,
@@ -44,33 +61,41 @@ function createLimiter(prefix: string, requests: number, window: string): Rateli
     });
 }
 
-// ── Rate Limiter Registry ──────────────────────────────────────────────────
-// Each limiter has its own prefix → no key collisions.
-// Limits match the previous in-memory values to avoid behavioral changes.
+// ── Rate Limiter Registry (lazy — built on first property access) ──────────
+function getLimiters() {
+    if (_limiters) return _limiters;
+    _limiters = {
+        // AI-powered endpoints (protect API spend)
+        cvMatch: createLimiter('rl:cv-match', 5, '1 m'),
+        cvOptimize: createLimiter('rl:cv-optimize', 3, '1 m'),
+        cvBullet: createLimiter('rl:cv-bullet', 10, '1 m'),
+        coverLetter: createLimiter('rl:cover-letter', 3, '1 m'),
+        videoScript: createLimiter('rl:video-script', 3, '1 m'),
 
-export const rateLimiters = {
-    // AI-powered endpoints (protect API spend)
-    cvMatch: createLimiter('rl:cv-match', 5, '1 m'),
-    cvOptimize: createLimiter('rl:cv-optimize', 3, '1 m'),
-    cvBullet: createLimiter('rl:cv-bullet', 10, '1 m'),
-    coverLetter: createLimiter('rl:cover-letter', 3, '1 m'),
-    videoScript: createLimiter('rl:video-script', 3, '1 m'),
+        // User interaction endpoints
+        feedback: createLimiter('rl:feedback', 3, '10 m'),
+        transcribe: createLimiter('rl:transcribe', 20, '10 m'),
+        jobSearch: createLimiter('rl:job-search', 10, '1 m'),
 
-    // User interaction endpoints
-    feedback: createLimiter('rl:feedback', 3, '10 m'),
-    transcribe: createLimiter('rl:transcribe', 20, '10 m'),
-    jobSearch: createLimiter('rl:job-search', 10, '1 m'),
+        // Public endpoints (keyed by IP hash, not user ID)
+        waitlist: createLimiter('rl:waitlist', 3, '1 m'),
 
-    // Public endpoints (keyed by IP hash, not user ID)
-    waitlist: createLimiter('rl:waitlist', 3, '1 m'),
+        // Coaching endpoints (previously unprotected — cost protection)
+        coachingMessage: createLimiter('rl:coaching-msg', 15, '1 m'),
+        coachingTranscribe: createLimiter('rl:coaching-transcribe', 20, '10 m'),
 
-    // Coaching endpoints (previously unprotected — cost protection)
-    coachingMessage: createLimiter('rl:coaching-msg', 15, '1 m'),
-    coachingTranscribe: createLimiter('rl:coaching-transcribe', 20, '10 m'),
+        // Job ingest (time-based, complements max-5-active guard)
+        jobIngest: createLimiter('rl:job-ingest', 5, '1 m'),
+    };
+    return _limiters;
+}
 
-    // Job ingest (time-based, complements max-5-active guard)
-    jobIngest: createLimiter('rl:job-ingest', 5, '1 m'),
-};
+/** Lazy proxy — `rateLimiters.coverLetter` triggers init on first access */
+export const rateLimiters = new Proxy({} as Record<string, Ratelimit | null>, {
+    get(_target, prop: string) {
+        return getLimiters()[prop] ?? null;
+    },
+});
 
 // ── Helper — Drop-in replacement for old `checkRateLimit()` ────────────────
 /**
