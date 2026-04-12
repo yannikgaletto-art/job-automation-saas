@@ -1426,12 +1426,12 @@
     "eu_privacy_note": "Tus datos se extraen y procesan en servidores de la UE conforme al RGPD.",
     "cv_hint_title": "Una nota rápida sobre tu CV",
     "cv_hint_description": "Para optimizar tu CV, necesitamos 2-3 puntos por puesto.",
-    "cv_hint_example_label": "Cómo debería verse",
+    "cv_hint_example_label": "Nuestra recomendación",
     "cv_hint_bullet_1": "Diseño y ejecución de 12+ pruebas de usabilidad",
     "cv_hint_bullet_2": "Análisis de datos cualitativos y elaboración de recomendaciones",
     "cv_hint_bullet_3": "Reducción del 34% en la tasa de errores mediante prototipado iterativo",
     "cv_hint_continue": "Subir CV",
-    "cv_hint_dismiss": "Ya lo leí — no mostrar más"
+    "cv_hint_dismiss": "Lo he leído"
   },
   "tour": {
     "step1_title": "Tus objetivos del día",

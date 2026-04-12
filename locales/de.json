@@ -1426,12 +1426,12 @@
     "eu_privacy_note": "Deine Daten werden DSGVO-konform auf EU-Servern extrahiert und verarbeitet.",
     "cv_hint_title": "Kurzer Hinweis zu deinem Lebenslauf",
     "cv_hint_description": "Um deinen CV zu optimieren, benötigen wir 2-3 Stichpunkte pro Station.",
-    "cv_hint_example_label": "So sollte es aussehen",
+    "cv_hint_example_label": "So empfehlen wir es",
     "cv_hint_bullet_1": "Konzeption und Durchführung von 12+ Usability-Tests",
     "cv_hint_bullet_2": "Analyse qualitativer Daten und Erstellung von Handlungsempfehlungen",
     "cv_hint_bullet_3": "Reduktion der Fehlerquote um 34% durch iteratives Prototyping",
     "cv_hint_continue": "Lebenslauf hochladen",
-    "cv_hint_dismiss": "Habe ich gelesen \u2014 nicht mehr anzeigen"
+    "cv_hint_dismiss": "Habe ich gelesen"
   },
   "tour": {
     "step1_title": "Deine Tagesziele",

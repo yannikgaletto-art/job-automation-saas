@@ -1426,12 +1426,12 @@
     "eu_privacy_note": "Your data is extracted and processed GDPR-compliantly on EU servers.",
     "cv_hint_title": "A quick note about your CV",
     "cv_hint_description": "To optimize your CV, we need 2-3 bullet points per position.",
-    "cv_hint_example_label": "What it should look like",
+    "cv_hint_example_label": "Our recommendation",
     "cv_hint_bullet_1": "Designed and ran 12+ usability tests",
     "cv_hint_bullet_2": "Analyzed qualitative data and created action recommendations",
     "cv_hint_bullet_3": "Reduced error rate by 34% through iterative prototyping",
     "cv_hint_continue": "Upload CV",
-    "cv_hint_dismiss": "I've read this — don't show again"
+    "cv_hint_dismiss": "I've read this"
   },
   "tour": {
     "step1_title": "Your Daily Goals",

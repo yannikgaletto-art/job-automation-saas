@@ -116,13 +116,17 @@ export function ActiveCVCard() {
     const handleCvHintDismissForever = () => {
         try { localStorage.setItem(CV_HINT_DISMISSED_KEY, 'true'); } catch {}
         cvHintDismissedRef.current = true;
-        setShowCvHint(false);
-        if (pendingCvFile) {
-            handleUpload(pendingCvFile, 'cv');
-            setPendingCvFile(null);
-        } else {
-            cvRef.current?.click();
-        }
+        const pending = pendingCvFile;
+        setPendingCvFile(null);
+        // 1s delay so the toggle animation is visible before closing
+        setTimeout(() => {
+            setShowCvHint(false);
+            if (pending) {
+                handleUpload(pending, 'cv');
+            } else {
+                cvRef.current?.click();
+            }
+        }, 1000);
     };
 
     const handleCvFileSelect = (file: File) => {
@@ -574,7 +578,7 @@ export function ActiveCVCard() {
             </div>
             {/* CV Upload Hint Dialog */}
             {showCvHint && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center">
                     {/* Backdrop */}
                     <div
                         className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
