@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// 20 transcriptions per 10 minutes per user (generous — each is short)
-const transcribeLimiter = createRateLimiter({ maxRequests: 20, windowMs: 600_000 });
+
 
 /**
  * POST /api/feedback/transcribe
@@ -24,8 +23,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Rate limit
-        const rateLimited = checkRateLimit(transcribeLimiter, user.id, 'feedback/transcribe');
+        // Rate limit (Upstash Redis)
+        const rateLimited = await checkUpstashLimit(rateLimiters.transcribe, user.id);
         if (rateLimited) return rateLimited;
 
         // Parse the audio blob from FormData

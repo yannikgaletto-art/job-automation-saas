@@ -17,9 +17,9 @@ import { searchJobs, type JobSearchFilters, type SerpLocale } from '@/lib/servic
 import { complete } from '@/lib/ai/model-router';
 import { requireJobSearchQuota, handleBillingError } from '@/lib/middleware/credit-gate';
 import { incrementJobSearchUsage } from '@/lib/services/credit-service';
-import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
-const jobSearchLimiter = createRateLimiter({ maxRequests: 10, windowMs: 60_000 });
+
 
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const MAX_SAVED_SEARCHES = 10;
@@ -149,8 +149,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
         }
 
-        // Rate limit: max 10 searches/min to prevent SerpAPI cost spikes
-        const rateLimited = checkRateLimit(jobSearchLimiter, user.id, 'job-search/query');
+        // Rate limit: max 10 searches/min to prevent SerpAPI cost spikes (Upstash Redis)
+        const rateLimited = await checkUpstashLimit(rateLimiters.jobSearch, user.id);
         if (rateLimited) return rateLimited;
 
         const body = await request.json();

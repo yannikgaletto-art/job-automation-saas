@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logging';
-import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import Anthropic from '@anthropic-ai/sdk';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
@@ -15,8 +15,7 @@ const supabaseAdmin = createAdminClient(
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
-// Rate limit: 3 script generations per minute per user
-const scriptGenLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
+
 
 interface CategorizedKeywords {
     mustHave: string[];
@@ -67,8 +66,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized', requestId }, { status: 401 });
         }
 
-        // Rate limit check
-        const rateLimited = checkRateLimit(scriptGenLimiter, user.id, 'video/scripts/generate');
+        // Rate limit check (Upstash Redis)
+        const rateLimited = await checkUpstashLimit(rateLimiters.videoScript, user.id);
         if (rateLimited) return rateLimited;
 
         const log = logger.forRequest(requestId, user.id, '/api/video/scripts/generate');

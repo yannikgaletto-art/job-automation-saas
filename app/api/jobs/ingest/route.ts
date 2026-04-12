@@ -10,6 +10,7 @@ import { inngest } from '@/lib/inngest/client';
 import { complete } from '@/lib/ai/model-router';
 import { getUserLocale, getLanguageName } from '@/lib/i18n/get-user-locale';
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -66,6 +67,10 @@ export async function POST(request: NextRequest) {
         }
 
         const userId = user.id;
+
+        // Rate limit (Upstash Redis — 5 req/min, complements max-5-active guard)
+        const rateLimited = await checkUpstashLimit(rateLimiters.jobIngest, userId);
+        if (rateLimited) return rateLimited;
 
         // ================================================================
         // STEP 0.5: Enforce max 5 active jobs per user
@@ -352,6 +357,17 @@ Schema: ${JSON.stringify(extractionSchema)}`,
         }
 
         console.log(`[${requestId}] route=jobs/ingest step=complete duration_ms=${Date.now() - startTime} job_id=${job.id}`);
+
+        // §ANALYTICS: Track job added (PostHog)
+        try {
+            const { captureServerEvent } = await import('@/lib/posthog/server');
+            captureServerEvent(userId, 'job_added_to_queue', {
+                jobId: job.id,
+                source: source || 'unknown',
+                hasSourceUrl: !!normalizedSourceUrl,
+                cacheHit: !!cachedExtraction,
+            });
+        } catch { /* non-blocking */ }
 
         // ================================================================
         // STEP 4.5: Trigger strong extraction pipeline (Lazy Extraction)

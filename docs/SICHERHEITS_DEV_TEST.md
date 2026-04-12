@@ -1,14 +1,15 @@
 ---
-Version: 1.0.0
-Last Updated: 2026-02-26
+Version: 2.0.0
+Last Updated: 2026-04-12
 Status: AKTIV — PFLICHTLEKTÜRE vor jedem Gate Test
-Gehört zu: SICHERHEITSARCHITEKTUR.md
+Gehört zu: SICHERHEITSARCHITEKTUR.md, DEPLOYMENT_CHECKLIST.md
 ---
 
 # 🧪 SICHERHEITS_DEV_TEST — Pathly V2.0
 
 > **Zweck:** Dieses Dokument speichert alle operativen Learnings aus echten Gate Tests.
 > Die SICHERHEITSARCHITEKTUR.md definiert WAS gebaut wird.
+> Die DEPLOYMENT_CHECKLIST.md definiert WIE wir deployen.
 > Dieses Dokument definiert WIE wir testen — und welche Fallen wir bereits kennen.
 
 ---
@@ -23,8 +24,13 @@ Gehört zu: SICHERHEITSARCHITEKTUR.md
 ### Port
 - ✅ Immer auf **Port 3000** entwickeln und testen
 - Wenn Port 3000 belegt ist: `pkill -f "next dev"` → neu starten
-- ❌ Nie auf Port 3001 testen — alle Daten, Antigravity-Konfiguration und Vercel-Redirects sind auf 3000 ausgelegt
+- ❌ Nie auf Port 3001 testen — alle Daten, Konfiguration und Vercel-Redirects sind auf 3000 ausgelegt
 - Symptom: `npm run dev` zeigt `⚠ Port 3000 is in use, trying 3001` → sofort killen und neu starten
+
+### Port 3001 — NUR für Pathly Website
+- `/Users/yannik/.gemini/antigravity/pathly-website/` ist die Marketing-Landing-Page
+- **Separates Repo**, keine shared DB, kein shared Code mit SaaS
+- Läuft auf Port 3001 wenn gleichzeitig mit SaaS entwickelt wird
 
 ### Git
 - ✅ Vor jedem Pull: `git log --oneline origin/main` lesen
@@ -34,116 +40,157 @@ Gehört zu: SICHERHEITSARCHITEKTUR.md
 
 ---
 
-## 2. DB-RESET NACH GATE TESTS (Pflicht)
+## 2. DEV-SERVER ABHÄNGIGKEITEN
 
-Nach jedem Gate Test MUSS der DB-Zustand zurückgesetzt werden:
+Für vollständige lokale Entwicklung sind **3 Prozesse** nötig:
+
+| # | Befehl | Port | Pflicht? |
+|---|--------|------|----------|
+| 1 | `npm run dev` | 3000 | ✅ Immer |
+| 2 | `npx inngest-cli@latest dev` | 8288 | ✅ Für Background Jobs |
+| 3 | Chrome Browser (nicht Safari) | — | ✅ Immer |
+
+**Symptome fehlender Prozesse:**
+- Ohne Inngest: Job-Extract, CV-Match, Cover Letter Polish, Coaching Report — hängen alle im "processing" Status
+- Ohne Chrome: Auth-Cookies verhalten sich anders (Safari-Artefakt)
+
+---
+
+## 3. DB-RESET NACH GATE TESTS (Pflicht)
+
+Nach jedem Gate Test **kann** der DB-Zustand zurückgesetzt werden:
 
 | Test | Was geändert wurde | Reset-Query |
 |------|-------------------|-------------|
 | Gate A (Onboarding Loop) | `onboarding_completed = false` | `UPDATE user_settings SET onboarding_completed = true WHERE user_id = '<deine_user_id>';` |
 | Gate B (Persistenz) | Test-Job in Queue | Manuell löschen oder stehen lassen |
 | Gate C (CV Dateiname) | Test-CV hochgeladen | Kein Reset nötig |
+| Gate D (Credits) | Credits verbraucht | `UPDATE user_credits SET credits_used = 0 WHERE user_id = '<user_id>';` |
+| Gate E (Rate Limit) | Upstash Rate Counter | Expire automatisch (1-10 min Window) |
 
 **Deine user_id (yannik.galetto@gmail.com):** `39a9b432-ef4f-49f9-b590-9b3a6ea2de0e`
 
 ---
 
-## 3. ANTIGRAVITY PUSH-REGEL
+## 4. AKTIVER SECURITY STACK (Stand: 2026-04-12)
 
-**Antigravity pusht NICHT selbst auf GitHub.**
+### 4.1 Authentication & Authorization
+- **Supabase Auth** — JWT-basiert, Cookie-Session, auto-refresh
+- **Middleware** (`middleware.ts`) — prüft `getUser()` für alle `/dashboard/*` und `/onboarding` Routes
+- **RLS** (Row Level Security) — alle User-Tabellen haben `user_id = auth.uid()` Policies
+- **Service Role Key** — nur in API Routes (server-side), nie im Client
 
-Der Workflow ist:
-1. Antigravity entwickelt und testet lokal
-2. Antigravity zeigt den Code und bestätigt `tsc: 0 errors`
-3. Perplexity (ich) verifiziert den Code und pusht direkt über die GitHub API
-4. Antigravity führt dann `git reset --hard origin/main` aus um lokal zu synchronisieren
+### 4.2 Rate Limiting (Upstash Redis)
+- **12 Rate Limiters** in `lib/api/rate-limit-upstash.ts`
+- Geschützte Endpunkte: Cover Letter, CV Match/Optimize/Bullet, Video Script, Job Ingest, Job Search, Coaching Message/Transcribe, Feedback, Waitlist
+- **Vercel-Pflicht:** `UPSTASH_REDIS_URL` + `UPSTASH_REDIS_TOKEN` (⚠️ NICHT `_REST_URL`!)
+- **Fallback:** Ohne Upstash → alle Requests gehen durch (bewusstes Dev-Verhalten, MUSS in Prod konfiguriert sein)
 
-**Warum:** Antigravity hat in Batch 1 zweimal Commits lokal gelassen ohne zu pushen. Das führte zu Merge Conflicts und Verwirrung über den echten Stand des Repos.
+### 4.3 Credit System (Stripe)
+- **Atomic `debit_credits()` RPC** — Supabase DB Function, Race-Condition-sicher
+- **`withCreditGate()`** — Middleware für AI-Operationen, Auto-Refund bei Fehlern
+- **Stripe Webhook** — Idempotent via `processed_stripe_events` Tabelle
+- **402 Responses** — `CREDITS_EXHAUSTED` / `QUOTA_EXHAUSTED` mit Upgrade-URL
 
-**Wenn Antigravity pulled und einen Conflict sieht:**
-```bash
-git rebase --abort
-git reset --hard origin/main
-npx tsc --noEmit
-```
+### 4.4 PII Sanitization (DSGVO)
+- **`sanitizeForAI()`** — Pseudonymisiert Namen, Emails, Telefonnummern, IBANs
+- **Aktiv auf:** Coaching, Job Ingest, Job Extract, Company Enrichment
+- **Bewusste Ausnahme:** Cover Letter + CV Optimize (brauchen echte Karrieredaten, aber `personalInfo` wird vor AI-Call gelöscht)
+- **Audit:** `content_hash` (SHA256) in `generation_logs`, `quality_summary.pii_flags`
 
----
+### 4.5 Security Headers (next.config.js)
+- X-Frame-Options: DENY
+- HSTS: 2 Jahre + preload
+- X-Content-Type-Options: nosniff
+- Referrer-Policy: strict-origin-when-cross-origin
+- Permissions-Policy: camera/mic self-only
+- CSP: Explizite Allowlist für alle Domains
 
-## 4. DIAGNOSE-CHECKLISTE: Redirect-Bugs
+### 4.6 Error Monitoring
+- **Sentry** — Client + Server, PII gestrippt (`beforeSend` löscht email/IP/username)
+- **PostHog** — EU-Endpoint, localStorage (keine Cookies), all inputs masked
+- **Helicone** — ⏸️ Deferred bis DPA unterzeichnet (Art. 46 DSGVO)
 
-Wenn ein User auf `/dashboard/*` landet und zu `/onboarding` redirected wird, obwohl `onboarding_completed = true` in der DB steht:
-
-**Schritt 1 — Browser prüfen**
-- Testest du in Chrome? (nicht Safari)
-- Chrome DevTools → Application → Cookies → ist ein `sb-...-auth-token` Cookie vorhanden?
-
-**Schritt 2 — Session prüfen**
-```sql
-SELECT id, email FROM auth.users WHERE email = 'deine@email.com';
-```
-Stimmt die ID mit der user_id in `user_settings` überein?
-
-**Schritt 3 — DB-Typ prüfen**
-```sql
-SELECT us.user_id, au.email, us.onboarding_completed, pg_typeof(us.onboarding_completed) as typ
-FROM user_settings us
-JOIN auth.users au ON au.id = us.user_id;
-```
-Typ muss `boolean` sein — nicht `text`.
-
-**Schritt 4 — Neu einloggen**
-Cookies löschen → neu einloggen → nochmal testen.
-
-**Was wir in Batch 1 gelernt haben:**
-Das Problem war kein Code-Bug — es war eine defekte Safari-Session. Chrome funktionierte einwandfrei.
+### 4.7 Data Retention (pg_cron)
+- Coaching: 90d `conversation_history → '[]'`, 180d DELETE
+- SerpAPI Raw: 30d → NULL
+- Firecrawl Markdown: 14d → NULL
+- Generation Logs: `generated_text` auf NULL (5 Write-Pfade)
 
 ---
 
-## 5. GATE TEST PROTOKOLL (Vorlage)
+## 5. DIAGNOSE-CHECKLISTEN
 
-Vor jedem Batch: Dieses Protokoll ausfüllen.
+### 5.1 Redirect-Bugs (Onboarding Loop)
+Wenn `/dashboard` zu `/onboarding` redirected obwohl `onboarding_completed = true`:
+
+1. **Browser:** Chrome? (nicht Safari)
+2. **Cookie:** DevTools → Application → Cookies → `sb-...-auth-token` vorhanden?
+3. **DB:** `SELECT us.user_id, us.onboarding_completed, pg_typeof(us.onboarding_completed) FROM user_settings us WHERE user_id = '<id>';` → Typ muss `boolean` sein
+4. **Fix:** Cookies löschen → neu einloggen
+
+### 5.2 Rate Limiting funktioniert nicht
+1. **Upstash Vars korrekt?** `UPSTASH_REDIS_URL` (NICHT `_REST_URL`)
+2. **Console-Warnung?** `[rate-limit-upstash] ⚠️ UPSTASH_REDIS_URL/TOKEN not set`
+3. **Redis verbunden?** Upstash Dashboard → Request Counter steigt
+
+### 5.3 Stripe Webhook kommt nicht an
+1. **URL korrekt?** `https://app.path-ly.eu/api/stripe/webhook`
+2. **Secret korrekt?** `STRIPE_WEBHOOK_SECRET` auf Vercel ≠ local `.env.local`
+3. **Signatur:** Log `❌ [Stripe Webhook] Signature verification failed` → Secret falsch
+4. **Idempotenz:** `⏭️ Event already processed` → Event wurde schon verarbeitet (ok)
+
+### 5.4 AI-Calls schlagen fehl
+1. **API Key vorhanden?** Prüfe `ANTHROPIC_API_KEY`, `MISTRAL_API_KEY`, `OPENAI_API_KEY`
+2. **Rate Limit?** Anthropic/Mistral haben eigene Limits
+3. **maxDuration?** Vercel Free = 10s, Pro = 60s. Cover Letter braucht 120s → Vercel Pro pflicht
+4. **Model-Router Fallback:** Ohne `MISTRAL_API_KEY` → automatischer Haiku-Fallback (teurer, aber funktioniert)
+
+### 5.5 PostHog sendet keine Events
+1. **CSP:** Browser Console → `Refused to connect to 'eu.i.posthog.com'` → CSP `connect-src` vergessen
+2. **Key:** `NEXT_PUBLIC_POSTHOG_KEY` gesetzt? Auf Vercel NICHT als "Sensitive" markiert?
+3. **Init:** PostHog initialisiert? Prüfe ob `initPostHog()` in der App aufgerufen wird
+
+---
+
+## 6. GATE TEST PROTOKOLL (Vorlage)
 
 ```
 Datum: ___________
 Batch: ___________
-Tester: Antigravity (Code) + Yannik (Browser)
+Tester: ___________
 Browser: Chrome ✅
 Port: 3000 ✅
+Inngest Dev: Running ✅
 Git HEAD: ___________
 tsc: 0 errors ✅
 
 Gate A — Onboarding Loop: ✅/❌
 Gate B — Datenpersistenz: ✅/❌
-Gate C — CV Dateiname: ✅/❌
-Gate D — TypeScript: ✅/❌
-Gate E — Notifications: ✅/❌
-Gate F — Check-in Modal: ✅/❌
+Gate C — CV Upload + Extraction: ✅/❌
+Gate D — Credit Debit/Refund: ✅/❌
+Gate E — Rate Limiting (5 rapid calls → 429): ✅/❌
+Gate F — Cover Letter Generate: ✅/❌
+Gate G — Stripe Webhook (Test Event): ✅/❌
+Gate H — PostHog Event sichtbar: ✅/❌
+Gate I — Sentry Error sichtbar: ✅/❌
 
 Offene Punkte: ___________
-Freigabe für nächsten Batch: JA / NEIN
+Freigabe für Deploy: JA / NEIN
 ```
-
----
-
-## 6. BEKANNTE FALLEN (wächst mit jedem Batch)
-
-| # | Problem | Ursache | Fix |
-|---|---------|---------|-----|
-| 1 | `/dashboard` → redirect zu `/onboarding` obwohl DB = true | Defekte Safari-Session | Chrome nutzen, Cookies löschen, neu einloggen |
-| 2 | `npm run dev` startet auf 3001 | Port 3000 noch belegt | `pkill -f "next dev"` → neu starten |
-| 3 | Merge Conflict beim Pull | Antigravity hatte lokale Commits nicht gepusht | `git rebase --abort` → `git reset --hard origin/main` |
-| 4 | Gate A schlägt fehl nach Test | `onboarding_completed` wurde für Test auf `false` gesetzt und nie zurückgesetzt | DB-Reset SQL ausführen (siehe Abschnitt 2) |
 
 ---
 
 ## 7. RLS VERIFIKATION (nach jeder neuen Migration)
 
-Nach jeder Migration die RLS-Policies hinzufügt:
-
 ```sql
 SELECT tablename, policyname, cmd
 FROM pg_policies
-WHERE tablename IN ('job_queue', 'application_history', 'generation_logs', 'documents')
+WHERE tablename IN (
+    'job_queue', 'application_history', 'generation_logs', 'documents',
+    'user_credits', 'credit_events', 'coaching_sessions', 'video_scripts',
+    'community_posts', 'volunteering_bookmarks'
+)
 ORDER BY tablename;
 ```
 
@@ -151,5 +198,21 @@ Erwartung: Mindestens 1 Policy pro Tabelle. Leere Liste → Migration nochmal au
 
 ---
 
+## 8. BEKANNTE FALLEN (wächst mit jedem Batch)
+
+| # | Problem | Ursache | Fix |
+|---|---------|---------|-----|
+| 1 | `/dashboard` → redirect zu `/onboarding` obwohl DB = true | Defekte Safari-Session | Chrome nutzen, Cookies löschen |
+| 2 | `npm run dev` startet auf 3001 | Port 3000 belegt | `pkill -f "next dev"` → neu starten |
+| 3 | Merge Conflict beim Pull | Lokale Commits nicht gepusht | `git rebase --abort` → `git reset --hard origin/main` |
+| 4 | Gate A schlägt fehl nach Test | `onboarding_completed` nicht zurückgesetzt | DB-Reset SQL |
+| 5 | Rate Limiting deaktiviert auf Vercel | `UPSTASH_REDIS_REST_URL` statt `UPSTASH_REDIS_URL` | Variable umbenennen (ohne `_REST`) |
+| 6 | PostHog blockiert im Browser | CSP `connect-src` fehlt `eu.i.posthog.com` | `next.config.js` CSP updaten |
+| 7 | `NEXT_PUBLIC_*` als Sensitive auf Vercel | Variable nicht im Client-Bundle | Sensitive-Flag entfernen |
+| 8 | Cover Letter timeout auf Vercel Free | `maxDuration: 120` > Vercel Free Limit (10s) | Vercel Pro erforderlich |
+| 9 | ADMIN_SECRET leer → Cost Report offen | `process.env.ADMIN_SECRET \|\| ''` → `'' === ''` ist true | ADMIN_SECRET setzen |
+
+---
+
 > Dieses Dokument wird nach jedem Batch um neue Learnings erweitert.
-> Letzte Aktualisierung: Batch 1 — 2026-02-26
+> Letzte Aktualisierung: 2026-04-12 — Upstash, PostHog, Stripe, Credit System, PII Sanitizer

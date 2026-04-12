@@ -85,6 +85,14 @@ export async function POST(request: NextRequest) {
 
         console.log(`💳 [Stripe] Checkout session created for user ${user.id.slice(0, 8)}… (${mode})`);
 
+        // §ANALYTICS: Track checkout start (PostHog)
+        const { captureServerEvent } = await import('@/lib/posthog/server');
+        captureServerEvent(user.id, 'stripe_checkout_started', {
+            mode,
+            priceId,
+            isTopup,
+        });
+
         return NextResponse.json({ checkoutUrl });
     } catch (error) {
         console.error('❌ [Stripe] Checkout error:', error);

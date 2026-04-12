@@ -50,6 +50,8 @@
     "pdf-parse": "^2.4.5",
     "pdf2json": "^4.0.2",
     "pg": "^8.18.0",
+    "posthog-js": "^1.367.0",
+    "posthog-node": "^5.29.2",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

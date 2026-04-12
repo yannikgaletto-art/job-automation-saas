@@ -32,6 +32,8 @@
 | **Mood Check-in V2** | `app/[locale]/dashboard/hooks/useMoodCheckIn.tsx` + `app/api/mood/checkin/route.ts` | Adaptive Tag/Nacht-Symbole, Progressive Reduction (5× Skip → auto-hide), `MoodCheckinContext`, `CheckinSettingsCard` in Settings, i18n (de/en/es), `lib/mood/mood-symbols.ts` |
 | **Guided Tours** | `components/dashboard/guided-tour-overlay.tsx` | Onboarding tooltips, `useDashboardTour` hook, target-rect syncing, auto-clamp viewports, localStorage state |
 | **Stripe Billing** | `app/api/stripe/webhook/route.ts` | Credit system (Free/Starter/Durchstarter), atomic `debit_credits()` RPC, `withCreditGate()` middleware, Stripe Checkout/Portal, idempotent webhook, `lib/supabase/admin.ts` singleton |
+| **Product Analytics** | `lib/posthog/client.ts`, `server.ts` | PostHog (EU DSGVO). Next.js browser pageviews + 5 core server events (onboarding_completed, etc.). Storage mode: localStorage (no cookies), maskAllInputs: true. |
+| **Rate Limiting** | `lib/api/rate-limit-upstash.ts` | Upstash Redis. Distributed window limiter. Gracefully degrades to pass-through in local dev (if URL is missing) to prevent dev blockages. Protects 11 API routes against cost spikes. |
 
 ---
 
@@ -58,6 +60,8 @@ Authoritative source: **`supabase/migrations/`** (not `database/schema.sql` — 
 ## 3. MODEL ROUTING
 
 See `lib/ai/model-router.ts` — single source of truth.
+
+> **AI OBSERVABILITY:** All Anthropic calls are routed through Helicone proxy transparently if `HELICONE_API_KEY` is present. Provides cost-per-feature, latency, and prompt history without code changes at the consumption site. Fallback is direct Anthropic API.
 
 | Task Type | Model |
 |-----------|-------|

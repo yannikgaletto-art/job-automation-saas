@@ -4,7 +4,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { complete } from '@/lib/ai/model-router';
 import { cvOptimizationProposalSchema, CvOptimizationProposal, CvStructuredData, CvChange } from '@/types/cv';
 import crypto from 'crypto';
-import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import { logger } from '@/lib/logging';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { translateCvIfNeeded } from '@/lib/services/cv-translator';
@@ -12,8 +12,7 @@ import { pruneForOptimizer } from '@/lib/utils/cv-payload-pruner';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
-// Rate limit: 3 CV optimize requests per minute per user
-const cvOptimizeLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
+
 
 export const maxDuration = 120; // Vercel timeout protection — Claude Sonnet can take 40-75s on large payloads
 
@@ -160,8 +159,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Rate limit check (3 req/min per user)
-        const rateLimited = checkRateLimit(cvOptimizeLimiter, user.id, 'cv/optimize');
+        // Rate limit check (3 req/min per user — Upstash Redis)
+        const rateLimited = await checkUpstashLimit(rateLimiters.cvOptimize, user.id);
         if (rateLimited) return rateLimited;
 
         const log = logger.forRequest(undefined, user.id, '/api/cv/optimize');

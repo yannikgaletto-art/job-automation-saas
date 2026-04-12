@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// 3 feedback submissions per 10 minutes per user
-const feedbackLimiter = createRateLimiter({ maxRequests: 3, windowMs: 600_000 });
+
 
 /**
  * POST /api/feedback/submit
@@ -27,8 +26,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Rate limit
-        const rateLimited = checkRateLimit(feedbackLimiter, user.id, 'feedback/submit');
+        // Rate limit (Upstash Redis)
+        const rateLimited = await checkUpstashLimit(rateLimiters.feedback, user.id);
         if (rateLimited) return rateLimited;
 
         // Input validation

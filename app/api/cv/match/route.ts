@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { getCVText } from '@/lib/services/cv-text-retriever';
 import { inngest } from '@/lib/inngest/client';
-import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import { logger } from '@/lib/logging';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
@@ -12,8 +12,7 @@ import { runCVMatchAnalysis } from '@/lib/services/cv-match-analyzer';
 import { computeInputHash } from '@/lib/services/cv-match-hash';
 import { preMatchKeywords } from '@/lib/services/pre-match-keywords';
 
-// Rate limit: 5 CV match requests per minute per user
-const cvMatchLimiter = createRateLimiter({ maxRequests: 5, windowMs: 60_000 });
+
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 
@@ -59,8 +58,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Rate limit check (5 req/min per user)
-        const rateLimited = checkRateLimit(cvMatchLimiter, user.id, 'cv/match');
+        // Rate limit check (5 req/min per user — Upstash Redis)
+        const rateLimited = await checkUpstashLimit(rateLimiters.cvMatch, user.id);
         if (rateLimited) return rateLimited;
 
         const log = logger.forRequest(undefined, user.id, '/api/cv/match');

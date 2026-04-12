@@ -105,6 +105,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Verification failed', success: false }, { status: 500 });
         }
 
+        // §ANALYTICS: Track activation (PostHog)
+        const { captureServerEvent } = await import('@/lib/posthog/server');
+        captureServerEvent(user.id, 'onboarding_completed', {
+            language: language || 'de',
+            goals: onboarding_goals?.length ?? 0,
+        });
+
         return NextResponse.json({ success: true }); // NUR hier — nach verifiziertem Read-Back
     } catch (error: unknown) {
         console.error('[onboarding/complete] Fatal:', error);

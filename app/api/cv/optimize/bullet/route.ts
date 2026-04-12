@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
-import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
-// Rate limit: 10 bullet requests per minute per user (lightweight calls)
-const bulletLimiter = createRateLimiter({ maxRequests: 10, windowMs: 60_000 });
+
 
 // Isolated Anthropic client — same pattern as Coaching & Video Script Studio.
 // Does NOT use model-router.ts to avoid Forbidden File violation (FEATURE_COMPAT_MATRIX §0.1).
@@ -22,8 +21,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Rate limit
-        const rateLimited = checkRateLimit(bulletLimiter, user.id, 'cv/optimize/bullet');
+        // Rate limit (Upstash Redis)
+        const rateLimited = await checkUpstashLimit(rateLimiters.cvBullet, user.id);
         if (rateLimited) return rateLimited;
 
         const body = await req.json();

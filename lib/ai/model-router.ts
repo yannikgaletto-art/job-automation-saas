@@ -131,8 +131,19 @@ let anthropicClient: Anthropic | null = null;
 
 function getAnthropicClient() {
     if (!anthropicClient) {
+        const heliconeKey = process.env.HELICONE_API_KEY?.trim();
+
         anthropicClient = new Anthropic({
             apiKey: process.env.ANTHROPIC_API_KEY!,
+            // Helicone proxy: transparent cost tracking, prompt history, latency monitoring.
+            // When HELICONE_API_KEY is absent (e.g. local dev), falls back to direct Anthropic.
+            ...(heliconeKey ? {
+                baseURL: 'https://anthropic.helicone.ai/v1',
+                defaultHeaders: {
+                    'Helicone-Auth': `Bearer ${heliconeKey}`,
+                    'Helicone-Property-App': 'pathly-v2',
+                },
+            } : {}),
         });
     }
     return anthropicClient;

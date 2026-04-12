@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendCoachingMessage } from '@/lib/services/coaching-service';
 import type { SendMessageResponse } from '@/types/coaching';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 export async function POST(
     request: Request,
@@ -21,6 +22,10 @@ export async function POST(
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        // Rate limit (Upstash Redis — 15 req/min, generous for chat)
+        const rateLimited = await checkUpstashLimit(rateLimiters.coachingMessage, user.id);
+        if (rateLimited) return rateLimited;
 
         const { id: sessionId } = await params;
         const { message } = await request.json();

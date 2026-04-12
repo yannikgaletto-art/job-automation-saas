@@ -3,7 +3,7 @@ import { generateCoverLetterWithQuality } from '@/lib/services/cover-letter-gene
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
-import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import { logger } from '@/lib/logging';
 import { inngest } from '@/lib/inngest/client';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
@@ -14,8 +14,7 @@ import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 
 export const maxDuration = 120; // Vercel timeout — frontend client waits 180s, server allows 120s
 
-// Rate limit: 3 cover letter requests per minute per user
-const coverLetterLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
+
 
 // Admin client for DB writes (used after Auth Guard verification)
 const supabaseAdmin = getSupabaseAdmin();
@@ -30,8 +29,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized', requestId }, { status: 401 });
         }
 
-        // Rate limit check (3 req/min per user)
-        const rateLimited = checkRateLimit(coverLetterLimiter, user.id, 'cover-letter/generate');
+        // Rate limit check (3 req/min per user — Upstash Redis)
+        const rateLimited = await checkUpstashLimit(rateLimiters.coverLetter, user.id);
         if (rateLimited) return rateLimited;
 
         const log = logger.forRequest(requestId, user.id, '/api/cover-letter/generate');
@@ -80,6 +79,18 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(`[${requestId}] step=complete iterations=${result.iterations} judge=${result.judgePassed ? 'PASS' : 'FAIL'} cost=${result.costCents}¢`);
+
+        // §ANALYTICS: Track cover letter generation (PostHog)
+        try {
+            const { captureServerEvent } = await import('@/lib/posthog/server');
+            captureServerEvent(userId, 'cover_letter_generated', {
+                jobId,
+                fixMode: fixMode || 'full',
+                judgePassed: result.judgePassed,
+                iterations: result.iterations,
+                costCents: result.costCents,
+            });
+        } catch { /* non-blocking */ }
 
         // ─── B1.4: Auto-Save as Draft ─────────────────────────────────────────
         // Contract 2 (Document Storage Safety): Write → Read-Back → Validate

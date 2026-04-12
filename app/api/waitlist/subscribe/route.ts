@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
-import { createRateLimiter, checkRateLimit } from '@/lib/api/rate-limit';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 /**
  * POST /api/waitlist/subscribe
@@ -20,8 +20,7 @@ const supabaseAdmin = createClient(
     { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
-// Rate limit by IP: 3 submits per minute
-const waitlistLimiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
+
 
 // ─── CORS ────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
@@ -83,7 +82,7 @@ export async function POST(request: NextRequest) {
             || 'unknown';
         const ipHash = createHash('sha256').update(ip).digest('hex').substring(0, 16);
 
-        const rateLimited = checkRateLimit(waitlistLimiter, ipHash, 'waitlist/subscribe');
+        const rateLimited = await checkUpstashLimit(rateLimiters.waitlist, ipHash);
         if (rateLimited) {
             // Override CORS headers on the rate limit response
             const rlHeaders = new Headers(rateLimited.headers);

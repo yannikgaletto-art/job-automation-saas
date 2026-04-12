@@ -1,9 +1,9 @@
 /**
- * API Rate Limiter — Per-User Sliding Window
+ * @deprecated — USE `lib/api/rate-limit-upstash.ts` INSTEAD.
  *
- * In-memory implementation suitable for single-instance dev/staging.
- * For production on Vercel (serverless): replace with Upstash Redis
- * (@upstash/ratelimit) since in-memory state resets per cold start.
+ * This in-memory rate limiter is broken on Vercel serverless (resets on cold
+ * starts). All API routes have been migrated to the Upstash Redis version.
+ * This file is kept only for local dev/test reference.
  *
  * Usage:
  *   const limiter = createRateLimiter({ maxRequests: 5, windowMs: 60_000 });
