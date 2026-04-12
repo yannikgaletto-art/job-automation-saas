@@ -97,6 +97,7 @@ export function ActiveCVCard() {
     const [isClDismissing, setIsClDismissing] = useState(false);
     const [pendingClFile, setPendingClFile] = useState<File | null>(null);
     const clHintDismissedRef = useRef(false);
+    const clHintSeenRef = useRef(false); // true once popup has been shown this session
 
     useEffect(() => {
         try {
@@ -153,9 +154,10 @@ export function ActiveCVCard() {
 
     // ── CL Hint handlers ──────────────────────────────────────────────────────
     const handleClUploadClick = () => {
-        if (clHintDismissedRef.current) {
+        if (clHintDismissedRef.current || clHintSeenRef.current) {
             clRef.current?.click();
         } else {
+            clHintSeenRef.current = true; // mark seen so file-select doesn't re-trigger
             setShowClHint(true);
         }
     };
@@ -189,9 +191,11 @@ export function ActiveCVCard() {
     };
 
     const handleClFileSelect = (file: File) => {
-        if (clHintDismissedRef.current) {
+        // Skip popup if: user dismissed forever OR already saw it this session
+        if (clHintDismissedRef.current || clHintSeenRef.current) {
             handleUpload(file, 'cover_letter');
         } else {
+            clHintSeenRef.current = true;
             setPendingClFile(file);
             setShowClHint(true);
         }
