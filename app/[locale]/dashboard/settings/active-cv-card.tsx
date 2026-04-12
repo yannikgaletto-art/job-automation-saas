@@ -581,6 +581,7 @@ export function ActiveCVCard() {
                         onClick={() => { setShowCvHint(false); setPendingCvFile(null); }}
                     />
                     {/* Dialog */}
+                    <div className="relative bg-white rounded-2xl shadow-2xl border border-[#E7E7E5] w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
 
                         <div className="p-6">
                             {/* Icon + Title */}
