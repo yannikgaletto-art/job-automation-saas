@@ -581,9 +581,6 @@ export function ActiveCVCard() {
                         onClick={() => { setShowCvHint(false); setPendingCvFile(null); }}
                     />
                     {/* Dialog */}
-                    <div className="relative bg-white rounded-2xl shadow-2xl border border-[#E7E7E5] w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        {/* Header accent */}
-                        <div className="h-1 bg-gradient-to-r from-[#012e7a] via-[#012e7a]/60 to-transparent" />
 
                         <div className="p-6">
                             {/* Icon + Title */}
@@ -620,34 +617,35 @@ export function ActiveCVCard() {
                                                 <span className="text-[#012e7a] mt-0.5">•</span>
                                                 {t('cv_hint_bullet_2')}
                                             </li>
+                                            <li className="text-xs text-[#73726E] flex items-start gap-1.5">
+                                                <span className="text-[#012e7a] mt-0.5">•</span>
+                                                {t('cv_hint_bullet_3')}
+                                            </li>
                                         </ul>
-                                    </div>
-                                    <div className="border-t border-dashed border-[#E7E7E5]" />
-                                    <div>
-                                        <p className="text-sm font-medium text-[#37352F] flex items-center gap-2">
-                                            <span className="text-red-400 text-xs">✗</span>
-                                            {t('cv_hint_bad_label')}
-                                        </p>
-                                        <p className="text-xs text-[#A8A29E] mt-0.5 italic">
-                                            {t('cv_hint_bad_example')}
-                                        </p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Actions */}
-                            <div className="flex flex-col gap-2">
+                            <div className="flex flex-col gap-3">
                                 <button
                                     onClick={handleCvHintContinue}
                                     className="w-full px-4 py-2.5 bg-[#012e7a] text-white text-sm font-medium rounded-lg hover:bg-[#011f5e] transition-colors"
                                 >
                                     {t('cv_hint_continue')}
                                 </button>
+                                {/* Lean toggle — replaces old grey text button */}
                                 <button
                                     onClick={handleCvHintDismissForever}
-                                    className="w-full px-4 py-2 text-xs text-[#A8A29E] hover:text-[#73726E] transition-colors"
+                                    className="group flex items-center justify-center gap-2 w-full py-1"
                                 >
-                                    {t('cv_hint_dismiss')}
+                                    {/* Toggle track */}
+                                    <span className="relative w-7 h-4 rounded-full bg-[#E7E7E5] group-hover:bg-[#012e7a]/20 transition-colors flex-shrink-0">
+                                        <span className="absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-[#A8A29E] group-hover:bg-[#012e7a] transition-all" />
+                                    </span>
+                                    <span className="text-xs text-[#A8A29E] group-hover:text-[#73726E] transition-colors">
+                                        {t('cv_hint_dismiss')}
+                                    </span>
                                 </button>
                             </div>
                         </div>

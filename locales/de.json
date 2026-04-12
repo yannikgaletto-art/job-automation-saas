@@ -1425,14 +1425,13 @@
     "status_done": "Fertig ✅ — Analyse läuft im Hintergrund",
     "eu_privacy_note": "Deine Daten werden DSGVO-konform auf EU-Servern extrahiert und verarbeitet.",
     "cv_hint_title": "Kurzer Hinweis zu deinem Lebenslauf",
-    "cv_hint_description": "Damit Pathly deinen CV wirklich optimieren kann, brauchen wir nicht nur deine Stationen — sondern auch 2–3 Stichpunkte pro Station.",
+    "cv_hint_description": "Um deinen CV zu optimieren, benötigen wir 2-3 Stichpunkte pro Station.",
     "cv_hint_example_label": "So sollte es aussehen",
     "cv_hint_bullet_1": "Konzeption und Durchführung von 12+ Usability-Tests",
     "cv_hint_bullet_2": "Analyse qualitativer Daten und Erstellung von Handlungsempfehlungen",
-    "cv_hint_bad_label": "Nur der Firmenname reicht nicht",
-    "cv_hint_bad_example": "\"Fraunhofer IGD — UX Researcher\" ohne weitere Details",
-    "cv_hint_continue": "Verstanden — Lebenslauf hochladen",
-    "cv_hint_dismiss": "Habe ich gelesen — nicht mehr anzeigen"
+    "cv_hint_bullet_3": "Reduktion der Fehlerquote um 34% durch iteratives Prototyping",
+    "cv_hint_continue": "Lebenslauf hochladen",
+    "cv_hint_dismiss": "Habe ich gelesen \u2014 nicht mehr anzeigen"
   },
   "tour": {
     "step1_title": "Deine Tagesziele",
