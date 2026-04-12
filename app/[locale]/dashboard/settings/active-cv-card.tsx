@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/motion/button";
@@ -86,6 +87,7 @@ export function ActiveCVCard() {
 
     // CV upload hint dialog
     const [showCvHint, setShowCvHint] = useState(false);
+    const [isDismissing, setIsDismissing] = useState(false);
     const [pendingCvFile, setPendingCvFile] = useState<File | null>(null);
     const cvHintDismissedRef = useRef(false);
 
@@ -114,6 +116,8 @@ export function ActiveCVCard() {
     };
 
     const handleCvHintDismissForever = () => {
+        if (isDismissing) return; // prevent double-click
+        setIsDismissing(true);
         try { localStorage.setItem(CV_HINT_DISMISSED_KEY, 'true'); } catch {}
         cvHintDismissedRef.current = true;
         const pending = pendingCvFile;
@@ -121,6 +125,7 @@ export function ActiveCVCard() {
         // 1s delay so the toggle animation is visible before closing
         setTimeout(() => {
             setShowCvHint(false);
+            setIsDismissing(false);
             if (pending) {
                 handleUpload(pending, 'cv');
             } else {
@@ -577,12 +582,12 @@ export function ActiveCVCard() {
                 />
             </div>
             {/* CV Upload Hint Dialog */}
-            {showCvHint && (
+            {showCvHint && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-                    {/* Backdrop */}
+                    {/* Backdrop — rendered via portal at document.body, escaping any transform stacking context */}
                     <div
                         className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-                        onClick={() => { setShowCvHint(false); setPendingCvFile(null); }}
+                        onClick={() => { if (!isDismissing) { setShowCvHint(false); setPendingCvFile(null); } }}
                     />
                     {/* Dialog */}
                     <div className="relative bg-white rounded-2xl shadow-2xl border border-[#E7E7E5] w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -639,23 +644,30 @@ export function ActiveCVCard() {
                                 >
                                     {t('cv_hint_continue')}
                                 </button>
-                                {/* Lean toggle — replaces old grey text button */}
+                                {/* State-driven toggle — thumb slides right when clicked */}
                                 <button
                                     onClick={handleCvHintDismissForever}
-                                    className="group flex items-center justify-center gap-2 w-full py-1"
+                                    className="flex items-center justify-center gap-2 w-full py-1"
+                                    disabled={isDismissing}
                                 >
-                                    {/* Toggle track */}
-                                    <span className="relative w-7 h-4 rounded-full bg-[#E7E7E5] group-hover:bg-[#012e7a]/20 transition-colors flex-shrink-0">
-                                        <span className="absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-[#A8A29E] group-hover:bg-[#012e7a] transition-all" />
+                                    <span className={`relative w-7 h-4 rounded-full flex-shrink-0 transition-colors duration-300 ${
+                                        isDismissing ? 'bg-[#012e7a]' : 'bg-[#E7E7E5]'
+                                    }`}>
+                                        <span className={`absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300 ${
+                                            isDismissing ? 'left-3.5 bg-white' : 'left-0.5 bg-[#A8A29E]'
+                                        }`} />
                                     </span>
-                                    <span className="text-xs text-[#A8A29E] group-hover:text-[#73726E] transition-colors">
+                                    <span className={`text-xs transition-colors duration-300 ${
+                                        isDismissing ? 'text-[#012e7a] font-medium' : 'text-[#A8A29E]'
+                                    }`}>
                                         {t('cv_hint_dismiss')}
                                     </span>
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
