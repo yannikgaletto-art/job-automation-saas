@@ -12,14 +12,15 @@ import { isAdmin } from '@/lib/admin';
  * Security: Session auth + admin email whitelist (same as admin/users)
  */
 
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-);
+// Client created lazily inside handlers to avoid build-time env var requirement
 
 // ─── GET: List all leads ─────────────────────────────────────────────
 export async function GET() {
+    const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
     const supabase = await createSSRClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -50,6 +51,11 @@ export async function GET() {
 
 // ─── DELETE: Remove a lead ──────────────────────────────────────────
 export async function DELETE(request: Request) {
+    const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
     const supabase = await createSSRClient();
     const { data: { user } } = await supabase.auth.getUser();
 

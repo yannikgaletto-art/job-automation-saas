@@ -14,11 +14,7 @@ import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
  * Cross-Origin: CORS for pathly-website domain
  */
 
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-);
+// Client created lazily inside POST handler to avoid build-time env var requirement
 
 
 
@@ -45,6 +41,11 @@ export async function OPTIONS(request: NextRequest) {
 
 // ─── POST: Subscribe ─────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
+    const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
     const origin = request.headers.get('origin');
     const headers = corsHeaders(origin);
 

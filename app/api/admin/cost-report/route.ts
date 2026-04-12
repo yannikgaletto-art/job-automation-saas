@@ -4,10 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Client created lazily inside GET handler to avoid build-time env var requirement
 
 /** Constant-time string comparison to prevent timing attacks */
 function safeCompare(a: string, b: string): boolean {
@@ -16,6 +13,12 @@ function safeCompare(a: string, b: string): boolean {
 }
 
 export async function GET(req: NextRequest) {
+    // Lazy init — runs at request time, not build time
+    const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     const adminSecret = req.headers.get('x-admin-secret') || '';
     const expected = process.env.ADMIN_SECRET || '';
     if (!expected || !adminSecret || !safeCompare(adminSecret, expected)) {

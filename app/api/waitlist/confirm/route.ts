@@ -9,13 +9,15 @@ import { createClient } from '@supabase/supabase-js';
  * Redirects to the marketing website with a success message.
  */
 
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-);
+// Client created lazily inside GET handler to avoid build-time env var requirement
 
 export async function GET(request: NextRequest) {
+    const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
 
