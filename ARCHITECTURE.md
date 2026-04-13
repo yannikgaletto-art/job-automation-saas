@@ -1,6 +1,6 @@
 ---
-Version: 5.0.0
-Last Updated: 2026-03-09
+Version: 5.1.0
+Last Updated: 2026-04-13
 ---
 
 # PATHLY V2.0 - SYSTEM ARCHITECTURE
@@ -11,8 +11,8 @@ Last Updated: 2026-03-09
 > Prüfe jedes mal, wenn du etwas neues machst, ob es wirklich notwendig ist, oder man auch später machen kann.
 
 **Status:** Production-Ready Design
-**Last Updated:** 2026-03-09
-**Version:** 5.0.0
+**Last Updated:** 2026-04-13
+**Version:** 5.1.0
 
 ---
 
@@ -28,10 +28,15 @@ Last Updated: 2026-03-09
 | **Queue** | Inngest (Background Jobs) |
 | **Job Search** | SerpAPI |
 | **Deep Scraping** | Firecrawl |
-| **Data Harvester** | OpenAI GPT-4o-mini |
-| **AI Judge / Analysis** | Anthropic Claude Haiku 4 |
+| **Data Harvester** | Mistral Small 4 (EU-native) |
+| **AI Judge / Analysis** | Anthropic Claude Haiku 4.5 |
 | **AI Generation** | Anthropic Claude Sonnet 4.5 |
 | **Company Research** | Perplexity Sonar Pro |
+| **Payments** | Stripe (Checkout, Webhooks, Portal) |
+| **Rate Limiting** | Upstash Redis (EU) |
+| **Analytics** | PostHog (EU, DSGVO) |
+| **Error Monitoring** | Sentry (PII gestrippt) |
+| **AI Observability** | Helicone (⏸️ DPA pending) |
 
 ---
 
@@ -243,7 +248,7 @@ Zwei separate Terminal-Prozesse sind **IMMER** erforderlich:
 ---
 
 ## 4.2 LEGAL — DRITTLANDTRANSFER STATUS (Art. 46 DSGVO)
-> Last Updated: 2026-03-19
+> Last Updated: 2026-04-13
 
 | Anbieter | SCCs | DPA | Zero Data Retention | Status |
 |---|---|---|---|---|
@@ -252,6 +257,12 @@ Zwei separate Terminal-Prozesse sind **IMMER** erforderlich:
 | Azure | ✅ Enterprise Agreement | ✅ Inkludiert | N/A (EU Region) | ✅ Compliant |
 | SerpAPI | ⬜ Angefordert | ⬜ Pending | N/A | 🟡 In Progress |
 | Perplexity | ⬜ Angefordert | ⬜ Pending | N/A | 🟡 In Progress |
+| Stripe | ✅ EU-SCCs + DPA | ⬜ Anfordern | N/A | 🟡 In Progress |
+| Sentry | ✅ EU-Ingest | ⬜ Pending | PII gestrippt | 🟡 In Progress |
+| Mistral | N/A (EU-native 🇫🇷) | ✅ Inkludiert | N/A | ✅ Compliant |
+| PostHog | N/A (EU 🇪🇺) | ✅ DPA verfügbar | N/A | ✅ Compliant |
+| Upstash | N/A (EU wählbar) | ✅ EU-Region | N/A | ✅ Compliant |
+| Inngest | ⬜ Angefordert | ⬜ Pending | Nur IDs | 🟡 In Progress |
 
 ---
 

@@ -1,8 +1,8 @@
 # 🛡️ CRITICAL QUALITY TESTING DIRECTOR — Pathly V2.0
 
 ---
-Version: 2.0.0
-Last Updated: 2026-04-12
+Version: 2.1.0
+Last Updated: 2026-04-13
 Status: AKTIV
 ---
 

@@ -1,6 +1,6 @@
 ---
-Version: 1.0.0
-Last Updated: 2026-04-12
+Version: 1.1.0
+Last Updated: 2026-04-13
 Status: AKTIV — PFLICHTLEKTÜRE vor jedem Vercel Deploy
 ---
 
@@ -134,12 +134,12 @@ Alle aktiven Sub-Processors MÜSSEN in der Privacy Policy gelistet sein:
 | Vercel | ✅ Gelistet | Hosting |
 | Azure DI | ✅ Gelistet | CV Extraktion |
 | Jina AI | ✅ Gelistet | HTML Scraping |
-| **Mistral** | 🔴 FEHLT | Job-Daten Extraktion |
-| **PostHog** | 🔴 FEHLT | Product Analytics |
-| **Stripe** | 🔴 FEHLT | Zahlungsabwicklung |
-| **Inngest** | 🟡 FEHLT | Background Jobs (nur IDs) |
-| **Upstash** | 🟢 Low Prio | Rate Limiting (nur IDs) |
-| **Sentry** | 🟡 FEHLT | Error Monitoring (PII gestrippt) |
+| Mistral | ✅ Gelistet | Job-Daten Extraktion |
+| PostHog | ✅ Gelistet | Product Analytics |
+| Stripe | ✅ Gelistet | Zahlungsabwicklung |
+| Inngest | ✅ Gelistet | Background Jobs (nur IDs) |
+| Upstash | ✅ Gelistet | Rate Limiting (nur IDs) |
+| Sentry | ✅ Gelistet | Error Monitoring (PII gestrippt) |
 
 ### 3.2 Drittlandtransfer (Art. 46)
 Für jeden US-basierten Sub-Processor: SCCs + DPA benötigt.

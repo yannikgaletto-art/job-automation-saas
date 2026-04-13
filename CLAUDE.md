@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 3.7
-**Last Updated:** 2026-04-09
+**Version:** 3.8
+**Last Updated:** 2026-04-13
 
 ---
 

@@ -1,8 +1,8 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 5.5  
-**Last Updated:** 2026-04-01  
+**Version:** 5.6  
+**Last Updated:** 2026-04-13  
 **Status:** Active  
 
 ---
@@ -34,7 +34,8 @@
 | **Onboarding Flow** | `app/[locale]/onboarding/page.tsx` | UI Sequence with Notion-style goal toggle, SlideToActionButton, and write-read-verify consent logic (`api/onboarding/complete/route.ts`) |
 | **Stripe Billing** | `app/api/stripe/webhook/route.ts` | Credit system (Free/Starter/Durchstarter), atomic `debit_credits()` RPC, `withCreditGate()` middleware, Stripe Checkout/Portal, idempotent webhook, `lib/supabase/admin.ts` singleton |
 | **Product Analytics** | `lib/posthog/client.ts`, `server.ts` | PostHog (EU DSGVO). Next.js browser pageviews + 5 core server events (onboarding_completed, etc.). Storage mode: localStorage (no cookies), maskAllInputs: true. |
-| **Rate Limiting** | `lib/api/rate-limit-upstash.ts` | Upstash Redis. Distributed window limiter. Gracefully degrades to pass-through in local dev (if URL is missing) to prevent dev blockages. Protects 11 API routes against cost spikes. |
+| **Rate Limiting** | `lib/api/rate-limit-upstash.ts` | Upstash Redis. Distributed window limiter. Gracefully degrades to pass-through in local dev (if URL is missing) to prevent dev blockages. Protects 12 API routes against cost spikes. |
+| **Error Monitoring** | `sentry.client.config.ts`, `sentry.server.config.ts` | Sentry. PII stripped via `beforeSend`. Session replay disabled. EU ingest. |
 
 ---
 

@@ -1,6 +1,6 @@
 ---
-Version: 2.0.0
-Last Updated: 2026-04-12
+Version: 2.1.0
+Last Updated: 2026-04-13
 Status: AKTIV — PFLICHTLEKTÜRE vor jedem Gate Test
 Gehört zu: SICHERHEITSARCHITEKTUR.md, DEPLOYMENT_CHECKLIST.md
 ---
@@ -211,6 +211,8 @@ Erwartung: Mindestens 1 Policy pro Tabelle. Leere Liste → Migration nochmal au
 | 7 | `NEXT_PUBLIC_*` als Sensitive auf Vercel | Variable nicht im Client-Bundle | Sensitive-Flag entfernen |
 | 8 | Cover Letter timeout auf Vercel Free | `maxDuration: 120` > Vercel Free Limit (10s) | Vercel Pro erforderlich |
 | 9 | ADMIN_SECRET leer → Cost Report offen | `process.env.ADMIN_SECRET \|\| ''` → `'' === ''` ist true | ADMIN_SECRET setzen |
+| 10 | CI-Pipeline scheitert ("All jobs have failed") | Fehlende `eslint.config.mjs` → interaktiver ESLint-Prompt in CI | `eslint.config.mjs` mit `next/core-web-vitals` erstellen |
+| 11 | Vercel Timeout auf AI-Routes | `maxDuration` fehlt → Vercel killt nach 10s (Free) / 60s (Pro) | `export const maxDuration = 60` in jeder AI-Route |
 
 ---
 
