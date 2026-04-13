@@ -44,13 +44,20 @@ function getSchemaInstruction(round: InterviewRound, companyName: string, jobTit
 {
   "strengths": ["Genau 3 relevante Stärken. Jede Stärke: 1 prägnanter Satz. Format: **Schlüsselwort:** Aussage."],
   "gaps": ["Genau 3 kritische Lücken. Jede Lücke: 1 prägnanter Satz. Format: **Schlüsselwort:** Aussage."],
-  "interviewQuestions": ["5 Fragen — siehe ORIENTIERUNG unten"],
+  "interviewQuestions": ["5 Fragen — PFLICHT-FORMAT: 'Ich sehe, du warst bei [FIRMENNAME] als [ROLLE] – [konkrete Frage dazu].' JEDE Frage MUSS mit einer konkreten Station aus dem Lebenslauf anfangen!"],
   "companyContext": "1-2 Sätze über das Unternehmen und die Rolle"
 }
 
+KRITISCH — FRAGEN-FORMAT (NICHT optional!):
+Jede der 5 Fragen MUSS:
+1. Mit einem Bezug auf eine KONKRETE Station aus dem Lebenslauf starten (Firmenname, Projektname oder spezifische Aufgabe)
+2. BEISPIEL-FORMAT: "Ich sehe, du warst Co-Founder bei [FIRMA] – was hat dich damals dazu bewogen, den Gründerweg zu gehen?"
+3. VERSCHIEDENE Stationen verwenden — nicht immer dieselbe. Variiere frühere Rollen, Nebenprojekte, besondere Qualifikationen.
+4. Immer die "du"-Form verwenden (NIEMALS "Sie").
+
 ORIENTIERUNG FÜR FRAGEN (Phase 1: Erstes Kennenlernen):
 Die Fragen sollen locker, menschlich und motivationsbezogen sein. KEIN technisches Tieftauchen!
-Der Recruiter soll zuerst auf eine interessante Station im Lebenslauf eingehen und DANN die Frage daraus ableiten.
+Der Recruiter bezieht sich immer zuerst auf eine echte Station im Lebenslauf und leitet dann die Frage daraus ab.
 
 Ton: Neugierig, wertschätzend, wie ein echtes Erstgespräch unter Menschen.
 Themen: Werdegang, Motivation, Cultural Fit, Arbeitsweise, Teamdynamik, Erwartungen.
@@ -223,7 +230,7 @@ export async function analyzeGap(
     locale: CoachingLocale = 'de'
 ): Promise<{ dossier: CoachingDossier; tokensUsed: number; costCents: number }> {
     // 1. Get CV text via existing service (QA: reuse, don't reinvent)
-    const cvResult = await getCVText(userId);
+    const cvResult = await getCVText(userId, undefined, { forAI: true });
     if (!cvResult) {
         throw new Error('CV_NOT_FOUND: Kein Lebenslauf gefunden. Bitte lade deinen CV in den Settings hoch.');
     }

@@ -20,6 +20,8 @@ import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
 import { cn } from '@/lib/utils';
 import QRCode from 'qrcode';
 import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
+import { useDashboardTour } from '@/app/[locale]/dashboard/hooks/useDashboardTour';
+import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
 
 const DynamicPdfViewer = dynamic(
     () => import('@/components/cv-templates/PdfViewerWrapper'),
@@ -360,9 +362,27 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
         if (res.success) {
             setStep(2); // -> Preview
             onComplete?.();
+            // Signal preview tour: fires once per job on first preview visit
+            if (typeof window !== 'undefined') {
+                sessionStorage.setItem('pathly_cv_preview_first_visit', '1');
+            }
         } else {
         }
     };
+
+    // ── CV Preview Tour — fires once per user, when step===2 ---
+    const CV_PREVIEW_TOUR_STEPS = [
+        {
+            targetSelector: '#cv-format-fix-btn',
+            position: 'top' as const,
+            titleKey: 'cv_optimizer.preview_tour_title',
+            bodyKey: 'cv_optimizer.preview_tour_body',
+        },
+    ];
+    const previewTour = useDashboardTour('cv-preview-format-hint', CV_PREVIEW_TOUR_STEPS, {
+        delayMs: 800,
+        enabled: step === 2,
+    });
 
     // -- Step 2: Template Switcher --
     const applyTemplateSwitch = async (newId: string) => {
@@ -530,13 +550,18 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
 
     if (!cvData) {
         return (
-            <div className="p-8 text-center bg-gray-50 border border-gray-200 rounded-lg space-y-4">
-                <p className="text-gray-800 text-lg font-medium">{t('no_cv_title')}</p>
-                <p className="text-sm text-gray-500 max-w-sm mx-auto">
+            <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
+                <div className="bg-amber-50 p-4 rounded-full shadow-sm mb-4 border border-amber-200">
+                    <Settings className="w-8 h-8 text-amber-500" />
+                </div>
+                <h3 className="text-xl font-semibold text-[#37352F] mb-2">{t('no_cv_title')}</h3>
+                <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
                     {t('no_cv_desc')}
                 </p>
-                <Link href={`/${locale}/dashboard/settings`} className="inline-block mt-4 text-blue-600 hover:text-blue-800 font-medium underline">
-                    {t('no_cv_link')}
+                <Link href={`/${locale}/dashboard/settings`}>
+                    <button className="px-6 py-2.5 bg-[#012e7a] hover:bg-[#01246b] text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                        {t('no_cv_link')}
+                    </button>
                 </Link>
             </div>
         );
@@ -904,6 +929,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                                 <div className="flex flex-col items-center sm:items-start w-full sm:w-auto">
                                     <button
+                                        id="cv-format-fix-btn"
                                         onClick={handleLayoutFixRetry}
                                         disabled={freeRetryUsed || isLayoutFixing}
                                         title={freeRetryUsed ? t('btn_layout_fix_used') : t('btn_layout_fix_tooltip')}
@@ -943,6 +969,17 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                     </div>
                 )}
             </motion.div>
+
+            {/* CV Preview Format Tour */}
+            {previewTour.isActive && previewTour.step && (
+                <GuidedTourOverlay
+                    step={previewTour.step}
+                    currentStep={previewTour.currentStep}
+                    totalSteps={previewTour.totalSteps}
+                    onNext={previewTour.nextStep}
+                    onSkip={previewTour.skipTour}
+                />
+            )}
 
             {/* QR-Video Consent Dialog */}
             <CustomDialog

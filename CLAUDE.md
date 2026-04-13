@@ -572,7 +572,7 @@ const fillApplication = async () => {
 - [ ] Environment variables set
 - [ ] RLS policies enabled
 - [ ] No console.logs with PII
-- [ ] **PII sanitized before external AI calls** (see SICHERHEITSARCHITEKTUR.md §14; exceptions: CV Optimize, CV Match)
+- [ ] **PII sanitized before external AI calls** (see SICHERHEITSARCHITEKTUR.md §14)
 - [ ] Visual verification complete
 - [ ] **Cross-Feature-Compatibility verified** (FEATURE_COMPAT_MATRIX.md checked)
 

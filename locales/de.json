@@ -548,8 +548,8 @@
     "step2": {
       "title": "Deine Daten. Deine Kontrolle.",
       "description": "Pathly verarbeitet deinen Lebenslauf und deine Bewerbungen — so schützen wir das:",
-      "trust_1_title": "Dein Name wird vor jedem KI-Call pseudonymisiert.",
-      "trust_1_detail": "Die KI sieht niemals deinen echten Namen.",
+      "trust_1_title": "Deine persönlichen Daten werden vor jedem KI-Call geschützt.",
+      "trust_1_detail": "Name, E-Mail und Telefon werden durch Platzhalter ersetzt — die KI sieht nur anonymisierte Daten.",
       "trust_2_title": "Deine Daten werden nicht für KI-Training genutzt.",
       "trust_2_detail": "Anthropic löscht jede Anfrage sofort nach der Verarbeitung — nichts wird auf deren Seite gespeichert.",
       "trust_3_title": "Deine Daten werden auf europäischen Servern gespeichert.",
@@ -931,7 +931,9 @@
     "btn_layout_fix_tooltip": "Kostenlose Korrektur — 1× pro Job",
     "btn_layout_fix_used": "Korrektur bereits genutzt",
     "btn_layout_fix_desc": "Wenn Titel und Zusammenfassung zu viel Platz einnehmen.",
-    "error_free_retry_exhausted": "Die kostenlose Korrektur wurde bereits genutzt."
+    "error_free_retry_exhausted": "Die kostenlose Korrektur wurde bereits genutzt.",
+    "preview_tour_title": "Formatierungsfehler? Kein Problem.",
+    "preview_tour_body": "Falls dein Lebenslauf zu viel Weißraum hat oder Abschnitte verschoben sind, klicke auf <b>\"Formatierung korrigieren\"</b>. Pathly überarbeitet das Layout automatisch. <b>Einmalig und kostenlos</b> pro Job."
   },
   "diff_review": {
     "section_experience": "Erfahrung",

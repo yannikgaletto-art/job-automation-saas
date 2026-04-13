@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         }
 
         // §2: CV Safety — verify CV exists before any processing
-        const cvData = await getCVText(user.id, cvDocumentId);
+        const cvData = await getCVText(user.id, cvDocumentId, { forAI: true });
         if (!cvData) {
             return NextResponse.json({
                 error: 'CV not found or empty. Please upload your CV in settings.',

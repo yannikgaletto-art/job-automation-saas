@@ -1,5 +1,5 @@
 /**
- * CV Payload Pruner — Cost Optimization Layer
+ * CV Payload Pruner — Cost Optimization + DSGVO Layer
  *
  * Removes fields the CV Optimizer never modifies before sending to Sonnet.
  * This reduces input tokens by 10-25% without affecting output quality.
@@ -9,12 +9,15 @@
  * - hobbies / interests
  * - publications
  * - certificates beyond top 8 (optimizer keeps max 6)
+ * - personalInfo PII fields (name, email, phone, address) — DSGVO Art. 25
  *
  * NEVER REMOVE (optimizer actively modifies):
- * - personalInfo, experience, education, skills
+ * - personalInfo.title (needed for contextual optimization)
+ * - experience, education, skills
  * - IDs (entityId, bulletId) — breaking these crashes the diff system
  *
  * Created: 2026-03-30
+ * Updated: 2026-04-13 — DSGVO personalInfo pruning
  */
 
 import type { CvStructuredData } from '@/types/cv';
@@ -32,6 +35,18 @@ export function pruneForOptimizer(
 ): CvStructuredData {
     // Deep clone to avoid mutating the original
     const pruned: CvStructuredData = JSON.parse(JSON.stringify(cv));
+
+    // 0. DSGVO Art. 25 — Remove PII from personalInfo before AI transfer.
+    // The optimizer only needs targetRole + summary for contextual optimization.
+    // All other PII (name, email, phone, location, linkedin, website) is restored
+    // from the frontend's local CV data after optimization completes.
+    // Pattern: identical to Cover Letter pipeline (cover-letter-prompt-builder.ts).
+    if (pruned.personalInfo) {
+        (pruned as any).personalInfo = {
+            targetRole: pruned.personalInfo.targetRole || '',
+            summary: pruned.personalInfo.summary || '',
+        };
+    }
 
     // 1. Remove languages (optimizer never touches these)
     if ('languages' in pruned) {

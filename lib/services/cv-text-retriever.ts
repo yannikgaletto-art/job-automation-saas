@@ -13,11 +13,15 @@ const supabaseAdmin = createAdminClient(
  *
  * @param userId - The user's ID (scoped query — Contract 3)
  * @param documentId - Optional: specific document ID. If omitted, uses latest CV.
+ * @param options.forAI - When true, PII placeholders ([NAME], [EMAIL], etc.) are
+ *   preserved instead of being decrypted back to real data. This ensures DSGVO
+ *   Art. 25 compliance: no PII is sent to external AI providers.
+ *   Default: false (backwards-compatible — Coaching UI still gets real names).
  *
  * Self-Healing: If the CV exists but has no extracted_text, attempts
  * on-the-fly extraction via processDocument() + saves the result.
  */
-export async function getCVText(userId: string, documentId?: string): Promise<{
+export async function getCVText(userId: string, documentId?: string, options?: { forAI?: boolean }): Promise<{
     text: string;
     documentId: string;
     fileName: string;
@@ -101,22 +105,50 @@ export async function getCVText(userId: string, documentId?: string): Promise<{
         }
     }
 
-    // If we have text but it has placeholders like [NAME], we could try to decrypt pii_encrypted and replace them.
-    // For AI matching, the sanitized text is usually sufficient and safer.
+    // DSGVO Art. 25: PII handling based on context
     if (text && doc.pii_encrypted && typeof doc.pii_encrypted === 'object') {
-        let reconstructedText = text;
-        for (const [key, encryptedValue] of Object.entries(doc.pii_encrypted)) {
-            if (typeof encryptedValue === 'string') {
-                try {
-                    const decrypted = decrypt(encryptedValue);
-                    const placeholder = `[${key.toUpperCase()}]`;
-                    reconstructedText = reconstructedText.split(placeholder).join(decrypted);
-                } catch (e) {
-                    console.error(`Failed to decrypt PII field ${key}:`, e);
+        if (options?.forAI) {
+            // forAI=true: STRIP all PII from the text before sending to external AI.
+            // This handles BOTH cases:
+            //   a) Text has placeholders ([NAME]) → placeholders are removed
+            //   b) Text has raw PII (Yannik Galetto) → raw values are removed
+            // Result: clean text with no personal identifiers, no awkward [NAME] tokens.
+            let cleanedText = text;
+            for (const [key, encryptedValue] of Object.entries(doc.pii_encrypted)) {
+                if (typeof encryptedValue === 'string') {
+                    try {
+                        const decrypted = decrypt(encryptedValue);
+                        // Remove the raw PII value (e.g. "Yannik Galetto")
+                        if (decrypted.trim()) {
+                            cleanedText = cleanedText.split(decrypted).join('');
+                        }
+                        // Also remove any placeholder form (e.g. "[NAME]")
+                        const placeholder = `[${key.toUpperCase()}]`;
+                        cleanedText = cleanedText.split(placeholder).join('');
+                    } catch (e) {
+                        console.error(`Failed to decrypt PII field ${key}:`, e);
+                    }
                 }
             }
+            // Clean up any double-spaces or leading commas left by removal
+            text = cleanedText.replace(/\s{2,}/g, ' ').replace(/^[\s,]+/gm, '').trim();
+        } else {
+            // forAI=false (default): Reconstruct PII for UI display.
+            // Replace placeholders ([NAME]) with real decrypted values.
+            let reconstructedText = text;
+            for (const [key, encryptedValue] of Object.entries(doc.pii_encrypted)) {
+                if (typeof encryptedValue === 'string') {
+                    try {
+                        const decrypted = decrypt(encryptedValue);
+                        const placeholder = `[${key.toUpperCase()}]`;
+                        reconstructedText = reconstructedText.split(placeholder).join(decrypted);
+                    } catch (e) {
+                        console.error(`Failed to decrypt PII field ${key}:`, e);
+                    }
+                }
+            }
+            text = reconstructedText;
         }
-        text = reconstructedText;
     }
 
     if (!text || text.trim().length < 50) {

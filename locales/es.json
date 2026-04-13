@@ -548,8 +548,8 @@
     "step2": {
       "title": "Tus datos. Tu control.",
       "description": "Pathly procesa tu CV y tus solicitudes — así es como lo protegemos:",
-      "trust_1_title": "Tu nombre se pseudonimiza antes de cada llamada a la IA.",
-      "trust_1_detail": "La IA nunca ve tu nombre real.",
+      "trust_1_title": "Tus datos personales se protegen antes de cada llamada a la IA.",
+      "trust_1_detail": "Nombre, email y teléfono se reemplazan con marcadores — la IA solo ve datos anonimizados.",
       "trust_2_title": "Tus datos no se usan para entrenar la IA.",
       "trust_2_detail": "Anthropic elimina cada solicitud inmediatamente después del procesamiento — nada se almacena en su lado.",
       "trust_3_title": "Tus datos se almacenan en servidores europeos.",
@@ -931,7 +931,9 @@
     "btn_layout_fix_tooltip": "Corrección gratuita — una vez por empleo",
     "btn_layout_fix_used": "Corrección ya utilizada",
     "btn_layout_fix_desc": "Si el título y el resumen ocupan demasiado espacio.",
-    "error_free_retry_exhausted": "La corrección gratuita ya ha sido utilizada."
+    "error_free_retry_exhausted": "La corrección gratuita ya ha sido utilizada.",
+    "preview_tour_title": "¿Problemas de formato? Sin problema.",
+    "preview_tour_body": "Si tu CV tiene demasiado espacio en blanco o las secciones están desplazadas, haz clic en <b>\"Corregir formato\"</b>. Pathly corrige el diseño automáticamente. <b>Gratis y una sola vez</b> por oferta."
   },
   "diff_review": {
     "section_experience": "Experiencia",

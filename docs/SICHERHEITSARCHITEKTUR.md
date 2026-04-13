@@ -532,39 +532,48 @@ Kein Job aus Job Search darf direkt in die Queue ohne User-Bestätigung.
 
 ---
 
-## §14 PII SANITIZER CONTRACT (Stand 2026-04-09)
+## §14 PII SANITIZER CONTRACT (Stand 2026-04-13)
 
-### Pflicht: `sanitizeForAI()` vor externen AI-Calls
+### Pflicht: PII-Schutz vor externen AI-Calls
 
-Jeder Datenpfad, der **User-Content an externe AI-Provider** (Anthropic US, Mistral EU) sendet, MUSS `sanitizeForAI()` aus `@/lib/services/pii-sanitizer` aufrufen.
+Jeder Datenpfad, der **User-Content an externe AI-Provider** (Anthropic US, Mistral EU) sendet, MUSS PII schützen.
+
+Zwei Mechanismen existieren – je nach Datenformat den passenden wählen:
+
+1. **Freitext (Chat, rohes HTML):** `sanitizeForAI()` aus `@/lib/services/pii-sanitizer` — Regex-basierte Pseudonymisierung.
+2. **CV Structured Data / Rohtext mit Upload-Platzhaltern:** `getCVText(..., { forAI: true })` — erhält Upload-Pseudonymisierung; oder chirurgisches `delete personalInfo` im Pruner.
 
 **Kanonischer Import:**
 ```typescript
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
+import { getCVText } from '@/lib/services/cv-text-retriever';
 ```
 
 ### Aktive Integrationen
 
-| Pfad | Datei | Status |
-|---|---|---|
-| **Coaching** | `lib/services/coaching-service.ts` | ✅ Aktiv (sanitize → restore) |
-| **Job Ingest** | `app/api/jobs/ingest/route.ts` | ✅ Aktiv (sanitize, kein restore) |
-| **Job Extract (Inngest)** | `lib/inngest/extract-job-pipeline.ts` | ✅ Aktiv (sanitize, kein restore) |
-| **Company Enrichment** | `lib/services/company-enrichment.ts` | ✅ Aktiv (sanitize, kein restore) |
+| Pfad | Datei | Mechanismus | Status |
+|---|---|---|---|
+| **Coaching (Chat)** | `lib/services/coaching-service.ts` | `sanitizeForAI()` → restore | ✅ Aktiv |
+| **Job Ingest** | `app/api/jobs/ingest/route.ts` | `sanitizeForAI()` | ✅ Aktiv |
+| **Job Extract (Inngest)** | `lib/inngest/extract-job-pipeline.ts` | `sanitizeForAI()` | ✅ Aktiv |
+| **Company Enrichment** | `lib/services/company-enrichment.ts` | `sanitizeForAI()` | ✅ Aktiv |
+| **CV Match (API)** | `app/api/cv/match/route.ts` | `getCVText(forAI: true)` | ✅ Aktiv (2026-04-13) |
+| **CV Match (Inngest)** | `lib/inngest/cv-match-pipeline.ts` | `getCVText(forAI: true)` | ✅ Aktiv (2026-04-13) |
+| **CV Optimize** | `app/api/cv/optimize/route.ts` | `pruneForOptimizer()` entfernt PII | ✅ Aktiv (2026-04-13) |
+| **Cover Letter** | `lib/prompts/cover-letter-prompt-builder.ts` | `delete personalInfo` | ✅ Aktiv |
+| **Coaching Gap Analyzer** | `lib/services/coaching-gap-analyzer.ts` | `getCVText(forAI: true)` | ✅ Aktiv (2026-04-13) |
+| **Coaching Role Research** | `app/api/coaching/role-research/route.ts` | `getCVText(forAI: true)` | ✅ Aktiv (2026-04-13) |
 
 ### Bewusste Ausnahmen
 
 | Pfad | Begründung |
 |---|---|
-| **CV Optimize** | `personalInfo` (Name, E-Mail, Telefon) wird für das Diff-System benötigt. User-Directive: Name bleibt im CV. |
-| **CV Match** | Analysiert Skills/Requirements — `personalInfo` wird nie in den Prompt injiziert. Kein PII-Risiko. |
-| **Cover Letter** | `sanitizeForAI()` NICHT geeignet — Pseudonymisierungs-Tokens (`[PII_1]`) würden von Claude reformuliert und im Output erscheinen. Stattdessen: chirurgische `delete personalInfo` / `delete personal_info` aus `cv_structured_data` in `cover-letter-prompt-builder.ts` (2026-04-09 K1-Fix). Claude sieht nur Karriere-Daten (Stationen, Skills), nie Name/Adresse/Telefon. |
 | **Document Processor (PII-Extraktion)** | Self-Referential: Claude muss PII sehen um sie zu extrahieren. Datentransfer-Minimierung via Text-Slice (3000 chars) statt Sanitizer. |
 
 ### Neue Features — Checkliste
 
 Beim Hinzufügen neuer AI-Features MUSS geprüft werden:
 1. Geht User-Content (Freitext, CV-Daten, Coaching-Nachrichten) an einen externen AI-Provider?
-2. Falls ja: `sanitizeForAI()` → AI-Call → ggf. `restore()` implementieren.
+2. Falls ja: Passenden Mechanismus wählen (Freitext → `sanitizeForAI()`, CV-Daten → `forAI: true` oder Pruner).
 3. Entry in dieser Tabelle dokumentieren.
 

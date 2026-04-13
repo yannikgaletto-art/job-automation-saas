@@ -113,7 +113,7 @@ export const analyzeCVMatch = inngest.createFunction(
 
         // Step 2: Load CV text
         const cvData = await step.run('load-cv', async () => {
-            const result = await getCVText(userId, cvDocumentId);
+            const result = await getCVText(userId, cvDocumentId, { forAI: true });
             if (!result) throw new NonRetriableError('CV not found — no retry');
             return result;
         });

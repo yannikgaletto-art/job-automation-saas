@@ -115,7 +115,7 @@ export async function POST(request: Request) {
         }
 
         // ── Load CV text (mandatory) ──
-        const cvResult = await getCVText(user.id);
+        const cvResult = await getCVText(user.id, undefined, { forAI: true });
         if (!cvResult) {
             return NextResponse.json({
                 error: 'Kein Lebenslauf gefunden. Bitte lade deinen CV in den Settings hoch.',
