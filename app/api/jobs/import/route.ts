@@ -7,6 +7,26 @@ import { z } from 'zod'
 import crypto from 'crypto'
 import { inngest } from '@/lib/inngest/client'
 import { getUserLocale } from '@/lib/i18n/get-user-locale'
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash'
+
+// ================================================================
+// CORS Headers — required for Browser Extension (chrome-extension:// origin)
+// Extensions cannot set CORS origin — we allow all origins here.
+// Auth is enforced via Bearer JWT, not CORS origin.
+// ================================================================
+const CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Max-Age': '86400',
+} as const
+
+/**
+ * CORS Preflight handler — required for cross-origin extension requests
+ */
+export async function OPTIONS() {
+    return new Response(null, { status: 204, headers: CORS_HEADERS })
+}
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -61,8 +81,20 @@ export async function POST(request: NextRequest) {
         if (!user) {
             return NextResponse.json(
                 { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED', requestId },
-                { status: 401 }
+                { status: 401, headers: CORS_HEADERS }
             )
+        }
+
+        // ================================================================
+        // STEP 0.5: Rate Limit (server-side, complements client 3s cooldown)
+        // Uses authenticated user.id for consistent rate limiting
+        // ================================================================
+        const rateLimitBlocked = await checkUpstashLimit(rateLimiters.jobIngest, user.id)
+        if (rateLimitBlocked) {
+            return new Response(rateLimitBlocked.body, {
+                status: rateLimitBlocked.status,
+                headers: { ...Object.fromEntries(rateLimitBlocked.headers.entries()), ...CORS_HEADERS },
+            })
         }
 
         console.log(`[${requestId}] route=jobs/import step=start userId=${user.id}`)
@@ -74,13 +106,13 @@ export async function POST(request: NextRequest) {
             .from('job_queue')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', user.id)
-            .in('status', ['pending', 'ready_for_review', 'ready_to_apply', 'submitted'])
+            .in('status', ['pending', 'ready_for_review', 'ready_to_apply'])
 
         if (!countError && (activeJobCount ?? 0) >= 5) {
             console.log(`[${requestId}] route=jobs/import step=limit_check blocked count=${activeJobCount}`)
             return NextResponse.json(
                 { success: false, error: 'job_limit_reached', code: 'LIMIT_5', requestId },
-                { status: 429 }
+                { status: 429, headers: CORS_HEADERS }
             )
         }
 
@@ -95,7 +127,7 @@ export async function POST(request: NextRequest) {
             if (validationError instanceof z.ZodError) {
                 return NextResponse.json(
                     { success: false, error: 'Invalid request', details: validationError.errors, requestId },
-                    { status: 400 }
+                    { status: 400, headers: CORS_HEADERS }
                 )
             }
             throw validationError
@@ -119,7 +151,7 @@ export async function POST(request: NextRequest) {
             console.log(`[${requestId}] route=jobs/import step=duplicate id=${existing.id}`)
             return NextResponse.json(
                 { success: true, id: existing.id, duplicate: true, requestId },
-                { status: 200 }
+                { status: 200, headers: CORS_HEADERS }
             )
         }
 
@@ -170,14 +202,14 @@ export async function POST(request: NextRequest) {
                 console.log(`[${requestId}] route=jobs/import step=db_insert duplicate_constraint`)
                 return NextResponse.json(
                     { success: true, duplicate: true, requestId },
-                    { status: 200 }
+                    { status: 200, headers: CORS_HEADERS }
                 )
             }
 
             console.error(`[${requestId}] route=jobs/import step=db_insert error=${insertError.message} code=${insertError.code}`)
             return NextResponse.json(
                 { success: false, error: 'Database error', code: insertError.code, requestId },
-                { status: 500 }
+                { status: 500, headers: CORS_HEADERS }
             )
         }
 
@@ -207,14 +239,14 @@ export async function POST(request: NextRequest) {
                 duplicate: false,
                 requestId,
             },
-            { status: 201 }
+            { status: 201, headers: CORS_HEADERS }
         )
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error)
         console.error(`[${requestId}] route=jobs/import step=unhandled_error error=${errMsg}`)
         return NextResponse.json(
             { success: false, error: errMsg, requestId },
-            { status: 500 }
+            { status: 500, headers: CORS_HEADERS }
         )
     }
 }
