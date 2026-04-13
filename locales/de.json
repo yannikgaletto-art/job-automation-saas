@@ -749,7 +749,19 @@
       "s10_title": "10. Cookies",
       "s10_body": "Pathly verwendet ausschließlich technisch notwendige Cookies für die Authentifizierung und Session-Verwaltung. Es werden keine Tracking-Cookies, Analyse-Cookies oder Werbe-Cookies eingesetzt. Ein Cookie-Banner ist daher nicht erforderlich.",
       "s11_title": "11. Änderungen dieser Datenschutzerklärung",
-      "s11_body": "Bei wesentlichen Änderungen an dieser Datenschutzerklärung wirst du per E-Mail oder per In-App-Benachrichtigung informiert und ggf. um erneute Einwilligung gebeten. Die aktuelle Version ist immer unter /legal/privacy-policy einsehbar."
+      "s11_body": "Bei wesentlichen Änderungen an dieser Datenschutzerklärung wirst du per E-Mail oder per In-App-Benachrichtigung informiert und ggf. um erneute Einwilligung gebeten. Die aktuelle Version ist immer unter /legal/privacy-policy einsehbar.",
+      "s4_mistral_purpose": "KI-Klassifizierung & Datenextraktion (Job-Parsing)",
+      "s4_mistral_data": "Stellenanzeigen-Texte (keine PII)",
+      "s4_stripe_purpose": "Zahlungsabwicklung & Abonnementverwaltung",
+      "s4_stripe_data": "E-Mail, Zahlungsmethode, Rechnungsdetails",
+      "s4_posthog_purpose": "Produktnutzungsanalyse (anonymisiert)",
+      "s4_posthog_data": "Seitenaufrufe, Feature-Nutzung (keine PII, maskierte Inputs)",
+      "s4_sentry_purpose": "Fehlerüberwachung & Stabilitätsmonitoring",
+      "s4_sentry_data": "Fehlermeldungen, Stack Traces (PII entfernt via beforeSend)",
+      "s4_inngest_purpose": "Hintergrund-Jobs (CV-Analyse, Anschreiben-Generierung)",
+      "s4_inngest_data": "Job-IDs, User-IDs (keine Inhaltsdaten)",
+      "s4_upstash_purpose": "Rate Limiting (Schutz vor Missbrauch)",
+      "s4_upstash_data": "User-IDs als Hash (keine Inhaltsdaten)"
     }
   },
   "community": {

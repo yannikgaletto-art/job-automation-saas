@@ -749,7 +749,19 @@
       "s10_title": "10. Cookies",
       "s10_body": "Pathly uses only technically necessary cookies for authentication and session management. No tracking cookies, analytics cookies, or advertising cookies are used. Therefore, no cookie banner is required.",
       "s11_title": "11. Changes to This Privacy Policy",
-      "s11_body": "For material changes to this privacy policy, you will be notified by email or in-app notification and may be asked for renewed consent. The current version is always available at /legal/privacy-policy."
+      "s11_body": "For material changes to this privacy policy, you will be notified by email or in-app notification and may be asked for renewed consent. The current version is always available at /legal/privacy-policy.",
+      "s4_mistral_purpose": "AI classification & data extraction (job parsing)",
+      "s4_mistral_data": "Job posting texts (no PII)",
+      "s4_stripe_purpose": "Payment processing & subscription management",
+      "s4_stripe_data": "Email, payment method, billing details",
+      "s4_posthog_purpose": "Product usage analytics (anonymized)",
+      "s4_posthog_data": "Page views, feature usage (no PII, masked inputs)",
+      "s4_sentry_purpose": "Error monitoring & stability tracking",
+      "s4_sentry_data": "Error messages, stack traces (PII removed via beforeSend)",
+      "s4_inngest_purpose": "Background jobs (CV analysis, cover letter generation)",
+      "s4_inngest_data": "Job IDs, user IDs (no content data)",
+      "s4_upstash_purpose": "Rate limiting (abuse protection)",
+      "s4_upstash_data": "User IDs as hash (no content data)"
     }
   },
   "community": {

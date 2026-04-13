@@ -14,6 +14,9 @@ import { getUserLocale } from '@/lib/i18n/get-user-locale';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
+// Vercel Serverless: Certificate generation involves credit gate + Inngest dispatch
+export const maxDuration = 30;
+
 export async function POST(request: NextRequest) {
     try {
         // Auth Guard (Contract §8)

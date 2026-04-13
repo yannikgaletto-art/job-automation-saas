@@ -82,7 +82,7 @@ export function FocusConfirmationModal() {
                     <div className="px-6 pb-4 space-y-4">
                         {/* Task info */}
                         <div className="bg-[#F7F7F5] rounded-lg p-4">
-                            <p className="text-sm font-semibold text-[#37352F]">„{task.title}"</p>
+                            <p className="text-sm font-semibold text-[#37352F]">&bdquo;{task.title}&ldquo;</p>
                             <p className="text-xs text-[#73726E] mt-1">
                                 {t('scheduled_time')}: {formatTimeRange()} ({task.estimated_minutes} min · {pomodoroCount} Pomodoro{pomodoroCount > 1 ? 's' : ''})
                             </p>

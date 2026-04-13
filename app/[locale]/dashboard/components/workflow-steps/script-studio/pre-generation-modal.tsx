@@ -150,7 +150,7 @@ export function PreGenerationModal({ open, onClose, onConfirm }: PreGenerationMo
                                             </div>
                                             <div>
                                                 <p className="text-sm font-semibold text-[#37352F]">{tone_opt.label}</p>
-                                                <p className="text-xs text-[#73726E] italic">„{tone_opt.snippet}"</p>
+                                                <p className="text-xs text-[#73726E] italic">&bdquo;{tone_opt.snippet}&ldquo;</p>
                                             </div>
                                         </button>
                                     ))}

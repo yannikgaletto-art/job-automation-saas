@@ -313,7 +313,6 @@ export async function findRelevantQuotes(
     // ── Tier 1: FTS + Category (DB) ──────────────────────────────────
     try {
         const searchResult = await withTimeout(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             Promise.resolve((supabase as any).rpc('search_quotes', {
                 search_query: searchTerm,
                 result_category: category,

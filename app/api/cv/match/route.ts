@@ -12,6 +12,9 @@ import { runCVMatchAnalysis } from '@/lib/services/cv-match-analyzer';
 import { computeInputHash } from '@/lib/services/cv-match-hash';
 import { preMatchKeywords } from '@/lib/services/pre-match-keywords';
 
+// Vercel Serverless: CV Match runs Claude + DB ops — needs extended timeout
+export const maxDuration = 60;
+
 
 
 const IS_DEV = process.env.NODE_ENV === 'development';

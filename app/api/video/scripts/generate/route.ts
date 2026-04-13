@@ -15,6 +15,9 @@ const supabaseAdmin = createAdminClient(
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
+// Vercel Serverless: Video script generation calls Claude + multiple DB ops
+export const maxDuration = 60;
+
 
 
 interface CategorizedKeywords {

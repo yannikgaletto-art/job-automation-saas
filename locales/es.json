@@ -749,7 +749,19 @@
       "s10_title": "10. Cookies",
       "s10_body": "Pathly utiliza exclusivamente cookies técnicamente necesarias para la autenticación y la gestión de sesiones. No se utilizan cookies de seguimiento, análisis ni publicidad. Por lo tanto, no se requiere un banner de cookies.",
       "s11_title": "11. Cambios en esta política de privacidad",
-      "s11_body": "Para cambios materiales en esta política de privacidad, serás notificado por correo electrónico o notificación en la aplicación y se te podrá solicitar un nuevo consentimiento. La versión actual siempre está disponible en /legal/privacy-policy."
+      "s11_body": "Para cambios materiales en esta política de privacidad, serás notificado por correo electrónico o notificación en la aplicación y se te podrá solicitar un nuevo consentimiento. La versión actual siempre está disponible en /legal/privacy-policy.",
+      "s4_mistral_purpose": "Clasificación IA y extracción de datos (análisis de empleos)",
+      "s4_mistral_data": "Textos de ofertas de empleo (sin PII)",
+      "s4_stripe_purpose": "Procesamiento de pagos y gestión de suscripciones",
+      "s4_stripe_data": "Email, método de pago, datos de facturación",
+      "s4_posthog_purpose": "Análisis de uso del producto (anonimizado)",
+      "s4_posthog_data": "Páginas visitadas, uso de funciones (sin PII, inputs enmascarados)",
+      "s4_sentry_purpose": "Monitorización de errores y estabilidad",
+      "s4_sentry_data": "Mensajes de error, stack traces (PII eliminado via beforeSend)",
+      "s4_inngest_purpose": "Tareas en segundo plano (análisis de CV, generación de cartas)",
+      "s4_inngest_data": "IDs de empleo, IDs de usuario (sin datos de contenido)",
+      "s4_upstash_purpose": "Limitación de velocidad (protección contra abuso)",
+      "s4_upstash_data": "IDs de usuario como hash (sin datos de contenido)"
     }
   },
   "community": {

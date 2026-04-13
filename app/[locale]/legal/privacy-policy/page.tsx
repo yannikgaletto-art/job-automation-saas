@@ -149,6 +149,42 @@ export default async function PrivacyPolicyPage() {
                                     <td className="p-3 text-[#73726E]">{t('s4_jina_data')}</td>
                                     <td className="p-3 text-[#73726E]">EU/USA</td>
                                 </tr>
+                                <tr>
+                                    <td className="p-3 font-medium">Mistral AI</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_mistral_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_mistral_data')}</td>
+                                    <td className="p-3 text-[#73726E]">EU (Paris) 🇫🇷</td>
+                                </tr>
+                                <tr>
+                                    <td className="p-3 font-medium">Stripe</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_stripe_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_stripe_data')}</td>
+                                    <td className="p-3 text-[#73726E]">USA/IE (EU-SCC, DPA)</td>
+                                </tr>
+                                <tr>
+                                    <td className="p-3 font-medium">PostHog</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_posthog_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_posthog_data')}</td>
+                                    <td className="p-3 text-[#73726E]">EU 🇪🇺</td>
+                                </tr>
+                                <tr>
+                                    <td className="p-3 font-medium">Sentry</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_sentry_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_sentry_data')}</td>
+                                    <td className="p-3 text-[#73726E]">EU/USA (EU-SCC)</td>
+                                </tr>
+                                <tr>
+                                    <td className="p-3 font-medium">Inngest</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_inngest_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_inngest_data')}</td>
+                                    <td className="p-3 text-[#73726E]">USA (EU-SCC)</td>
+                                </tr>
+                                <tr>
+                                    <td className="p-3 font-medium">Upstash</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_upstash_purpose')}</td>
+                                    <td className="p-3 text-[#73726E]">{t('s4_upstash_data')}</td>
+                                    <td className="p-3 text-[#73726E]">EU 🇪🇺</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>

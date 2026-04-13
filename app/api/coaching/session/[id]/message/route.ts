@@ -11,6 +11,9 @@ import { sendCoachingMessage } from '@/lib/services/coaching-service';
 import type { SendMessageResponse } from '@/types/coaching';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
+// Vercel Serverless: Coaching calls Claude with multi-turn context
+export const maxDuration = 60;
+
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
