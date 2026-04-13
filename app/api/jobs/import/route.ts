@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
             .from('job_queue')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', user.id)
-            .in('status', ['pending', 'ready_for_review', 'ready_to_apply'])
+            .not('status', 'in', '("archived","rejected")')
 
         if (!countError && (activeJobCount ?? 0) >= 5) {
             console.log(`[${requestId}] route=jobs/import step=limit_check blocked count=${activeJobCount}`)
