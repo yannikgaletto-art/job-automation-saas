@@ -9,6 +9,9 @@ Sentry.init({
     ignoreErrors: [
         'ResizeObserver loop limit exceeded',
         'Non-Error promise rejection captured',
+        'AbortError',
+        'signal is aborted without reason',
+        'The operation was aborted',
     ],
     beforeSend(event) {
         // PII aus Error-Events entfernen (DSGVO)
