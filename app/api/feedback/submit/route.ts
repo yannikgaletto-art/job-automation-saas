@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    from: 'Pathly Feedback <onboarding@resend.dev>',
+                    from: 'Pathly Feedback <noreply@path-ly.eu>',
                     to: ['galettoyannik7@gmail.com', 'contact@path-ly.eu'],
                     subject: `💬 Neues Feedback von ${senderDisplay}`,
                     html: `
