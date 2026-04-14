@@ -1407,8 +1407,6 @@
     "question_1": "¿Qué es lo que más te gusta de Pathly?",
     "question_2": "¿Qué te frustra o qué sientes que falta?",
     "question_3": "¿Tienes un consejo que debería aplicar de inmediato?",
-    "question_4": "¿Recomendarías Pathly y si es así a quién?",
-    "question_5": "¿Cuál fue tu primera impresión cuando viste Pathly por primera vez?",
     "error_rate_limit": "Has enviado varias veces recientemente. Espera unos minutos.",
     "error_generic": "Algo salió mal. Por favor, inténtalo de nuevo."
   },

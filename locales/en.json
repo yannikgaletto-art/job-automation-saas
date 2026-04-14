@@ -1407,8 +1407,6 @@
     "question_1": "What do you like most about Pathly?",
     "question_2": "What frustrates you or what is still missing?",
     "question_3": "Do you have a tip I should act on immediately?",
-    "question_4": "Would you recommend Pathly and if so to whom?",
-    "question_5": "What was your first impression when you first saw Pathly?",
     "error_rate_limit": "You've sent multiple feedbacks recently. Please wait a few minutes.",
     "error_generic": "Something went wrong. Please try again."
   },

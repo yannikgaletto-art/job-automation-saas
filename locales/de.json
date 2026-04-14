@@ -1407,8 +1407,6 @@
     "question_1": "Was gefällt dir an Pathly am besten?",
     "question_2": "Was frustriert dich oder was fehlt dir noch?",
     "question_3": "Hast du einen Tipp, den ich sofort umsetzen sollte?",
-    "question_4": "Würdest du Pathly weiterempfehlen und wenn ja, wem?",
-    "question_5": "Was war dein erster Gedanke, als du Pathly zum ersten Mal gesehen hast?",
     "error_rate_limit": "Du hast gerade mehrmals Feedback gesendet. Bitte warte ein paar Minuten.",
     "error_generic": "Leider ist ein Fehler aufgetreten. Bitte versuche es erneut."
   },
