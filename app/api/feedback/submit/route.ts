@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
         // Failure here does NOT block the 200 response to the user.
         const resendKey = process.env.RESEND_API_KEY;
         if (resendKey) {
-            const senderDisplay = name?.trim() || user.email || 'Anonymous';
+            const fullName = name?.trim() || user.email || 'Anonymous';
+            const senderDisplay = fullName.split(' ')[0]; // First name only
             const timestamp = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' });
 
             fetch('https://api.resend.com/emails', {
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
                 },
                 body: JSON.stringify({
                     from: 'Pathly Feedback <onboarding@resend.dev>',
-                    to: ['galettoyannik7@gmail.com'],
+                    to: ['galettoyannik7@gmail.com', 'contact@path-ly.eu'],
                     subject: `💬 Neues Feedback von ${senderDisplay}`,
                     html: `
                         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#FAFAF8;border-radius:12px;">

@@ -43,12 +43,13 @@ export function FeedbackVoiceClient() {
 
     const isValid = feedback.trim().length > 10;
 
-    // Pre-fill name silently from auth session
+    // Pre-fill name silently from auth session — first name only
     useEffect(() => {
         const supabase = createClient();
         supabase.auth.getUser().then(({ data }) => {
-            const n = data?.user?.user_metadata?.full_name || data?.user?.email?.split('@')[0] || '';
-            setUserName(n);
+            const fullName = data?.user?.user_metadata?.full_name || '';
+            const firstName = fullName.split(' ')[0] || data?.user?.email?.split('@')[0] || '';
+            setUserName(firstName);
         });
     }, []);
 
