@@ -151,6 +151,15 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ hidden: shouldHide, streak: newStreak });
         }
 
+        if (action === 'disable_forever') {
+            await supabaseAdmin
+                .from('user_profiles')
+                .update({ show_checkin: false, checkin_skip_streak: 99 })
+                .eq('user_id', user.id);
+
+            return NextResponse.json({ hidden: true });
+        }
+
         if (action === 'reactivate') {
             await supabaseAdmin
                 .from('user_profiles')

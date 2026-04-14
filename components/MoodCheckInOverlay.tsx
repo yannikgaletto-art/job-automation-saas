@@ -22,11 +22,13 @@ interface MoodCheckInOverlayProps {
     onDismiss: () => void;
     onSkip: () => Promise<{ hidden: boolean }>;
     onSubmit: (score: number) => Promise<void>;
+    onNeverShow: () => Promise<void>;
 }
 
-export function MoodCheckInOverlay({ visible, onDismiss, onSkip, onSubmit }: MoodCheckInOverlayProps) {
+export function MoodCheckInOverlay({ visible, onDismiss, onSkip, onSubmit, onNeverShow }: MoodCheckInOverlayProps) {
     const [selectedMood, setSelectedMood] = useState<number | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [neverShow, setNeverShow] = useState(false);
     const t = useTranslations('mood');
     const timeOfDay = useTimeOfDay();
     const symbols = getSymbolsForTime(timeOfDay);
@@ -49,8 +51,11 @@ export function MoodCheckInOverlay({ visible, onDismiss, onSkip, onSubmit }: Moo
     };
 
     const handleSkip = async () => {
-        await onSkip();
-        // Toast for "auto_hidden" is handled by the parent when hidden = true
+        if (neverShow) {
+            await onNeverShow();
+        } else {
+            await onSkip();
+        }
     };
 
     return (
@@ -116,13 +121,34 @@ export function MoodCheckInOverlay({ visible, onDismiss, onSkip, onSubmit }: Moo
                             {submitting ? t('checkin_submitting') : t('checkin_cta')}
                         </motion.button>
 
-                        {/* Skip link */}
-                        <button
-                            onClick={handleSkip}
-                            className="mt-3 text-xs text-[#94a3b8] hover:text-[#64748b] bg-transparent border-none cursor-pointer transition-colors"
-                        >
-                            {t('checkin_skip')}
-                        </button>
+                        {/* Skip + Never show again */}
+                        <div className="mt-4 flex flex-col items-center gap-2">
+                            <button
+                                onClick={handleSkip}
+                                className="text-xs text-[#94a3b8] hover:text-[#64748b] bg-transparent border-none cursor-pointer transition-colors"
+                            >
+                                {t('checkin_skip')}
+                            </button>
+
+                            {/* Never show again toggle */}
+                            <label className="flex items-center gap-2 cursor-pointer select-none group mt-1">
+                                <div
+                                    onClick={() => setNeverShow(v => !v)}
+                                    className={`relative w-8 h-4 rounded-full transition-colors duration-200 ${
+                                        neverShow ? 'bg-[#94a3b8]' : 'bg-[#e2e8f0]'
+                                    }`}
+                                >
+                                    <div
+                                        className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${
+                                            neverShow ? 'translate-x-4' : 'translate-x-0.5'
+                                        }`}
+                                    />
+                                </div>
+                                <span className="text-[10px] text-[#94a3b8] group-hover:text-[#64748b] transition-colors">
+                                    {t('checkin_never_show')}
+                                </span>
+                            </label>
+                        </div>
                     </motion.div>
                 </motion.div>
             )}

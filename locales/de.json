@@ -1430,7 +1430,8 @@
     "today_message_5": "Du bist in Bestform! Fünf Pomodoros — los geht's!",
     "auto_hidden": "Check-in ausgeblendet. Reaktivieren in Einstellungen → Persönlich.",
     "checkin_reactivate": "Mood Check-in reaktivieren",
-    "checkin_reactivate_desc": "Check-in wurde nach 5× Überspringen ausgeblendet."
+    "checkin_reactivate_desc": "Check-in wurde nach 5× Überspringen ausgeblendet.",
+    "checkin_never_show": "Nie wieder anzeigen"
   },
   "upload": {
     "status_uploading": "Datei wird hochgeladen…",

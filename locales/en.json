@@ -1430,7 +1430,8 @@
     "today_message_5": "You're at your best! Five Pomodoros — let's go!",
     "auto_hidden": "Check-in hidden. Re-enable in Settings → Personal.",
     "checkin_reactivate": "Reactivate mood check-in",
-    "checkin_reactivate_desc": "Check-in was hidden after skipping 5 times."
+    "checkin_reactivate_desc": "Check-in was hidden after skipping 5 times.",
+    "checkin_never_show": "Never show again"
   },
   "upload": {
     "status_uploading": "Uploading file…",

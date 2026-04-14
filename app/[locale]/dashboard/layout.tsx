@@ -83,7 +83,7 @@ function DashboardLayoutInner({
     const pathname = usePathname();
     const locale = useLocale();
     const t = useTranslations('dashboard');
-    const { showOverlay: showMoodOverlay, dismiss: dismissMoodOverlay, handleSkip, handleSubmit } = useMoodCheckIn();
+    const { showOverlay: showMoodOverlay, dismiss: dismissMoodOverlay, handleSkip, handleSubmit, handleNeverShow } = useMoodCheckIn();
     const { setCount } = useJobQueueCount();
     const timerTick = useCalendarStore((s) => s.timerTick);
 
@@ -251,6 +251,7 @@ function DashboardLayoutInner({
                 onDismiss={dismissMoodOverlay}
                 onSkip={handleSkip}
                 onSubmit={handleSubmit}
+                onNeverShow={handleNeverShow}
             />
 
             {/* Command Palette (Cmd+K) */}

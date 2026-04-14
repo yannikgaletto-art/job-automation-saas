@@ -1430,7 +1430,8 @@
     "today_message_5": "¡Estás en tu mejor momento! Cinco Pomodoros — ¡vamos!",
     "auto_hidden": "Check-in ocultado. Reactívalo en Ajustes → Personal.",
     "checkin_reactivate": "Reactivar mood check-in",
-    "checkin_reactivate_desc": "Check-in fue ocultado después de omitir 5 veces."
+    "checkin_reactivate_desc": "Check-in fue ocultado después de omitir 5 veces.",
+    "checkin_never_show": "No mostrar nunca más"
   },
   "upload": {
     "status_uploading": "Subiendo archivo…",
