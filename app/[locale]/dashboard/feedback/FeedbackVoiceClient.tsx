@@ -34,14 +34,24 @@ export function FeedbackVoiceClient() {
 
     const mediaRecorderRef  = useRef<MediaRecorder | null>(null);
     const audioChunksRef    = useRef<Blob[]>([]);
-    const inputRef          = useRef<HTMLInputElement>(null);
+    const textareaRef       = useRef<HTMLTextAreaElement>(null);
     const autoStopTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Capture handleSubmit in a ref so the auto-stop timer closure always sees
     // the latest feedback value without needing it in the dependency array.
     const handleSubmitRef = useRef<(() => void) | null>(null);
 
-    const isValid = feedback.trim().length > 10;
+    const isValid    = feedback.trim().length > 10;
+    // Expanded = more than one visible line (~52px = single line incl padding)
+    const isExpanded = (textareaRef.current?.scrollHeight ?? 0) > 58 || feedback.includes('\n');
+
+    // Auto-resize textarea on every feedback change
+    useEffect(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    }, [feedback]);
 
     // Pre-fill name silently from auth session — first name only
     useEffect(() => {
@@ -182,7 +192,7 @@ export function FeedbackVoiceClient() {
                         if (text?.trim()) {
                             setFeedback(prev => prev ? `${prev} ${text.trim()}` : text.trim());
                             // Text lands in the input field — user reviews and sends manually
-                            setTimeout(() => inputRef.current?.focus(), 100);
+                            setTimeout(() => textareaRef.current?.focus(), 100);
                         }
                     }
                 } catch (err) {
@@ -207,11 +217,13 @@ export function FeedbackVoiceClient() {
         }
     }, [recordingState, locale, stopRecording]);
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
+            // Single Enter = submit (like a modern chat)
             e.preventDefault();
             handleSubmit();
         }
+        // Shift+Enter = natural newline (textarea default, no override needed)
     };
 
     // Cleanup timer on unmount
@@ -331,81 +343,164 @@ export function FeedbackVoiceClient() {
                     className="w-full h-px bg-[#E0DDD8] origin-left"
                 />
 
-                {/* ── Input Row — Bild 2 ── */}
+                {/* ── Input Area — Pill → Card morph ── */}
                 <motion.form
                     initial={{ opacity: 0, y: 18 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.85, ease: 'easeOut' }}
                     onSubmit={handleSubmit}
-                    className="flex items-center gap-3 w-full pt-7 pb-10"
+                    className="w-full pt-7 pb-10"
                 >
-                    {/* Text Input — empty placeholder (Feedback 2) */}
-                    <div className={`flex-1 rounded-full px-6 py-[17px] flex items-center border transition-all ${
-                        formState === 'error'
-                            ? 'border-[#E8490F]/30 bg-[#FFF9F7]'
-                            : 'border-[#E7E7E5] bg-[#F3F4F6] focus-within:bg-white focus-within:border-[#C8C4BF]'
-                    }`}>
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={feedback}
-                            onChange={(e) => {
-                                setFeedback(e.target.value);
-                                if (formState === 'error') setFormState('idle');
-                            }}
-                            onKeyDown={handleKeyDown}
-                            placeholder={t('placeholder')}
-                            className="w-full bg-transparent outline-none text-[15px] text-[#1C1917] placeholder:text-[#B0A99E]"
-                            disabled={formState === 'submitting'}
-                            autoComplete="off"
-                        />
-                    </div>
-
-                    {/* Mic Button — Pathly dark blue when recording (Feedback 5) */}
-                    <button
-                        type="button"
-                        onClick={handleMicClick}
-                        disabled={formState === 'submitting'}
-                        className={`w-[56px] h-[56px] rounded-full flex items-center justify-center shrink-0 border transition-all duration-200 focus:outline-none ${
-                            recordingState === 'recording'
-                                ? 'bg-[#012e7a] border-[#012e7a]'   // Pathly dark blue, no pulse
-                                : recordingState === 'transcribing'
-                                    ? 'bg-[#F3F4F6] border-[#E7E7E5] cursor-wait'
-                                    : 'bg-[#F3F4F6] border-[#E7E7E5] hover:bg-[#E8E8E8] hover:border-[#D1D5DB]'
-                        }`}
-                        title={recordingState === 'recording' ? 'Aufnahme stoppen' : 'Sprachnotiz aufnehmen'}
-                    >
-                        {recordingState === 'transcribing' ? (
-                            <Loader2 className="w-5 h-5 text-[#73726E] animate-spin" />
-                        ) : recordingState === 'recording' ? (
-                            <MicOff className="w-5 h-5 text-white" />
-                        ) : (
-                            <Mic className="w-5 h-5 text-[#73726E]" />
-                        )}
-                    </button>
-
-                    {/* Send Button */}
-                    <button
-                        type="submit"
-                        disabled={!isValid || formState === 'submitting'}
-                        className={`w-[56px] h-[56px] rounded-full flex items-center justify-center shrink-0 transition-all duration-300 focus:outline-none ${
-                            isValid
-                                ? 'bg-[#012e7a] hover:bg-[#023a97] shadow-sm cursor-pointer'
-                                : 'bg-[#E5E7EB] cursor-not-allowed'
+                    {/* Morphing container: pill when collapsed, card when expanded */}
+                    <motion.div
+                        layout
+                        transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                        className={`relative w-full border transition-colors duration-300 ${
+                            formState === 'error'
+                                ? 'border-[#E8490F]/30 bg-[#FFF9F7]'
+                                : 'border-[#E7E7E5] bg-[#F3F4F6] focus-within:bg-white focus-within:border-[#C8C4BF]'
+                        } ${
+                            isExpanded
+                                ? 'rounded-2xl px-5 pt-4 pb-4 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.08)]'
+                                : 'rounded-full pl-6 pr-3 py-[11px]'
                         }`}
                     >
-                        {formState === 'submitting' ? (
-                            <Loader2 className="w-5 h-5 text-white animate-spin" />
+                        {/* Collapsed row: textarea + inline buttons */}
+                        {!isExpanded ? (
+                            <div className="flex items-center gap-2">
+                                <textarea
+                                    ref={textareaRef}
+                                    rows={1}
+                                    value={feedback}
+                                    onChange={(e) => {
+                                        setFeedback(e.target.value);
+                                        if (formState === 'error') setFormState('idle');
+                                    }}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder={t('placeholder')}
+                                    style={{ resize: 'none', overflow: 'hidden' }}
+                                    className="flex-1 bg-transparent outline-none text-[15px] text-[#1C1917] placeholder:text-[#B0A99E] leading-[1.5] py-[6px]"
+                                    disabled={formState === 'submitting'}
+                                    autoComplete="off"
+                                />
+                                {/* Inline mic */}
+                                <button
+                                    type="button"
+                                    onClick={handleMicClick}
+                                    disabled={formState === 'submitting'}
+                                    className={`w-[44px] h-[44px] rounded-full flex items-center justify-center shrink-0 border transition-all duration-200 focus:outline-none ${
+                                        recordingState === 'recording'
+                                            ? 'bg-[#012e7a] border-[#012e7a]'
+                                            : recordingState === 'transcribing'
+                                                ? 'bg-[#F3F4F6] border-[#E7E7E5] cursor-wait'
+                                                : 'bg-transparent border-transparent hover:bg-[#E8E8E8]'
+                                    }`}
+                                    title={recordingState === 'recording' ? 'Aufnahme stoppen' : 'Sprachnotiz aufnehmen'}
+                                >
+                                    {recordingState === 'transcribing' ? (
+                                        <Loader2 className="w-4 h-4 text-[#73726E] animate-spin" />
+                                    ) : recordingState === 'recording' ? (
+                                        <MicOff className="w-4 h-4 text-white" />
+                                    ) : (
+                                        <Mic className="w-4 h-4 text-[#73726E]" />
+                                    )}
+                                </button>
+                                {/* Inline send */}
+                                <button
+                                    type="submit"
+                                    disabled={!isValid || formState === 'submitting'}
+                                    className={`w-[44px] h-[44px] rounded-full flex items-center justify-center shrink-0 transition-all duration-300 focus:outline-none ${
+                                        isValid
+                                            ? 'bg-[#012e7a] hover:bg-[#023a97] shadow-sm cursor-pointer'
+                                            : 'bg-[#E5E7EB] cursor-not-allowed'
+                                    }`}
+                                >
+                                    {formState === 'submitting' ? (
+                                        <Loader2 className="w-4 h-4 text-white animate-spin" />
+                                    ) : (
+                                        <Send
+                                            className={`w-4 h-4 ${isValid ? 'text-white' : 'text-[#A8A29E]'}`}
+                                            style={{
+                                                transform: isValid ? 'translate(1px, -1px)' : 'none',
+                                                transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                            }}
+                                        />
+                                    )}
+                                </button>
+                            </div>
                         ) : (
-                            <Send
-                                className={`w-5 h-5 ${isValid ? 'text-white' : 'text-[#A8A29E]'}`}
-                                style={{
-                                    transform: isValid ? 'translate(1px, -1px)' : 'none',
-                                    transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                }}
-                            />
+                            /* ── Expanded card layout ── */
+                            <>
+                                <textarea
+                                    ref={textareaRef}
+                                    rows={1}
+                                    value={feedback}
+                                    onChange={(e) => {
+                                        setFeedback(e.target.value);
+                                        if (formState === 'error') setFormState('idle');
+                                    }}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder={t('placeholder')}
+                                    style={{ resize: 'none', overflow: 'hidden', minHeight: '80px' }}
+                                    className="w-full bg-transparent outline-none text-[15px] text-[#1C1917] placeholder:text-[#B0A99E] leading-[1.6] pb-12"
+                                    disabled={formState === 'submitting'}
+                                    autoComplete="off"
+                                />
+                                {/* Hint + Buttons pinned bottom-right */}
+                                <div className="absolute bottom-3 left-5 right-3 flex items-center justify-between">
+                                    <span className="text-[11px] text-[#C4BFB9] select-none">
+                                        Enter ↵ senden · Shift+Enter neue Zeile
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {/* Mic */}
+                                        <button
+                                            type="button"
+                                            onClick={handleMicClick}
+                                            disabled={formState === 'submitting'}
+                                            className={`w-[40px] h-[40px] rounded-full flex items-center justify-center shrink-0 border transition-all duration-200 focus:outline-none ${
+                                                recordingState === 'recording'
+                                                    ? 'bg-[#012e7a] border-[#012e7a]'
+                                                    : recordingState === 'transcribing'
+                                                        ? 'bg-[#F3F4F6] border-[#E7E7E5] cursor-wait'
+                                                        : 'bg-[#F3F4F6] border-[#E7E7E5] hover:bg-[#E8E8E8]'
+                                            }`}
+                                            title={recordingState === 'recording' ? 'Aufnahme stoppen' : 'Sprachnotiz aufnehmen'}
+                                        >
+                                            {recordingState === 'transcribing' ? (
+                                                <Loader2 className="w-4 h-4 text-[#73726E] animate-spin" />
+                                            ) : recordingState === 'recording' ? (
+                                                <MicOff className="w-4 h-4 text-white" />
+                                            ) : (
+                                                <Mic className="w-4 h-4 text-[#73726E]" />
+                                            )}
+                                        </button>
+                                        {/* Send */}
+                                        <button
+                                            type="submit"
+                                            disabled={!isValid || formState === 'submitting'}
+                                            className={`w-[40px] h-[40px] rounded-full flex items-center justify-center shrink-0 transition-all duration-300 focus:outline-none ${
+                                                isValid
+                                                    ? 'bg-[#012e7a] hover:bg-[#023a97] shadow-sm cursor-pointer'
+                                                    : 'bg-[#E5E7EB] cursor-not-allowed'
+                                            }`}
+                                        >
+                                            {formState === 'submitting' ? (
+                                                <Loader2 className="w-4 h-4 text-white animate-spin" />
+                                            ) : (
+                                                <Send
+                                                    className={`w-4 h-4 ${isValid ? 'text-white' : 'text-[#A8A29E]'}`}
+                                                    style={{
+                                                        transform: isValid ? 'translate(1px, -1px)' : 'none',
+                                                        transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                                    }}
+                                                />
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
                         )}
-                    </button>
+                    </motion.div>
                 </motion.form>
 
                 {/* Error Banner */}
