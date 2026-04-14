@@ -1397,8 +1397,8 @@
     "upload_privacy_cancel": "Abbrechen"
   },
   "feedback_voice": {
-    "title": "Sag mir, was du denkst.",
-    "subtitle": "Dein Feedback zu Pathly! Hier sind einige Fragen, die mich interessieren:",
+    "title": "Was denkst du?",
+    "subtitle": "",
     "placeholder": "Deine Antwort…",
     "name_placeholder": "Dein Name (optional)",
     "submit_button": "Abschicken →",

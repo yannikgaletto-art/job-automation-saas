@@ -286,13 +286,9 @@ export function FeedbackVoiceClient() {
                     transition={{ duration: 0.5, ease: 'easeOut' }}
                     className="mb-10"
                 >
-                    <h1 className="text-[2.1rem] md:text-[2.6rem] font-bold text-[#1C1917] tracking-tight leading-tight mb-3">
+                    <h1 className="text-[2.1rem] md:text-[2.6rem] font-bold text-[#1C1917] tracking-tight leading-tight">
                         {t('title')}
                     </h1>
-                    {/* Subtitle — fully translated via i18n (Feedback 3) */}
-                    <p className="text-[1rem] text-[#9A9086] max-w-xl leading-relaxed">
-                        {t('subtitle')}
-                    </p>
                 </motion.div>
 
                 {/* ── Falling Pills — Bild 1 style, no checkmarks (Feedback 1) ── */}
@@ -396,7 +392,7 @@ export function FeedbackVoiceClient() {
                         disabled={!isValid || formState === 'submitting'}
                         className={`w-[56px] h-[56px] rounded-full flex items-center justify-center shrink-0 transition-all duration-300 focus:outline-none ${
                             isValid
-                                ? 'bg-[#A8C4E6] hover:bg-[#93B5DC] shadow-sm cursor-pointer'
+                                ? 'bg-[#012e7a] hover:bg-[#023a97] shadow-sm cursor-pointer'
                                 : 'bg-[#E5E7EB] cursor-not-allowed'
                         }`}
                     >
