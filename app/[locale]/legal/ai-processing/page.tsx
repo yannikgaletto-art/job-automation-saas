@@ -36,7 +36,7 @@ export default async function AIProcessingPage() {
             <div className="mb-10 p-5 bg-[#F5F5F4] border border-[#E7E7E5] rounded-xl">
                 <h2 className="text-sm font-semibold text-[#37352F] mb-4">{t('flow_title')}</h2>
                 <div className="flex flex-col gap-0">
-                    {['flow_1', 'flow_2', 'flow_3', 'flow_4', 'flow_5'].map((key, idx, arr) => (
+                    {['flow_1', 'flow_2', 'flow_3', 'flow_4', 'flow_5', 'flow_6'].map((key, idx, arr) => (
                         <div key={key}>
                             <div className="flex items-start gap-3">
                                 <div className="flex flex-col items-center">
