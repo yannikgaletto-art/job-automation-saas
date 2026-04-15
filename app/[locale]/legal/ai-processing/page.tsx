@@ -14,14 +14,14 @@ export default async function AIProcessingPage() {
     const t = await getTranslations('legal.ai_processing');
 
     const sections = [
-        { key: 's1', icon: '🤖' },
-        { key: 's2', icon: '🔒' },
-        { key: 's3', icon: '📤' },
-        { key: 's4', icon: '🗑️' },
-        { key: 's5', icon: '🧩' },
-        { key: 's6', icon: '🛡️' },
-        { key: 's7', icon: '✋' },
-        { key: 's8', icon: '📧' },
+        { key: 's1' },
+        { key: 's2' },
+        { key: 's3' },
+        { key: 's4' },
+        { key: 's5' },
+        { key: 's6' },
+        { key: 's7' },
+        { key: 's8' },
     ];
 
     return (
@@ -56,10 +56,9 @@ export default async function AIProcessingPage() {
 
             {/* Sections */}
             <div className="space-y-8">
-                {sections.map(({ key, icon }) => (
+                {sections.map(({ key }) => (
                     <section key={key} className="border-b border-[#E7E7E5] pb-6 last:border-0">
-                        <h2 className="text-base font-semibold mb-2 flex items-center gap-2">
-                            <span>{icon}</span>
+                        <h2 className="text-base font-semibold mb-2">
                             {t(`${key}_title`)}
                         </h2>
                         <div
