@@ -41,6 +41,16 @@ export async function GET() {
         (settings || []).map(s => [s.user_id, s.onboarding_completed])
     );
 
+    // Fetch onboarding_goals from user_profiles
+    const { data: profiles } = await adminClient
+        .from('user_profiles')
+        .select('user_id, onboarding_goals')
+        .in('user_id', userIds);
+
+    const goalsMap = new Map(
+        (profiles || []).map(p => [p.user_id, p.onboarding_goals as string[] | null])
+    );
+
     // Fetch active job counts per user (DSGVO-compliant: only counts, no job data)
     const { data: jobCounts } = await adminClient
         .from('job_queue')
@@ -69,6 +79,7 @@ export async function GET() {
         email_confirmed_at: u.email_confirmed_at,
         last_sign_in_at: u.last_sign_in_at,
         onboarding_completed: settingsMap.get(u.id) ?? false,
+        onboarding_goals: goalsMap.get(u.id) ?? [],
         active_jobs: jobCountMap.get(u.id) || 0,
         applications: appCountMap.get(u.id) || 0,
     }));

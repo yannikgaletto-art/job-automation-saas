@@ -14,8 +14,16 @@ type AdminUser = {
     email_confirmed_at: string | null;
     last_sign_in_at: string | null;
     onboarding_completed: boolean;
+    onboarding_goals: string[];
     active_jobs: number;
     applications: number;
+};
+
+const GOAL_LABELS: Record<string, string> = {
+    active_applications: 'Bewerbungen abschicken',
+    personalization: 'Personalisierung',
+    exploring: 'Nur umschauen',
+    interview_prep: 'Interview-Vorbereitung',
 };
 
 type WaitlistLead = {
@@ -355,9 +363,21 @@ export default function AdminPage() {
                                     <td className="px-5 py-3">
                                         <div>
                                             <p className="font-medium text-[#37352F]">
-                                                {u.full_name || '—'}
+                                                {u.full_name || 'kein Name'}
                                             </p>
                                             <p className="text-xs text-[#73726E]">{u.email}</p>
+                                            {u.onboarding_goals && u.onboarding_goals.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {u.onboarding_goals.map(g => (
+                                                        <span
+                                                            key={g}
+                                                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#012e7a]/8 text-[#012e7a] border border-[#012e7a]/15"
+                                                        >
+                                                            {GOAL_LABELS[g] ?? g}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="px-5 py-3">
