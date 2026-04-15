@@ -4,16 +4,21 @@ import { NextResponse } from 'next/server'
 /**
  * Auth Callback Route — handles the email confirmation redirect from Supabase.
  *
- * Flow: User clicks confirmation link in email → Supabase redirects here with `code` param
- * → We exchange the code for a session → Redirect to /{locale}/onboarding (or dashboard).
+ * TWO scenarios:
  *
- * IMPORTANT: This route is excluded from middleware locale-handling (see middleware matcher).
- * We must manually detect locale from the `next` param or default to 'de'.
+ * 1. SAME DEVICE: User signed up on this browser, clicks confirmation link here.
+ *    → code_verifier exists in cookies → exchangeCodeForSession succeeds
+ *    → Session established, redirect to /onboarding ✅
+ *
+ * 2. CROSS DEVICE: User signed up on desktop, clicks link on phone.
+ *    → code_verifier NOT in this browser → exchangeCodeForSession FAILS
+ *    → BUT: Supabase still marks the email as confirmed when the link is visited!
+ *    → The desktop polling will detect this and sign in automatically.
+ *    → Show a "return to your original browser" message instead of login page.
  */
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
-    // `next` is passed from the signup emailRedirectTo URL if explicitly set
     const next = searchParams.get('next') ?? '/onboarding'
 
     // Detect locale from the `next` param, or fall back to 'de'
@@ -32,10 +37,18 @@ export async function GET(request: Request) {
             return NextResponse.redirect(`${origin}${localizedNext}`)
         }
 
-        console.error('❌ [auth/callback] Code exchange failed:', error.message)
+        // Code exchange failed — most likely cross-device PKCE mismatch.
+        // The email IS confirmed in Supabase, but we can't establish a session here.
+        // Redirect to a friendly page instead of login.
+        console.log('⚠️ [auth/callback] Code exchange failed (likely cross-device):', error.message)
+
+        // Redirect to login with a special flag that shows a helpful message
+        return NextResponse.redirect(
+            `${origin}/${locale}/login?confirmed=true`
+        )
     }
 
-    // If code exchange fails, redirect to login with error hint
-    console.error('❌ [auth/callback] No code or exchange failed, redirecting to login')
-    return NextResponse.redirect(`${origin}/de/login?error=auth_callback_failed`)
+    // No code at all — shouldn't happen normally
+    console.error('❌ [auth/callback] No code provided')
+    return NextResponse.redirect(`${origin}/${locale}/login?error=auth_callback_failed`)
 }

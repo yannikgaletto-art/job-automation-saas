@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, usePathname } from "@/i18n/navigation"
 import { useTranslations, useLocale } from "next-intl"
 import { createClient } from "@/lib/supabase/client"
@@ -24,6 +24,9 @@ export default function SignupPage() {
     const [error, setError] = useState("")
     const [signupSuccess, setSignupSuccess] = useState(false)
     const [langOpen, setLangOpen] = useState(false)
+    const [confirmChecking, setConfirmChecking] = useState(false)
+    const [resending, setResending] = useState(false)
+    const [pollCount, setPollCount] = useState(0)
 
     const router = useRouter()
     const pathname = usePathname()
@@ -31,35 +34,118 @@ export default function SignupPage() {
     const t = useTranslations('auth.signup')
     const currentLocale = useLocale()
 
+    // Refs to keep credentials stable across polls (avoid stale closures)
+    const emailRef = useRef(email)
+    const passwordRef = useRef(password)
+    useEffect(() => { emailRef.current = email }, [email])
+    useEffect(() => { passwordRef.current = password }, [password])
+
     // ── Poll for email confirmation (cross-device) ──────────────
-    // When the user confirms on their phone, this desktop tab detects the
-    // new session and auto-redirects to onboarding.
+    // Uses signInWithPassword to check if email has been confirmed.
+    // Exponential backoff: 5s → 8s → 12s → 15s to avoid Supabase rate limits.
     useEffect(() => {
-        if (!signupSuccess) return
+        if (!signupSuccess || !emailRef.current || !passwordRef.current) return
 
-        const interval = setInterval(async () => {
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session) {
-                clearInterval(interval)
-                console.log("✅ Email confirmed (detected via polling) — redirecting to onboarding")
-                router.push("/onboarding")
+        let cancelled = false
+        let pollNumber = 0
+
+        async function poll() {
+            if (cancelled) return
+
+            try {
+                const { data } = await supabase.auth.signInWithPassword({
+                    email: emailRef.current,
+                    password: passwordRef.current,
+                })
+                if (data?.session && !cancelled) {
+                    console.log("✅ Email confirmed (polling) — redirecting to onboarding")
+                    router.push("/onboarding")
+                    return
+                }
+            } catch {
+                // Network errors — silently continue
             }
-        }, 3000) // check every 3 seconds
 
-        // Also listen for realtime auth state changes (same-device)
+            if (cancelled) return
+
+            // Exponential backoff: start at 5s, increase to 15s max
+            pollNumber++
+            setPollCount(pollNumber)
+            const delay = Math.min(5000 + pollNumber * 1500, 15000)
+            setTimeout(poll, delay)
+        }
+
+        // First poll after 5s
+        const initialTimeout = setTimeout(poll, 5000)
+
+        // Also listen for same-device confirmation (auth state change)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            if (event === "SIGNED_IN" && session) {
-                clearInterval(interval)
+            if (event === "SIGNED_IN" && session && !cancelled) {
                 console.log("✅ Email confirmed (auth state change) — redirecting to onboarding")
                 router.push("/onboarding")
             }
         })
 
         return () => {
-            clearInterval(interval)
+            cancelled = true
+            clearTimeout(initialTimeout)
             subscription.unsubscribe()
         }
-    }, [signupSuccess, supabase, router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [signupSuccess])
+
+    // ── Manual "I confirmed" handler ────────────────────────────
+    const handleManualConfirm = useCallback(async () => {
+        setConfirmChecking(true)
+        setError("")
+        try {
+            const { data, error: signInError } = await supabase.auth.signInWithPassword({
+                email: emailRef.current,
+                password: passwordRef.current,
+            })
+            if (data?.session) {
+                console.log("✅ Email confirmed (manual check) — redirecting to onboarding")
+                router.push("/onboarding")
+                return
+            }
+            if (signInError) {
+                console.log("⏳ Email not yet confirmed:", signInError.message)
+                setError(t('confirm_not_yet'))
+                setTimeout(() => setError(""), 4000)
+            }
+        } catch {
+            setError(t('error_default'))
+        } finally {
+            setConfirmChecking(false)
+        }
+    }, [supabase, router, t])
+
+    // ── Resend confirmation email ───────────────────────────────
+    const handleResend = useCallback(async () => {
+        setResending(true)
+        setError("")
+        try {
+            const { error: resendError } = await supabase.auth.resend({
+                type: 'signup',
+                email: emailRef.current,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                },
+            })
+            if (resendError) {
+                console.error("❌ Resend failed:", resendError.message)
+                setError(t('error_default'))
+            } else {
+                setError("")
+                // Brief success feedback
+                setPollCount(0) // Reset poll counter
+            }
+        } catch {
+            setError(t('error_default'))
+        } finally {
+            setResending(false)
+        }
+    }, [supabase, t])
 
     function handleLanguageChange(code: string) {
         setLangOpen(false)
@@ -100,9 +186,15 @@ export default function SignupPage() {
             setSignupSuccess(true)
 
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : t('error_default')
-            console.error("❌ Signup failed:", msg)
-            setError(msg)
+            const rawMsg = err instanceof Error ? err.message : ''
+            console.error("❌ Signup failed:", rawMsg)
+
+            // Normalize: never expose raw DB/system errors to the user.
+            if (rawMsg.includes('already registered') || rawMsg.includes('already been registered')) {
+                setError(t('error_already_registered'))
+            } else {
+                setError(t('error_default'))
+            }
         } finally {
             setLoading(false)
         }
@@ -126,15 +218,41 @@ export default function SignupPage() {
                             <div className="w-2 h-2 bg-[#012e7a] rounded-full animate-pulse" />
                             <p className="text-sm text-[#73726E]">{t('waiting_confirmation')}</p>
                         </div>
+
+                        {/* Manual confirmation button — prominent */}
+                        <button
+                            onClick={handleManualConfirm}
+                            disabled={confirmChecking}
+                            className="w-full mt-2 px-4 py-2.5 bg-[#012e7a] text-white text-sm font-medium rounded-lg hover:bg-[#012e7a]/90 transition-colors disabled:opacity-50"
+                        >
+                            {confirmChecking ? t('confirm_checking') : t('confirm_done_btn')}
+                        </button>
+
+                        {error && (
+                            <p className="text-xs text-amber-600 mt-1">{error}</p>
+                        )}
+
+                        {/* Resend button — actually resends the email */}
                         <p className="text-xs text-[#9B9A97] mt-4">
                             {t('success_no_email')}{" "}
                             <button
-                                onClick={() => setSignupSuccess(false)}
-                                className="text-[#012e7a] hover:underline font-medium"
+                                onClick={handleResend}
+                                disabled={resending}
+                                className="text-[#012e7a] hover:underline font-medium disabled:opacity-50"
                             >
-                                {t('success_retry')}
+                                {resending ? '...' : t('success_retry')}
                             </button>.
                         </p>
+
+                        {/* Poll status indicator */}
+                        {pollCount > 0 && (
+                            <p className="text-xs text-[#9B9A97]">
+                                {pollCount > 6
+                                    ? 'Tipp: Öffne den Bestätigungslink auf diesem Gerät, dann klicke oben auf den Button.'
+                                    : `Prüfe automatisch... (${pollCount})`
+                                }
+                            </p>
+                        )}
                     </div>
                 ) : (
                     <>
