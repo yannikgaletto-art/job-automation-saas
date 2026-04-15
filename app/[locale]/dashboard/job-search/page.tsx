@@ -7,7 +7,7 @@ import {
     Search, SlidersHorizontal, Loader2, X, Sparkles,
     ExternalLink, ArrowRight, CheckCircle2, AlertTriangle,
     ChevronDown, ChevronRight, Clock, Trash2, Plus, Star, RefreshCw,
-    Compass, List, Layers, BriefcaseBusiness, PenLine, Globe
+    Compass, List, Layers, BriefcaseBusiness, PenLine, Globe, Puzzle
 } from 'lucide-react';
 import type { SerpApiJob } from '@/lib/services/job-search-pipeline';
 import { useJobQueueCount } from '@/store/use-job-queue-count';
@@ -393,7 +393,8 @@ export default function JobSearchPage() {
                 <ManualJobForm isOpen={showManualModal} onClose={() => setShowManualModal(false)} />
 
                 {/* Search UI (always visible now) */}
-                <div className="flex gap-3">
+                <div className="flex gap-2">
+                    {/* Keyword input — takes remaining space */}
                     <div className="flex-1 relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A8A29E]" />
                         <input
@@ -405,7 +406,8 @@ export default function JobSearchPage() {
                             className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
                         />
                     </div>
-                    <div className="w-48 relative">
+                    {/* Location input — fixed width */}
+                    <div className="w-36 relative">
                         <input
                             type="text"
                             placeholder={t('placeholder_location')}
@@ -415,6 +417,18 @@ export default function JobSearchPage() {
                             className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
                         />
                     </div>
+                    {/* Chrome Extension button */}
+                    <a
+                        href="https://chromewebstore.google.com/detail/pathly/nleibaphejfnklbobkcooidfldckkigh"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg border border-[#002e7a]/30 text-[#002e7a] text-sm font-medium bg-[#f0f4ff] hover:bg-[#e0eaff] transition-colors whitespace-nowrap shrink-0"
+                        title="Pathly Chrome Extension installieren"
+                    >
+                        <Puzzle className="w-4 h-4" />
+                        <span className="hidden sm:inline">Extension</span>
+                    </a>
+                    {/* Suchen button */}
                     <motion.button
                         whileHover={{ scale: 1.02, y: -1 }}
                         whileTap={{ scale: 0.98 }}

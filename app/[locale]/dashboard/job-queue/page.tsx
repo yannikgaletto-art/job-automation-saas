@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, PlusCircle } from 'lucide-react';
+import { ChevronRight, PlusCircle, Puzzle } from 'lucide-react';
 import { JobQueueTable } from '../components/job-queue-table';
 import { Job } from '../components/job-row';
 import { Button } from '@/components/motion/button';
@@ -397,6 +397,16 @@ export default function JobQueuePage() {
                     <p className="text-sm text-[#73726E] mt-1">{t('subtitle')}</p>
                 </div>
                 <div className="mt-3 flex items-center gap-3">
+                    {/* Chrome Extension — left of Add Job */}
+                    <a
+                        href="https://chromewebstore.google.com/detail/pathly/nleibaphejfnklbobkcooidfldckkigh"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#002e7a]/30 text-[#002e7a] text-sm font-medium bg-[#f0f4ff] hover:bg-[#e0eaff] transition-colors"
+                    >
+                        <Puzzle className="w-4 h-4" />
+                        Chrome Extension
+                    </a>
                     <Button
                         variant="primary"
                         onClick={() => setIsAddJobOpen(true)}
