@@ -20,6 +20,9 @@ import { createClient } from '@/lib/supabase/server';
 import { deleteUserAccount } from '@/lib/services/account-deletion';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
+// Vercel timeout protection — Stripe cleanup + 30-table cascade can take 15-30s
+export const maxDuration = 60;
+
 export async function DELETE() {
     // Auth guard FIRST: derive userId from session (token is still valid at this point)
     const supabase = await createClient();
@@ -43,7 +46,7 @@ export async function DELETE() {
         console.error(`[account/delete] Failed for ${user.id}:`, result.error);
         return NextResponse.json(
             {
-                error: result.error || 'Löschung fehlgeschlagen. Bitte kontaktiere support@path-ly.eu',
+                error: result.error || 'Löschung fehlgeschlagen. Bitte kontaktiere contact@path-ly.eu',
                 success: false,
             },
             { status: 500 }

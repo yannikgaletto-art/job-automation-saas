@@ -384,7 +384,7 @@ export default function SecurityPage() {
                       const res = await fetch('/api/account/delete', { method: 'DELETE' });
                       const data = await res.json();
                       if (!res.ok || !data.success) {
-                        setDeleteError(data.error || 'Löschung fehlgeschlagen. Bitte kontaktiere support@path-ly.eu');
+                        setDeleteError(data.error || 'Löschung fehlgeschlagen. Bitte kontaktiere contact@path-ly.eu');
                         setDeleting(false);
                         return;
                       }

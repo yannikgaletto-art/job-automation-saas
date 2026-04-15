@@ -19,6 +19,9 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { rateLimiters, checkUpstashLimit } from "@/lib/api/rate-limit-upstash"
 
+// Vercel timeout protection — 8 parallel DB queries + JSON serialization
+export const maxDuration = 30;
+
 export async function GET() {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()

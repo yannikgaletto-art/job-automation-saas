@@ -136,7 +136,7 @@ export async function deleteUserAccount(userId: string): Promise<AccountDeletion
         const stripeResult = await cleanupStripe(creditData.stripe_customer_id);
         if (!stripeResult.success) {
             // KRITISCH #3: If Stripe fails, abort — don't orphan the subscription
-            result.error = `Stripe-Bereinigung fehlgeschlagen: ${stripeResult.error}. Bitte kontaktiere support@path-ly.eu`;
+            result.error = `Stripe-Bereinigung fehlgeschlagen: ${stripeResult.error}. Bitte kontaktiere contact@path-ly.eu`;
             return result;
         }
         result.stripeCleanedUp = true;

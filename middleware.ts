@@ -113,10 +113,14 @@ export async function middleware(request: NextRequest) {
                 }
             )
 
+            // Touch user_settings to keep last_active_at current (triggers trg_update_last_active_at).
+            // This prevents the pg_cron cleanup from marking active users as inactive.
+            // We update updated_at to trigger the BEFORE UPDATE trigger, and return onboarding_completed.
             const { data: settings } = await supabaseAdmin
                 .from('user_settings')
-                .select('onboarding_completed')
+                .update({ updated_at: new Date().toISOString() })
                 .eq('user_id', user.id)
+                .select('onboarding_completed')
                 .maybeSingle()
 
             // If no settings row or onboarding not completed → redirect to onboarding
