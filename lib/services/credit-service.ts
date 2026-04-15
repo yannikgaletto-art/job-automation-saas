@@ -112,13 +112,13 @@ export async function getUserCredits(userId: string): Promise<CreditInfo | null>
             console.warn('⚠️ [Credits] user_credits table missing — returning synthetic beta credit info');
             return {
                 planType: 'free',
-                creditsTotal: 10,
+                creditsTotal: 15,
                 creditsUsed: 0,
                 topupCredits: 0,
-                creditsAvailable: 10,
-                coachingSessionsTotal: 5,
+                creditsAvailable: 15,
+                coachingSessionsTotal: 3,
                 coachingSessionsUsed: 0,
-                jobSearchesTotal: 10,
+                jobSearchesTotal: 15,
                 jobSearchesUsed: 0,
                 billingPeriodEnd: null,
                 stripeCustomerId: null,
@@ -139,12 +139,12 @@ export async function getUserCredits(userId: string): Promise<CreditInfo | null>
             .upsert({
                 user_id: userId,
                 plan_type: 'free',
-                credits_total: 10.0,
+                credits_total: 15.0,
                 credits_used: 0,
                 topup_credits: 0,
-                coaching_sessions_total: 5,
+                coaching_sessions_total: 3,
                 coaching_sessions_used: 0,
-                job_searches_total: 10,
+                job_searches_total: 15,
                 job_searches_used: 0,
             }, { onConflict: 'user_id' })
             .select('*')

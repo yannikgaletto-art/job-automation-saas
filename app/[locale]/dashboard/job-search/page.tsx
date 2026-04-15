@@ -348,7 +348,7 @@ export default function JobSearchPage() {
         <div className="space-y-6 max-w-[1200px]">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-[#37352F]">Job Search</h1>
+                <h1 className="text-2xl font-bold text-[#37352F]">{t('title')}</h1>
                 <p className="text-sm text-[#73726E] mt-1">
                     {t('subtitle')}
                 </p>
@@ -385,7 +385,7 @@ export default function JobSearchPage() {
                         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                         className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-[#73726E] border border-[#E7E7E5] hover:border-[#002e7a]/30`}
                     >
-                        <span className="flex items-center gap-1.5"><PenLine className="w-3 h-3" />Add Job <span className="opacity-70">(Highest Quality)</span></span>
+                        <span className="flex items-center gap-1.5"><PenLine className="w-3 h-3" />Job hinzufügen <span className="opacity-70">(Höchste Qualität)</span></span>
                     </motion.button>
                 </div>
 
@@ -419,7 +419,7 @@ export default function JobSearchPage() {
                     </div>
                     {/* Chrome Extension button */}
                     <a
-                        href="https://chromewebstore.google.com/detail/pathly/nleibaphejfnklbobkcooidfldckkigh"
+                        href="https://chromewebstore.google.com/detail/pathly-%E2%80%94-job-copilot/iebipapmekiemcgdonmnmlpbobfonkki"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg border border-[#002e7a]/30 text-[#002e7a] text-sm font-medium bg-[#f0f4ff] hover:bg-[#e0eaff] transition-colors whitespace-nowrap shrink-0"

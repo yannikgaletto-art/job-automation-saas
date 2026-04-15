@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
+import { PLAN_CONFIG } from "@/lib/services/credit-types"
 import { cn } from "@/lib/utils"
 
 // ────────────────────────────────────────────────
@@ -100,11 +101,11 @@ export function CreditUsageCard() {
                 return res.json()
             })
             .then((data: CreditInfo) => {
-                // Plan defaults — used as floor when DB has 0 (beta / missing rows)
+                // Plan defaults — derived from PLAN_CONFIG (single source of truth)
                 const PLAN_DEFAULTS: Record<string, { coaching: number; searches: number; credits: number }> = {
-                    free:         { credits: 10, coaching: 5,  searches: 10 },
-                    starter:      { credits: 20, coaching: 3,  searches: 20 },
-                    durchstarter: { credits: 50, coaching: 10, searches: 50 },
+                    free:         { credits: PLAN_CONFIG.free.credits, coaching: PLAN_CONFIG.free.coachingSessions,  searches: PLAN_CONFIG.free.jobSearches },
+                    starter:      { credits: PLAN_CONFIG.starter.credits, coaching: PLAN_CONFIG.starter.coachingSessions,  searches: PLAN_CONFIG.starter.jobSearches },
+                    durchstarter: { credits: PLAN_CONFIG.durchstarter.credits, coaching: PLAN_CONFIG.durchstarter.coachingSessions, searches: PLAN_CONFIG.durchstarter.jobSearches },
                 }
                 const defaults = PLAN_DEFAULTS[data.planType] ?? PLAN_DEFAULTS.free
                 setCredits({
@@ -119,13 +120,13 @@ export function CreditUsageCard() {
                 // Hard fallback for beta (no billing tables yet)
                 setCredits({
                     planType: "free",
-                    creditsTotal: 10,
+                    creditsTotal: PLAN_CONFIG.free.credits,
                     creditsUsed: 0,
                     topupCredits: 0,
-                    creditsAvailable: 10,
-                    coachingSessionsTotal: 5,
+                    creditsAvailable: PLAN_CONFIG.free.credits,
+                    coachingSessionsTotal: PLAN_CONFIG.free.coachingSessions,
                     coachingSessionsUsed: 0,
-                    jobSearchesTotal: 10,
+                    jobSearchesTotal: PLAN_CONFIG.free.jobSearches,
                     jobSearchesUsed: 0,
                 })
             })

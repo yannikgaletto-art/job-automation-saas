@@ -9,7 +9,6 @@ import { DocumentsRequiredDialog } from '@/components/shared/documents-required-
 import { CertificateCompactList } from '@/components/certificates/certificate-compact-list';
 import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
 import { useDashboardTour, type TourStep } from '../hooks/useDashboardTour';
-import { AiGeneratedBadge } from '@/components/ui/ai-generated-badge';
 
 const BLUE = '#2B5EA7';
 const BLUE_LIGHT = '#E8EFF8';
@@ -353,7 +352,7 @@ export default function CoachingPage() {
                 {t('title')}
             </motion.h1>
             <p className="text-sm mb-8" style={{ color: MUTED }}>
-                {t('subtitle')} <AiGeneratedBadge variant="coach" />
+                {t('subtitle')}
             </p>
 
             {/* ─── Active Session Banner ────────────────────────────────── */}

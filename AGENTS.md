@@ -1,8 +1,8 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 5.6  
-**Last Updated:** 2026-04-13  
+**Version:** 5.7  
+**Last Updated:** 2026-04-15  
 **Status:** Active  
 
 ---
@@ -32,7 +32,7 @@
 | **Mood Check-in V2** | `app/[locale]/dashboard/hooks/useMoodCheckIn.tsx` + `app/api/mood/checkin/route.ts` | Adaptive Tag/Nacht-Symbole, Progressive Reduction (5× Skip → auto-hide), `MoodCheckinContext`, `CheckinSettingsCard` in Settings, i18n (de/en/es), `lib/mood/mood-symbols.ts` |
 | **Guided Tours** | `components/dashboard/guided-tour-overlay.tsx` | Onboarding tooltips, `useDashboardTour` hook, target-rect syncing, auto-clamp viewports, localStorage state |
 | **Onboarding Flow** | `app/[locale]/onboarding/page.tsx` | UI Sequence with Notion-style goal toggle, SlideToActionButton, and write-read-verify consent logic (`api/onboarding/complete/route.ts`) |
-| **Stripe Billing** | `app/api/stripe/webhook/route.ts` | Credit system (Free/Starter/Durchstarter), atomic `debit_credits()` RPC, `withCreditGate()` middleware, Stripe Checkout/Portal, idempotent webhook, `lib/supabase/admin.ts` singleton |
+| **Stripe Billing** | `app/api/stripe/webhook/route.ts` | Credit system: Free(15)/Starter(€9,90→30)/Durchstarter(€19,90→75). Coaching: 3/10/25. Searches: 15/30/75. Atomic `debit_credits()` RPC, `withCreditGate()` middleware, Stripe Checkout/Portal, idempotent webhook, `lib/supabase/admin.ts` singleton |
 | **Product Analytics** | `lib/posthog/client.ts`, `server.ts` | PostHog (EU DSGVO). Next.js browser pageviews + 5 core server events (onboarding_completed, etc.). Storage mode: localStorage (no cookies), maskAllInputs: true. |
 | **Rate Limiting** | `lib/api/rate-limit-upstash.ts` | Upstash Redis. Distributed window limiter. Gracefully degrades to pass-through in local dev (if URL is missing) to prevent dev blockages. Protects 12 API routes against cost spikes. |
 | **Error Monitoring** | `sentry.client.config.ts`, `sentry.server.config.ts` | Sentry. PII stripped via `beforeSend`. Session replay disabled. EU ingest. |
@@ -137,6 +137,17 @@ Pathly besteht aus **zwei getrennten Projekten** die unabhängig deployt werden:
 
 - **Impressum vervollständigen:** In `lib/constants.ts` unter `IMPRESSUM.sections` müssen `[Straße und Hausnummer]`, `[PLZ] [Ort]` und `[Telefonnummer eintragen]` überschrieben werden (rechtlich erforderlich vor Go-Live). Die DEV-only Warnung auf der Page verschwindet dann.
 - **Warteliste-Endpoint:** In `FinalCTA.tsx` den simulierten Submit (`setTimeout`) durch einen echten API-Call (z.B. Resend/Supabase) ersetzen.
+
+---
+
+## 5. LOCALIZATION & UI CONSISTENCY
+
+> **STRICT RULE:** Pathly SaaS is a German-first application for the DACH region. No English strings are allowed in the Dashboard UI.
+
+- **Use `next-intl`:** All user-facing text in the Dashboard must be defined in `locales/de.json` and consumed via `{t('key')}`.
+- **No Hardcoding:** Never hardcode English text like `<h1>Job Search</h1>` or `<p>No jobs in queue</p>`.
+- **Sync Locales:** Anything added to `locales/de.json` must be added to `locales/en.json` (as a fallback/parity), but the primary working language for UI definitions is German.
+- **Legacy Components:** Static or dead components (like old sidebars) must still follow German localization if they cannot be safely deleted.
 
 ---
 

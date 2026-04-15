@@ -15,12 +15,12 @@ interface ConsentRecord {
 }
 
 const CONSENT_LABELS: Record<string, string> = {
-  privacy_policy: 'Privacy Policy',
-  terms_of_service: 'Terms of Service',
-  ai_processing: 'AI Processing',
-  cookies: 'Cookie Consent',
-  coaching_ai: 'Coaching AI',
-  cv_special_categories: 'CV Special Categories (Art. 9)',
+  privacy_policy: 'Datenschutzerklärung',
+  terms_of_service: 'Nutzungsbedingungen',
+  ai_processing: 'KI-Verarbeitung',
+  cookies: 'Cookie-Einwilligung',
+  coaching_ai: 'Coaching KI',
+  cv_special_categories: 'CV Besondere Kategorien (Art. 9)',
 };
 
 const CONSENT_VERSIONS: Record<string, string> = {
@@ -46,34 +46,34 @@ function getRelativeTime(dateStr: string): string {
 const COMPLIANCE_ITEMS = {
   dsgvo: [
     {
-      title: 'Data Encryption at Rest',
+      title: 'Datenverschlüsselung',
       subtitle: 'Alle Daten werden mit AES-256 verschlüsselt gespeichert — wie in einem digitalen Tresor.',
       detail: 'Deine Daten liegen verschlüsselt auf Supabase-Servern in Frankfurt (eu-central-1). Selbst bei einem Servereinbruch wären die Daten ohne den Schlüssel nicht lesbar.',
     },
     {
-      title: 'PII Pseudonymization',
+      title: 'PII-Pseudonymisierung',
       subtitle: 'Dein Name wird von deinen Daten getrennt, bevor die KI sie verarbeitet.',
       detail: 'Personenbezogene Daten (Name, Adresse, Kontaktdaten) werden vor der KI-Verarbeitung durch Platzhalter ersetzt. Die KI sieht nur den Inhalt, nicht deine Identität.',
     },
     {
-      title: 'Right to Deletion',
+      title: 'Recht auf Löschung',
       subtitle: 'Du kannst jederzeit die vollständige Löschung aller deiner Daten beantragen.',
       detail: 'Gemäß DSGVO Art. 17 kannst du die Löschung beantragen. Alle Daten (CV, Anschreiben, Job-Queue, Bewerbungs-Historie) werden innerhalb von 30 Tagen unwiderruflich gelöscht.',
     },
   ],
   nis2: [
     {
-      title: 'Incident Reporting',
+      title: 'Vorfallmeldung',
       subtitle: 'Sicherheitsvorfälle werden innerhalb von 24 Stunden gemeldet und dokumentiert.',
       detail: 'Sollte es zu einem Datenleck oder Sicherheitsvorfall kommen, wirst du innerhalb von 24 Stunden informiert. Der Vorfall wird dokumentiert und an die zuständige Behörde gemeldet.',
     },
     {
-      title: 'Audit Trails',
+      title: 'Audit-Protokolle',
       subtitle: 'Alle sicherheitsrelevanten Aktionen werden protokolliert — für deine Transparenz.',
       detail: 'Jede KI-Dokumentgenerierung wird mit Modellname, Zeitstempel und Token-Verbrauch in der Tabelle generation_logs gespeichert. Du kannst diese Daten jederzeit exportieren.',
     },
     {
-      title: 'Supply Chain Security',
+      title: 'Lieferkettensicherheit',
       subtitle: 'Drittanbieter (z.B. KI-Modelle) werden regelmäßig auf Sicherheit geprüft.',
       detail: 'Unsere KI-Partner (Anthropic Claude, OpenAI) sind vertraglich verpflichtet, deine Daten nicht zum Modell-Training zu verwenden. Alle API-Aufrufe laufen über verschlüsselte Verbindungen (TLS 1.3).',
     },
@@ -94,7 +94,7 @@ function ComplianceCard({ title, icon, items }: {
           {icon}
           <h2 className="text-xl font-semibold text-[#37352F]">{title}</h2>
         </div>
-        <Badge variant="success">✓ Compliant</Badge>
+        <Badge variant="success">✓ Konform</Badge>
       </div>
 
       <div className="space-y-3">
@@ -194,20 +194,20 @@ export default function SecurityPage() {
       <div>
         <h1 className="text-3xl font-semibold text-[#37352F] flex items-center gap-3">
           <Shield className="w-8 h-8 text-[#012e7a]" />
-          Security & Privacy
+          Datensicherheit & Datenschutz
         </h1>
-        <p className="text-[#73726E] mt-1">DSGVO & NIS2 compliant data management. Your privacy is our top priority.</p>
+        <p className="text-[#73726E] mt-1">DSGVO- & NIS2-konforme Datenverwaltung. Dein Datenschutz hat höchste Priorität.</p>
       </div>
 
       {/* Compliance Status Grid */}
       <div className="grid md:grid-cols-2 gap-6">
         <ComplianceCard
-          title="DSGVO Compliance"
+          title="DSGVO-Konformität"
           icon={<Lock className="w-5 h-5 text-[#37352F]" />}
           items={COMPLIANCE_ITEMS.dsgvo}
         />
         <ComplianceCard
-          title="NIS2 Directive"
+          title="NIS2-Richtlinie"
           icon={<AlertTriangle className="w-5 h-5 text-[#37352F]" />}
           items={COMPLIANCE_ITEMS.nis2}
         />
@@ -217,7 +217,7 @@ export default function SecurityPage() {
       <div className="grid md:grid-cols-2 gap-6">
         {/* Your Data Rights */}
         <div className="bg-white rounded-lg border border-[#E7E7E5] p-6 flex flex-col">
-          <h2 className="text-xl font-semibold text-[#37352F] mb-4">Your Data Rights</h2>
+          <h2 className="text-xl font-semibold text-[#37352F] mb-4">Deine Datenschutzrechte</h2>
           <div className="space-y-3 flex-1">
             <Button
               variant="outline"
@@ -226,7 +226,7 @@ export default function SecurityPage() {
             >
               <FileText className="h-4 w-4 mr-2" />
               <div className="text-left">
-                <span className="block font-medium">View Privacy Policy</span>
+                <span className="block font-medium">Datenschutzerklärung ansehen</span>
                 <span className="text-xs text-[#73726E]">Vollständige Datenschutzerklärung (v1.0)</span>
               </div>
             </Button>
@@ -242,7 +242,7 @@ export default function SecurityPage() {
                 <Download className="h-4 w-4 mr-2" />
               )}
               <div className="text-left">
-                <span className="block font-medium">{exporting ? 'Wird exportiert...' : 'Export My Data'}</span>
+                <span className="block font-medium">{exporting ? 'Wird exportiert...' : 'Meine Daten exportieren'}</span>
                 <span className="text-xs text-[#73726E]">Download aller gespeicherten Daten (JSON)</span>
               </div>
             </Button>
@@ -253,7 +253,7 @@ export default function SecurityPage() {
             >
               <Trash2 className="h-4 w-4 mr-2" />
               <div className="text-left">
-                <span className="block font-medium">Delete Account</span>
+                <span className="block font-medium">Account löschen</span>
                 <span className="text-xs opacity-80">Dauerhafte Löschung aller Daten</span>
               </div>
             </Button>
@@ -262,7 +262,7 @@ export default function SecurityPage() {
 
         {/* Consent History */}
         <div className="bg-white rounded-lg border border-[#E7E7E5] p-6">
-          <h2 className="text-xl font-semibold text-[#37352F] mb-4">Consent History</h2>
+          <h2 className="text-xl font-semibold text-[#37352F] mb-4">Einwilligungshistorie</h2>
           <div className="space-y-0 divide-y divide-[#E7E7E5]">
             {loadingConsents ? (
               // Skeleton loading
@@ -290,7 +290,7 @@ export default function SecurityPage() {
                     </span>
                   </div>
                   <span className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded">
-                    Accepted
+                    Akzeptiert
                   </span>
                 </div>
               ))
@@ -303,7 +303,7 @@ export default function SecurityPage() {
                     <span className="text-xs text-[#73726E]">{CONSENT_VERSIONS[type]}</span>
                   </div>
                   <span className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded">
-                    Accepted
+                    Akzeptiert
                   </span>
                 </div>
               ))

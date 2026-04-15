@@ -121,6 +121,7 @@
       }
     },
     "job_search": {
+      "title": "Job Search",
       "subtitle": "Find matching jobs — powered by Google Jobs.",
       "placeholder_keyword": "Enter job title...",
       "placeholder_mission": "Describe your next mission...",

@@ -5,9 +5,9 @@ export function EmptyJobQueue({ onAddJob }: { onAddJob?: () => void }) {
     return (
         <EmptyState
             icon={Briefcase}
-            title="No jobs in queue"
-            description="Start by adding a job URL to automatically generate optimized applications."
-            actionLabel="Add Your First Job"
+            title="Noch keine Jobs in der Queue"
+            description="Füge eine Job-URL hinzu, um automatisch optimierte Bewerbungen zu erstellen."
+            actionLabel="Ersten Job hinzufügen"
             onAction={onAddJob}
         />
     )

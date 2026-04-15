@@ -9,23 +9,26 @@
 // PLAN DEFINITIONS
 // ============================================================================
 
+// ⚠️ SYNC: Free-plan defaults below are also hardcoded in the DB trigger:
+//   supabase/migrations/20260415b_fix_signup_trigger.sql → create_user_credits()
+//   If you change values here, you MUST update the trigger SQL and deploy it.
 export const PLAN_CONFIG = {
     free: {
-        credits: 10.0,       // Free plan: 10 credits
-        coachingSessions: 5, // 5 coaching sessions
-        jobSearches: 10,     // 10 unique SerpAPI queries (cache hits are free)
+        credits: 15.0,       // Free plan: 15 credits (~10 full applications)
+        coachingSessions: 3, // 3 coaching sessions ("Reinschnuppern")
+        jobSearches: 15,     // 15 unique SerpAPI queries (cache hits are free)
         label: 'Free',
     },
     starter: {
-        credits: 20.0,
-        coachingSessions: 3,
-        jobSearches: 20,
+        credits: 30.0,       // Starter: full month of applications
+        coachingSessions: 10, // Serious interview prep
+        jobSearches: 30,
         label: 'Starter',
     },
     durchstarter: {
-        credits: 50.0,
-        coachingSessions: 10,
-        jobSearches: 50,
+        credits: 75.0,       // Durchstarter: intensive job search
+        coachingSessions: 25, // Interview bootcamp
+        jobSearches: 75,
         label: 'Durchstarter',
     },
 } as const;

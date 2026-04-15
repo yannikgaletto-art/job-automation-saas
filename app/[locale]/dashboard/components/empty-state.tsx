@@ -9,14 +9,14 @@ export function EmptyState() {
       <div className="rounded-full bg-muted p-6 mb-4">
         <Inbox className="h-12 w-12 text-muted-foreground" />
       </div>
-      <h3 className="text-lg font-semibold mb-2">No jobs in queue yet</h3>
+      <h3 className="text-lg font-semibold mb-2">Noch keine Jobs in der Queue</h3>
       <p className="text-muted-foreground text-center mb-6 max-w-md">
-        Start by adding jobs from job boards using our Chrome extension,
-        or upload a job description manually.
+        Füge Jobs von Job-Portalen mit unserer Chrome-Erweiterung hinzu
+        oder lade eine Stellenbeschreibung manuell hoch.
       </p>
       <div className="flex gap-3">
-        <Button variant="outline">Install Extension</Button>
-        <Button>Add Job Manually</Button>
+        <Button variant="outline">Erweiterung installieren</Button>
+        <Button>Job manuell hinzufügen</Button>
       </div>
     </div>
   )

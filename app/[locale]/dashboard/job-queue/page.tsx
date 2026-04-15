@@ -399,7 +399,7 @@ export default function JobQueuePage() {
                 <div className="mt-3 flex items-center gap-3">
                     {/* Chrome Extension — left of Add Job */}
                     <a
-                        href="https://chromewebstore.google.com/detail/pathly/nleibaphejfnklbobkcooidfldckkigh"
+                        href="https://chromewebstore.google.com/detail/pathly-%E2%80%94-job-copilot/iebipapmekiemcgdonmnmlpbobfonkki"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#002e7a]/30 text-[#002e7a] text-sm font-medium bg-[#f0f4ff] hover:bg-[#e0eaff] transition-colors"

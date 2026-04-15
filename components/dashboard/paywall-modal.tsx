@@ -13,6 +13,7 @@
  */
 
 import { useTranslations } from 'next-intl';
+import { PLAN_CONFIG } from '@/lib/services/credit-types';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -59,9 +60,9 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
         t('exhausted_title');
 
     const subtitle =
-        reason === 'coaching' ? t('coaching_limit_desc', { total: '5' }) :
-        reason === 'search' ? t('search_limit_desc', { total: '10' }) :
-        t('exhausted_thanks', { total: '10' });
+        reason === 'coaching' ? t('coaching_limit_desc', { total: String(PLAN_CONFIG.free.coachingSessions) }) :
+        reason === 'search' ? t('search_limit_desc', { total: String(PLAN_CONFIG.free.jobSearches) }) :
+        t('exhausted_thanks', { total: String(PLAN_CONFIG.free.credits) });
 
     const icon = reason === 'coaching' ? '🎯' : reason === 'search' ? '🔍' : '⚡';
 

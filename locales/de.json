@@ -76,7 +76,7 @@
       "tools": "Tools"
     },
     "todays_goals": {
-      "title": "Today's Goals",
+      "title": "Tagesziele",
       "subtitle": "Was machst du heute? Plane deinen Tag."
     },
     "calendar": {
@@ -121,6 +121,7 @@
       }
     },
     "job_search": {
+      "title": "Jobsuche",
       "subtitle": "Finde passende Jobs — powered by Google Jobs.",
       "placeholder_keyword": "Jobtitel eingeben...",
       "placeholder_mission": "Beschreibe deine nächste Mission...",
@@ -235,11 +236,11 @@
     "job_queue": {
       "title": "Job Queue",
       "subtitle": "Verwalte und tracke deine aktiven Bewerbungen",
-      "add_job": "Add Job",
+      "add_job": "Job hinzufügen",
       "max_jobs": "Max. 5 aktive Jobs erreicht",
       "current_jobs": "Aktuelle Jobs",
       "application_history": "Bewerbungs-Journey",
-      "review_cv": "Review Optimized CV",
+      "review_cv": "Optimierten CV prüfen",
       "notify_added": "Job zur Queue hinzugefügt",
       "notify_steckbrief": "Steckbrief erstellt",
       "notify_confirmed": "Steckbrief bestätigt",
@@ -603,7 +604,7 @@
       "plan_label": "Aktueller Plan",
       "credits_label": "Job Queue",
       "coaching_label": "Coaching",
-      "searches_label": "Job Searches",
+      "searches_label": "Jobsuchen",
       "cost_hint": "Jede KI-Aktion (CV Match, Anschreiben, CV-Optimierung) verbraucht 0,5 Credits."
     }
   },
@@ -1031,12 +1032,12 @@
     "hint_navigate": "Navigieren",
     "hint_select": "Auswählen",
     "hint_close": "Schließen",
-    "cmd_goals": "Today's Goals öffnen",
-    "cmd_search": "Job Search öffnen",
+    "cmd_goals": "Tagesziele öffnen",
+    "cmd_search": "Jobsuche öffnen",
     "cmd_queue": "Job Queue öffnen",
-    "cmd_analytics": "Analytics öffnen",
-    "cmd_settings": "Settings öffnen",
-    "cmd_security": "Data Security öffnen"
+    "cmd_analytics": "Analytik öffnen",
+    "cmd_settings": "Einstellungen öffnen",
+    "cmd_security": "Datensicherheit öffnen"
   },
   "job_queue": {
     "tab_profile": "Steckbrief",
