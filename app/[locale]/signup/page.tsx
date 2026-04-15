@@ -53,7 +53,7 @@ export default function SignupPage() {
             if (cancelled) return
 
             try {
-                const { data } = await supabase.auth.signInWithPassword({
+                const { data, error: pollError } = await supabase.auth.signInWithPassword({
                     email: emailRef.current,
                     password: passwordRef.current,
                 })
@@ -62,8 +62,11 @@ export default function SignupPage() {
                     router.push("/onboarding")
                     return
                 }
-            } catch {
-                // Network errors — silently continue
+                if (pollError) {
+                    console.log(`⏳ Poll #${pollNumber + 1}: ${pollError.message}`)
+                }
+            } catch (err) {
+                console.log("⏳ Poll network error:", err)
             }
 
             if (cancelled) return
