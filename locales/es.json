@@ -556,6 +556,8 @@
       "trust_3_detail": "Todos los detalles en nuestra Política de Privacidad.",
       "privacy_label": "He leído la <privacyLink>Política de Privacidad</privacyLink> y estoy de acuerdo.",
       "ai_label": "Acepto el procesamiento de mis datos por <aiLink>servicios de IA</aiLink>. (Sin este consentimiento, Pathly no puede utilizarse.)",
+      "cv_special_label": "Acepto el procesamiento de categorías especiales de datos (p.ej. foto, discapacidad) de mi CV por servicios de IA — exclusivamente para solicitudes personalizadas.",
+      "cv_special_hint": "Opcional — sin este consentimiento, dichos datos se eliminan automáticamente del procesamiento por IA.",
       "submit": "Iniciar Pathly",
       "submitting": "Guardando…",
       "error_save": "Error al guardar. Por favor, inténtalo de nuevo.",
@@ -1550,5 +1552,23 @@
     "feedback_success_desc": "¡Gracias por tu feedback — sigamos adelante!",
     "feedback_already_claimed": "Ya has recibido tus créditos de feedback.",
     "feedback_error": "Error al enviar. Inténtalo de nuevo."
+  },
+  "ai_badge": {
+    "generated": "Generado por IA",
+    "optimized": "Optimizado por IA",
+    "researched": "Investigado por IA",
+    "coach": "Coach de IA",
+    "recommendation": "Recomendación de IA",
+    "tooltip_generated": "Este contenido fue creado con ayuda de IA. Revísalo cuidadosamente antes de usarlo.",
+    "tooltip_optimized": "Este CV fue optimizado por IA. Revisa todos los cambios antes de enviarlo.",
+    "tooltip_researched": "Esta información fue investigada por IA. Los datos pueden ser inexactos — por favor verifícalos.",
+    "tooltip_coach": "Estás practicando con un coach de IA. Las preguntas y el feedback son generados por IA.",
+    "tooltip_recommendation": "Esta recomendación se basa en análisis de IA. Revísala críticamente en el contexto de tu situación."
+  },
+  "reconsent_banner": {
+    "title": "Aviso de privacidad actualizado para procesamiento de IA",
+    "body": "Hemos actualizado nuestro aviso sobre el procesamiento de categorías especiales de datos (p.ej. fotos en tu CV). Tu protección de datos personales sigue completamente activa.",
+    "link": "Leer detalles",
+    "dismiss_label": "Cerrar"
   }
 }

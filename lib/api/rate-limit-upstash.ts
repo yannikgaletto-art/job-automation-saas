@@ -86,6 +86,10 @@ function getLimiters() {
 
         // Job ingest (time-based, complements max-5-active guard)
         jobIngest: createLimiter('rl:job-ingest', 5, '1 m'),
+
+        // DSGVO self-service endpoints (abuse protection)
+        accountDelete: createLimiter('rl:account-delete', 1, '10 m'),
+        dataExport: createLimiter('rl:data-export', 3, '10 m'),
     };
     return _limiters;
 }

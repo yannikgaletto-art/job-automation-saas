@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createSSRClient } from '@/lib/supabase/server';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { isAdmin } from '@/lib/admin';
+import { deleteUserAccount } from '@/lib/services/account-deletion';
 
 /**
  * Admin API: List all users, delete users, reset onboarding.
  * 
  * Security: Double-check — session auth + admin email whitelist.
- * Uses SUPABASE_SERVICE_ROLE_KEY to access auth.admin API.
+ * Uses getSupabaseAdmin() singleton (canonical import per CLAUDE.md).
  */
 
 // GET /api/admin/users — list all registered users
@@ -20,11 +21,7 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Use admin client to list users
-    const adminClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const adminClient = getSupabaseAdmin();
 
     const { data, error } = await adminClient.auth.admin.listUsers();
 
@@ -83,6 +80,7 @@ export async function GET() {
 }
 
 // DELETE /api/admin/users — delete a user by ID
+// Uses shared deleteUserAccount() service (DRY — KRITISCH #1 fix)
 export async function DELETE(request: Request) {
     const supabase = await createSSRClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -102,61 +100,14 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 });
     }
 
-    const adminClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const result = await deleteUserAccount(userId);
 
-    // --- CASCADE DELETE: all user-scoped tables (ordered: leaf tables first) ---
-    // These must all be cleaned before deleting the auth user to avoid FK constraint errors.
-    const tables = [
-        'credit_events',
-        'processed_stripe_events',
-        'generation_logs',
-        'coaching_sessions',
-        'job_certificates',
-        'validation_logs',
-        'video_scripts',
-        'video_approaches',
-        'script_block_templates',
-        'mood_checkins',
-        'daily_energy',
-        'daily_briefings',
-        'pomodoro_sessions',
-        'tasks',
-        'community_upvotes',
-        'community_comments',
-        'community_posts',
-        'volunteering_bookmarks',
-        'volunteering_votes',
-        'application_history',
-        'company_research',
-        'saved_job_searches',
-        'job_queue',
-        'documents',
-        'user_credits',
-        'user_profiles',
-        'user_values',
-        'user_settings',
-    ] as const;
-
-    for (const table of tables) {
-        const { error: delErr } = await adminClient.from(table).delete().eq('user_id', userId);
-        if (delErr) {
-            // Log but continue — table may not exist yet or may have no rows
-            console.warn(`[admin/users] cascade delete warn (${table}):`, delErr.message);
-        }
+    if (!result.success) {
+        console.error(`[admin/users] deleteUser failed for ${userId}:`, result.error);
+        return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
-    // Delete the auth user (only after all FK refs are gone)
-    const { error } = await adminClient.auth.admin.deleteUser(userId);
-
-    if (error) {
-        console.error('[admin/users] deleteUser error:', error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    console.log(`[admin] User ${userId} deleted by ${user.email}`);
+    console.log(`[admin] User ${userId} deleted by ${user.email} (tables=${result.tablesDeleted.length}, stripe=${result.stripeCleanedUp})`);
     return NextResponse.json({ success: true });
 }
 
@@ -175,10 +126,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
-    const adminClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const adminClient = getSupabaseAdmin();
 
     const { error } = await adminClient
         .from('user_settings')

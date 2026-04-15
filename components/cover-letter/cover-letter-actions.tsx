@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/motion/button"
 import { RefreshCw, Copy, Download, Check } from "lucide-react"
+import { AiGeneratedBadge } from "@/components/ui/ai-generated-badge"
 
 interface CoverLetterActionsProps {
     coverLetter: string
@@ -42,6 +43,7 @@ export function CoverLetterActions({
 
     return (
         <div className="flex items-center gap-2">
+            <AiGeneratedBadge />
             {/* Regenerate */}
             <Button
                 variant="outline"

@@ -556,6 +556,8 @@
       "trust_3_detail": "Full details in our Privacy Policy.",
       "privacy_label": "I have read the <privacyLink>Privacy Policy</privacyLink> and agree.",
       "ai_label": "I consent to the processing of my data by <aiLink>AI services</aiLink>. (Without this consent, Pathly cannot be used.)",
+      "cv_special_label": "I consent to the processing of special data categories (e.g. photo, disability) from my CV by AI services — exclusively for personalized applications.",
+      "cv_special_hint": "Optional — without this consent, such data is automatically removed from AI processing.",
       "submit": "Start Pathly",
       "submitting": "Saving…",
       "error_save": "Saving failed. Please try again.",
@@ -1550,5 +1552,23 @@
     "feedback_success_desc": "Thanks for your feedback — let's keep going!",
     "feedback_already_claimed": "You've already received your feedback credits.",
     "feedback_error": "Error submitting. Please try again."
+  },
+  "ai_badge": {
+    "generated": "AI-generated",
+    "optimized": "AI-optimized",
+    "researched": "AI-researched",
+    "coach": "AI coach",
+    "recommendation": "AI recommendation",
+    "tooltip_generated": "This content was created with the help of AI. Review it carefully before use.",
+    "tooltip_optimized": "This CV was optimized by AI. Review all changes before submitting.",
+    "tooltip_researched": "This information was researched by AI. Facts may be inaccurate — please verify.",
+    "tooltip_coach": "You're practicing with an AI coach. Questions and feedback are AI-generated.",
+    "tooltip_recommendation": "This recommendation is based on AI analysis. Review it critically in the context of your situation."
+  },
+  "reconsent_banner": {
+    "title": "Updated privacy notice for AI processing",
+    "body": "We've updated our notice regarding the processing of special data categories (e.g. photos in your CV). Your PII protection remains fully active.",
+    "link": "Read details",
+    "dismiss_label": "Dismiss"
   }
 }

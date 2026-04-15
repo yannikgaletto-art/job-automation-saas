@@ -72,6 +72,7 @@ export default function OnboardingPage() {
     const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
     const [privacyAccepted, setPrivacyAccepted] = useState(false);
     const [aiProcessingAccepted, setAiProcessingAccepted] = useState(false);
+    const [cvSpecialCategoriesAccepted, setCvSpecialCategoriesAccepted] = useState(false);
     const [completing, setCompleting] = useState(false);
     const [completionError, setCompletionError] = useState<string | null>(null);
 
@@ -114,7 +115,9 @@ export default function OnboardingPage() {
                     onboarding_goals: selectedGoals,
                     consents: [
                         { document_type: 'privacy_policy', document_version: 'v1.0', consent_given: true },
-                        { document_type: 'ai_processing', document_version: 'v1.0', consent_given: true },
+                        { document_type: 'ai_processing', document_version: 'v2.0', consent_given: true },
+                        // Art. 9 DSGVO: Special category consent is opt-in (not required)
+                        ...(cvSpecialCategoriesAccepted ? [{ document_type: 'cv_special_categories', document_version: 'v1.0', consent_given: true }] : []),
                     ],
                 }),
             });
@@ -179,8 +182,10 @@ export default function OnboardingPage() {
                                 <Step2Consent
                                     privacyAccepted={privacyAccepted}
                                     aiProcessingAccepted={aiProcessingAccepted}
+                                    cvSpecialCategoriesAccepted={cvSpecialCategoriesAccepted}
                                     onTogglePrivacy={() => setPrivacyAccepted((v) => !v)}
                                     onToggleAI={() => setAiProcessingAccepted((v) => !v)}
+                                    onToggleCvSpecial={() => setCvSpecialCategoriesAccepted((v) => !v)}
                                     onComplete={handleComplete}
                                     completing={completing}
                                     error={completionError}
@@ -414,16 +419,20 @@ const TRUST_POINTS = [
 function Step2Consent({
     privacyAccepted,
     aiProcessingAccepted,
+    cvSpecialCategoriesAccepted,
     onTogglePrivacy,
     onToggleAI,
+    onToggleCvSpecial,
     onComplete,
     completing,
     error,
 }: {
     privacyAccepted: boolean;
     aiProcessingAccepted: boolean;
+    cvSpecialCategoriesAccepted: boolean;
     onTogglePrivacy: () => void;
     onToggleAI: () => void;
+    onToggleCvSpecial: () => void;
     onComplete: () => void;
     completing: boolean;
     error: string | null;
@@ -514,6 +523,32 @@ function Step2Consent({
                                 .replace('</aiLink>', '</a>'),
                         }}
                     />
+                </label>
+                {/* Art. 9 DSGVO: Special Categories — Optional Opt-In */}
+                <label className={`flex items-start gap-3 cursor-pointer select-none p-3 rounded-lg border transition-colors ${
+                    cvSpecialCategoriesAccepted ? 'border-[#002e7a] bg-[#002e7a]/5' : 'border-[#E7E7E5] hover:border-[#002e7a]/30'
+                }`}>
+                    <div
+                        className={`rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                            cvSpecialCategoriesAccepted ? 'bg-[#002e7a] border-[#002e7a]' : 'border-[#D6D6D3] bg-white'
+                        }`}
+                        style={{ width: '18px', height: '18px' }}
+                    >
+                        {cvSpecialCategoriesAccepted && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
+                    </div>
+                    <input type="checkbox" checked={cvSpecialCategoriesAccepted} onChange={onToggleCvSpecial} className="sr-only" />
+                    <div>
+                        <span className="text-sm text-[#37352F]">
+                            {t('cv_special_label')}
+                        </span>
+                        <span className="block text-xs text-[#94a3b8] mt-1">
+                            {t('cv_special_hint')}
+                        </span>
+                    </div>
                 </label>
             </div>
 

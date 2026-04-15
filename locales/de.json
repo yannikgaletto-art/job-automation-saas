@@ -556,6 +556,8 @@
       "trust_3_detail": "Alle Details in unserer Datenschutzerklärung.",
       "privacy_label": "Ich habe die <privacyLink>Datenschutzerklärung</privacyLink> gelesen und stimme zu.",
       "ai_label": "Ich stimme der Verarbeitung meiner Daten durch <aiLink>KI-Dienste</aiLink> zu. (Ohne diese Zustimmung kann Pathly nicht genutzt werden.)",
+      "cv_special_label": "Ich bin damit einverstanden, dass besondere Datenkategorien (z.B. Foto, Behinderung) aus meinem Lebenslauf an KI-Dienste übermittelt werden — ausschließlich für personalisierte Bewerbungen.",
+      "cv_special_hint": "Optional — ohne diese Zustimmung werden solche Daten automatisch aus der KI-Verarbeitung entfernt.",
       "submit": "Pathly starten",
       "submitting": "Wird gespeichert…",
       "error_save": "Speichern fehlgeschlagen. Bitte erneut versuchen.",
@@ -1550,5 +1552,23 @@
     "feedback_success_desc": "Danke für dein Feedback — weiter geht's!",
     "feedback_already_claimed": "Du hast deine Feedback-Credits bereits erhalten.",
     "feedback_error": "Fehler beim Senden. Bitte versuche es erneut."
+  },
+  "ai_badge": {
+    "generated": "KI-generiert",
+    "optimized": "KI-optimiert",
+    "researched": "KI-recherchiert",
+    "coach": "KI-Gesprächspartner",
+    "recommendation": "KI-Empfehlung",
+    "tooltip_generated": "Dieser Inhalt wurde mit Hilfe von KI erstellt. Prüfe ihn sorgfältig vor der Verwendung.",
+    "tooltip_optimized": "Dieser Lebenslauf wurde mit KI optimiert. Prüfe alle Änderungen vor dem Absenden.",
+    "tooltip_researched": "Diese Informationen wurden mit KI recherchiert. Fakten können ungenau sein — bitte verifiziere sie.",
+    "tooltip_coach": "Du übst mit einem KI-Coach. Die Fragen und das Feedback werden von KI generiert.",
+    "tooltip_recommendation": "Diese Empfehlung basiert auf KI-Analyse. Prüfe sie kritisch im Kontext deiner Situation."
+  },
+  "reconsent_banner": {
+    "title": "Aktualisierte Datenschutzhinweise zur KI-Verarbeitung",
+    "body": "Wir haben unsere Hinweise zur Verarbeitung besonderer Datenkategorien (z.B. Fotos im Lebenslauf) ergänzt. Dein PII-Schutz bleibt unverändert aktiv.",
+    "link": "Details lesen",
+    "dismiss_label": "Schließen"
   }
 }

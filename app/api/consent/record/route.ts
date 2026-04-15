@@ -7,16 +7,13 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
-const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const supabaseAdmin = getSupabaseAdmin()
 
 interface ConsentPayload {
     consents: Array<{
-        document_type: 'privacy_policy' | 'terms_of_service' | 'ai_processing' | 'cookies'
+        document_type: 'privacy_policy' | 'terms_of_service' | 'ai_processing' | 'cookies' | 'coaching_ai' | 'cv_special_categories'
         document_version: string
         consent_given: boolean
     }>
@@ -93,8 +90,9 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // §3: User-scoped — only return own consent records
-        const { data, error } = await supabaseAdmin
+        // §3: User-scoped — RLS ensures only own consent records are returned
+        // Using RLS-scoped client (least privilege — admin not needed for reads)
+        const { data, error } = await supabase
             .from('consent_history')
             .select('*')
             .eq('user_id', user.id)

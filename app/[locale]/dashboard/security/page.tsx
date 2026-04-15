@@ -5,6 +5,7 @@ import { Shield, Lock, Download, FileText, Trash2, CheckCircle2, AlertTriangle, 
 import { Badge } from '@/components/motion/badge';
 import { Button } from '@/components/motion/button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createClient } from '@/lib/supabase/client';
 
 interface ConsentRecord {
   document_type: string;
@@ -18,6 +19,8 @@ const CONSENT_LABELS: Record<string, string> = {
   terms_of_service: 'Terms of Service',
   ai_processing: 'AI Processing',
   cookies: 'Cookie Consent',
+  coaching_ai: 'Coaching AI',
+  cv_special_categories: 'CV Special Categories (Art. 9)',
 };
 
 const CONSENT_VERSIONS: Record<string, string> = {
@@ -141,6 +144,9 @@ export default function SecurityPage() {
   const [loadingConsents, setLoadingConsents] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchConsents() {
@@ -306,7 +312,7 @@ export default function SecurityPage() {
         </div>
       </div>
 
-      {/* Delete Account Modal */}
+      {/* Delete Account Modal — Self-Service (DSGVO Art. 17) */}
       <AnimatePresence>
         {showDeleteModal && (
           <motion.div
@@ -314,7 +320,7 @@ export default function SecurityPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
-            onClick={() => setShowDeleteModal(false)}
+            onClick={() => { if (!deleting) setShowDeleteModal(false); }}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -324,31 +330,81 @@ export default function SecurityPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-[#37352F]">Account löschen</h3>
-                <button onClick={() => setShowDeleteModal(false)} className="text-[#73726E] hover:text-[#37352F]">
+                <h3 className="text-lg font-semibold text-[#37352F]">Account dauerhaft löschen</h3>
+                <button
+                  onClick={() => { if (!deleting) { setShowDeleteModal(false); setDeleteConfirm(''); setDeleteError(null); } }}
+                  className="text-[#73726E] hover:text-[#37352F]"
+                  disabled={deleting}
+                >
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <p className="text-[#73726E] mb-4">
-                Um deinen Account und alle gespeicherten Daten dauerhaft zu löschen, kontaktiere uns bitte per E-Mail.
-                Wir bearbeiten deine Anfrage gemäß DSGVO Art. 17 innerhalb von 30 Tagen.
-              </p>
-              <div className="bg-[#F5F5F4] rounded-lg p-4 mb-4">
-                <p className="text-sm font-medium text-[#37352F]">Kontakt:</p>
-                <a
-                  href="mailto:contact@path-ly.eu?subject=Account%20Deletion%20Request"
-                  className="text-sm text-[#012e7a] hover:underline"
-                >
-                  contact@path-ly.eu
-                </a>
+
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-red-800 font-medium mb-1">⚠️ Diese Aktion kann nicht rückgängig gemacht werden</p>
+                <p className="text-xs text-red-700">
+                  Alle deine Daten werden unwiderruflich gelöscht: Lebenslauf, Anschreiben, Job Queue,
+                  Bewerbungshistorie, Coaching Sessions und Stripe-Abonnement.
+                </p>
               </div>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setShowDeleteModal(false)}
-              >
-                Verstanden
-              </Button>
+
+              <p className="text-sm text-[#73726E] mb-3">
+                Tippe <strong className="text-[#37352F]">LÖSCHEN</strong> ein, um die Löschung zu bestätigen:
+              </p>
+              <input
+                type="text"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder="LÖSCHEN"
+                disabled={deleting}
+                className="w-full px-3 py-2 border border-[#E7E7E5] rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400 disabled:opacity-50"
+                autoComplete="off"
+              />
+
+              {deleteError && (
+                <p className="text-sm text-red-600 mb-3">{deleteError}</p>
+              )}
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => { setShowDeleteModal(false); setDeleteConfirm(''); setDeleteError(null); }}
+                  disabled={deleting}
+                >
+                  Abbrechen
+                </Button>
+                <Button
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white border-none disabled:opacity-40"
+                  disabled={deleteConfirm !== 'LÖSCHEN' || deleting}
+                  onClick={async () => {
+                    setDeleting(true);
+                    setDeleteError(null);
+                    try {
+                      const res = await fetch('/api/account/delete', { method: 'DELETE' });
+                      const data = await res.json();
+                      if (!res.ok || !data.success) {
+                        setDeleteError(data.error || 'Löschung fehlgeschlagen. Bitte kontaktiere support@path-ly.eu');
+                        setDeleting(false);
+                        return;
+                      }
+                      // Success: sign out and redirect
+                      const supabase = createClient();
+                      await supabase.auth.signOut();
+                      window.location.href = '/login';
+                    } catch {
+                      setDeleteError('Netzwerkfehler. Bitte versuche es erneut.');
+                      setDeleting(false);
+                    }
+                  }}
+                >
+                  {deleting ? (
+                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Wird gelöscht…</>
+                  ) : (
+                    'Account löschen'
+                  )}
+                </Button>
+              </div>
             </motion.div>
           </motion.div>
         )}
