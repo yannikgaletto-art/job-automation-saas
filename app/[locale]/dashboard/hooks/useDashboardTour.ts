@@ -85,9 +85,8 @@ export function useDashboardTour(
             if (flag !== '1') return;
         }
 
-        hasTriggered.current = true;
-
         const timer = setTimeout(() => {
+            hasTriggered.current = true;
             setIsActive(true);
             setCurrentStep(0);
         }, delayMs);

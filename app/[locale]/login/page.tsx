@@ -76,7 +76,7 @@ function LoginForm() {
                     <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                         <p className="text-sm font-medium text-green-800 mb-1">E-Mail bestätigt!</p>
                         <p className="text-xs text-green-700">
-                            Dein Konto ist verifiziert. Falls du dich auf einem anderen Gerät angemeldet hast, kehre dorthin zurück, die Anmeldung wird automatisch erkannt. Oder logge dich hier ein.
+                            Dein Konto ist verifiziert. Bitte kehre zu deinem Hauptbildschirm zurück. Der Onboarding-Prozess wartet schon auf dich.
                         </p>
                     </div>
                 )}

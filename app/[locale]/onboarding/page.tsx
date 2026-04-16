@@ -132,6 +132,12 @@ export default function OnboardingPage() {
             // Signal to dashboard that user just finished onboarding → trigger guided tour
             if (typeof window !== 'undefined') {
                 sessionStorage.setItem('pathly_show_post_onboarding_tour', '1');
+                // Clear stale keys from previous accounts in same browser
+                sessionStorage.removeItem('pathly_confetti_fired');
+                ['goals', 'job-queue', 'job-search', 'coaching'].forEach(
+                    tab => localStorage.removeItem(`pathly_tour_completed_${tab}`)
+                );
+                localStorage.removeItem('pathly_welcome_confetti_shown');
             }
 
             router.push('/dashboard');
