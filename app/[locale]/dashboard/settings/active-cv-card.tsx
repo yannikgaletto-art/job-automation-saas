@@ -91,6 +91,7 @@ export function ActiveCVCard() {
     const [isDismissing, setIsDismissing] = useState(false);
     const [pendingCvFile, setPendingCvFile] = useState<File | null>(null);
     const cvHintDismissedRef = useRef(false);
+    const cvHintSeenRef = useRef(false); // true once popup has been shown this session
 
     // CL upload hint dialog
     const [showClHint, setShowClHint] = useState(false);
@@ -107,9 +108,10 @@ export function ActiveCVCard() {
     }, []);
 
     const handleCvUploadClick = () => {
-        if (cvHintDismissedRef.current) {
+        if (cvHintDismissedRef.current || cvHintSeenRef.current) {
             cvRef.current?.click();
         } else {
+            cvHintSeenRef.current = true; // mark seen so file-select doesn't re-trigger
             setShowCvHint(true);
         }
     };
@@ -144,9 +146,11 @@ export function ActiveCVCard() {
     };
 
     const handleCvFileSelect = (file: File) => {
-        if (cvHintDismissedRef.current) {
+        // Skip popup if: user dismissed forever OR already saw it this session
+        if (cvHintDismissedRef.current || cvHintSeenRef.current) {
             handleUpload(file, 'cv');
         } else {
+            cvHintSeenRef.current = true;
             setPendingCvFile(file);
             setShowCvHint(true);
         }

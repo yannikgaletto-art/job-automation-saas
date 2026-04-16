@@ -18,7 +18,7 @@ import { useCalendarStore } from '@/store/use-calendar-store';
 import { createClient } from '@/lib/supabase/client';
 import { CreditExhaustedProvider, useCreditExhausted } from './hooks/credit-exhausted-context';
 import { PaywallModal } from '@/components/dashboard/paywall-modal';
-import { ReConsentBanner } from '@/components/dashboard/re-consent-banner';
+// ReConsentBanner removed — v2.0 consent info handled via Security page
 
 const ADMIN_EMAILS = ['galettoyannik7@gmail.com', 'yannik.galetto@gmail.com'];
 
@@ -236,7 +236,7 @@ function DashboardLayoutInner({
 
                 {/* Main Content */}
                 <main className="flex-1 min-w-0 p-8">
-                    <ReConsentBanner />
+
                     {children}
                 </main>
             </div>
