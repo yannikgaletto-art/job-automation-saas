@@ -18,20 +18,21 @@ const GOAL_OPTIONS = [
 ] as const;
 
 // Animation sequence timing (ms from start):
-// [0]  label_before + all 3 before lines         →     0ms  (Teil 1 appears together)
-// [1]  (same as 0)                               →     0ms
-// [2]  (same as 0)                               →     0ms
-// [3]  (same as 0)                               →     0ms
-// [4]  label_after + all 3 after lines           →  3000ms  (+3s pause ← user request)
-// [5]  (same as 4)                               →  3000ms
-// [6]  (same as 4)                               →  3000ms
-// [7]  (same as 4)                               →  3000ms
-// [8]  Question toggle                           →  6000ms  (+3s pause)
-// [9]  Goal 1                                    →  6300ms
-// [10] Goal 2                                    →  6600ms
-// [11] Goal 3                                    →  6900ms
-// [12] Goal 4                                    →  7200ms
-const SEQUENCE_DELAYS = [0, 0, 0, 0, 3000, 3000, 3000, 3000, 6000, 6300, 6600, 6900, 7200];
+// [0]  welcome greeting                          →     0ms  (immediate)
+// [1]  label_before + all 3 before lines         →  1500ms  (after greeting is read)
+// [2]  (same as 1)                               →  1500ms
+// [3]  (same as 1)                               →  1500ms
+// [4]  (same as 1)                               →  1500ms
+// [5]  label_after + all 3 after lines           →  4500ms  (+3s pause)
+// [6]  (same as 5)                               →  4500ms
+// [7]  (same as 5)                               →  4500ms
+// [8]  (same as 5)                               →  4500ms
+// [9]  Question toggle                           →  7500ms  (+3s pause)
+// [10] Goal 1                                    →  7800ms
+// [11] Goal 2                                    →  8100ms
+// [12] Goal 3                                    →  8400ms
+// [13] Goal 4                                    →  8700ms
+const SEQUENCE_DELAYS = [0, 1500, 1500, 1500, 1500, 4500, 4500, 4500, 4500, 7500, 7800, 8100, 8400, 8700];
 const TOTAL_SEQUENCE_ITEMS = SEQUENCE_DELAYS.length;
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
@@ -233,6 +234,19 @@ function Step1Goals({
 }) {
     const t = useTranslations('onboarding.step1');
 
+    // Fetch user's first name for the personalized greeting
+    const [firstName, setFirstName] = useState('');
+    useEffect(() => {
+        import('@/lib/supabase/client').then(({ createClient }) => {
+            const supabase = createClient();
+            supabase.auth.getUser().then(({ data }) => {
+                const raw = data.user?.user_metadata?.full_name as string | undefined;
+                // Extract first name: take everything before first space
+                if (raw) setFirstName(raw.split(' ')[0]);
+            });
+        });
+    }, []);
+
     // visible[i] = true when item i should appear
     const [visible, setVisible] = useState<boolean[]>(
         Array(TOTAL_SEQUENCE_ITEMS).fill(false)
@@ -266,11 +280,19 @@ function Step1Goals({
     return (
         <div className="bg-white rounded-2xl shadow-lg p-8">
 
+            {/* ── Welcome greeting ───────────────────────────── */}
+            <p
+                style={{ ...fadeIn, ...(visible[0] ? show : hide) }}
+                className="text-base font-semibold text-[#37352F] mb-6"
+            >
+                {t('welcome', { name: firstName || '👋' })}
+            </p>
+
             {/* ── Before section ─────────────────────────────── */}
 
             {/* Label: bold, grey, uppercase */}
             <p
-                style={{ ...fadeIn, ...(visible[0] ? show : hide) }}
+                style={{ ...fadeIn, ...(visible[1] ? show : hide) }}
                 className="text-xs font-bold text-[#94a3b8] uppercase tracking-widest mb-3"
             >
                 {t('label_before')}
@@ -278,13 +300,13 @@ function Step1Goals({
 
             {/* Before lines: normal weight */}
             <div className="mb-8 space-y-1.5">
-                <p style={{ ...fadeIn, ...(visible[1] ? show : hide) }} className="text-sm text-[#94a3b8] font-normal">
+                <p style={{ ...fadeIn, ...(visible[2] ? show : hide) }} className="text-sm text-[#94a3b8] font-normal">
                     {t('before_line_1')}
                 </p>
-                <p style={{ ...fadeIn, ...(visible[2] ? show : hide) }} className="text-sm text-[#94a3b8] font-normal">
+                <p style={{ ...fadeIn, ...(visible[3] ? show : hide) }} className="text-sm text-[#94a3b8] font-normal">
                     {t('before_line_2')}
                 </p>
-                <p style={{ ...fadeIn, ...(visible[3] ? show : hide) }} className="text-sm text-[#94a3b8] font-normal">
+                <p style={{ ...fadeIn, ...(visible[4] ? show : hide) }} className="text-sm text-[#94a3b8] font-normal">
                     {t('before_line_3')}
                 </p>
             </div>
@@ -293,7 +315,7 @@ function Step1Goals({
 
             {/* Label: bold, navy, uppercase */}
             <p
-                style={{ ...fadeIn, ...(visible[4] ? show : hide) }}
+                style={{ ...fadeIn, ...(visible[5] ? show : hide) }}
                 className="text-xs font-bold text-[#002e7a] uppercase tracking-widest mb-3"
             >
                 {t('label_after')}
@@ -301,20 +323,20 @@ function Step1Goals({
 
             {/* After lines: normal weight (user request) */}
             <div className="mb-10 space-y-1.5">
-                <p style={{ ...fadeIn, ...(visible[5] ? show : hide) }} className="text-sm text-[#002e7a] font-normal">
+                <p style={{ ...fadeIn, ...(visible[6] ? show : hide) }} className="text-sm text-[#002e7a] font-normal">
                     {t('after_line_1')}
                 </p>
-                <p style={{ ...fadeIn, ...(visible[6] ? show : hide) }} className="text-sm text-[#002e7a] font-normal">
+                <p style={{ ...fadeIn, ...(visible[7] ? show : hide) }} className="text-sm text-[#002e7a] font-normal">
                     {t('after_line_2')}
                 </p>
-                <p style={{ ...fadeIn, ...(visible[7] ? show : hide) }} className="text-sm text-[#002e7a] font-normal">
+                <p style={{ ...fadeIn, ...(visible[8] ? show : hide) }} className="text-sm text-[#002e7a] font-normal">
                     {t('after_line_3')}
                 </p>
             </div>
 
             {/* ── Question: Notion-style toggle ──────────────── */}
 
-            <div style={{ ...fadeIn, ...(visible[8] ? show : hide) }}>
+            <div style={{ ...fadeIn, ...(visible[9] ? show : hide) }}>
                 {/* Toggle header */}
                 <button
                     onClick={() => setToggleOpen((o) => !o)}
@@ -355,8 +377,8 @@ function Step1Goals({
                             <div className="space-y-2 mb-6 pl-6">
                                 {GOAL_OPTIONS.map((goal, idx) => {
                                     const isSelected = selectedGoals.includes(goal.key);
-                                    // Goals appear one by one: visible[9..12]
-                                    const goalVisible = visible[9 + idx];
+                                    // Goals appear one by one: visible[10..13]
+                                    const goalVisible = visible[10 + idx];
                                     return (
                                         <label
                                             key={goal.key}

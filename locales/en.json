@@ -535,6 +535,7 @@
   "onboarding": {
     "step_indicator": "Step {current} of {total}",
     "step1": {
+      "welcome": "We're glad you're here, {name}",
       "label_before": "How I used to do it...",
       "label_after": "How we do it today...",
       "before_line_1": "LinkedIn. Copy. Gemini. Paste.",
