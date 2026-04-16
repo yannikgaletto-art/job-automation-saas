@@ -137,6 +137,29 @@ export async function POST(request: NextRequest) {
         console.log(`[${requestId}] route=jobs/import step=validate title="${title}" company="${company}" platform=${platform}`)
 
         // ================================================================
+        // STEP 1.5: LinkedIn Description Quality Guard
+        // LinkedIn's SPA sometimes renders only a truncated preview (~80-120 chars).
+        // If description is too short AND the URL is a LinkedIn job, reject early.
+        // This prevents Zombie-Jobs (imported with empty Steckbrief) entirely.
+        // The extension will show an amber warning banner to guide the user.
+        // Threshold: 200 chars (same value as MIN_DESCRIPTION_LENGTH in extension constants.ts)
+        // ================================================================
+        const isLinkedIn = url.includes('linkedin.com')
+        const descLen = description?.length ?? 0
+        if (isLinkedIn && descLen < 200) {
+            console.log(`[${requestId}] route=jobs/import step=linkedin_quality_guard rejected desc_len=${descLen}`)
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: 'Stellenbeschreibung konnte nicht vollständig gelesen werden. Bitte klappe sie auf LinkedIn manuell auf.',
+                    code: 'LINKEDIN_DESCRIPTION_TOO_SHORT',
+                    requestId,
+                },
+                { status: 400, headers: CORS_HEADERS }
+            )
+        }
+
+        // ================================================================
         // STEP 2: Duplicate Check (QA-Fix BUG 1 — source_url, NOT apply_link)
         // UNIQUE Index: idx_jobqueue_user_url(user_id, source_url)
         // ================================================================
