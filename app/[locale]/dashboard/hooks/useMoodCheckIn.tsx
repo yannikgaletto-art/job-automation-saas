@@ -15,8 +15,7 @@
  * - Added handleNeverShow() — calls PATCH disable_forever → showCheckin = false
  */
 
-import { useEffect, useState, useCallback, useRef, createContext, useContext, type ReactNode } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useEffect, useState, useCallback, createContext, useContext, type ReactNode } from 'react';
 
 // ─── Context ──────────────────────────────────────────────────────
 interface MoodCheckinContextValue {
@@ -43,9 +42,11 @@ export function MoodCheckinProvider({ children }: { children: ReactNode }) {
     );
 }
 
-// ─── Helper: build today's localStorage key ──────────────────────
-function getCheckinKey(userId: string): string {
-    return `pathly_checkin_${userId}_${new Date().toDateString()}`;
+// ─── Helper: user-independent daily localStorage key ──────────────
+// Key is based ONLY on today's date so it works without waiting for user auth.
+// This is browser-local only — one check-in dialog per browser per day.
+function getDailyCheckinKey(): string {
+    return `pathly_checkin_shown_${new Date().toDateString()}`;
 }
 
 // ─── Main Hook ───────────────────────────────────────────────────
@@ -55,23 +56,32 @@ export function useMoodCheckIn() {
     const { todayMood, setTodayMood } = useMoodCheckinContext();
 
     // 1. On mount: fetch mood + visibility, then decide whether to show overlay.
-    //    This replaces the SIGNED_IN trigger — overlay shows at most once per day
-    //    regardless of how many times the user logs in or refreshes the page.
+    //    Decision order:
+    //    1. localStorage date key present → already shown in this browser today → skip (FAST, no network)
+    //    2. API returns showCheckin === false → permanently disabled → skip
+    //    3. API returns todayMood !== null   → already checked in today (DB) → skip
+    //    4. All clear → set localStorage key + show overlay
     useEffect(() => {
         let cancelled = false;
 
         (async () => {
             try {
-                // Get the current user id for the localStorage key
-                const supabase = createClient();
-                const { data: { user } } = await supabase.auth.getUser();
+                // ── Guard 1: localStorage (synchronous, no async needed) ──
+                // Check BEFORE any network call so we exit immediately on
+                // subsequent page loads within the same calendar day.
+                const dailyKey = getDailyCheckinKey();
+                if (typeof window !== 'undefined' && localStorage.getItem(dailyKey)) {
+                    return; // Already shown today in this browser — skip
+                }
 
+                // ── Guard 2: API (showCheckin + todayMood from DB) ────────
                 const res = await fetch('/api/mood/checkin');
                 const data = await res.json();
                 if (cancelled) return;
 
-                // Update context
+                // Update context with DB mood value
                 if (data.todayMood != null) setTodayMood(data.todayMood);
+
                 const checkinEnabled = data.showCheckin ?? true;
                 if (!checkinEnabled) {
                     setShowCheckin(false);
@@ -80,13 +90,10 @@ export function useMoodCheckIn() {
 
                 if (data.todayMood != null) return; // Already checked in today (DB)
 
-                // Check localStorage: only show once per day per browser
-                if (user) {
-                    const key = getCheckinKey(user.id);
-                    if (localStorage.getItem(key)) return; // Already shown today
-                    localStorage.setItem(key, 'true');
+                // ── All guards passed → mark shown + display overlay ──────
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem(dailyKey, 'true');
                 }
-
                 setShowOverlay(true);
             } catch {
                 // Fail-open — don't block dashboard access

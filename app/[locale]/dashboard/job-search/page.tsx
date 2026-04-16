@@ -169,6 +169,7 @@ export default function JobSearchPage() {
     const tour = useDashboardTour('job-search', tourSteps, {
         delayMs: 2000,
         enabled: tourReady,
+        requireOnboardingFlag: true,
     });
 
     const handleTourNext = useCallback(() => tour.nextStep(), [tour]);
@@ -348,8 +349,8 @@ export default function JobSearchPage() {
         <div className="space-y-6 max-w-[1200px]">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-[#37352F]">{t('title')}</h1>
-                <p className="text-sm text-[#73726E] mt-1">
+                <h1 className="text-3xl font-semibold text-[#37352F]">{t('title')}</h1>
+                <p className="text-[#73726E] mt-1">
                     {t('subtitle')}
                 </p>
             </div>

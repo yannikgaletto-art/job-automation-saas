@@ -145,6 +145,7 @@ export default function CoachingPage() {
     const tour = useDashboardTour('coaching', tourSteps, {
         delayMs: 2000,
         enabled: tourReady,
+        requireOnboardingFlag: true,
     });
 
     const handleTourNext = useCallback(() => tour.nextStep(), [tour]);
@@ -343,15 +344,13 @@ export default function CoachingPage() {
             />
 
             {/* ─── Header ──────────────────────────────────────────────── */}
-            <motion.h1
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-2xl font-bold mb-1"
+            <h1
+                className="text-3xl font-semibold mb-1"
                 style={{ color: TEXT }}
             >
                 {t('title')}
-            </motion.h1>
-            <p className="text-sm mb-8" style={{ color: MUTED }}>
+            </h1>
+            <p className="mb-8" style={{ color: MUTED }}>
                 {t('subtitle')}
             </p>
 

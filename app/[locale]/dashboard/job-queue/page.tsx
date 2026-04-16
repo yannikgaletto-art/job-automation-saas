@@ -127,6 +127,7 @@ export default function JobQueuePage() {
     const tour = useDashboardTour('job-queue', tourSteps, {
         delayMs: 2000,
         enabled: tourReady,
+        requireOnboardingFlag: true,
     });
 
     const handleTourNext = useCallback(() => tour.nextStep(), [tour]);
@@ -393,8 +394,8 @@ export default function JobQueuePage() {
             {/* Header */}
             <div>
                 <div>
-                    <h1 className="text-2xl font-semibold text-[#37352F]">{t('title')}</h1>
-                    <p className="text-sm text-[#73726E] mt-1">{t('subtitle')}</p>
+                    <h1 className="text-3xl font-semibold text-[#37352F]">{t('title')}</h1>
+                    <p className="text-[#73726E] mt-1">{t('subtitle')}</p>
                 </div>
                 <div className="mt-3 flex items-center gap-3">
                     {/* Chrome Extension — left of Add Job */}

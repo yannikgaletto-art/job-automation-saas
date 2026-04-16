@@ -29,7 +29,7 @@ export default async function SettingsPage() {
                         <Sparkles className="h-6 w-6 text-[#012e7a]" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold text-[#37352F]">{t('page.title')}</h1>
+                        <h1 className="text-3xl font-semibold text-[#37352F]">{t('page.title')}</h1>
                         <p className="text-sm text-[#73726E]">
                             {t('page.subtitle')}
                         </p>

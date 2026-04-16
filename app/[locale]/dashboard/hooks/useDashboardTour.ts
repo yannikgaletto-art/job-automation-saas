@@ -76,13 +76,13 @@ export function useDashboardTour(
         if (isTourCompleted(tabId)) return;
         if (steps.length === 0) return;
 
-        // When requireOnboardingFlag is true, only show tour if user just completed onboarding
+        // When requireOnboardingFlag is true, only show tour if user just completed onboarding.
+        // NOTE: We do NOT remove the flag here — each tab needs to read it independently.
+        // sessionStorage auto-clears when the browser tab closes, preventing re-triggers.
         if (requireOnboardingFlag) {
             if (typeof window === 'undefined') return;
             const flag = sessionStorage.getItem('pathly_show_post_onboarding_tour');
             if (flag !== '1') return;
-            // Consume the flag so tour doesn't re-trigger on page refresh
-            sessionStorage.removeItem('pathly_show_post_onboarding_tour');
         }
 
         hasTriggered.current = true;
