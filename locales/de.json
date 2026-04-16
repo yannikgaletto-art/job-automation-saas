@@ -1490,6 +1490,8 @@
     "button_next": "Weiter",
     "button_start": "Los geht's!",
     "step_indicator": "Schritt {current} von {total}",
+    "cv_preview_format_title": "Sieht das Layout komisch aus?",
+    "cv_preview_format_body": "Falls dein Lebenslauf zu viel Leerraum hat oder Abschnitte verschoben sind, klicke auf <b>\"Formatierung korrigieren\"</b>. Pathly überarbeitet das Layout automatisch. <b>Einmalig und kostenlos</b> pro Job.",
     "job_queue": {
       "empty_step1_title": "Deine Bewerbungsablage",
       "empty_step1_body": "Hier verwaltest du alle Stellen die du im Blick behalten willst. Pathly analysiert jede Stelle automatisch. <b>Du kannst bis zu 5 aktive Jobs gleichzeitig bearbeiten.</b> Klicke auf den Button um loszulegen.",
@@ -1575,7 +1577,15 @@
     "feedback_success_title": "5 Bonus-Credits aktiviert! 🎉",
     "feedback_success_desc": "Danke für dein Feedback — weiter geht's!",
     "feedback_already_claimed": "Du hast deine Feedback-Credits bereits erhalten.",
-    "feedback_error": "Fehler beim Senden. Bitte versuche es erneut."
+    "feedback_error": "Fehler beim Senden. Bitte versuche es erneut.",
+    "beta_surprise_title": "Das ist unser Geschenk.",
+    "beta_surprise_body": "Wir sind in der Beta und schenken dir deine Credits zurück. Viel Erfolg bei deiner Jobsuche!",
+    "beta_surprise_credits": "{amount} Credits wieder aufgefüllt",
+    "beta_surprise_cta": "Weiter geht's",
+    "beta_already_claimed": "Du hast dein Beta-Geschenk bereits erhalten.",
+    "beta_unavailable": "Diese Funktion ist gerade nicht verfügbar.",
+    "beta_granting": "Wird freigeschaltet…",
+    "beta_timeout": "Zeitüberschreitung — bitte versuche es erneut."
   },
   "ai_badge": {
     "generated": "KI-generiert",

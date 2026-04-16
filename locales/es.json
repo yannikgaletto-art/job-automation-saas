@@ -1574,7 +1574,15 @@
     "feedback_success_title": "¡5 créditos de bonificación activados! 🎉",
     "feedback_success_desc": "¡Gracias por tu feedback — sigamos adelante!",
     "feedback_already_claimed": "Ya has recibido tus créditos de feedback.",
-    "feedback_error": "Error al enviar. Inténtalo de nuevo."
+    "feedback_error": "Error al enviar. Inténtalo de nuevo.",
+    "beta_surprise_title": "¡Sorpresa! 🎉",
+    "beta_surprise_body": "Estamos en Beta y te devolvemos tus créditos gratis. ¡Mucha suerte con tu búsqueda de empleo!",
+    "beta_surprise_credits": "¡{amount} créditos recargados!",
+    "beta_surprise_cta": "Seguimos",
+    "beta_already_claimed": "Ya has recibido tu regalo Beta.",
+    "beta_unavailable": "Esta función no está disponible en este momento.",
+    "beta_granting": "Activando…",
+    "beta_timeout": "Tiempo de espera agotado — inténtalo de nuevo."
   },
   "ai_badge": {
     "generated": "Generado por IA",

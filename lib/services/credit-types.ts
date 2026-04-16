@@ -64,7 +64,9 @@ export type CreditEventType =
     | 'plan_downgrade'
     | 'monthly_reset'
     | 'refund'
-    | 'admin_adjustment';
+    | 'admin_adjustment'
+    | 'feedback_bonus'
+    | 'beta_refill';
 
 // ============================================================================
 // CREDIT INFO (returned to frontend)

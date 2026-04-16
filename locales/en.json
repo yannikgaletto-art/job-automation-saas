@@ -1490,6 +1490,8 @@
     "button_next": "Next",
     "button_start": "Let's go!",
     "step_indicator": "Step {current} of {total}",
+    "cv_preview_format_title": "Does the layout look off?",
+    "cv_preview_format_body": "If your CV has too much whitespace or sections appear misaligned, click <b>\"Fix Formatting\"</b>. Pathly will automatically fix the layout. <b>Free, once per job.</b>",
     "job_queue": {
       "empty_step1_title": "Your application hub",
       "empty_step1_body": "Here you manage all roles you want to track. Pathly analyses each role automatically. <b>You can work on up to 5 active jobs at a time.</b> Click the button to get started.",
@@ -1575,7 +1577,15 @@
     "feedback_success_title": "5 bonus credits activated! 🎉",
     "feedback_success_desc": "Thanks for your feedback — let's keep going!",
     "feedback_already_claimed": "You've already received your feedback credits.",
-    "feedback_error": "Error submitting. Please try again."
+    "feedback_error": "Error submitting. Please try again.",
+    "beta_surprise_title": "This one's on us.",
+    "beta_surprise_body": "We're in Beta and giving your credits back for free. Good luck with your job search!",
+    "beta_surprise_credits": "{amount} credits refilled",
+    "beta_surprise_cta": "Let's go",
+    "beta_already_claimed": "You've already received your Beta gift.",
+    "beta_unavailable": "This feature is currently unavailable.",
+    "beta_granting": "Activating…",
+    "beta_timeout": "Request timed out — please try again."
   },
   "ai_badge": {
     "generated": "AI-generated",

@@ -22,7 +22,7 @@ import QRCode from 'qrcode';
 import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
 import { useDashboardTour } from '@/app/[locale]/dashboard/hooks/useDashboardTour';
 import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
-import { AiGeneratedBadge } from '@/components/ui/ai-generated-badge';
+
 
 const DynamicPdfViewer = dynamic(
     () => import('@/components/cv-templates/PdfViewerWrapper'),
@@ -376,8 +376,8 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
         {
             targetSelector: '#cv-format-fix-btn',
             position: 'top' as const,
-            titleKey: 'cv_optimizer.preview_tour_title',
-            bodyKey: 'cv_optimizer.preview_tour_body',
+            titleKey: 'cv_preview_format_title',
+            bodyKey: 'cv_preview_format_body',
         },
     ];
     const previewTour = useDashboardTour('cv-preview-format-hint', CV_PREVIEW_TOUR_STEPS, {
@@ -683,7 +683,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                     </div>
                                 )}
                                 <div className="text-center max-w-md w-full">
-                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('main_title')} <AiGeneratedBadge /></h3>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('main_title')}</h3>
                                     <p className="text-gray-500 mb-4 text-pretty leading-relaxed">
                                         {t.rich('main_desc', {
                                             cv: (chunks) => <strong className="text-gray-700 font-medium">{chunks}</strong>,
