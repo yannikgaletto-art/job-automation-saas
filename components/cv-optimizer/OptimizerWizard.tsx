@@ -13,7 +13,7 @@ import { saveCvDecisions } from "@/app/actions/save-cv-decisions"
 import { createClient } from '@/lib/supabase/client'
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { CustomDialog } from "@/components/ui/custom-dialog"
-import { Check, Settings, Sparkles, Layout, Pencil, CheckCheck, ToggleLeft, ToggleRight, Video, Loader2 } from "lucide-react"
+import { Check, Settings, Sparkles, Layout, Pencil, CheckCheck, ToggleLeft, ToggleRight, Video, Loader2, FileText, ArrowRight } from "lucide-react"
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
@@ -552,16 +552,20 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     if (!cvData) {
         return (
             <div className="px-6 py-12 flex flex-col items-center justify-center text-center bg-[#FAFAF9] rounded-b-xl border-t border-slate-200">
-                <div className="bg-amber-50 p-4 rounded-full shadow-sm mb-4 border border-amber-200">
-                    <Settings className="w-8 h-8 text-amber-500" />
+                <div className="bg-blue-50 p-4 rounded-full shadow-sm mb-4 border border-blue-100">
+                    <FileText className="w-8 h-8 text-[#002e7a]" />
                 </div>
                 <h3 className="text-xl font-semibold text-[#37352F] mb-2">{t('no_cv_title')}</h3>
-                <p className="text-slate-500 text-sm max-w-md mb-6 leading-relaxed">
+                <p className="text-slate-500 text-sm max-w-md mb-4 leading-relaxed">
                     {t('no_cv_desc')}
                 </p>
+                <p className="text-slate-400 text-xs max-w-sm mb-6 leading-relaxed bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+                    {t('no_cv_scan_hint')}
+                </p>
                 <Link href={`/${locale}/dashboard/settings`}>
-                    <button className="px-6 py-2.5 bg-[#012e7a] hover:bg-[#01246b] text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                    <button className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#012e7a] hover:bg-[#01246b] text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
                         {t('no_cv_link')}
+                        <ArrowRight className="w-4 h-4" />
                     </button>
                 </Link>
             </div>

@@ -1,3 +1,7 @@
+// Vercel timeout: Azure Document Intelligence + Claude CV parsing can take 20-40s.
+// Without this, Vercel defaults to 10s (Hobby) causing silent production timeouts.
+export const maxDuration = 60;
+
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server' // Auth client

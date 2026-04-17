@@ -912,6 +912,7 @@
     "error_retry": "Try again",
     "no_cv_title": "No CV found.",
     "no_cv_desc": "Please upload and scan your initial CV first before optimizing it.",
+    "no_cv_scan_hint": "💡 Tip: Uploading alone is not enough. Go to Settings → CV → Upload. The scan starts automatically after upload.",
     "no_cv_link": "Go to Settings",
     "main_title": "CV: How can we improve?",
     "main_desc": "We compare your <cv>CV</cv> with the <matchResults>match results</matchResults> and give you <suggestions>targeted suggestions</suggestions> on which phrases will lead to <moreSuccess>more success</moreSuccess>.",

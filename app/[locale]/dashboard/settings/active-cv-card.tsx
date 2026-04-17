@@ -3,7 +3,7 @@
 /**
  * Active CV Card — Shows all uploaded documents in Settings.
  * Reads from /api/documents/list (same source as onboarding).
- * Uses /api/documents/upload-simple — fast upload, no AI pipeline.
+ * Uses /api/documents/upload — full pipeline with Azure OCR + Claude CV parsing.
  *
  * Contract (SICHERHEITSARCHITEKTUR.md Section 6):
  * - XHR for real upload progress
@@ -277,7 +277,10 @@ export function ActiveCVCard() {
                     router.push(decodeURIComponent(returnTo));
                 }, 1500); // Short delay so user sees "Fertig ✅" status
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : 'Upload fehlgeschlagen';
+            notify(errMsg);
+            console.error('[ActiveCVCard] Upload failed:', errMsg);
         } finally {
             setUploading(null);
             setTimeout(() => {

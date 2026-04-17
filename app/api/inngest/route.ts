@@ -2,7 +2,6 @@ export const maxDuration = 300; // Vercel Pro — Inngest functions can take 30-
 
 import { serve } from 'inngest/next';
 import { inngest } from '@/lib/inngest/client';
-import { discoverJobs, researchCompany, generateCoverLetter } from '@/lib/inngest/functions';
 import { generateCertificates } from '@/lib/inngest/certificates-pipeline';
 import { extractJob } from '@/lib/inngest/extract-job-pipeline';
 import { analyzeCVMatch } from '@/lib/inngest/cv-match-pipeline';
@@ -14,9 +13,6 @@ import { polishCoverLetter } from '@/lib/inngest/cover-letter-polish';
 export const { GET, POST, PUT } = serve({
     client: inngest,
     functions: [
-        discoverJobs,
-        researchCompany,
-        generateCoverLetter,
         generateCertificates,
         extractJob,
         analyzeCVMatch,

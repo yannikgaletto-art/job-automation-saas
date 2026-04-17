@@ -912,6 +912,7 @@
     "error_retry": "Erneut versuchen",
     "no_cv_title": "Kein Lebenslauf gefunden.",
     "no_cv_desc": "Bitte lade deinen initialen Lebenslauf zuerst hoch und scanne ihn, bevor du ihn optimieren kannst.",
+    "no_cv_scan_hint": "💡 Tipp: Video hochladen reicht nicht. Gehe zu den Einstellungen → Lebenslauf (CV) → Hochladen. Der Scan startet automatisch nach dem Upload.",
     "no_cv_link": "Zu den Einstellungen",
     "main_title": "CV: Was können wir besser machen?",
     "main_desc": "Wir gleichen deinen <cv>Lebenslauf</cv> mit den <matchResults>Match-Ergebnissen</matchResults> ab und geben dir <suggestions>gezielte Vorschläge</suggestions>, mit welchen Formulierungen du <moreSuccess>mehr Erfolg</moreSuccess> haben wirst.",
