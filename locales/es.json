@@ -1601,5 +1601,17 @@
     "body": "Hemos actualizado nuestro aviso sobre el procesamiento de categorías especiales de datos (p.ej. fotos en tu CV). Tu protección de datos personales sigue completamente activa.",
     "link": "Leer detalles",
     "dismiss_label": "Cerrar"
+  },
+  "admin": {
+    "title": "Founder OS",
+    "registered_users": "usuarios registrados",
+    "admin_only": "Solo administradores",
+    "refresh": "Actualizar",
+    "delete_user_title": "Eliminar usuario",
+    "delete_lead_title": "Eliminar lead",
+    "delete_confirm": "será eliminado permanentemente.",
+    "delete_all_data": "Todos los datos (empleos, documentos, créditos) también serán eliminados.",
+    "cancel": "Cancelar",
+    "delete": "Eliminar permanentemente"
   }
 }

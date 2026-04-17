@@ -1604,5 +1604,17 @@
     "body": "We've updated our notice regarding the processing of special data categories (e.g. photos in your CV). Your PII protection remains fully active.",
     "link": "Read details",
     "dismiss_label": "Dismiss"
+  },
+  "admin": {
+    "title": "Founder OS",
+    "registered_users": "registered users",
+    "admin_only": "Admins only",
+    "refresh": "Refresh",
+    "delete_user_title": "Delete user",
+    "delete_lead_title": "Delete lead",
+    "delete_confirm": "will be permanently deleted.",
+    "delete_all_data": "All data (jobs, documents, credits) will also be removed.",
+    "cancel": "Cancel",
+    "delete": "Delete permanently"
   }
 }

@@ -1604,5 +1604,17 @@
     "body": "Wir haben unsere Hinweise zur Verarbeitung besonderer Datenkategorien (z.B. Fotos im Lebenslauf) ergänzt. Dein PII-Schutz bleibt unverändert aktiv.",
     "link": "Details lesen",
     "dismiss_label": "Schließen"
+  },
+  "admin": {
+    "title": "Founder OS",
+    "registered_users": "registrierte User",
+    "admin_only": "Nur für Admins",
+    "refresh": "Aktualisieren",
+    "delete_user_title": "User löschen",
+    "delete_lead_title": "Lead löschen",
+    "delete_confirm": "wird unwiderruflich gelöscht.",
+    "delete_all_data": "Alle Daten (Jobs, Dokumente, Credits) werden ebenfalls entfernt.",
+    "cancel": "Abbrechen",
+    "delete": "Endgültig löschen"
   }
 }
