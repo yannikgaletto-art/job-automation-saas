@@ -111,6 +111,13 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 });
     }
 
+    // Prevent deletion of master admin
+    const adminClient = getSupabaseAdmin();
+    const { data: targetUser } = await adminClient.auth.admin.getUserById(userId);
+    if (targetUser?.user?.email === 'galettoyannik7@gmail.com') {
+        return NextResponse.json({ error: 'Super-Admin Account kann nicht gelöscht werden' }, { status: 403 });
+    }
+
     const result = await deleteUserAccount(userId);
 
     if (!result.success) {

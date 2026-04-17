@@ -880,9 +880,11 @@ function TabUsers({
                                                     {actionLoading === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
                                                 </button>
                                             )}
-                                            <button onClick={() => handleDelete(u.id, u.email)} disabled={actionLoading === u.id} className="p-1.5 text-[#73726E] hover:text-red-600 hover:bg-red-50 rounded-md transition-all disabled:opacity-40" title="User löschen">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            {u.email !== 'galettoyannik7@gmail.com' && (
+                                                <button onClick={() => handleDelete(u.id, u.email)} disabled={actionLoading === u.id} className="p-1.5 text-[#73726E] hover:text-red-600 hover:bg-red-50 rounded-md transition-all disabled:opacity-40" title="User löschen">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
