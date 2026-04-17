@@ -118,7 +118,7 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
-    console.log(`[admin] User ${userId} deleted by ${user.email} (tables=${result.tablesDeleted.length}, stripe=${result.stripeCleanedUp})`);
+    console.log(`[admin] User ${userId} deleted by ${user.email} (stripe=${result.stripeCleanedUp}, storage=${result.storageCleaned})`);
     return NextResponse.json({ success: true });
 }
 
