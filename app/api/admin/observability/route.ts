@@ -254,18 +254,17 @@ async function fetchSentry(): Promise<SourceResult<SentryData>> {
 }
 
 // ── Helicone ───────────────────────────────────────────────────────────────
+// Tries the Helicone Query API first. On 401/403 (Proxy Key limitation),
+// falls back to computing costs directly from generation_logs (DB Fallback).
 
 async function fetchHelicone(): Promise<SourceResult<HeliconeData>> {
-    // The Query/Management API requires a Helicone API key (not a proxy key).
-    // Proxy keys (sk-helicone-...) only work for routing AI calls, not for querying data.
     const apiKey = process.env.HELICONE_QUERY_API_KEY ?? process.env.HELICONE_API_KEY;
-    if (!apiKey) return { ok: false, error: 'HELICONE_QUERY_API_KEY nicht konfiguriert' };
+    // No key at all → go straight to DB fallback
+    if (!apiKey) return fetchHeliconeFromDB();
 
     try {
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-        // Management API — always api.helicone.ai (the EU proxy is anthropic.helicone.ai for inference;
-        // the query/management API is only available on the US endpoint)
         const res = await fetch('https://api.helicone.ai/v1/request/query', {
             method: 'POST',
             headers: {
@@ -273,11 +272,7 @@ async function fetchHelicone(): Promise<SourceResult<HeliconeData>> {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                filter: {
-                    request: {
-                        created_at: { gte: sevenDaysAgo },
-                    },
-                },
+                filter: { request: { created_at: { gte: sevenDaysAgo } } },
                 offset: 0,
                 limit: 2000,
             }),
@@ -285,6 +280,10 @@ async function fetchHelicone(): Promise<SourceResult<HeliconeData>> {
         });
 
         if (!res.ok) {
+            // 401/403 = Proxy Key can't access Query API → use DB fallback silently
+            if (res.status === 401 || res.status === 403) {
+                return fetchHeliconeFromDB();
+            }
             const errText = await res.text().catch(() => '');
             return { ok: false, error: `Helicone ${res.status}: ${errText.slice(0, 200)}` };
         }
@@ -292,11 +291,9 @@ async function fetchHelicone(): Promise<SourceResult<HeliconeData>> {
         const json = await res.json();
         const requests: Record<string, unknown>[] = Array.isArray(json) ? json : (json?.data ?? []);
 
-        // Aggregate by model
         const modelMap = new Map<string, { requests: number; cost_usd: number; latency_sum: number; tokens: number }>();
 
         for (const r of requests) {
-            // Helicone response fields — be defensive
             const model = String(
                 r.model ?? r.request_model ?? (r.body as Record<string, unknown> | undefined)?.model ?? 'unknown'
             );
@@ -320,7 +317,7 @@ async function fetchHelicone(): Promise<SourceResult<HeliconeData>> {
             return {
                 model: model.replace(/^claude-/, '').replace(/-\d{8}$/, ''),
                 requests: stats.requests,
-                cost_eur: +(stats.cost_usd * 0.93).toFixed(4), // approximate USD→EUR
+                cost_eur: +(stats.cost_usd * 0.93).toFixed(4),
                 avg_latency: stats.requests > 0 ? Math.round(stats.latency_sum / stats.requests) : 0,
                 tokens: stats.tokens,
             };
@@ -337,6 +334,76 @@ async function fetchHelicone(): Promise<SourceResult<HeliconeData>> {
         };
     } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : 'Helicone fetch fehlgeschlagen' };
+    }
+}
+
+// ── Helicone DB Fallback ────────────────────────────────────────────────────
+// Called when Helicone Proxy Keys can't access the Query API (401).
+// Computes costs from generation_logs using official Anthropic pricing (USD/MTok).
+
+const MODEL_PRICING_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
+    'claude-haiku-4-5-20250929':  { input: 0.80,  output: 4.00  },
+    'claude-haiku-4-5':           { input: 0.80,  output: 4.00  },
+    'claude-sonnet-4-5-20250929': { input: 3.00,  output: 15.00 },
+    'claude-sonnet-4-5':          { input: 3.00,  output: 15.00 },
+    'default':                    { input: 1.50,  output: 7.50  },
+};
+
+function computeModelCostUSD(modelName: string, promptTokens: number, completionTokens: number): number {
+    const key = Object.keys(MODEL_PRICING_USD_PER_MTOK).find(k => k !== 'default' && modelName.includes(k)) ?? 'default';
+    const pricing = MODEL_PRICING_USD_PER_MTOK[key];
+    return (promptTokens / 1_000_000) * pricing.input + (completionTokens / 1_000_000) * pricing.output;
+}
+
+async function fetchHeliconeFromDB(): Promise<SourceResult<HeliconeData>> {
+    try {
+        const admin = getSupabaseAdmin();
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data: logs, error } = await admin
+            .from('generation_logs')
+            .select('model_name, prompt_tokens, completion_tokens')
+            .gte('created_at', sevenDaysAgo);
+
+        if (error) return { ok: false, error: `DB-Fallback Fehler: ${error.message}` };
+
+        const rows = logs ?? [];
+        const modelMap = new Map<string, { requests: number; cost_usd: number; tokens: number }>();
+        let total_cost = 0;
+
+        for (const row of rows) {
+            const model = (row.model_name as string) ?? 'unknown';
+            const ptok = Number(row.prompt_tokens ?? 0);
+            const ctok = Number(row.completion_tokens ?? 0);
+            const cost = computeModelCostUSD(model, ptok, ctok);
+            total_cost += cost;
+
+            const existing = modelMap.get(model) ?? { requests: 0, cost_usd: 0, tokens: 0 };
+            existing.requests += 1;
+            existing.cost_usd += cost;
+            existing.tokens += ptok + ctok;
+            modelMap.set(model, existing);
+        }
+
+        const by_model = Array.from(modelMap.entries()).map(([model, stats]) => ({
+            model: model.replace(/^claude-/, '').replace(/-\d{8}$/, ''),
+            requests: stats.requests,
+            cost_eur: +(stats.cost_usd * 0.93).toFixed(4),
+            avg_latency: 0,
+            tokens: stats.tokens,
+        })).sort((a, b) => b.cost_eur - a.cost_eur);
+
+        return {
+            ok: true,
+            data: {
+                total_cost_eur: +(total_cost * 0.93).toFixed(2),
+                total_requests: rows.length,
+                avg_latency_ms: 0,
+                by_model,
+            },
+        };
+    } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : 'DB-Fallback fehlgeschlagen' };
     }
 }
 
