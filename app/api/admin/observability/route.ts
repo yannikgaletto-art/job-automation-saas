@@ -256,8 +256,10 @@ async function fetchSentry(): Promise<SourceResult<SentryData>> {
 // ── Helicone ───────────────────────────────────────────────────────────────
 
 async function fetchHelicone(): Promise<SourceResult<HeliconeData>> {
-    const apiKey = process.env.HELICONE_API_KEY;
-    if (!apiKey) return { ok: false, error: 'HELICONE_API_KEY nicht konfiguriert' };
+    // The Query/Management API requires a Helicone API key (not a proxy key).
+    // Proxy keys (sk-helicone-...) only work for routing AI calls, not for querying data.
+    const apiKey = process.env.HELICONE_QUERY_API_KEY ?? process.env.HELICONE_API_KEY;
+    if (!apiKey) return { ok: false, error: 'HELICONE_QUERY_API_KEY nicht konfiguriert' };
 
     try {
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
