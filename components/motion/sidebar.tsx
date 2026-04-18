@@ -282,29 +282,34 @@ export function Sidebar({ children, className, collapsed = false }: SidebarProps
     supabase.auth.getUser().then(async ({ data: authData }) => {
       if (!authData?.user) return;
 
+      // ✅ Set email + name immediately from auth metadata — no API wait, no '?' flash
+      setUser({
+        email: authData.user.email,
+        full_name: authData.user.user_metadata?.full_name || null,
+      });
+
       // Load avatar from localStorage (instant, no network)
       const saved = localStorage.getItem(`pathly_avatar_${authData.user.id}`);
       if (saved) setSelectedAnimal(saved);
 
-      // Try to get full_name + avatar_animal from profile API
+      // Enhance with DB profile (full_name from user_profiles, avatar_animal)
       try {
         const res = await fetch('/api/settings/profile');
         if (res.ok) {
           const profile = await res.json();
+          // Only override if DB has a value (DB is the source of truth after first save)
           setUser({
             email: authData.user.email,
-            full_name: profile.full_name || profile.data?.full_name || authData.user.user_metadata?.full_name,
+            full_name: profile.full_name || authData.user.user_metadata?.full_name || null,
           });
           // DB-fallback: if localStorage was empty but DB has an avatar, use it
           if (!saved && profile.avatar_animal) {
             setSelectedAnimal(profile.avatar_animal);
             localStorage.setItem(`pathly_avatar_${authData.user.id}`, profile.avatar_animal);
           }
-        } else {
-          setUser({ email: authData.user.email, full_name: authData.user.user_metadata?.full_name });
         }
       } catch {
-        setUser({ email: authData.user.email, full_name: authData.user.user_metadata?.full_name });
+        // Silent — we already have the auth metadata fallback set above
       }
     });
   }, []);

@@ -595,7 +595,7 @@
       "section_title": "Geführte Touren",
       "section_description": "Wiederhole jede Tab-Tour, um Features neu zu entdecken.",
       "title": "Touren zurücksetzen",
-      "description": "Setze alle abgeschlossenen Touren zurück, damit sie beim nächsten Besuch erneut erscheinen.",
+      "description": "Setzt alle abgeschlossenen Touren und Upload-Hinweise zurück, damit sie beim nächsten Besuch erneut erscheinen.",
       "reset_btn": "Alle Touren zurücksetzen",
       "reset_done": "Zurückgesetzt"
     },

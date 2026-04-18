@@ -3,16 +3,23 @@
 -- ============================================
 -- This trigger automatically creates a user_profiles entry
 -- when a new user signs up via Supabase Auth
+-- Updated 2026-04-18: Also captures full_name from user_metadata
 
 CREATE OR REPLACE FUNCTION create_user_profile()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO user_profiles (id, pii_encrypted, encryption_key_version)
+  INSERT INTO user_profiles (id, full_name, pii_encrypted, encryption_key_version)
   VALUES (
     NEW.id,
-    E'\\x00'::bytea,  -- Placeholder, will be updated during onboarding
+    NEW.raw_user_meta_data->>'full_name',  -- Captured from signup data
+    E'\\x00'::bytea,                        -- Placeholder, updated during onboarding
     1
   );
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  -- CRITICAL: Never block user creation. Log and continue.
+  RAISE WARNING '[create_user_profile] Trigger failed for user %: % (SQLSTATE: %)',
+    NEW.id, SQLERRM, SQLSTATE;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -31,5 +38,5 @@ CREATE TRIGGER on_auth_user_created
 -- ============================================
 -- To verify this trigger works:
 -- 1. Sign up a new user via the signup page
--- 2. Run: SELECT * FROM user_profiles WHERE id = 'user_id';
--- 3. Should see a row with placeholder pii_encrypted
+-- 2. Run: SELECT id, full_name FROM user_profiles WHERE id = 'user_id';
+-- 3. Should see a row with the user's full name from signup

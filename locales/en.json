@@ -595,7 +595,7 @@
       "section_title": "Guided Tours",
       "section_description": "Replay any tab tour to rediscover features.",
       "title": "Reset tours",
-      "description": "Reset all completed tours so they appear again on your next visit.",
+      "description": "Reset all completed tours and upload hints so they appear again on your next visit.",
       "reset_btn": "Reset all tours",
       "reset_done": "Reset done"
     },
