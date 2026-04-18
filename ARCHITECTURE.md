@@ -1,6 +1,6 @@
 ---
-Version: 5.1.0
-Last Updated: 2026-04-13
+Version: 5.2.0
+Last Updated: 2026-04-18
 ---
 
 # PATHLY V2.0 - SYSTEM ARCHITECTURE
@@ -11,8 +11,8 @@ Last Updated: 2026-04-13
 > Prüfe jedes mal, wenn du etwas neues machst, ob es wirklich notwendig ist, oder man auch später machen kann.
 
 **Status:** Production-Ready Design
-**Last Updated:** 2026-04-13
-**Version:** 5.1.0
+**Last Updated:** 2026-04-18
+**Version:** 5.2.0
 
 ---
 
@@ -183,6 +183,55 @@ Zwei separate Terminal-Prozesse sind **IMMER** erforderlich:
 2. `npx inngest-cli@latest dev` → Inngest Dev-Server (Port 8288)
 
 ---
+
+## 3.3 CV OPTIMIZER — DATA INTEGRITY GUARANTEE
+
+> Added: 2026-04-17 (Root Cause: corrupted `proposal.translated` in production DB)
+
+**Mandatory pattern** for all code that writes to `job_queue.cv_optimization_proposal`.
+
+### Pipeline Overview
+```
+cv_structured_data (user_profiles) — immutable source of truth
+  ↓
+translateCvIfNeeded()         [lib/services/cv-translator.ts]
+  → PII Restore after AI     ← MANDATORY (AI may drop fields it was told not to translate)
+  ↓
+pruneForOptimizer()            [lib/utils/cv-payload-pruner.ts]
+  → Deep Clone (never mutate original)
+  → Strips PII for AI prompt (DSGVO Art. 25)
+  ↓
+Claude Sonnet AI Optimization
+  ↓
+applyCvChanges()               [app/api/cv/optimize/route.ts]
+  ↓
+INTEGRITY GUARD               ← MANDATORY before DB write
+  → Restore PII from cv_structured_data (email, phone, location, linkedin, website, name)
+  → Restore structures that must not shrink (languages, certifications)
+  → Guard: if experience/education < 50% of original → restore + warn log
+  ↓
+proposal = { translated: safeTranslated, optimized, changes } → DB
+```
+
+### Rules
+1. **`pruneForOptimizer()` only strips for AI prompt** — never stored. Stored `translated` must have full PII.
+2. **`translatedCv` is NOT the storage object** — always create `safeTranslated = JSON.parse(JSON.stringify(translatedCv))` before the Integrity Guard.
+3. **Source of truth** = `cv_structured_data` from the request body (loaded from `user_profiles`, RLS-scoped).
+4. **Frontend Layout-Fix** must send raw `cvData` (from `user_profiles`), never display-filtered data.
+5. **cv-merger.ts `applyOptimizations()`** must support entity-level removes (parity with backend `applyCvChanges()`).
+
+### Key Files
+| File | Role |
+|------|------|
+| `app/api/cv/optimize/route.ts` | Integrity Guard (lines 610-653) |
+| `lib/services/cv-translator.ts` | PII + Structure Restore (lines 172-213) |
+| `lib/utils/cv-payload-pruner.ts` | AI-only pruning — `certifications` (not `certificates`) |
+| `lib/utils/cv-merger.ts` | Frontend apply logic — bullets + entity-level removes |
+| `components/cv-optimizer/OptimizerWizard.tsx` | Layout-Fix sends `cvData` only |
+
+---
+
+
 
 ## 4. DATENBANKSTRUKTUR
 

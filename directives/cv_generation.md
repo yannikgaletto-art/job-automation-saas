@@ -772,3 +772,32 @@ Azure OCR kann Text aus mehrspaltigem PDF-Layout in nicht-linearer Reihenfolge l
     ...
 </div>
 ```
+
+### 12.8 CV Data Integrity — Mandatory Rules (2026-04-17)
+
+**Root Cause:** `proposal.translated` in Production-DB war korrupt (PII null, 6→2 Stationen).  
+**Ursache:** Zwischenzeitliches Deployment auf Vercel mutierte `translatedCv` direkt.
+
+**REGELN die NIEMALS verletzt werden dürfen:**
+
+| # | Regel | Datei |
+|---|-------|-------|
+| **R1** | `pruneForOptimizer()` ist AUSSCHLIESSLICH für den AI-Prompt-Payload. Das gespeicherte `proposal.translated` MUSS volle PII haben. | `cv-payload-pruner.ts` |
+| **R2** | Vor dem DB-Write: Integrity Guard MUSS PII (email, phone, location, linkedin, website) aus `cv_structured_data` restoren. | `route.ts` (§610-653) |
+| **R3** | Translator-Restore MUSS nach AI-Translation laufen: company, dateRangeText, institution, grade idempotent aus Original-CV kopieren. | `cv-translator.ts` (§172-213) |
+| **R4** | `translatedCv` ist NICHT das Speicher-Objekt. Immer `safeTranslated = JSON.parse(JSON.stringify(translatedCv))` als neues Objekt erstellen. | Jeder neue Optimizer-Code |
+| **R5** | Layout-Fix sendet IMMER `cvData` (immutables Original), niemals `editablePdfData` (display-gefiltert). | `OptimizerWizard.tsx` |
+| **R6** | `cv-payload-pruner.ts` filtert `certifications` (MIT i) — NICHT `certificates`. Feldname exakt wie im Schema. | `cv-payload-pruner.ts` |
+
+**Verification Query nach jeder Optimizer-Änderung:**
+```sql
+SELECT 
+    cv_optimization_proposal->'translated'->'personalInfo'->>'email' AS email,
+    jsonb_array_length(cv_optimization_proposal->'translated'->'experience') AS exp_count
+FROM job_queue
+WHERE cv_optimization_proposal IS NOT NULL
+ORDER BY created_at DESC LIMIT 3;
+-- Email darf NIEMALS null sein. exp_count muss >= orig exp_count sein.
+```
+
+

@@ -67,22 +67,20 @@ export function pruneForOptimizer(
     }
 
     // 4. Cap certificates at 8 (optimizer keeps max 6, needs selection pool)
-    if ('certificates' in pruned && Array.isArray((pruned as any).certificates)) {
-        const certs = (pruned as any).certificates as Array<{ name?: string; id?: string; [key: string]: unknown }>;
-        if (certs.length > 8) {
-            if (jobBuzzwords && jobBuzzwords.length > 0) {
-                // Sort by relevance: certs matching job buzzwords first
-                const buzzLower = jobBuzzwords.map(b => b.toLowerCase());
-                certs.sort((a, b) => {
-                    const aMatch = buzzLower.some(bw => (a.name || '').toLowerCase().includes(bw));
-                    const bMatch = buzzLower.some(bw => (b.name || '').toLowerCase().includes(bw));
-                    if (aMatch && !bMatch) return -1;
-                    if (!aMatch && bMatch) return 1;
-                    return 0;
-                });
-            }
-            (pruned as any).certificates = certs.slice(0, 8);
+    if (pruned.certifications && pruned.certifications.length > 8) {
+        const certs = pruned.certifications;
+        if (jobBuzzwords && jobBuzzwords.length > 0) {
+            // Sort by relevance: certs matching job buzzwords first
+            const buzzLower = jobBuzzwords.map(b => b.toLowerCase());
+            certs.sort((a, b) => {
+                const aMatch = buzzLower.some(bw => (a.name || '').toLowerCase().includes(bw));
+                const bMatch = buzzLower.some(bw => (b.name || '').toLowerCase().includes(bw));
+                if (aMatch && !bMatch) return -1;
+                if (!aMatch && bMatch) return 1;
+                return 0;
+            });
         }
+        pruned.certifications = certs.slice(0, 8);
     }
 
     // 5. Trim verbose metadata fields on requirementRows (if accidentally attached to CV)

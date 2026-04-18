@@ -38,8 +38,14 @@ export function applyOptimizations(
         if (!entity) continue;
 
         if (change.type === 'remove') {
+            // Bullet-level remove: remove a specific bullet from description
             if (field === 'description' && bulletId && Array.isArray(entity.description)) {
                 entity.description = entity.description.filter((b: any) => b.id !== bulletId);
+            }
+            // Entity-level remove: remove the entire entry from the section array
+            // (e.g., remove an old internship). Matches backend applyCvChanges parity.
+            else if (entityId && !bulletId && !field) {
+                (result as any)[section] = sectionArray.filter((e: any) => e.id !== entityId);
             }
             continue;
         }

@@ -226,7 +226,6 @@ function DashboardLayoutInner({
                     </NavSection>
 
                     <NavSection title={t('nav_section.tools')}>
-                        <NavItem icon={Shield} label={t('nav.data_security')} href={`/${locale}/dashboard/security`} />
                         <NavItem icon={Mic} label={t('nav.feedback_voice')} href={`/${locale}/dashboard/feedback`} />
                         <NavItem icon={Settings} label={t('nav.settings')} href={`/${locale}/dashboard/settings`} />
                         <AdminNavItem />

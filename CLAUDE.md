@@ -1,8 +1,8 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 3.8
-**Last Updated:** 2026-04-13
+**Version:** 3.9
+**Last Updated:** 2026-04-18
 
 ---
 
@@ -118,6 +118,7 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **UX & Video Pipeline Overhaul (2026-04-06)** | **Video UX: Confirm dialogs, preview tab links, Double-Assurance delete endpoint with stable QR tokens. Formality drift fixed via deep style constraints. Credit-loop bypass via Feedback UI integration. CV bullets fully synced to CLI context. Default Intro Scripts available in DE/EN/ES natively.** |
 | **CL Pipeline Hardening (2026-04-09)** | **K1: PII personalInfo stripped from CV JSON before prompt. K2: Inngest polish writes metadata ONLY (no content overwrite — Lost Edit Prevention). K3: Multi-Agent Pipeline deprecated (Haiku→Sonnet regression). Blacklist consolidated: 4 lists → 1 SSOT (~74 patterns). Fluff feedback injected into sync-loop. kill-fluff degraded to scan-only (cost=$0). Em-dash utility extracted.** |
 | **CL Structural Hardening & Quotes (2026-04-09)** | **Quote-Bridge reformiert ("wurde mir klar" → "Dieser Gedanke begleitete mich"). JD-Zitat Logik repariert (Max 5 Wörter Fragment, Thema statt Organisationsform). Fragment-Validator Check + False-Positive Exclusion für Attributions. Kritischer Prompt Unicode-Escape Bug (escaped `\u201e`) gefixt. Anti-Fluff System 100% test-gesichert.** |
+| **CV Data Integrity Hardening (2026-04-17)** | **Root Cause analysiert: `proposal.translated` wurde korrupt in DB gespeichert (PII null, 6→2 Stationen). Fix 1 (`route.ts`): Integrity Guard — nach AI-Optimierung werden PII-Felder (email, phone, location, linkedin, website) und Strukturfelder (languages, certifications, experience/education-Count) aus `cv_structured_data` wiederhergestellt, BEVOR das Proposal in die DB geschrieben wird. Fix 2 (`cv-translator.ts`): PII + Structure Restore nach AI-Translation — company, dateRangeText, institution, grade werden idempotent aus dem Original-CV zurückkopiert. Fix 3 (`OptimizerWizard.tsx`): Layout-Fix sendet immer `cvData` (immutable Original), niemals display-gefiltertes `editablePdfData`. Fix 4 (`cv-merger.ts`): Entity-Level-Remove Parität mit Backend. Fix 5 (`cv-payload-pruner.ts`): Dead Code Fix — Feldname `certificates` → `certifications` (war immer false-y, Cap-at-8 war toter Code).** |
 
 
 ---

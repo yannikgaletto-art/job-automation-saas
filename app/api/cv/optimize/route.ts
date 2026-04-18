@@ -607,13 +607,58 @@ This is a layout correction — not an optimization round.
         // Apply changes programmatically to create the optimized CV
         const optimizedCv = applyCvChanges(translatedCv, rawJson.changes);
 
+        // ── INTEGRITY GUARD — Restore PII & structural fields on translated ──
+        // Defence-in-depth: even if a future code change accidentally mutates
+        // translatedCv (e.g. a pruner refactor forgetting the deep-clone), we
+        // guarantee the stored `proposal.translated` always has the user's full
+        // PII and complete structure.  The source of truth is `cv_structured_data`
+        // from the original request body — immutable within this request scope.
+        const safeTranslated: CvStructuredData = JSON.parse(JSON.stringify(translatedCv));
+        const srcPi = cv_structured_data.personalInfo;
+        if (srcPi && safeTranslated.personalInfo) {
+            // Restore PII fields that must never be lost (DSGVO: these were pruned
+            // only for the AI prompt, the stored base must keep them for PDF rendering)
+            safeTranslated.personalInfo.name     = srcPi.name     ?? safeTranslated.personalInfo.name;
+            safeTranslated.personalInfo.email    = srcPi.email    ?? safeTranslated.personalInfo.email;
+            safeTranslated.personalInfo.phone    = srcPi.phone    ?? safeTranslated.personalInfo.phone;
+            safeTranslated.personalInfo.location = srcPi.location ?? safeTranslated.personalInfo.location;
+            safeTranslated.personalInfo.linkedin = srcPi.linkedin ?? safeTranslated.personalInfo.linkedin;
+            safeTranslated.personalInfo.website  = srcPi.website  ?? safeTranslated.personalInfo.website;
+        }
+        // Restore arrays that must not shrink (languages, certifications are pruned
+        // for the optimizer prompt but must remain on the stored base CV).
+        if (cv_structured_data.languages?.length && (!safeTranslated.languages?.length)) {
+            safeTranslated.languages = cv_structured_data.languages;
+        }
+        if (cv_structured_data.certifications?.length && (!safeTranslated.certifications?.length)) {
+            safeTranslated.certifications = cv_structured_data.certifications;
+        }
+        // Guard: if experience/education shrank by >50%, something went wrong —
+        // restore from source (Translation AI may merge entries incorrectly).
+        if (cv_structured_data.experience?.length &&
+            safeTranslated.experience.length < cv_structured_data.experience.length * 0.5) {
+            log.warn('Integrity guard: experience count collapsed, restoring from source', {
+                stored: safeTranslated.experience.length,
+                source: cv_structured_data.experience.length,
+            });
+            safeTranslated.experience = cv_structured_data.experience;
+        }
+        if (cv_structured_data.education?.length &&
+            safeTranslated.education.length < cv_structured_data.education.length * 0.5) {
+            log.warn('Integrity guard: education count collapsed, restoring from source', {
+                stored: safeTranslated.education.length,
+                source: cv_structured_data.education.length,
+            });
+            safeTranslated.education = cv_structured_data.education;
+        }
+
         // Construct the final proposal object.
         // `translated` is the base CV after Pass 1 (language translation) but before
         // Pass 2 (ATS optimization). The frontend needs it as a stable base for
         // re-applying selective user decisions after a page refresh — without it, the
         // restore path would fall back to the original (possibly untranslated) CV.
         const proposalPayload = {
-            translated: translatedCv,
+            translated: safeTranslated,
             optimized: optimizedCv,
             changes: rawJson.changes
         };

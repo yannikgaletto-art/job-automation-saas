@@ -169,6 +169,49 @@ ${JSON.stringify(cv, null, 2)}`;
             }
         }
 
+        // ── PII & Structure Restore ──────────────────────────────────
+        // The prompt says "DO NOT translate: emails, phones, dates, URLs,
+        // company names, institution names" — but LLMs may interpret this
+        // as "don't include them". Restore all untranslatable fields from
+        // the original CV to guarantee data integrity. This is idempotent:
+        // if the AI kept them, the restore is a no-op.
+        const srcPi = cv.personalInfo;
+        if (srcPi && translated.personalInfo) {
+            translated.personalInfo.name     = srcPi.name     ?? translated.personalInfo.name;
+            translated.personalInfo.email    = srcPi.email    ?? translated.personalInfo.email;
+            translated.personalInfo.phone    = srcPi.phone    ?? translated.personalInfo.phone;
+            translated.personalInfo.location = srcPi.location ?? translated.personalInfo.location;
+            translated.personalInfo.linkedin = srcPi.linkedin ?? translated.personalInfo.linkedin;
+            translated.personalInfo.website  = srcPi.website  ?? translated.personalInfo.website;
+        }
+        // Restore experience fields the AI must not change
+        for (let i = 0; i < (translated.experience || []).length; i++) {
+            const orig = cv.experience?.[i];
+            const trans = translated.experience[i];
+            if (orig && trans) {
+                trans.company       = orig.company       ?? trans.company;
+                trans.dateRangeText = orig.dateRangeText  ?? trans.dateRangeText;
+                trans.location      = orig.location       ?? trans.location;
+            }
+        }
+        // Restore education fields the AI must not change
+        for (let i = 0; i < (translated.education || []).length; i++) {
+            const orig = cv.education?.[i];
+            const trans = translated.education[i];
+            if (orig && trans) {
+                trans.institution  = orig.institution  ?? trans.institution;
+                trans.dateRangeText = orig.dateRangeText ?? trans.dateRangeText;
+                trans.grade        = orig.grade         ?? trans.grade;
+            }
+        }
+        // Restore arrays the AI may have dropped entirely
+        if (cv.languages?.length && !translated.languages?.length) {
+            translated.languages = cv.languages;
+        }
+        if (cv.certifications?.length && !translated.certifications?.length) {
+            translated.certifications = cv.certifications;
+        }
+
         console.log(`[cv-translator] ✅ Translation complete (${response.tokensUsed} tokens, ${response.latencyMs}ms)`);
         return { cv: translated, wasTranslated: true };
     } catch (error: any) {

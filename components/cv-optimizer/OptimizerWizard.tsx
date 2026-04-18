@@ -436,11 +436,11 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
         setIsLayoutFixing(true);
         setLayoutFixError(null);
         try {
-            // BUG-FIX: Send the user's ACTUAL current CV, not the raw original.
-            // editablePdfData = InlineCvEditor state (includes manual edits)
-            // finalCv = after DiffReview optimizations (pre-display-filter)
-            // cvData = raw original (last resort fallback)
-            const currentCv = editablePdfData ?? finalCv ?? cvData;
+            // FIX: Always send the RAW original CV from user_profiles, never the
+            // display-filtered editablePdfData. Display filters (showLanguages=false etc.)
+            // must not be baked into the API payload — the Integrity Guard in route.ts
+            // uses cv_structured_data as the PII/structure restoration source.
+            const currentCv = cvData;
             const res = await fetch('/api/cv/optimize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
