@@ -208,21 +208,37 @@ async function fetchViaJinaAndClaude(
         console.log(`🤖 [Fallback] Claude Haiku extracting intel for "${companyName}"...`);
         const { complete } = await import('@/lib/ai/model-router');
 
-        // Strip markdown noise before truncation — Jina scrapes contain blob: URLs,
-        // image refs, navigation links, and boilerplate that waste token budget.
-        // Without this, the first 8K chars can be pure navigation with zero business content.
+        // ── Robust Content Extraction Pipeline ─────────────────────────────
+        // Enterprise websites (e.g. ALTEN Germany) can have 20K+ chars of navigation
+        // menus, cookie banners, and footer links BEFORE any business content.
+        // The naive approach of only stripping images/blob-URLs is insufficient.
+        //
+        // Strategy: Strip structural noise (nav menus, cookie consent, link lists)
+        // BEFORE truncation, so Claude always receives actual business content.
         const cleaned = scrapedMarkdown
-            .replace(/!\[.*?\]\(.*?\)/g, '')           // Remove markdown images
-            .replace(/\[([^\]]*)\]\(blob:.*?\)/g, '')  // Remove blob: links
-            .replace(/\[([^\]]*)\]\(javascript:.*?\)/g, '') // Remove JS links
-            .replace(/\[([^\]]*)\]\((#[^\)]*)\)/g, '$1')    // Anchor links → text only
-            .replace(/^\s*[-*]{3,}\s*$/gm, '')         // Remove horizontal rules
-            .replace(/\n{3,}/g, '\n\n')                // Collapse excessive blank lines
+            // Phase 1: Remove structural noise (navigation menus, link lists)
+            .replace(/^[ \t]*\*[ \t]+\[.*?\]\(.*?\)\s*$/gm, '')  // Nav menu items: "* [Link](url)"
+            .replace(/^[ \t]*-[ \t]+\[.*?\]\(.*?\)\s*$/gm, '')   // Alt nav items: "- [Link](url)"
+            .replace(/^\[]\(.*?\)\s*$/gm, '')                     // Empty links: "[](url)"
+            // Phase 2: Remove visual noise (images, blob URLs)
+            .replace(/!\[.*?\]\(.*?\)/g, '')                       // Markdown images
+            .replace(/\[[^\]]*\]\(blob:.*?\)/g, '')                // Blob links
+            .replace(/\[[^\]]*\]\(javascript:.*?\)/g, '')          // JS links
+            // Phase 3: Convert remaining links to text (keep content, drop URLs)
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')              // [text](url) → text
+            // Phase 4: Remove cookie/consent banners
+            .replace(/^.*(?:Cookies?|Cookie-?Einstellung|Akzeptieren|Ablehnen|Personalisieren|Zustimmung|Datenschutzeinstellung).*$/gmi, '')
+            // Phase 5: Clean up artifacts
+            .replace(/^\s*[-*]{3,}\s*$/gm, '')                    // Horizontal rules
+            .replace(/^\s*\[\s*$/gm, '')                          // Orphan "[" on own line
+            .replace(/^\s*\]\s*$/gm, '')                          // Orphan "]" on own line
+            .replace(/\n{3,}/g, '\n\n')                           // Collapse blank lines
             .trim();
 
         // Haiku has 200K context — 15K chars ≈ 4K tokens, well within budget.
         // PII sanitization: website scrapes may contain employee names/contact info (DSGVO Art. 25)
         const truncatedContent = sanitizeForAI(cleaned.substring(0, 15000)).sanitized;
+        console.log(`📊 [Enrichment] Content: ${scrapedMarkdown.length} raw → ${cleaned.length} cleaned → ${truncatedContent.length} truncated for "${companyName}"`);
 
         const prompt = `Du bist ein Unternehmens-Analyst. Extrahiere strukturierte Informationen aus dem folgenden Website-Inhalt von "${companyName}" (${websiteUrl}).
 
