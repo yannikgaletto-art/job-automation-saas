@@ -52,6 +52,24 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
             const res = await fetch(`/api/cover-letter/setup-data?jobId=${jobId}`);
             if (!res.ok) throw new Error(t('error_load_data'));
             const data: SetupDataResponse = await res.json();
+
+            // ─── Stale Hook Invalidation ────────────────────────────
+            // WHY: Zustand persists selectedHook in localStorage per jobId.
+            // When the 7-day company_research cache expires, setup-data returns
+            // only a manual hook. The old persisted hook (e.g. 'vision') no longer
+            // exists in the server response → UI shows empty "results" dead-end.
+            // Fix: Clear the hook BEFORE setSetupData so StepHookSelection mounts
+            // with the correct initial phase ('idle' instead of stale 'results').
+            const { selectedHook } = useCoverLetterSetupStore.getState();
+            if (selectedHook && !data.hooks.some(h => h.id === selectedHook.id)) {
+                console.warn(`⚠️ [WizardSetup] Stale hook "${selectedHook.id}" not in server hooks — clearing`);
+                useCoverLetterSetupStore.setState({
+                    selectedHook: null,
+                    selectedQuote: null,
+                    fetchedQuotes: [],
+                });
+            }
+
             setSetupData(data);
             console.log(`✅ [WizardSetup] Setup data loaded for job ${jobId}`);
         } catch (err) {

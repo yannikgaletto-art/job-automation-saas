@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { enrichCompany, linkEnrichmentToJob } from "@/lib/services/company-enrichment"
 
+// Jina scrape (5-15s) + Claude extraction (3-5s) + DB write = needs 20-25s
+export const maxDuration = 45;
+
 export async function POST(req: NextRequest) {
     try {
         const { jobId, companyName, website, industry, description } = await req.json()
