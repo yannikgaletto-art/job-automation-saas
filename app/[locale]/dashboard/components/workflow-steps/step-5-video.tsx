@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useLocale } from 'next-intl';
 import { motion } from 'framer-motion';
-import { Video, Mic, Square, Upload, RefreshCw, AlertTriangle, CheckCircle2, Trash2, ExternalLink } from 'lucide-react';
+import { Video, Mic, Square, Upload, RefreshCw, AlertTriangle, CheckCircle2, Trash2, ExternalLink, Eye } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { createClient } from '@/lib/supabase/client';
 import { VideoScriptStudio } from './video-script-studio';
@@ -28,6 +28,8 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
     const [showPrivacyConsent, setShowPrivacyConsent] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [viewCount, setViewCount] = useState(0);
+    const [firstViewedAt, setFirstViewedAt] = useState<string | null>(null);
 
     // Script data for overlay during recording
     const [scriptBlocks, setScriptBlocks] = useState<{ id: string; title: string; content: string; durationSeconds: number; isRequired: boolean; templateId: string | null; sortOrder: number }[]>([]);
@@ -59,6 +61,8 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                 if (data.status === 'uploaded') {
                     setExpiresAt(data.expiresAt);
                     setAccessToken(data.accessToken || null);
+                    setViewCount(data.viewCount ?? 0);
+                    setFirstViewedAt(data.firstViewedAt ?? null);
                     setState('done');
                 } else if (data.status === 'prompts_ready' || data.hasScript) {
                     // QR token created or script already exists — skip consent, go straight to script studio
@@ -239,6 +243,8 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
             setUploadProgress(100);
             setExpiresAt(confirmData.expiresAt);
             setAccessToken(confirmData.accessToken || null);
+            setViewCount(0);
+            setFirstViewedAt(null);
             setState('done');
 
         } catch (err) {
@@ -523,6 +529,13 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
         const previewHref = accessToken ? `/v/${accessToken}` : null;
         const fullPreviewUrl = accessToken ? `https://app.path-ly.eu/v/${accessToken}` : null;
 
+        const firstViewDate = firstViewedAt
+            ? new Date(firstViewedAt).toLocaleDateString(locale, { day: 'numeric', month: 'long' })
+            : null;
+        const firstViewTime = firstViewedAt
+            ? new Date(firstViewedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+            : null;
+
         return (
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -541,17 +554,47 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                         </p>
                     </div>
 
-                    {/* LIVE badge — explicit "bereit für Recruiter" */}
+                    {/* LIVE badge */}
                     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
                         <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-xs font-semibold text-green-700">Video ist LIVE — Recruiter können es jetzt ansehen</span>
+                        <span className="text-xs font-semibold text-green-700">{t('done_live_badge')}</span>
                     </div>
+                </div>
+
+                {/* Monitoring panel */}
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t('done_monitor_label')}</p>
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                            <Eye className="w-4 h-4 text-slate-400" />
+                            <div>
+                                <p className="text-xl font-bold text-slate-800 leading-none">{viewCount}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">{viewCount === 1 ? t('done_monitor_view_singular') : t('done_monitor_view_plural')}</p>
+                            </div>
+                        </div>
+                        {firstViewDate && firstViewTime && (
+                            <div>
+                                <p className="text-xs font-medium text-slate-600">
+                                    {t('done_monitor_first_view', { date: firstViewDate })}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                    {t('done_monitor_first_view_time', { time: firstViewTime })}
+                                </p>
+                            </div>
+                        )}
+                        {viewCount === 0 && (
+                            <p className="text-xs text-slate-400">{t('done_monitor_not_viewed')}</p>
+                        )}
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed border-t border-slate-200 pt-2.5">
+                        {t('done_monitor_privacy')}
+                    </p>
                 </div>
 
                 {/* Preview link box */}
                 {previewHref && (
                     <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2">
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Vorschau-Link für Recruiter</p>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t('done_preview_label')}</p>
                         <div className="flex items-center gap-2">
                             <code className="flex-1 text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-1.5 truncate">
                                 {fullPreviewUrl}
@@ -567,7 +610,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                             </a>
                         </div>
                         <p className="text-xs text-slate-400">
-                            Dieser Link ist identisch mit dem QR-Code auf deinem Lebenslauf.
+                            {t('done_preview_hint')}
                         </p>
                     </div>
                 )}
@@ -579,7 +622,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <p className="text-xs text-amber-700">
-                            <span className="font-semibold">Automatische Löschung:</span> {t('done_expiry', { date: expiryFormatted })}. Das Video wird dann unwiderruflich gelöscht.
+                            <span className="font-semibold">{t('done_auto_delete_label')}</span> {t('done_expiry', { date: expiryFormatted })}. {t('done_auto_delete_suffix')}
                         </p>
                     </div>
                 )}

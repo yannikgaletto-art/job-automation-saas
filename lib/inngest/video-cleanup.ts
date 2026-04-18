@@ -117,6 +117,29 @@ export const videoCleanupCron = inngest.createFunction(
                     .in('id', ids);
             }
 
+            // 3. Orphan file cleanup: pg_cron sets status='expired' + storage_path=NULL,
+            // but if the row still has a storage_path (edge case), clean the file.
+            const { data: orphans } = await supabaseAdmin
+                .from('video_approaches')
+                .select('id, storage_path')
+                .eq('status', 'expired')
+                .not('storage_path', 'is', null);
+
+            if (orphans && orphans.length > 0) {
+                console.log(`[video-cron] Cleaning ${orphans.length} orphan storage files`);
+                for (const orphan of orphans) {
+                    if (orphan.storage_path) {
+                        await supabaseAdmin.storage
+                            .from('videos')
+                            .remove([orphan.storage_path]);
+                    }
+                    await supabaseAdmin
+                        .from('video_approaches')
+                        .update({ storage_path: null, updated_at: new Date().toISOString() })
+                        .eq('id', orphan.id);
+                }
+            }
+
             console.log('[video-cron] Cleanup complete');
         });
     }

@@ -74,6 +74,8 @@ export async function POST(request: NextRequest) {
                 storage_path: null,
                 uploaded_at: null,
                 expires_at: null,
+                view_count: 0,
+                first_viewed_at: null,
                 updated_at: new Date().toISOString(),
             })
             .eq('user_id', userId)

@@ -1,4 +1,5 @@
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { VideoViewTracker } from './video-view-tracker';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,7 +16,7 @@ export default async function VideoLandingPage({ params }: PageProps) {
     // Lookup video by access_token (no auth — public page)
     const { data: video, error } = await supabaseAdmin
         .from('video_approaches')
-        .select('status, storage_path, expires_at')
+        .select('status, storage_path, expires_at, view_count, first_viewed_at')
         .eq('access_token', token)
         .maybeSingle();
 
@@ -92,6 +93,13 @@ export default async function VideoLandingPage({ params }: PageProps) {
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex flex-col items-center justify-center p-4">
+            {/*
+              Fire view tracking on client side.
+              This increments view_count and sets first_viewed_at in the DB.
+              Rendered after the video player so tracking never blocks playback.
+            */}
+            <VideoViewTracker token={token} />
+
             <div className="w-full max-w-2xl">
                 {/* Video Player */}
                 <div className="bg-black rounded-xl overflow-hidden shadow-2xl">

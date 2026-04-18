@@ -36,12 +36,12 @@ interface GeneratedBlock {
     sortOrder: number;
 }
 
-// ── Fixed Vorstellung Script — USER REQUEST 2025-04 ───────────────────────────────
+// ── Fixed Vorstellung Script — T2 style (short, authentic, ~10s) ───────────────────────────────
 // These are shown as editable defaults. [Name] = Hiring Manager, [Dein Name] = Applicant.
 const INTRO_DEFAULTS: Record<string, string> = {
-    de: 'Hallo [Name], ich bin [Dein Name]. Weil ein kurzes Video oft mehr sagt als ein langes Anschreiben, dachte ich, ich stelle mich Ihnen einfach mal persönlich vor. Und bevor wir jetzt meinen Lebenslauf durchgehen, möchte ich lieber direkt auf den Punkt kommen und Ihnen sagen, warum ich genau in Ihrem Team mit anpacken möchte.',
-    en: 'Hello [Name], I’m [Your Name]. Because a short video often says more than a long cover letter, I thought I’d introduce myself to you in person. And before we go through my CV, I’d rather get straight to the point and tell you why I specifically want to roll up my sleeves and join your team.',
-    es: 'Hola [Nombre], soy [Tu Nombre]. Porque un vídeo corto dice más que una larga carta de presentación, pensé en presentarme personalmente. Y antes de repasar mi CV, prefiero ir al grano y decirle por qué quiero exactamente unirme a su equipo.',
+    de: 'Hallo [Name], ich bin [Dein Name]. Ein kurzes Video sagt oft mehr als ein langes Anschreiben. Ich stelle mich kurz vor, damit ihr einen besseren Eindruck habt, wer hinter dem Lebenslauf steckt.',
+    en: 'Hi [Name], I am [Your Name]. A short video often says more than a long cover letter. Let me quickly introduce myself so you get a better sense of who is behind the CV.',
+    es: 'Hola [Nombre], soy [Tu Nombre]. Un video corto dice mas que una larga carta. Me presento brevemente para que tengan una mejor idea de quien esta detras del CV.',
 };
 // Localized title of the intro block (must match TITLE_MAPS)
 const INTRO_TITLES: Record<string, string> = {
@@ -570,62 +570,89 @@ Responde SOLO con JSON:
     // Default: DE
     return {
         titleMap,
-        prompt: `Du schreibst Stichpunkte für ein 60-Sekunden-Video-Pitch, der vom BEWERBER gesprochen wird.
-Kein Essay. Eine echte Person schaut in eine Kamera und redet über SICH SELBST.
+        prompt: `Du schreibst Stichpunkte fuer ein 60-Sekunden-Video-Pitch, gesprochen vom BEWERBER.
+Kein Essay. Eine echte Person schaut in die Kamera und redet locker ueber SICH SELBST.
 
-═══ PERSPEKTIVE — KRITISCH ═══
-Du schreibst AUS der Perspektive des Bewerbers.
-✅ "Ich habe gebaut...", "Ich habe bei X gearbeitet...", "Ich möchte bei euch..."
-❌ NIEMALS aus der Firmenperspektive schreiben: "Wir sind...", "Unsere Mission...", "Join us..."
-❌ NIEMALS Firmen-Marketing-Text oder Stellenbeschreibungs-Sätze wörtlich übernehmen
-Jeder Satz muss in der ersten Person Singular stehen ("ich").
-Wenn du einen einzigen Satz aus der Firmenperspektive schreibst, hast du VERSAGT.
+=== PERSPEKTIVE ===
+Du schreibst AUS der Perspektive des Bewerbers. Erste Person Singular.
+"Ich habe...", "Ich moechte...", "Mich hat abgeholt..."
+NIEMALS Firmenperspektive: "Wir sind...", "Unsere Mission..."
+Ein Satz aus Firmenperspektive = VERSAGT.
+
+=== TONFALL: UMGANGSSPRACHE ===
+- Schreibe so, wie ein selbstsicherer Mensch frei in die Kamera spricht
+- Kurze Saetze. Max 20 Woerter pro Satz. Ideal 12-15.
+- KEINE Floskelsprache: "Ich freue mich darauf...", "meine Expertise einzubringen"
+- Stattdessen: "Mich hat euer Ansatz direkt abgeholt", "Dort habe ich gelernt..."
+- Nutze erzaehlende Sprache: "Zum Beispiel", "Konkret", "Dabei habe ich gelernt"
 
 KONTEXT:
-- Jeder Block wird laut gesprochen, in die Kamera schauend
-- 60 Sekunden = ca. 130 Wörter gesamt — null Füllwörter
-- Der Bewerber spricht MIT dem Hiring Manager
+- 60 Sekunden = ca. 130 Woerter gesamt
+- Jeder Block wird laut gesprochen -- muss natuerlich klingen
+- Der Bewerber spricht MIT dem Hiring Manager, nicht UEBER sich
 
 Firma: ${job.company_name}
 Position: ${job.job_title}
-Keywords aus der Stelle: ${uniqueKeywords.join(', ')}
-${descSnippet ? `\nStellenbeschreibung (nur Kontext — NICHT wörtlich übernehmen):\n${descSnippet}` : ''}
+Keywords: ${uniqueKeywords.join(', ')}
+${descSnippet ? `\nStellenbeschreibung (NUR Kontext -- NICHT woertlich uebernehmen):\n${descSnippet}` : ''}
 ${applicantContext ? `\nBewerber-Hintergrund (Quelle: ${contextSource}):\n${applicantContext}` : ''}
 
-═══ FAKTEN-REGEL — KRITISCH ═══
-Du DARFST ausschließlich Erfahrungen, Technologien und Firmen nennen, die im "Bewerber-Hintergrund" stehen.
-ERFINDE KEINE Technologien, Firmen oder Projekte.
-${!applicantContext ? 'Es wurde kein Hintergrund übermittelt. Nutze die Stationsnamen aus der Stelle und schreibe generische Stichpunkte, die der Bewerber personalisieren kann.' : 'Matche die Stationen des Bewerbers mit den Job-Anforderungen. Bleibe faktisch.'}
+=== FAKTEN-REGEL ===
+NUR Erfahrungen, Technologien und Firmen nennen, die im Bewerber-Hintergrund stehen.
+ERFINDE NICHTS.
+${!applicantContext ? 'Kein Hintergrund vorhanden. Nutze Platzhalter wie [CV-Station 1], [Konkrete Handlung], die der Bewerber personalisieren kann.' : 'Matche die Stationen des Bewerbers mit den Job-Anforderungen.'}
 ${archetypeHint ? `\n${archetypeHint}` : ''}
 
 ${toneCalibration}
 
-═══ VERBOTENE KONSTRUKTIONEN ═══
-❌ "Ich freue mich darauf, meine Expertise einzubringen"
-❌ "Mit meinem Hintergrund in X kann ich Y unterstützen"
-❌ "Ich bin Kandidat/in für die Position..."
-❌ "Wir sind...", "Unser Team...", "Unsere Mission..." (Firmenstimme — NIEMALS)
-❌ Passiv-Konstruktionen, Konjunktiv als Hauptton
-Wenn du einen dieser Sätze generierst, hast du VERSAGT.
+=== BLOCK-STRUKTUR (T2-Format) ===
+Generiere genau diese 4 Bloecke mit dem angegebenen Timing:
 
-Aufgabe 1: Kategorisiere die Keywords in 3 Gruppen:
+1. Vorstellung (10s, ~20 Woerter): NICHT generieren -- wird vom System vorgefuellt.
+
+2. Motivation (15s, ~33 Woerter):
+   - Beginne mit: Was hat mich an dieser Firma abgeholt?
+   - Ueberleitung: Parallele zur eigenen Arbeit
+   - Endet mit: Was will ich bei denen methodisch lernen?
+   - Bescheidener Ton -- "ich moechte von euch lernen"
+
+3. Erfahrung (15s, ~33 Woerter):
+   - EINE konkrete Station, EINE Erkenntnis in Umgangssprache
+   - Schema: "Bei [Station] habe ich erlebt: [Umgangssprachliche Erkenntnis]. Dort habe ich [messbare Handlung in 1 Satz]."
+   - Beispiel-Stil: "Theorie ist gut, aber man muss die Leute auch ins Machen kriegen"
+   - KEINE Aufzaehlung von 3+ Stationen
+
+4. Abschluss (10s, ~20 Woerter):
+   - Entspannter CTA, KEIN "Hochachtungsvoll"
+   - Tenor: "Wenn das fuer euch nach einem guten Match klingt, freue ich mich auf ein kurzes Kennenlernen."
+
+=== VERBOTENE KONSTRUKTIONEN ===
+- "Ich freue mich darauf, meine Expertise einzubringen"
+- "Mit meinem Hintergrund in X kann ich Y unterstuetzen"
+- "Ich bin Kandidat/in fuer die Position..."
+- "Beiden Erfahrungen zeigen mir..."
+- Aufzaehlung von 3+ Buzzwords in einem Satz
+- Passiv, Konjunktiv als Hauptton
+Ein Verstoss = VERSAGT.
+
+Aufgabe 1: Kategorisiere Keywords in 3 Gruppen:
 - "mustHave" (max 4): Hard Skills, Technologien
 - "niceToHave" (max 4): Soft Skills, Branchenkenntnisse
 - "companySpecific" (max 3): Firmen-Selbstbeschreibungen
 
-Aufgabe 2: Erstelle Stichpunkte für jeden Block (erste Person, laut gesprochen):
-${blockList}
+Aufgabe 2: Erstelle Stichpunkte fuer Bloecke 2-4 (Vorstellung wird automatisch gefuellt).
+Beachte: MAX 33 Woerter pro Block. Umgangssprache. Erste Person.
 
-Aufgabe 3: Extrahiere 2-3 Identitäts-Phrasen der Firma (nur für die Seitenleiste).
+Aufgabe 3: Extrahiere 2-3 Identitaets-Phrasen der Firma (nur Seitenleiste).
 
 Antworte NUR mit JSON:
 {
   "keywords": { "mustHave": ["..."], "niceToHave": ["..."], "companySpecific": ["..."] },
   "mirror_phrases": ["..."],
   "blocks": [
-    { "title": "Vorstellung", "content": "..." },
-    { "title": "Erfahrung", "content": "..." },
+    { "title": "Vorstellung", "content": "" },
     { "title": "Motivation", "content": "..." },
+    { "title": "Erfahrung", "content": "..." },
     { "title": "Abschluss", "content": "..." }
   ]
 }`,
