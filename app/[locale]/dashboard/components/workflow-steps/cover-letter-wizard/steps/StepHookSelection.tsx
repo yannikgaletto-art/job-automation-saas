@@ -45,17 +45,6 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     const [phase, setPhase] = useState<Phase>(getInitialPhase);
     const [analysisStep, setAnalysisStep] = useState(0);
 
-    // ─── Phase guard: reset to idle on re-renders when no enrichment data ────
-    // WHY: useState(getInitialPhase) only runs on first mount. When onReloadData
-    // is called (e.g. after cache expiry → only manual hook returned), the phase
-    // stays stale at 'results'. This effect catches that case and resets.
-    useEffect(() => {
-        if (!setupData.hasPerplexityData && !selectedHook && phase === 'results') {
-            console.warn('⚠️ [StepHook] No enrichment data + no hook → resetting to idle');
-            setPhase('idle');
-        }
-    }, [setupData.hasPerplexityData, selectedHook, phase]);
-
     // i18n-translated typeLabel for HookCard badges
     const hookTypeLabel = useMemo(() => ({
         news: `\uD83D\uDCF0 ${t('hook_type_news')}`,
@@ -318,10 +307,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     if (groupHooks.length === 0) return null;
 
                     const hasSelection = groupHooks.some(h => selectedHook?.id === h.id);
-                    // Auto-open: first group with hooks opens by default if nothing is open/selected yet
-                    const isFirstGroup = filteredHooks.filter(h => group.types.includes(h.type)).length > 0
-                        && groups.findIndex(g => g.label === group.label) === groups.findIndex(g => filteredHooks.some(h => g.types.includes(h.type)));
-                    const isOpen = openAccordion === group.label || hasSelection || (isFirstGroup && openAccordion === null && !selectedHook);
+                    const isOpen = openAccordion === group.label || hasSelection;
                     const bestScore = Math.max(...groupHooks.map(h => Math.round((h.relevanceScore || 0) * 100)));
 
                     return (

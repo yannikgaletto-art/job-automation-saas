@@ -208,9 +208,21 @@ async function fetchViaJinaAndClaude(
         console.log(`🤖 [Fallback] Claude Haiku extracting intel for "${companyName}"...`);
         const { complete } = await import('@/lib/ai/model-router');
 
-        // Truncate to ~8000 chars to stay within token limits
+        // Strip markdown noise before truncation — Jina scrapes contain blob: URLs,
+        // image refs, navigation links, and boilerplate that waste token budget.
+        // Without this, the first 8K chars can be pure navigation with zero business content.
+        const cleaned = scrapedMarkdown
+            .replace(/!\[.*?\]\(.*?\)/g, '')           // Remove markdown images
+            .replace(/\[([^\]]*)\]\(blob:.*?\)/g, '')  // Remove blob: links
+            .replace(/\[([^\]]*)\]\(javascript:.*?\)/g, '') // Remove JS links
+            .replace(/\[([^\]]*)\]\((#[^\)]*)\)/g, '$1')    // Anchor links → text only
+            .replace(/^\s*[-*]{3,}\s*$/gm, '')         // Remove horizontal rules
+            .replace(/\n{3,}/g, '\n\n')                // Collapse excessive blank lines
+            .trim();
+
+        // Haiku has 200K context — 15K chars ≈ 4K tokens, well within budget.
         // PII sanitization: website scrapes may contain employee names/contact info (DSGVO Art. 25)
-        const truncatedContent = sanitizeForAI(scrapedMarkdown.substring(0, 8000)).sanitized;
+        const truncatedContent = sanitizeForAI(cleaned.substring(0, 15000)).sanitized;
 
         const prompt = `Du bist ein Unternehmens-Analyst. Extrahiere strukturierte Informationen aus dem folgenden Website-Inhalt von "${companyName}" (${websiteUrl}).
 
