@@ -443,8 +443,34 @@ export const BLACKLIST_PATTERNS: BlacklistPattern[] = [
         feedback: 'Entferne die allwissende Erkenntnis. Stattdessen: konkretes Ergebnis oder Zuversicht.',
     },
     {
+        pattern: 'nur dann greifen, wenn',
+        reason: 'Allwissende Wenn-dann-Wahrheit — Bewerber stellen keine universellen Regeln auf.',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'nur dann funktionieren, wenn',
+        reason: 'Allwissende Wenn-dann-Wahrheit — klingt belehrend.',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'nur dann gelingen, wenn',
+        reason: 'Allwissende Wenn-dann-Wahrheit.',
+        category: 'ai_marker',
+    },
+    {
         pattern: 'funktioniert nur, wenn',
         reason: 'Allwissende Wenn-dann-Wahrheit — der Bewerber stellt keine Regeln auf.',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'prägt eure Arbeit',
+        reason: 'Omniszientes Prädikat — der Bewerber kann nicht wissen, was die Arbeit der Firma "prägt". Stattdessen: ICH-Perspektive mit Quelle.',
+        category: 'ai_marker',
+        feedback: 'Formuliere aus ICH-Perspektive: "Auf eurer Website habe ich gelesen, dass..." statt allwissend über die Firma zu sprechen.',
+    },
+    {
+        pattern: 'prägt Ihre Arbeit',
+        reason: 'Omniszientes Prädikat — Sie-Form-Variante.',
         category: 'ai_marker',
     },
     {

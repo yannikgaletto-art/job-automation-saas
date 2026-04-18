@@ -207,8 +207,9 @@ DRAMATURGIE:
 - Verbinde die Stationen zu einem kohärenten Karriere-Narrativ: Jede Station baut auf der vorherigen auf
 - Das "Warum" ist wichtiger als das "Was" — zeige Motivation und Entwicklung
 - Erlaube 1-2 persönliche Aussagen zur Motivation (aber kein Pathos)
-- Nutze Zeitwörter: "Zunächst", "Später erkannte ich", "Heute weiß ich"
+- Nutze Zeitwörter: "Zunächst", "Im nächsten Schritt", "Daraus entwickelte sich"
 - Die rote Linie: Alle Absätze führen logisch zur Bewerbung bei DIESER Firma
+RHETORISCHE WÜRZUNG (PFLICHT in diesem Stil): Verwende MINDESTENS 1 rhetorisches Stilmittel (Trikolon, Asyndeton oder Anadiplose) an einer Stelle wo es den Lesefluss natürlich verbessert. Max. 2 gesamt.
 SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Aufzählungen, Bullet-Points-Stil, trockene Fakten ohne Kontext, "Mein Werdegang zeigt..."`,
 
@@ -249,6 +250,7 @@ INTELLEKTUELLER RAHMEN:
 - Verbinde branchenspezifische Trends mit persönlicher Erfahrung
 - Nutze Analogien und Querverweise: "Wie in der [Disziplin/Branche], zeigt sich auch hier..."
 - Die konzeptionelle Ebene zeigt Senioritität und strategisches Denken
+RHETORISCHE WÜRZUNG (PFLICHT in diesem Stil): Verwende MINDESTENS 1 rhetorisches Stilmittel (Trikolon, Asyndeton oder Anadiplose) an einer Stelle wo es den Lesefluss natürlich verbessert. Max. 2 gesamt.
 SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Oberflächliche Name-Dropping von Philosophen ohne Bezug, Arroganz, akademischer Jargon, mehr als 1 Zitat.`,
     };
@@ -325,7 +327,7 @@ PFLICHT: Verwende AUSSCHLIESSLICH diese ${ctx.cvStations.length} Stationen: ${st
 VERBOT: Erwähne KEINE anderen Stationen aus dem CV — nur die oben genannten sind erlaubt!
 
 - Schreibe keinen Fließtext-Lebenslauf! Widme jeder ausgewählten CV-Station einen EIGENEN, kurzen Absatz (max. 3 Sätze).
-- Nenne den Kontext kurz, aber fokussiere dich zu 70% auf den erlernten WERT (Was hat der Kandidat gelernt? Warum ist das für den neuen Arbeitgeber relevant?). Verbinde Sätze logisch (z.B. 'Diese Erfahrung hat meinen Blick dafür geschärft, wie...').
+- Nenne den Kontext kurz, aber fokussiere dich zu 70% auf den erlernten WERT (Was hat der Kandidat gelernt? Warum ist das für den neuen Arbeitgeber relevant?).
 - REDUZIERE BUZZWORDS DRASTISCH. Pro Absatz maximal 2 zentrale Fachbegriffe. Wenn eine CV-Station viele Technologien enthält, erwähne NUR diejenige, die absolut essenziell für die ausgeschriebene Stelle ist. Lass alles andere weg.
 - ROTER FADEN (optional): Wenn die Stellenanzeige ein prägnantes Schlüsselwort enthält (z.B. "Generalist", "Teamaufbau"), darfst du es im Intro UND im ersten Stations-Absatz organisch aufgreifen — nicht wörtlich kopieren, sondern als verbindendes Motiv nutzen.
 
@@ -426,6 +428,7 @@ Es muss BUCHSTÄBLICH und WORTWÖRTLICH in der Sprache übernommen werden, in de
 Egal ob das Anschreiben auf Deutsch oder einer anderen Sprache verfasst wird — das Zitat bleibt unverändert.
 
 FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
+- ABSOLUT VERBOTEN: Das Zitat als ALLERERSTEN Satz des Anschreibens platzieren. Der Einleitungssatz (Firmenbezug) kommt IMMER VOR dem Zitat. Reihenfolge: Anrede → Einleitungssatz → Zitat → Bruecke. NIEMALS: Anrede → Zitat (wirkt wie ein Epigraph).
 - Leite das Zitat mit einer KONKRETEN SITUATION ein (1 Satz — kuerzer ist besser).
 
   PFLICHT — FIRMA ZUERST (NICHT VERHANDELBAR):
@@ -846,6 +849,34 @@ HINWEIS: Schreibe professionell und präzise. Stil-Kalibrierung nicht möglich (
                 : `PRESET: ${ctx?.tone.preset || 'formal'}
 ${activeTone}`}
 
+${(() => {
+    // Shared bridging logic — injected into ALL tone paths (custom-style AND preset)
+    // Extracted to avoid duplication and ensure preset users get the same Case A/B bridging rules.
+    const bridgingRulesDE = `[STATION-BRIDGING DECISION — 2-Wege-Logik (GILT FUER ALLE STILE)]
+Evaluiere VOR jedem Stations-Brueckensatz:
+FRAGE: "Gibt es einen thematischen INHALTS-Ueberschnitt zwischen dem, was diese Station inhaltlich behandelt hat, und dem, womit ${companyName} sich beschaeftigt?"
+
+CASE A — JA (Inhalts-Match oder Rollen-Match, z.B. Beratung zu Beratung, Tech zu Tech):
+  Bruecke UEBER INHALT/ROLLE — zeige die direkte Verbindung.
+
+CASE B — NEIN (Inhalts-Dissimilar, z.B. Quantum Computing zu AgriFood-Foerderung):
+  VERBOTEN: "[Firmenthema] erinnert mich an meine Arbeit mit [inhaltlich unverwandtem Stationsthema]"
+  PFLICHT: Bruecke UEBER UEBERTRAGBAREN SKILL (konkret und messbar, nicht generisch).
+  VERBOTEN: "Kommunikationskompetenz" / "analytisches Denken" ohne konkreten Beweis.
+
+SELBST-CHECK: "Wuerde ein Personaler denken: 'Ja, das macht Sinn.' oder 'Was hat das damit zu tun?'"
+Wenn letzteres: Case B anwenden und mit uebertragbarem Skill neu formulieren.
+
+[ANTI-ALLWISSEND — FIRMENBEZUEGE ALS PRAEDIKATE (VERBOTEN)]
+VERBOTEN: Saetze in denen der Bewerber allwissend ueber das VERHALTEN der Firma spricht:
+- "[Thema] praegt eure Arbeit" / "praegt Ihre Arbeit"
+- "[Thema] zeichnet euch aus" / "zeichnet Sie aus"
+- "[Thema] macht euch besonders" / "macht Sie besonders"
+- "[Thema] steht bei euch im Mittelpunkt"
+STATTDESSEN: ICH-Perspektive mit Quelle: "Auf eurer Website habe ich gelesen, dass..." / "In der Stellenanzeige ist mir aufgefallen, dass..."`;
+    return isCustomStyle && customStyleBlock ? '' : bridgingRulesDE;
+})()}
+
 ${isCustomStyle ? '' : styleSection}
 
 ${buildBlacklistPromptSection()}
@@ -868,7 +899,7 @@ STATTDESSEN — Persönliche Reflexion:
 NIE dieselbe Lernkurven-Formulierung zweimal im selben Anschreiben. Wähle EINEN aus diesem Pool und SCHLIESSE ihn zu einem vollständigen Satz ab — KEIN Doppelpunkt am Ende:
 ✅ "Erst durch [konkretes Event] verstand ich, dass [Einsicht]."
 ✅ "Diese Erfahrung zeigte mir, dass [konkreter Schluss]."
-✅ "Anfangs unterschätzte ich [X]; erst durch [Y] wurde klar, dass [Z]."
+✅ "Anfangs unterschaetzte ich [X]; die Zusammenarbeit mit [Y] zeigte, dass [Z]."
 ✅ "Ich lernte auf die harte Tour, dass [konkreter Schluss]."
 ✅ "Gerade dieser Prozess machte deutlich, dass [konkreter Schluss]."
 REGEL: Der Lernkurven-Satz ist immer ein vollständiger Aussagesatz. Der Einblick folgt DIREKT im selben Satz — nie als eigener Satz mit Doppelpunkt.
@@ -1114,7 +1145,7 @@ VERBOTEN: "Habe ich..." gefolgt von "Habe ich..." oder "Zudem habe ich..." gefol
 VERBOTEN: "Ich konnte..." gefolgt von "Ich konnte..."
 JEDER Satz muss mit einem ANDEREN Einstieg beginnen. Variiere: Zeitangabe, Kontext, Ergebnis, Vergleich, Konkretes Beispiel.
 BEISPIEL FALSCH: "Bei X habe ich... Zudem habe ich... Daher habe ich gelernt..."
-BEISPIEL RICHTIG: "Bei X übernahm ich die Steuerung von Y. Der Fokus lag auf Z. Diese Erfahrung schärfte meinen Blick für..."`,
+BEISPIEL RICHTIG: "Bei X übernahm ich die Steuerung von Y. Der Fokus lag auf Z. Deshalb freue ich mich, diese Erfahrung einzubringen."`,
 `[ANTI-SENTENCE-START REPETITION (MANDATORY)]
 NEVER start two consecutive sentences with the same subject or verb.
 FORBIDDEN: "I was able to..." followed by "I was also able to..."
