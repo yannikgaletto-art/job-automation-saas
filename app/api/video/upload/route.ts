@@ -82,11 +82,15 @@ export async function POST(request: NextRequest) {
             log.info('Confirming video upload', { jobId });
 
             const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+            // Safety: re-set storage_path atomically here to handle edge cases
+            // where the get-signed-url DB write was not yet committed.
+            const storagePath = `${userId}/${jobId}.webm`;
 
             const { error: updateError } = await supabaseAdmin
                 .from('video_approaches')
                 .update({
                     status: 'uploaded',
+                    storage_path: storagePath,
                     uploaded_at: new Date().toISOString(),
                     expires_at: expiresAt,
                     updated_at: new Date().toISOString(),

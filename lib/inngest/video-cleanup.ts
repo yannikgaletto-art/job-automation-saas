@@ -9,6 +9,8 @@ const supabaseAdmin = createAdminClient(
 /**
  * 1. Event-based deletion: Triggered after video upload.
  *    Sleeps 14 days, then deletes storage file and sets status to 'expired'.
+ *    NOTE: pg_cron in the DB runs a daily fallback at 03:30 UTC as the
+ *    legal DSGVO Art. 17 guarantee. This Inngest job is best-effort.
  */
 export const videoDeleteScheduled = inngest.createFunction(
     { id: 'video-delete-scheduled', name: 'Video Scheduled Deletion' },
@@ -23,13 +25,20 @@ export const videoDeleteScheduled = inngest.createFunction(
             // Get storage path
             const { data: video } = await supabaseAdmin
                 .from('video_approaches')
-                .select('storage_path, status')
+                .select('storage_path, status, expires_at')
                 .eq('user_id', userId)
                 .eq('job_id', jobId)
                 .single();
 
-            if (!video || video.status === 'expired') {
-                console.log(`[video-cleanup] Already expired: ${userId}/${jobId}`);
+            // Already expired (by pg_cron or manual delete) — nothing to do
+            if (!video || video.status === 'expired' || !video.storage_path) {
+                console.log(`[video-cleanup] Already handled: ${userId}/${jobId} (status=${video?.status})`);
+                return;
+            }
+
+            // Double-check: only delete if expires_at has actually passed
+            if (video.expires_at && new Date(video.expires_at) > new Date()) {
+                console.log(`[video-cleanup] Not yet expired: ${userId}/${jobId} — skipping`);
                 return;
             }
 
@@ -46,14 +55,15 @@ export const videoDeleteScheduled = inngest.createFunction(
             // Mark as expired
             await supabaseAdmin
                 .from('video_approaches')
-                .update({ status: 'expired', updated_at: new Date().toISOString() })
+                .update({ status: 'expired', storage_path: null, updated_at: new Date().toISOString() })
                 .eq('user_id', userId)
                 .eq('job_id', jobId);
 
-            console.log(`[video-cleanup] Expired: ${userId}/${jobId}`);
+            console.log(`[video-cleanup] Expired by Inngest: ${userId}/${jobId}`);
         });
     }
 );
+
 
 /**
  * 2. Daily cron cleanup: Catches any missed deletions and zombie tokens.

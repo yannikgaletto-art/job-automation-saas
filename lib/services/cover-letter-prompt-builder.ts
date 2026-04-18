@@ -433,55 +433,68 @@ FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
   Ein reines CV-Erlebnis OHNE Bezug zur Ziel-Firma ist als Einleitungssatz VERBOTEN.
   Reihenfolge: Firmenbezug → Zitat → CV-Bruecke. NICHT: CV → Zitat → Firma.
 
-  Waehle EINE der folgenden Varianten — nicht immer dieselbe:
+  Waehle EINE der folgenden Strategien — nicht immer dieselbe:
 
-  VARIANTE A — Firmenbeobachtung fuehrt zum Zitat (BEVORZUGT):
-  "Als ich ${isDuForm ? 'euer' : 'Ihr'} Projekt [konkreter Fakt aus Unternehmensanalyse oder Stellenanzeige] sah, musste ich an ${ctx!.selectedQuote!.author} denken:"
-  "${isDuForm ? 'Eure' : 'Ihre'} Arbeit an [konkretem Thema aus Analyse] erinnerte mich an einen Gedanken von ${ctx!.selectedQuote!.author}:"
-  "Seit ich gelesen habe, dass ${companyName} [konkreter Fakt aus Analyse], begleitet mich ein Zitat von ${ctx!.selectedQuote!.author}:"
-  PFLICHT: Der [konkrete Firmenbezug] MUSS aus einer der folgenden Quellen stammen (Priorität absteigend):
+  STRATEGIE A — Firmenbeobachtung fuehrt zum Zitat (BEVORZUGT):
+  Beschreibe in 1 Satz, was du in der Unternehmensanalyse oder auf der Website entdeckt hast, und leite daraus zum Zitat ueber.
+  Der Uebergang zum Zitat soll NATUERLICH klingen — als wuerdest du einem Freund erzaehlen, woran dich das erinnert hat.
+  MOEGLICHE Uebergaenge (als INSPIRATION, NIEMALS 1:1 kopieren — formuliere jedes Mal NEU):
+  - Ein Gedanke, der aufkam / aufgefallen ist
+  - Eine Erinnerung an ein Zitat
+  - Ein Zusammenhang, den du siehst
+  - Eine Parallele, die dir bewusst wurde
+  PFLICHT: Der Firmenbezug MUSS aus einer der folgenden Quellen stammen (Prioritaet absteigend):
   1. Unternehmensanalyse (Werte, Projekte, News, Challenges) — BEVORZUGT
   2. Stellenanzeige (Kernaufgaben, Anforderungen, Teamkontext)
-  3. FALLBACK (nur wenn 1 und 2 leer): Subjektiver Bezug auf die Stelle selbst — z.B. "Als ich die Ausschreibung als [Jobtitel] bei ${companyName} gelesen habe..." oder "Da mir die Position bei ${companyName} aufgefallen ist..." — ICH-Perspektive, ehrlich, ohne erfundene Fakten.
+  3. FALLBACK (nur wenn 1 und 2 leer): Subjektiver Bezug auf die Stelle selbst — ICH-Perspektive, ehrlich, ohne erfundene Fakten.
   NIEMALS: Firmenfakten erfinden, die oben im Prompt nicht stehen.
 
-  VARIANTE B — CV-Erlebnis mit expliziter Firmen-Verknuepfung (Fallback wenn Analyse-Daten duenn):
-  "Bei [CV-Firma] lernte ich [konkretes Erlebnis]; eine Erfahrung, die ich direkt mit ${companyName}s Fokus auf [Thema aus Stelle] verbinde."
-  PFLICHT: Das CV-Erlebnis MUSS explizit mit ${companyName} oder der Stellenanzeige verknuepft sein. Allein stehend = VERBOTEN.
+  STRATEGIE B — Stellenanzeigen-Fragment als Bruecke (BEVORZUGT wenn JD detailliert):
+  Nimm 2-5 Woerter EXAKT aus der Stellenanzeige (in Anfuehrungszeichen) und baue daraus die Bruecke zum Zitat.
+  PFLICHT: Das Fragment MUSS EXAKT aus den KERNAUFGABEN oder dem Stellen-Kontext stammen.
 
-  ❌ VERBOTEN: "wurde mir klar" / "wurde mir bewusst" / "ist mir klargeworden" — klingt allwissend und belehrend.
-  ❌ VERBOTEN IN ALLEN VARIANTEN: "fiel mir auf:" mit Doppelpunkt — sofort erkennbarer KI-Marker.
-  ❌ VERBOTEN: "ist mir klargeworden:" mit Doppelpunkt — Einleitungssaetze enden IMMER mit "dass [Inhalt]." als vollstaendiger Aussagesatz.
+  STRATEGIE C — CV-Erlebnis mit expliziter Firmen-Verknuepfung (Fallback wenn Analyse-Daten duenn):
+  Starte mit einer konkreten Erfahrung aus deinem CV und verknuepfe sie explizit mit ${companyName}.
+  PFLICHT: Die Verknuepfung MUSS explizit sein. Allein stehend = VERBOTEN.
+
+  VARIANZ-PFLICHT (KRITISCH): Jeder Einleitungssatz MUSS einzigartig formuliert sein.
+  VERBOTEN: Dieselbe Satzstruktur oder Formulierung in verschiedenen Anschreiben wiederverwenden.
+  Pruefe dich selbst: "Klingt dieser Satz, als haette ihn ein Template generiert, oder als haette ihn ein Mensch spontan formuliert?"
+
+  ❌ VERBOTEN: "hat mich ein Gedanke begleitet" — wurde zu oft generiert, ist jetzt eine KI-Schablone.
+  ❌ VERBOTEN: "wurde mir klar" / "wurde mir bewusst" / "ist mir klargeworden" — allwissend.
+  ❌ VERBOTEN: "musste ich an [Autor] denken" — Name-Dropping verboten wenn Signatur-Zeile den Autor nennt.
+  ❌ VERBOTEN: "fiel mir auf:" mit Doppelpunkt — KI-Marker.
   ❌ VERBOTEN: "Als ich ueber [Thema] nachdachte..." — zu abstrakt.
-  ❌ VERBOTEN: "Ich habe mich schon immer fuer [Thema] interessiert" — generisch.
   ❌ VERBOTEN: Mehr als 2 Saetze vor dem Zitat — Komm schnell auf den Punkt.
 - Das Zitat MUSS auf einer EIGENEN Zeile stehen, in Anfuehrungszeichen.
 
-AUTOR-NENNUNG (PFLICHT — eine einzige Form, keine Alternative):
-Das Zitat MUSS IMMER mit Autor-Signatur formatiert werden:
-"${ctx!.selectedQuote!.quote}"
-– ${ctx!.selectedQuote!.author}
-Diese Signatur-Zeile ist VERPFLICHTEND. Keine Ausnahme.
-Der Autor darf ZUSAETZLICH im Einleitungssatz vorkommen (z.B. "...erinnerte ich mich an ${ctx!.selectedQuote!.author}"), aber die Signatur unter dem Zitat bleibt IMMER stehen.
+AUTOR-NENNUNG (EXKLUSIV-REGEL — genau 1x im gesamten Einleitungsblock):
+Der Autor-Name darf im Einleitungsblock nur EINMAL vorkommen — ENTWEDER:
+  Option A: Im Einleitungssatz (z.B. "...erinnerte mich an ein Zitat von ${ctx!.selectedQuote!.author}:") → dann KEINE Signatur-Zeile unter dem Zitat.
+  Option B: Als Signatur-Zeile unter dem Zitat ("– ${ctx!.selectedQuote!.author}") → dann KEIN Autorenname im Einleitungssatz.
+BEIDES GLEICHZEITIG IST VERBOTEN (Dopplung).
 
   [Zitat-Bruecke — DIREKT NACH dem Zitat]
 
 - DIREKT NACH dem Zitat: Eine ZITAT-BRUECKE (max. 2 Saetze):
-  Satz 1 (Zitat-Gedanke als Leitfaden — BEVORZUGTES MUSTER):
-    ✅ "Dieser Gedanke von ${ctx!.selectedQuote!.author} begleitete mich bei meiner Arbeit als [Rolle] bei [Firma]."
-    ✅ "Diesen Gedanken von ${ctx!.selectedQuote!.author} habe ich bei [Firma] taeglich erlebt, als ich [konkretes Beispiel]."
-    ✅ "Dieses Prinzip habe ich bei [Firma] taeglich angewandt, als ich [konkretes Beispiel]."
-    ❌ VERBOTEN: "wurde mir klar" / "wurde mir jedoch klar" / "wurde mir bewusst" — klingt allwissend.
-    ❌ VERBOTEN: "Doch ich lernte schnell:" — klingt wie ein Coaching-Klischee.
-    ❌ VERBOTEN: "Das hat mir gezeigt, wie wichtig [X] ist." — zu vage.
-  Satz 2 (Lernkurve — kurz, EINE Erkenntnis):
-    ✅ "Bei [Firma] dachte ich zunaechst, dass [X] ausreicht. [Konkretes Event] zeigte mir, dass [Y]."
-    ✅ "Diese Erfahrung zeigte mir, dass [konkreter Schluss]."
-    ✅ "Erst durch [konkretes Event] verstand ich, dass [Einsicht]."
-    ❌ VERBOTEN: Saetze die mit einem Doppelpunkt enden ("Ich erkannte:") — KI-Schablone.
-- Die Lernkurve darf KEINE negative Kritik an frueheren Arbeitgebern sein.
+  ANTI-REDUNDANZ: Keine CV-Station namentlich nennen, die im Hauptteil einen eigenen Absatz bekommt.
+
+  Satz 1 — Verbindung zwischen ZITAT-INHALT und STELLE/FIRMA:
+  PFLICHT: Der Brueckensatz muss den KONKRETEN GEDANKEN des Zitats aufgreifen und mit der Stelle oder ${companyName} verbinden.
+  VERBOTEN: Generische Floskeln die zu JEDEM Zitat passen wuerden ("Dieses Prinzip praegt meinen Arbeitsstil grundlegend").
+  STATTDESSEN: Was bedeutet genau DIESES Zitat fuer genau DIESE Stelle? Was ist die inhaltliche Verbindung?
+  TEST: Wenn man das Zitat austauscht und der Brueckensatz trotzdem passt → er ist zu generisch. Neu schreiben.
+
+  Satz 2 — Ueberleitung zur Bewerbung:
+  Leite von der Zitat-Reflexion zur konkreten Bewerbung ueber: Warum bewirbst du dich als [Jobtitel]?
+  Optional: Anadiplose (Ende von Satz 1 = Anfang von Satz 2) — nur wenn es natuerlich klingt.
+  ❌ VERBOTEN: Saetze die mit einem Doppelpunkt enden ("Ich erkannte:") — KI-Schablone.
+
+  VARIANZ-PFLICHT AUCH HIER: Jede Zitat-Bruecke muss einzigartig sein. Keine Standardsaetze.
+- Die Bruecke darf KEINE negative Kritik an frueheren Arbeitgebern enthalten.
 - KEINE leeren Floskeln wie 'Genau diese Haltung treibt mich an'.
-- ANTI-DOPPLUNG: Der Lernkurven-Absatz und der ERSTE Satz von Absatz 2 dürfen sich INHALTLICH NICHT überschneiden.
+- ANTI-DOPPLUNG: Die Zitat-Bruecke und der ERSTE Satz von Absatz 2 duerfen sich INHALTLICH NICHT ueberschneiden.
 
 [COMPANY-BEZUG — SOURCED REFERENZ mit Unternehmensanalyse]
 Nutze IMMER eine sourced Referenz für den Firmenbezug. Die Daten für diesen Satz kommen aus der Unternehmensanalyse (Perplexity-Research), die oben im Prompt als Kontext bereitgestellt wurde.
@@ -749,7 +762,7 @@ OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
 - Anrede-Form: ${isDuForm ? 'DU-FORM (du/dein/euch/dir). Wende diese Du-Form STRIKT auf das GESAMTE Anschreiben an. Kein "Sie" oder "Ihnen" — NIEMALS.' : 'SIE-FORM (Sie/Ihr/Ihnen). Wende diese Sie-Form STRIKT auf das GESAMTE Anschreiben an.'}
 - ${t('Maximale Satzlänge: 25 Wörter. Bei komplexen Gedanken: Zwei kurze Sätze statt einem langen.', 'Maximum sentence length: 25 words. For complex thoughts: Two short sentences instead of one long one.', 'Longitud máxima por oración: 25 palabras. Para ideas complejas: Dos oraciones cortas.')}
 - ${t('Max. 2 Kommas pro Satz. Mehr Kommas = Satz aufteilen.', 'Max. 2 commas per sentence. More commas = split the sentence.')}
-- ${t('KEIN Gedankenstrich (– oder —) im Text. Nutze stattdessen Semikolon (;) oder Punkt.', 'NO em-dash (– or —) in the text. Use semicolons (;) or periods instead.', 'PROHIBIDO el guión largo (– o —). Usa punto y coma (;) o punto en su lugar.')}
+- ${t('KEIN Gedankenstrich (– oder —) im Fließtext. EINZIGE AUSNAHME: Die Zitat-Signatur-Zeile (z.B. "– Autor"). Überall sonst: Nutze Semikolon (;) oder Punkt statt Gedankenstrich.', 'NO em-dash (– or —) in body text. ONLY EXCEPTION: The quote attribution line ("– Author"). Everywhere else: Use semicolons (;) or periods instead.', 'PROHIBIDO el guión largo (– o —) en el texto. ÚNICA EXCEPCIÓN: La línea de atribución de cita. Usa punto y coma (;) o punto.')}
 - ${t('TONALITÄT: Eloquenz + Bescheidenheit. Sei zuversichtlich aber nicht abgehoben. Zeige Lernbereitschaft statt Allwissenheit. GUT: "Ich gehe zuversichtlich ran", "Ich freue mich, von Ihrer Expertise zu lernen". VERBOTEN: "Ich bringe eine solide Grundlage", "Meine Erfahrung befähigt mich".', 'TONE: Eloquence + Humility. Be confident yet grounded. Show eagerness to learn, not omniscience. GOOD: "I approach this with confidence", "I look forward to learning from your expertise". FORBIDDEN: "I bring a solid foundation", "My experience qualifies me".', 'TONO: Elocuencia + Humildad. Sé seguro pero sin arrogancia. Muestra disposición a aprender.')}
 
 === SEKTION 2: TONALITÄT & STIL (HÖCHSTE PRIORITÄT) ===
@@ -766,18 +779,61 @@ ${customStyleBlock}
 ${t(
     `ABSATZ-STRUKTUR (Standard — unabhaengig vom Schreibstil, immer gueltig):
 Einleitung: Oeffne mit einer subjektiven eigenen Beobachtung/Recherche zu ${companyName} als Anker. ICH-Perspektive — nie Firmenbeschreibung als objektive Tatsache.
-Jeder Stations-Absatz: Bezug zur Stelle oder zu ${companyName} → konkreter Beweis aus der eigenen Karriere (2-3 Saetze) → kurze Verbindung zur Zielposition.
+
+Jeder Stations-Absatz — ZWINGEND VOR DEM SCHREIBEN:
+[STATION-BRIDGING DECISION — 2-Wege-Logik]
+Evaluiere VOR jedem Stations-Brueckensatz:
+
+FRAGE: "Gibt es einen thematischen INHALTS-Ueberschnitt zwischen dem, was diese Station inhaltlich behandelt hat, und dem, womit ${companyName} sich beschaeftigt?"
+
+CASE A — JA (Inhalts-Match oder Rollen-Match, z.B. Beratung zu Beratung, Tech zu Tech):
+  Bruecke UEBER INHALT/ROLLE:
+  - "Meine Projekte zu [Stationsthema] bei [Station] decken sich direkt mit eurer Arbeit an [Firmenthema]."
+  - "Da ich bei [Station] aehnliche Fragestellungen bearbeitet habe, kenne ich die Herausforderungen bei [Firmenkontext]."
+
+CASE B — NEIN (Inhalts-Dissimilar, z.B. Quantum Computing zu AgriFood-Foerderung):
+  VERBOTEN: "[Firmenthema] erinnert mich an meine Arbeit mit [inhaltlich unverwandtem Stationsthema]"
+  PFLICHT: Bruecke UEBER UEBERTRAGBAREN SKILL:
+  Der Skill MUSS konkret und messbar sein (keine generischen Nomen wie "Kommunikation"):
+  - "Die Workshop-Moderation komplexer Themen fuer 30+ Teilnehmer, die ich bei [Station] entwickelt habe, ist direkt auf euren Ansatz zur Foerderberatung uebertragbar."
+  - "Das Methodenset aus Design Thinking und Miro, das ich bei [Station] aufgebaut habe, unterstuetzt die Arbeit an interaktiven Foerderformaten."
+  VERBOTEN: "Kommunikationskompetenz" / "analytisches Denken" ohne konkreten Beweis
+
+SELBST-CHECK (nach dem Schreiben des Brueckensatzes):
+"Wuerde ein Personaler denken: 'Ja, das macht Sinn.' oder 'Was hat das damit zu tun?'"
+Wenn letzteres: Case B anwenden und mit uebertragbarem Skill neu formulieren.
+
 Stations-Uebergaenge: Aktiv formuliert — z.B. "kann ich mit meiner Zeit bei X anknuepfen", "habe ich mich in [Aufgabe] wiedergefunden, da es zu meiner taeglichen Arbeit gehoerte", "freue ich mich, meine Erfahrung aus X einzubringen". VERBOTEN: Passiv wie "ist meine Erfahrung bei X relevant fuer". VERBOTEN: "Moechte ich mein Projekt bei X beleuchten" — invertierter Modalsatz als Aussage.
 Closing: Warm und bescheiden — kein Verkaufs-CTA. Bevorzugt: "Ich hoffe, ihr konntet einen kleinen Eindruck von mir gewinnen. Ich bin die naechsten Wochen flexibel und freue mich darauf, euch kennenzulernen."`,
     `PARAGRAPH STRUCTURE (standard — always applies regardless of writing style):
 Intro: Open with a subjective personal observation/research about ${companyName} as anchor. I-perspective — never company description as objective fact.
-Each station paragraph: Reference to the role or ${companyName} → concrete proof from own career (2-3 sentences) → brief connection to target position.
-Station transitions: Active — e.g. "I can build on my time at X", "I would like to highlight my project at X", "I look forward to bringing in my experience from X". FORBIDDEN: Passive phrasing like "my experience at X is relevant for".
-Closing: Warm and humble — no sales CTA. Preferred: "I hope this gave you a small impression of who I am. I am flexible over the coming weeks and look forward to meeting you."`,
-    `ESTRUCTURA DE PARRAFOS (estandar — aplica siempre sin importar el estilo):
-Intro: Abre con observacion personal subjetiva sobre ${companyName}. Perspectiva en primera persona.
-Transiciones: Activas — "puedo aprovechar mi tiempo en X", "me gustaria destacar mi proyecto en X". PROHIBIDO: pasivo "mi experiencia en X es relevante para".
-Cierre: Calido y humilde — sin pitch.`
+
+Each station paragraph — MANDATORY BEFORE WRITING:
+[STATION-BRIDGING DECISION — 2-Way Logic]
+Evaluate BEFORE each station bridge sentence:
+
+QUESTION: "Is there a thematic CONTENT overlap between what this station dealt with, and what ${companyName} does?"
+
+CASE A — YES (Content-Match or Role-Match, e.g. consulting to consulting, tech to tech):
+  Bridge via CONTENT/ROLE:
+  - "My projects on [station topic] at [station] align directly with your work on [company topic]."
+
+CASE B — NO (Content-Dissimilar, e.g. Quantum Computing to AgriFood promotion):
+  FORBIDDEN: "[Company topic] reminds me of my work with [unrelated station topic]"
+  REQUIRED: Bridge via TRANSFERABLE SKILL (must be concrete and measurable, not generic):
+  - "The workshop facilitation skills for 30+ participants I built at [station] are directly applicable to your interactive advisory formats."
+  FORBIDDEN: "communication skills" / "analytical thinking" without concrete proof
+
+SELF-CHECK: "Would a recruiter think 'Yes, that makes sense.' or 'What does that have to do with anything?'"
+If the latter: apply Case B and reformulate with transferable skill.
+
+Station transitions: Active — e.g. "I can build on my time at X". FORBIDDEN: Passive phrasing or inverted modal constructions.
+Closing: Warm and humble — no sales CTA.`,
+    `ESTRUCTURA DE PARRAFOS (estandar — aplica siempre):
+Intro: Observacion subjetiva personal sobre ${companyName}. Primera persona.
+Decision de puente (Case A: contenido similar — puente por contenido; Case B: disimilar — puente por habilidad transferible concreta).
+Autocomprobacion: el reclutador pensaria que tiene sentido?
+Transiciones: activas. Cierre: calido, sin pitch.`
 )}`
             : isCustomStyle && !customStyleBlock
                 // Race-Condition Fallback: User selected custom-style but style analysis is not yet ready.
@@ -810,14 +866,16 @@ STATTDESSEN — Persönliche Reflexion:
 
 [LERNKURVEN-VARIANZ — PFLICHT]
 NIE dieselbe Lernkurven-Formulierung zweimal im selben Anschreiben. Wähle EINEN aus diesem Pool und SCHLIESSE ihn zu einem vollständigen Satz ab — KEIN Doppelpunkt am Ende:
-✅ "Rückblickend wird mir klar, dass [konkreter Schluss]." — NICHT: "Rückblickend erkenne ich:"
 ✅ "Erst durch [konkretes Event] verstand ich, dass [Einsicht]."
 ✅ "Diese Erfahrung zeigte mir, dass [konkreter Schluss]."
 ✅ "Anfangs unterschätzte ich [X]; erst durch [Y] wurde klar, dass [Z]."
 ✅ "Ich lernte auf die harte Tour, dass [konkreter Schluss]."
+✅ "Gerade dieser Prozess machte deutlich, dass [konkreter Schluss]."
 REGEL: Der Lernkurven-Satz ist immer ein vollständiger Aussagesatz. Der Einblick folgt DIREKT im selben Satz — nie als eigener Satz mit Doppelpunkt.
 VERBOTEN: "Doch ich lernte schnell" — klingt nach Coaching-Template.
-VERBOTEN: Sätze die mit einem Doppelpunkt enden ("Ich erkannte:", "Rückblickend:") — das ist eine KI-Formatierungs-Schablone.`,
+VERBOTEN: Sätze die mit einem Doppelpunkt enden ("Ich erkannte:", "Rückblickend:") — das ist eine KI-Formatierungs-Schablone.
+VERBOTEN: "Rückblickend wird mir klar" / "wurde mir klar" / "wurde mir bewusst" — allwissend-Marker, global auf der Blacklist.
+BLACKLIST-OVERRIDE: Alle globalen Blacklist-Regeln gelten auch wenn der Lernkurven-Toggle aktiv ist. Der Toggle gewährt KEINE Ausnahmen von verbotenen Phrasen.`,
 `[AUTHENTICITY RULES]
 FORBIDDEN — Generic competence phrases:
 ❌ "The combination of X and Y enables me to..."
@@ -870,11 +928,42 @@ Beende Stations-Absätze NICHT mit generischen Erkenntnissätzen.
 ❌ VERBOTEN: "Das öffnete mir die Augen für..."
 ❌ VERBOTEN: "Diese Erfahrung hat mein Verständnis dafür geprägt, dass..."
 ❌ VERBOTEN: "Das hat mich gelehrt, dass..."
+❌ VERBOTEN: "können nur dann wirken, wenn..." / "funktioniert nur, wenn..." — allwissende Wenn-dann-Regeln sind hochnäsig.
 STATTDESSEN — Konkreter Schluss oder Zuversicht:
 ✅ "Daher gehe ich zuversichtlich an diese Aufgabe."
 ✅ "Deshalb freue ich mich darauf, diese Erfahrung bei ${companyName} einzubringen."
+✅ "Gerade dieser Perspektivwechsel kann für [Jobtitel] sehr hilfreich sein." (zeigt Demut + konkrete Anwendung)
 ✅ [Konkretes Ergebnis oder Zahl nennen statt abstrakte Reflexion]
 LOGIK: Der letzte Satz eines Absatzes soll dem Recruiter zeigen, was du MITBRINGST — nicht was du ERKANNT hast.
+
+[LEVEL-AWARENESS — JUNIOR/SENIOR TONALITÄT]
+Wenn der Jobtitel "Junior", "Trainee", "Werkstudent" oder "Einstiegsposition" enthält:
+→ VERBOTEN: Allwissende Erkenntnissätze die Regeln aufstellen ("Workshops wirken nur, wenn...")
+→ ERLAUBT: Lernperspektive ("Gerade dieser Perspektivwechsel kann für einen Junior Consultant hilfreich sein")
+→ ERLAUBT: Demütige Zuversicht ("Ich freue mich darauf, von eurer Expertise zu lernen")
+→ VERBOTEN: Sich als Experte positionieren, der der Firma sagt, was funktioniert und was nicht.
+
+[RHETORISCHE STILMITTEL — OPTIONALE WÜRZUNG]
+Rhetorik ist wie Salz beim Kochen: Richtig dosiert hebt es den Geschmack aller Zutaten; überdosiert ruiniert es das Gericht.
+Nutze diese Stilmittel NUR wenn sie den Lesefluss verbessern — NIEMALS erzwingen. Max. 2 Stilmittel pro Anschreiben gesamt.
+
+TRIKOLON (Dreiergruppe — optional):
+Drei parallele Glieder in einem Satz, die einen Rhythmus erzeugen.
+✅ "...wie man komplexe Konzepte analysiert, visuell verankert und in spielerische Handlungsschritte übersetzt."
+Nutze Trikolon bevorzugt bei Aufzählungen von Kompetenzen oder Tätigkeiten. Max. 1x pro Anschreiben.
+
+ASYNDETON & KLIMAX (Aufzählung ohne Bindewort — optional):
+Weglassen von "und"/"oder" beschleunigt das Lesetempo.
+✅ "Workshop-Facilitation, agile Produktentwicklung, der Aufbau interdisziplinärer Teams; das sind die Werkzeuge, die ich mitbringen kann."
+Nutze Asyndeton bevorzugt im Zusammenfassungs-Absatz. Max. 1x pro Anschreiben.
+
+[WORT-WIEDERHOLUNGS-SCHUTZ (PFLICHT)]
+Dasselbe Substantiv darf in zwei aufeinanderfolgenden Absätzen NICHT wiederholt werden.
+Häufige Fallen:
+- "Fokus" → Synonyme: "Ausrichtung", "Schwerpunkt", "Ansatz"
+- "Erfahrung" → Synonyme: "Praxis", "Arbeit", "Zeit bei [Firma]"
+- "Team" → Synonyme: "Gruppe", "Kollegium", "Mannschaft"
+Prüfe VOR dem Schreiben: Wurde das Wort bereits im vorherigen Absatz verwendet? Wenn ja → Synonym wählen.
 
 === SEKTION 3: AUFHÄNGER (KURZ & PRÄGNANT) ===
 ${introGuidance || t(
@@ -1109,7 +1198,12 @@ ${isEnglish ? '- Example: "To sum up: I bring [X] from my projects, especially [
 
 - The closing sentence AFTER the summary is SHORT and WARM. Wähle den Ton:
   BEVORZUGT (warm, bescheiden): ${isEnglish ? '"I hope this gives you a small impression of who I am. I am available over the coming weeks and would love to get to know you."' : isDuForm ? '"Ich hoffe, ihr konntet einen kleinen Eindruck von mir gewinnen. Ich bin die nächsten Wochen flexibel und freue mich darauf, euch kennenzulernen."' : '"Ich hoffe, Sie konnten einen ersten Eindruck von mir gewinnen. Ich stehe die nächsten Wochen flexibel zur Verfügung und freue mich auf ein Gespräch."'}
-  ALTERNATIV (verbindlich): ${isEnglish
+  ALTERNATIV A (persoenlich, Wellenlaenge): ${isEnglish
+    ? '"I hope this gives you a small impression of who I am. I would love to find out in a call whether we are also on the same wavelength personally."'
+    : isDuForm
+        ? '"Ich hoffe, ihr konntet einen kleinen Eindruck von mir gewinnen. Ich wuerde mich freuen, in einem Call herauszufinden, ob wir auch menschlich auf einer Wellenlaenge sind."'
+        : '"Ich hoffe, Sie konnten einen Eindruck von mir gewinnen. Ich wuerde mich freuen, in einem Gespraech herauszufinden, ob wir auch persoenlich auf einer Wellenlaenge sind."'}
+  ALTERNATIV B (verbindlich): ${isEnglish
     ? '"I would welcome the opportunity to discuss in a brief call how I could contribute to ' + companyName + '."'
     : isDuForm
         ? '"Ich würde mich freuen, in einem kurzen Gespräch zu zeigen, wie ich euch unterstützen kann."'

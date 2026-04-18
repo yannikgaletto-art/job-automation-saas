@@ -50,8 +50,9 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     ],
     'Finanzen_Banking_Investment_Controlling': [
         'finance', 'finanz', 'banking', 'investment', 'controlling', 'controller',
-        'accountant', 'buchhalter', 'wirtschaftsprüfer', 'audit', 'treasury', 'risk',
-        'analyst', 'portfolio',
+        'accountant', 'buchhalter', 'buchhaltung', 'finanzbuchhaltung', 'lohnbuchhaltung',
+        'wirtschaftsprüfer', 'steuerberater', 'audit', 'treasury', 'risk',
+        'analyst', 'portfolio', 'rechnungswesen', 'bilanz',
     ],
     'HR_People_Culture_Leadership': [
         'hr', 'human resources', 'people', 'culture', 'recruiter', 'recruiting',
@@ -169,25 +170,7 @@ function getSupabase() {
  * Priority: 1) industrySegment from Perplexity  2) job-title keyword match
  */
 function inferCategory(jobTitle: string, industrySegment?: string): string | null {
-    // Priority 1: Perplexity-provided industry segment (most reliable signal)
-    if (industrySegment) {
-        const key = industrySegment.toLowerCase().trim();
-        // Exact match first
-        if (INDUSTRY_SEGMENT_MAP[key]) {
-            console.log(`🎯 [QuoteService] Industry match: "${industrySegment}" → ${INDUSTRY_SEGMENT_MAP[key]}`);
-            return INDUSTRY_SEGMENT_MAP[key];
-        }
-        // Partial match (e.g. "Health Technology" contains "health")
-        for (const [mapKey, category] of Object.entries(INDUSTRY_SEGMENT_MAP)) {
-            if (key.includes(mapKey) || mapKey.includes(key)) {
-                console.log(`🎯 [QuoteService] Industry partial match: "${industrySegment}" → ${category}`);
-                return category;
-            }
-        }
-        console.log(`⚠️ [QuoteService] Industry segment "${industrySegment}" not in map, falling back to job-title matching`);
-    }
-
-    // Priority 2: Job-title keyword scoring
+    // Step 1: Always score the job title first — it is the most direct signal.
     const titleLower = jobTitle.toLowerCase();
     let bestCategory: string | null = null;
     let bestScore = 0;
@@ -197,6 +180,34 @@ function inferCategory(jobTitle: string, industrySegment?: string): string | nul
             if (titleLower.includes(keyword)) score++;
         }
         if (score > bestScore) { bestScore = score; bestCategory = category; }
+    }
+
+    // Step 2: If the job title has a STRONG match (≥2 keywords), trust it over industry segment.
+    // Rationale: A "Buchhalterin" at an education company should get finance quotes, not science quotes.
+    if (bestScore >= 2) {
+        console.log(`🎯 [QuoteService] Strong job-title match (score=${bestScore}): "${jobTitle}" → ${bestCategory} (overrides industry)`);
+        return bestCategory;
+    }
+
+    // Step 3: Weak or no job-title match → use industry segment as tiebreaker.
+    if (industrySegment) {
+        const key = industrySegment.toLowerCase().trim();
+        if (INDUSTRY_SEGMENT_MAP[key]) {
+            console.log(`🎯 [QuoteService] Industry match (job-title score=${bestScore}): "${industrySegment}" → ${INDUSTRY_SEGMENT_MAP[key]}`);
+            return INDUSTRY_SEGMENT_MAP[key];
+        }
+        for (const [mapKey, category] of Object.entries(INDUSTRY_SEGMENT_MAP)) {
+            if (key.includes(mapKey) || mapKey.includes(key)) {
+                console.log(`🎯 [QuoteService] Industry partial match: "${industrySegment}" → ${category}`);
+                return category;
+            }
+        }
+        console.log(`⚠️ [QuoteService] Industry segment "${industrySegment}" not in map`);
+    }
+
+    // Step 4: Weak job-title match is still better than nothing.
+    if (bestCategory) {
+        console.log(`🔍 [QuoteService] Weak job-title match (score=${bestScore}): "${jobTitle}" → ${bestCategory}`);
     }
     return bestCategory;
 }

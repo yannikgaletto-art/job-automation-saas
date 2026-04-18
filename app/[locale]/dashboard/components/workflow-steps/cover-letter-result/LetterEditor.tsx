@@ -26,8 +26,8 @@ export function LetterEditor({ letter, onLetterChange, fixingParagraphIndex }: L
 
     return (
         <div className="space-y-1.5">
-            <p className="text-[10px] text-[#A8A29E] flex items-center gap-1 select-none">
-                <Pencil className="w-2.5 h-2.5" />
+            <p className="text-[13px] text-[#002e7a] flex items-center gap-1.5 select-none font-medium">
+                <Pencil className="w-3.5 h-3.5" />
                 {t('editor_manual_hint')}
             </p>
             <div className="bg-white p-8 rounded-lg border border-[#E7E7E5] shadow-sm font-serif text-[11pt] leading-relaxed text-[#000] space-y-4">

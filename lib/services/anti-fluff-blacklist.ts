@@ -424,6 +424,57 @@ export const BLACKLIST_PATTERNS: BlacklistPattern[] = [
         category: 'ai_marker',
         feedback: 'Entferne das "Sprung von X zur Y"-Konstrukt — es ist eine erkennbare KI-Schablone. Formuliere stattdessen konkret, was du einbringen willst.',
     },
+
+    // ─── NEW: User-Feedback Blacklist (2026-04-18 — Anti-Allwissend + Authentizität) ──
+    {
+        pattern: 'echte Zusammenarbeit',
+        reason: '"Echte" ist ein leeres Adjektiv — was ist "nicht-echte" Zusammenarbeit? Konkret beschreiben.',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'echte Wirkung',
+        reason: '"Echte" vor abstrakten Nomen ist substanzlos — stattdessen konkretes Ergebnis nennen.',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'können nur dann wirken, wenn',
+        reason: 'Allwissende Wenn-dann-Wahrheit — klingt belehrend und hochnäsig, besonders bei Junior-Positionen.',
+        category: 'ai_marker',
+        feedback: 'Entferne die allwissende Erkenntnis. Stattdessen: konkretes Ergebnis oder Zuversicht.',
+    },
+    {
+        pattern: 'funktioniert nur, wenn',
+        reason: 'Allwissende Wenn-dann-Wahrheit — der Bewerber stellt keine Regeln auf.',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'Raum für echte',
+        reason: 'Kombination aus allwissendem Framing + leerem "echte" — doppelt verboten.',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'schärfte meinen Blick dafür',
+        reason: 'Generischer Erkenntnissatz — klingt allwissend und ist austauschbar. Absätze enden mit konkretem Ergebnis oder Zuversicht, nicht mit abstrakten Reflexionen.',
+        category: 'ai_marker',
+        feedback: 'Beende den Absatz mit einem konkreten Ergebnis oder einer zuversichtlichen Aussage, nicht mit einer abstrakten Erkenntnis.',
+    },
+    {
+        pattern: 'hat mich ein Gedanke begleitet',
+        reason: 'KI-Schablone — wird in jedem Anschreiben identisch generiert. Einleitungen müssen einzigartig formuliert sein.',
+        category: 'ai_marker',
+        feedback: 'Formuliere den Übergang zum Zitat natürlicher und einzigartig — z.B. "ist mir aufgefallen", "erinnerte ich mich", "kam mir ein Gedanke".',
+    },
+    {
+        pattern: 'Dieses Prinzip prägt meinen Arbeitsstil grundlegend',
+        reason: 'KI-Schablone — identische Zitat-Brücke in jedem Anschreiben. Die Brücke muss den KONKRETEN Zitat-Inhalt aufgreifen.',
+        category: 'ai_marker',
+        feedback: 'Verbinde den konkreten Gedanken des Zitats mit der Stelle — nicht mit einer generischen "Arbeitsstil"-Floskel.',
+    },
+    {
+        pattern: 'Genau dieses Denken begleitet mich',
+        reason: 'KI-Schablone — Template-Formulierung für Zitat-Brücken.',
+        category: 'ai_marker',
+    },
 ];
 
 export interface FluffScanResult {

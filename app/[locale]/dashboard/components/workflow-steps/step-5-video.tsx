@@ -521,39 +521,67 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
             ? new Date(expiresAt).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
             : null;
         const previewHref = accessToken ? `/v/${accessToken}` : null;
+        const fullPreviewUrl = accessToken ? `https://app.path-ly.eu/v/${accessToken}` : null;
 
         return (
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-8 bg-white border border-gray-200 rounded-xl max-w-md mx-auto text-center space-y-5"
+                className="p-8 bg-white border border-gray-200 rounded-xl max-w-md mx-auto space-y-5"
             >
-                <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto">
-                    <CheckCircle2 className="w-7 h-7 text-green-600" />
-                </div>
-                <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('done_title')}</h3>
-                    <p className="text-sm text-gray-500">
-                        {t('done_description')}
-                    </p>
-                    {expiryFormatted && (
-                        <p className="text-xs text-gray-400 mt-2">
-                            {t('done_expiry', { date: expiryFormatted })}
+                {/* Success header */}
+                <div className="text-center space-y-3">
+                    <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto">
+                        <CheckCircle2 className="w-7 h-7 text-green-600" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('done_title')}</h3>
+                        <p className="text-sm text-gray-500 leading-relaxed">
+                            {t('done_description')}
                         </p>
-                    )}
+                    </div>
+
+                    {/* LIVE badge — explicit "bereit für Recruiter" */}
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
+                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                        <span className="text-xs font-semibold text-green-700">Video ist LIVE — Recruiter können es jetzt ansehen</span>
+                    </div>
                 </div>
 
-                {/* Preview link — opens public video page in new tab */}
+                {/* Preview link box */}
                 {previewHref && (
-                    <a
-                        href={previewHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white text-sm font-medium rounded-lg transition"
-                    >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        {t('done_preview_link')}
-                    </a>
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2">
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Vorschau-Link für Recruiter</p>
+                        <div className="flex items-center gap-2">
+                            <code className="flex-1 text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-1.5 truncate">
+                                {fullPreviewUrl}
+                            </code>
+                            <a
+                                href={previewHref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white text-xs font-medium rounded-lg transition shrink-0"
+                            >
+                                <ExternalLink className="w-3 h-3" />
+                                {t('done_preview_link')}
+                            </a>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                            Dieser Link ist identisch mit dem QR-Code auf deinem Lebenslauf.
+                        </p>
+                    </div>
+                )}
+
+                {/* 14-day deletion notice */}
+                {expiryFormatted && (
+                    <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2.5">
+                        <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-xs text-amber-700">
+                            <span className="font-semibold">Automatische Löschung:</span> {t('done_expiry', { date: expiryFormatted })}. Das Video wird dann unwiderruflich gelöscht.
+                        </p>
+                    </div>
                 )}
 
                 {/* Action Buttons */}
@@ -614,6 +642,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
             </motion.div>
         );
     }
+
 
     // Error fallback
     return (
