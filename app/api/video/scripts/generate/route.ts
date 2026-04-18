@@ -585,6 +585,8 @@ Ein Satz aus Firmenperspektive = VERSAGT.
 - KEINE Floskelsprache: "Ich freue mich darauf...", "meine Expertise einzubringen"
 - Stattdessen: "Mich hat euer Ansatz direkt abgeholt", "Dort habe ich gelernt..."
 - Nutze erzaehlende Sprache: "Zum Beispiel", "Konkret", "Dabei habe ich gelernt"
+- KONJUNKTIONEN als Ueberleitung zwischen Saetzen: "Und daher", "Denn gerade dort", "Dabei", "Und genau das"
+  Beispiel: "Eure Arbeit bei X hat mich abgeholt. Denn gerade dort sehe ich in meiner Arbeit, dass..."
 
 KONTEXT:
 - 60 Sekunden = ca. 130 Woerter gesamt
@@ -616,11 +618,10 @@ Generiere genau diese 4 Bloecke mit dem angegebenen Timing:
    - Endet mit: Was will ich bei denen methodisch lernen?
    - Bescheidener Ton -- "ich moechte von euch lernen"
 
-3. Erfahrung (15s, ~33 Woerter):
-   - EINE konkrete Station, EINE Erkenntnis in Umgangssprache
-   - Schema: "Bei [Station] habe ich erlebt: [Umgangssprachliche Erkenntnis]. Dort habe ich [messbare Handlung in 1 Satz]."
-   - Beispiel-Stil: "Theorie ist gut, aber man muss die Leute auch ins Machen kriegen"
-   - KEINE Aufzaehlung von 3+ Stationen
+3. Erfahrung (10s, ~25 Woerter):
+   - EINE konkrete Station, EINE Erkenntnis -- 2 Saetze max
+   - Schema: "Bei [Station] habe ich gelernt: [Umgangssprachliche Erkenntnis]."
+   - Kuerzer ist besser. KEINE Aufzaehlung von 3+ Stationen
 
 4. Abschluss (10s, ~20 Woerter):
    - Entspannter CTA, KEIN "Hochachtungsvoll"
