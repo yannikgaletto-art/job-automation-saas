@@ -33,8 +33,9 @@ type CategoryMap = Record<string, string[]>; // categoryName → [documentId, ..
 
 const STORAGE_KEY = 'pathly_cl_categories';
 const COLLAPSED_KEY = 'pathly_cl_collapsed';
-const CV_HINT_DISMISSED_KEY = 'pathly_cv_hint_dismissed';
-const CL_HINT_DISMISSED_KEY = 'pathly_cl_hint_dismissed';
+// ✅ User-scoped keys — prevents one account's dismissed state leaking to another account on same browser
+const cvHintKey = (uid: string) => `pathly_cv_hint_dismissed_${uid}`;
+const clHintKey = (uid: string) => `pathly_cl_hint_dismissed_${uid}`;
 
 function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("de-DE", {
@@ -79,6 +80,8 @@ export function ActiveCVCard() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const returnTo = searchParams.get('returnTo');
+    // ✅ User ID for scoped localStorage keys — loaded async, empty string until resolved
+    const [userId, setUserId] = useState<string>('');
 
     // Category state
     const [categories, setCategories] = useState<CategoryMap>({});
@@ -101,10 +104,19 @@ export function ActiveCVCard() {
     const clHintSeenRef = useRef(false); // true once popup has been shown this session
 
     useEffect(() => {
-        try {
-            cvHintDismissedRef.current = localStorage.getItem(CV_HINT_DISMISSED_KEY) === 'true';
-            clHintDismissedRef.current = localStorage.getItem(CL_HINT_DISMISSED_KEY) === 'true';
-        } catch {}
+        // Load user ID first, then read user-scoped dismissed flags
+        import('@/lib/supabase/client').then(({ createClient }) => {
+            const supabase = createClient();
+            supabase.auth.getUser().then(({ data }) => {
+                const uid = data.user?.id ?? '';
+                setUserId(uid);
+                if (!uid) return;
+                try {
+                    cvHintDismissedRef.current = localStorage.getItem(cvHintKey(uid)) === 'true';
+                    clHintDismissedRef.current = localStorage.getItem(clHintKey(uid)) === 'true';
+                } catch {}
+            });
+        });
     }, []);
 
     const handleCvUploadClick = () => {
@@ -129,7 +141,7 @@ export function ActiveCVCard() {
     const handleCvHintDismissForever = () => {
         if (isDismissing) return; // prevent double-click
         setIsDismissing(true);
-        try { localStorage.setItem(CV_HINT_DISMISSED_KEY, 'true'); } catch {}
+        try { if (userId) localStorage.setItem(cvHintKey(userId), 'true'); } catch {}
         cvHintDismissedRef.current = true;
         const pending = pendingCvFile;
         setPendingCvFile(null);
@@ -179,7 +191,7 @@ export function ActiveCVCard() {
     const handleClHintDismissForever = () => {
         if (isClDismissing) return;
         setIsClDismissing(true);
-        try { localStorage.setItem(CL_HINT_DISMISSED_KEY, 'true'); } catch {}
+        try { if (userId) localStorage.setItem(clHintKey(userId), 'true'); } catch {}
         clHintDismissedRef.current = true;
         const pending = pendingClFile;
         setPendingClFile(null);

@@ -13,7 +13,7 @@ import { useTranslations } from 'next-intl';
 const TOUR_KEYS = [
     'pathly_tour_completed_goals',
     'pathly_tour_completed_job-queue',
-    // Upload hint popups — cleared here so user can see them again
+    // Legacy global hint keys (for browsers that dismissed before user-scoping was added)
     'pathly_cv_hint_dismissed',
     'pathly_cl_hint_dismissed',
     // Future tabs: 'pathly_tour_completed_coaching', 'pathly_tour_completed_job-search'
@@ -23,8 +23,22 @@ export function TourResetCard() {
     const [done, setDone] = useState(false);
     const t = useTranslations('settings');
 
-    function handleReset() {
+    async function handleReset() {
+        // Clear global keys (legacy + tours)
         TOUR_KEYS.forEach((key) => localStorage.removeItem(key));
+
+        // Clear user-scoped hint keys
+        try {
+            const { createClient } = await import('@/lib/supabase/client');
+            const supabase = createClient();
+            const { data } = await supabase.auth.getUser();
+            const uid = data.user?.id;
+            if (uid) {
+                localStorage.removeItem(`pathly_cv_hint_dismissed_${uid}`);
+                localStorage.removeItem(`pathly_cl_hint_dismissed_${uid}`);
+            }
+        } catch { /* non-blocking */ }
+
         setDone(true);
         // Reset done-state after 3s so the button is usable again
         setTimeout(() => setDone(false), 3000);
