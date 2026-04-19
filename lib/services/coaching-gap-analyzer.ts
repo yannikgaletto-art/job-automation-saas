@@ -27,7 +27,7 @@ function getClient(): Anthropic {
     return coachingClient;
 }
 
-const COACHING_MODEL = 'claude-sonnet-4-5-20250929';
+const COACHING_MODEL = 'claude-sonnet-4-6';
 
 interface JobData {
     jobTitle: string;

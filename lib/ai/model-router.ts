@@ -22,7 +22,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 export const MODELS = {
     CLAUDE_SONNET: {
-        id: 'claude-sonnet-4-5-20250929',
+        id: 'claude-sonnet-4-6',
         provider: 'anthropic' as const,
         cost_input_per_1m: 3.0,
         cost_output_per_1m: 15.0,
