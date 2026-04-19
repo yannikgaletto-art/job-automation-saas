@@ -20,7 +20,7 @@ export interface HiringPersona {
     name: string;            // z.B. "Anna-Nicole W." oder "Unbekannt"
     role: string;            // z.B. "People Lead @ Mission Wertvoll"
     traits: string[];        // z.B. ["Werteorientiert", "Empathisch"]
-    preferredStyle: 'storytelling' | 'data-driven' | 'formal' | 'philosophisch';
+    preferredStyle: 'storytelling' | 'data-driven' | 'formal';
     confidence: number;      // 0-1: Wie sicher ist die Persona-Ableitung?
 }
 
@@ -60,7 +60,7 @@ Output als JSON:
       "name": "Name oder Archetyp-Bezeichnung",
       "role": "Rolle @ Firma",
       "traits": ["Eigenschaft 1", "Eigenschaft 2", "Eigenschaft 3"],
-      "preferredStyle": "storytelling" | "data-driven" | "formal" | "philosophisch",
+      "preferredStyle": "storytelling" | "data-driven" | "formal",
       "confidence": 0.0-1.0
     }
   ]
@@ -88,7 +88,7 @@ Maximal 3 Personas. confidence = 0.0 wenn Archetyp, > 0.5 wenn reale Person iden
             name: (p.name as string) || 'Unbekannt',
             role: (p.role as string) || '',
             traits: (p.traits as string[]) || [],
-            preferredStyle: (['storytelling', 'data-driven', 'formal', 'philosophisch'].includes(p.preferredStyle as string)
+            preferredStyle: (['storytelling', 'data-driven', 'formal'].includes(p.preferredStyle as string)
                 ? p.preferredStyle
                 : 'formal') as HiringPersona['preferredStyle'],
             confidence: typeof p.confidence === 'number' ? Math.min(1, Math.max(0, p.confidence)) : 0,

@@ -558,15 +558,47 @@ export function scanForFluff(text: string): FluffScanResult {
 }
 
 /**
- * Generate a prompt section listing all forbidden patterns.
- * Used in buildSystemPrompt() to instruct Claude during generation.
+ * T1-Tier Patterns — Claude generates these with >50% probability when not explicitly forbidden.
+ * Empirically validated from production cover letter outputs.
+ * WHY only these: The full 74-pattern list consumed ~888 tokens.
+ * The remaining patterns are caught by scanForFluff() (post-gen) and buildJudgeBlacklistSection() (judge).
  */
-export function buildBlacklistPromptSection(): string {
+const T1_TIER_PATTERNS: string[] = [
+    'wurde mir klar',
+    'wurde mir bewusst',
+    'wurde mir jedoch klar',
+    'Ich bin überzeugt, dass',
+    'bildet eine solide Grundlage',
+    'Die Kombination aus',
+    'Diese Kombination aus',
+    'stehen und fallen',
+    'echten Mehrwert',
+    'echter Mehrwert',
+    'nicht als isoliertes Thema, sondern als',
+    'Doch ich lernte schnell',
+    'schnell den Sprung',
+    'hat mich ein Gedanke begleitet',
+];
+
+/**
+ * Lean prompt section — T1-tier patterns only, no reasons (~120 tokens vs ~888).
+ * Used in buildSystemPrompt() for generation-time blacklist.
+ * Full scan remains in scanForFluff() (post-gen) and buildJudgeBlacklistSection() (judge).
+ */
+export function buildLeanBlacklistSection(): string {
     return `VERBOTENE PHRASEN (HARD RULES — niemals verwenden):
-${BLACKLIST_PATTERNS.map(p => `- "${p.pattern}" (${p.reason})`).join('\n')}
+${T1_TIER_PATTERNS.map(p => `- "${p}"`).join('\n')}
 - Sätze über 30 Wörter ohne Komma
 - Sätze die bei einem Leser den Gedanken auslösen: "Das hat ChatGPT geschrieben"
 - Aussagen die für jede Firma 1:1 kopierbar wären`;
+}
+
+/**
+ * @deprecated Use buildLeanBlacklistSection() — full pattern list is wasteful in system prompt.
+ * Kept for backward compatibility with tests.
+ */
+export function buildBlacklistPromptSection(): string {
+    return buildLeanBlacklistSection();
 }
 
 /**

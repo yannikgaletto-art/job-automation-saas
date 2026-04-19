@@ -35,7 +35,7 @@ nach dem Upload von Referenz-Anschreiben.
 **Extrahierte Style-Marker (Pflicht):**
 ```typescript
 interface StyleAnalysis {
-  tone: 'professional' | 'storytelling' | 'data-driven' | 'philosophical';
+  tone: 'professional' | 'storytelling' | 'data-driven';
   sentence_length: 'short' | 'medium' | 'long'; // avg Wörter
   conjunctions: string[];     // Top-5: ["Daher", "Deshalb", "Zudem"...]
   greeting: string;           // z.B. "Liebe Anna-Nicole" / "Sehr geehrte..."
@@ -135,7 +135,6 @@ Beispiel aus T2: *"Ehrlich gesagt war ich davon früher kein Fan, weil...
 | Storytelling | Narrativer Einstieg, Dramaturgie-Bogen | Persönliche Anekdote als Opening, Spannungsbogen |
 | Daten-getrieben | Struktur: Claim → Beweis → Implikation | Zahlen/Metriken in jedem Absatz verpflichtend |
 | Formal | Klassisch: Einleitung → Hauptteil → Schluss | Kein "Ihr/Du", keine Zitate, kein Ping-Pong |
-| Philosophisch | Zitat-Einstieg, konzeptionelle Ebene | Intellektueller Rahmen, Referenzen erlaubt |
 
 ---
 
@@ -158,10 +157,14 @@ if (jobData.contact_person) {
 ## 🟡 BATCH 2 — Die Qualitäts-Pipeline
 *Voraussetzung: Batch 1 vollständig und stabil.*
 
-### B2.1 — Drei-Agenten-Pipeline
-**Architektur:**
+### B2.1 — ~~Drei-Agenten-Pipeline~~ [DEPRECATED seit 2026-04-09]
+
+> **Status:** Entfernt — Multi-Agent Pipeline (Haiku overwriting Sonnet) verursachte Qualitätsregression.
+> **Aktuell:** Sync-Loop: Claude Sonnet Generation → Haiku Judge (Pass/Fail) → ggf. Re-Generation mit Feedback.
+
+~~**Architektur:**~~
 ```
-Agent 1: Claude Sonnet → Erster Entwurf (User-Stil + Company-Intel)
+~~Agent 1: Claude Sonnet → Erster Entwurf (User-Stil + Company-Intel)~~
     ↓
 Agent 2: GPT-4o (Language Judge) → Anti-Fluff, Satz-Rhythmus, KI-Detektion
     ↓
@@ -263,15 +266,13 @@ Nur ausgewählte Stationen werden im Generator verwendet.
 
 ---
 
-### B2.4 — Kill the Fluff Button
-**Platzierung:** Im Editor nach der Generierung, rechts unten.
+### B2.4 — Kill the Fluff ~~Button~~ → Scan-Only
+**Status:** Degradiert zu automatischem Post-Generation Scan (`scanForFluff()`).
 **Mechanik:**
-1. User klickt "Kill the Fluff"
-2. GPT-4o scannt Text auf Blacklist + Kalenderspruch-Muster
-3. Erkannte Phrasen werden rot unterkringelt + Erklärung (Tooltip)
-4. Button: "Alle entfernen" → GPT-4o ersetzt durch konkrete, belegbare Aussagen
-5. Optional: User kann einzelne Phrasen manuell reviewen
-**Kosten:** ~$0.003 pro Klick (on-demand, nicht automatisch)
+1. Nach jeder Generation: Regex-Scan auf 74+ Blacklist-Patterns
+2. Bei Fund: Feedback wird in den Sync-Loop injiziert → automatische Korrektur in Iteration 2
+3. Kein separater AI-Call mehr (GPT-4o entfernt)
+**Kosten:** $0 (reiner Regex-Scan, kein API-Call)
 
 ---
 
@@ -416,7 +417,7 @@ Zusätzlich zu Gates A–K aus SICHERHEITSARCHITEKTUR.md und FEATURE_IMPACT_ANAL
 - [ ] **Gate CL-5** — Nur gewählte Stationen werden erwähnt
 - [ ] **Gate CL-6** — Gewählte News ist organisch integriert (wenn gewählt)
 - [ ] **Gate CL-7** — Auto-Save: CL in DB mit status='draft' gespeichert
-- [ ] **Gate CL-8** — Perplexity hat alle Firmenreferenzen verifiziert (Batch 2)
+- [ ] **Gate CL-8** — ~~Perplexity hat alle Firmenreferenzen verifiziert~~ [DEPRECATED — nie implementiert]
 - [ ] **Gate CL-9** — X-Ray Annotations vollständig (Batch 3)
 
 ---
@@ -425,15 +426,15 @@ Zusätzlich zu Gates A–K aus SICHERHEITSARCHITEKTUR.md und FEATURE_IMPACT_ANAL
 
 | Batch | Komponente | Kosten/CL |
 |---|---|---|
-| 1 | Claude Sonnet (Generierung) | ~$0.015 |
-| 1 | Style Analysis (Haiku, einmalig) | ~$0.0005 |
-| 2 | GPT-4o Language Judge | ~$0.008 |
-| 2 | Perplexity Fact Checker | ~$0.006 |
-| 2 | Kill the Fluff (on-demand) | ~$0.003 |
-| **Gesamt Batch 1** | | **~$0.016** |
-| **Gesamt Batch 1+2** | | **~$0.030** |
+| 1 | Claude Sonnet 4.5 (Generierung, 1-2 Iterationen) | ~$0.025-0.050 |
+| 1 | Style Analysis (Haiku, einmalig pro Dokument) | ~$0.0005 |
+| 1 | Haiku Judge (Pass/Fail, pro Iteration) | ~$0.003 |
+| 1 | scanForFluff() (Post-Gen Regex) | $0 |
+| ~~2~~ | ~~GPT-4o Language Judge~~ | ~~DEPRECATED~~ |
+| ~~2~~ | ~~Perplexity Fact Checker~~ | ~~DEPRECATED~~ |
+| **Gesamt (aktuell)** | | **~$0.028-0.053** |
 
-**Akzeptabel:** Batch 1+2 zusammen < $0.05 pro CL ist vertretbar für die Qualität.
+**Akzeptabel:** Pro CL unter $0.06 bei 2 Iterationen.
 
 ---
 
@@ -476,7 +477,7 @@ Diese 8 "Golden Rules" wurden aus direkten Trainingssessions destilliert. Sie de
 | M | **Logische Kohärenz** | Firmenbrücke + Station müssen thematisch zusammenpassen. *"EYs Fokus auf Nachhaltigkeit erinnert mich an meine Zeit als Co-Founder der Nachhaltigkeitsstrategie."* | *"EYs Fokus auf Nachhaltigkeit erinnert mich an meine Arbeit im Vertrieb."* (kein logischer Bezug) |
 | N | **Eloquenz + Bescheidenheit** | *"Daher gehe ich zuversichtlich ran."*, *"Ich freue mich, von Ihrer Expertise zu lernen."* | *"Ich bringe eine solide Grundlage mit."*, *"Meine Erfahrung befähigt mich."* (anmaßend) |
 
-**Klammer-Technik (Optional):** Bei `storytelling` oder `philosophisch` Presets darf im Closing kurz auf den Eingangs-Gedanken (z.B. ein Zitat) zurückgegriffen werden.
+**Klammer-Technik (Optional):** Bei `storytelling` Preset darf im Closing kurz auf den Eingangs-Gedanken (z.B. ein Zitat) zurückgegriffen werden.
 
 **Format-Regeln (Update 2026-04-06):**
 - Maximale Satzlänge: 25 Wörter (Target). Claude überschreitet Fast-Targets systematisch um 10-15%, daher 25 statt 30.

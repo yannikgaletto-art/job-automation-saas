@@ -79,7 +79,7 @@ const tests: TestCase[] = [
     },
     {
         name: '4. Quote + Hook + Philosophisch',
-        ctx: makeCtx({ selectedQuote: quote, introFocus: 'quote', tone: baseTone('philosophisch') }),
+        ctx: makeCtx({ selectedQuote: quote, introFocus: 'quote', tone: baseTone('storytelling') }),
         checks: [
             { label: 'Quote in intro', test: p => p.includes('ZITAT-BRIDGING') },
             { label: 'Hook in body', test: p => p.includes('ABSATZ 2') },
@@ -91,7 +91,7 @@ const tests: TestCase[] = [
     },
     {
         name: '5. Quote + Philosophisch (no hook)',
-        ctx: makeCtx({ selectedQuote: quote, selectedHook: { ...hook, content: '' }, tone: baseTone('philosophisch') }),
+        ctx: makeCtx({ selectedQuote: quote, selectedHook: { ...hook, content: '' }, tone: baseTone('storytelling') }),
         checks: [
             { label: 'Quote in intro', test: p => p.includes(quote.quote) },
             { label: 'No hookBody block', test: p => !p.includes('ABSATZ 2') },
@@ -100,7 +100,7 @@ const tests: TestCase[] = [
     },
     {
         name: '6. Hook + Philosophisch (no quote)',
-        ctx: makeCtx({ selectedQuote: undefined, tone: baseTone('philosophisch') }),
+        ctx: makeCtx({ selectedQuote: undefined, tone: baseTone('storytelling') }),
         checks: [
             { label: 'Hook in intro', test: p => p.includes('Unternehmens-Fakt') },
             { label: 'No quote block', test: p => !p.includes('ZITAT-BRIDGING') },
@@ -150,7 +150,7 @@ const tests: TestCase[] = [
     },
     {
         name: '11. Ping-Pong + Philosophisch (guard check)',
-        ctx: makeCtx({ selectedQuote: quote, introFocus: 'quote', tone: baseTone('philosophisch'), optInModules: { ...DEFAULT_OPT_IN_MODULES, pingPong: true } }),
+        ctx: makeCtx({ selectedQuote: quote, introFocus: 'quote', tone: baseTone('storytelling'), optInModules: { ...DEFAULT_OPT_IN_MODULES, pingPong: true } }),
         checks: [
             { label: 'PING-PONG block present', test: p => p.includes('PING-PONG EINLEITUNG') },
             { label: 'Philosophisch guard still defers (no competing format)', test: p => p.includes('Sektion 3 (Aufhänger) gesteuert') },

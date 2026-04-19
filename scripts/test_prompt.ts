@@ -48,7 +48,7 @@ export const ctx: CoverLetterSetupContext = {
         }
     ],
     tone: {
-        preset: 'philosophisch',
+        preset: 'storytelling',
         toneSource: 'preset',
         targetLanguage: 'de',
         hasStyleSample: false,

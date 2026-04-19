@@ -15,7 +15,7 @@
 import { z } from 'zod';
 
 // ─── Tone preset ──────────────────────────────────────────────────────────────
-const TonePresetSchema = z.enum(['formal', 'storytelling', 'data-driven', 'philosophisch'])
+const TonePresetSchema = z.enum(['formal', 'storytelling', 'data-driven'])
     .default('formal');
 
 const TargetLanguageSchema = z.enum(['de', 'en', 'es']).default('de');

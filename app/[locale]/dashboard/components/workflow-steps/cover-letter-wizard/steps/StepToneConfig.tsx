@@ -29,7 +29,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const { setTone, setOptInModule, isStepComplete, tone, optInModules } = useCoverLetterSetupStore();
 
     const toneOptions = useMemo(() => toneOptionIds.map(id => {
-        const key = id.replace(/-/g, '_') as 'tone_data_driven' | 'tone_storytelling' | 'tone_formal' | 'tone_philosophisch';
+        const key = id.replace(/-/g, '_') as 'tone_data_driven' | 'tone_storytelling' | 'tone_formal';
         return {
             id,
             label: t(`tone_${key}` as typeof key),

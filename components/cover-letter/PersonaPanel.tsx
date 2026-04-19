@@ -64,7 +64,6 @@ export function PersonaPanel({
         'storytelling': 'Narrativ',
         'data-driven': 'Datengetrieben',
         'formal': 'Klassisch',
-        'philosophisch': 'Intellektuell',
     }
 
     return (

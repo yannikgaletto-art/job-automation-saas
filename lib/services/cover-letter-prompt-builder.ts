@@ -7,7 +7,7 @@
 
 import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import type { StyleAnalysis } from './writing-style-analyzer';
-import { buildBlacklistPromptSection } from './anti-fluff-blacklist';
+import { buildLeanBlacklistSection } from './anti-fluff-blacklist';
 import { DEFAULT_OPT_IN_MODULES } from '@/types/cover-letter-setup';
 import type { HiringPersona } from './hiring-manager-resolver';
 
@@ -328,55 +328,26 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
   → ROTER FADEN (PFLICHT für JEDEN Stations-Absatz):
     Beginne JEDEN Stations-Absatz mit einer Verknüpfung, die dem Recruiter erklärt WARUM diese Erfahrung relevant ist.
 
-    §POSITIONSBASIERTE OPENER (waehle passend zur Position, nie denselben zweimal):
+    §STATIONS-OPENER (waehle fuer JEDEN Absatz EINE andere Variante — nie dieselbe zweimal):
 
-    PFLICHT-MUSTER — AUFGABEN-FRAGMENTE ZITIEREN:
-    Wenn Kernaufgaben aus der Stelle extrahiert wurden (siehe STELLEN-ANFORDERUNGEN unten),
-    zitiere ein KURZES FRAGMENT (2-5 Woerter) aus der Stellenanzeige in „...“ als Bruecke:
+    Wenn Kernaufgaben extrahiert wurden, zitiere ein KURZES FRAGMENT (2-5 Woerter) in Anfuehrungszeichen als Bruecke.
+    HALLUZINATIONS-SCHUTZ: Max. 5 Woerter, NUR Arbeitsthemen (nicht Teamstrukturen/Organisationsformen). Unsicher? Paraphrasiere OHNE Anfuehrungszeichen.
 
-    ⛔ HALLUZINATIONS-SCHUTZ (KRITISCH — VOR JEDEM ZITAT PRUEFEN):
-    - Zitiere NUR Woerter die EXAKT SO in den KERNAUFGABEN oder STELLEN-ANFORDERUNGEN stehen.
-    - MAXIMAL 5 Woerter in einem Zitat-Fragment. NIEMALS einen ganzen Satz zitieren!
-    - Das Fragment MUSS ein ARBEITSTHEMA beschreiben (WORAN gearbeitet wird).
-    - VERBOTEN als Zitat: Teamstrukturen, Organisationsformen, Prozessbeschreibungen.
-      ✅ RICHTIGE Fragmente (Themen): „strategische Roadmap“, „umsetzungsorientierte Loesungen“, „komplexe Fragestellungen“
-      ❌ FALSCHE Fragmente: „in fachuebergreifenden Teams“ (Organisationsform, kein Thema),
-        „auf Augenhoehe mit dem Top-Management“ (Interaktionsform), „entlang der Wertschoepfungskette“ (Prozess)
-    - VERBOTEN: Ganze Saetze paraphrasieren und als „Zitat“ ausgeben.
-      ❌ FALSCH: „Sie entwickeln praxisnahe Loesungen in fachuebergreifenden Teams“
-      ✅ RICHTIG: „umsetzungsorientierte Loesungen“
-    - Wenn du dir NICHT sicher bist ob das Fragment exakt so vorkommt: Paraphrasiere OHNE Anfuehrungszeichen.
+    VARIANTEN-POOL (waehle passend zum Inhalt, nie nach Position):
+    A) \"„[2-5 Woerter Kernaufgabe]", genau an diesem Thema habe ich bei [Firma] gearbeitet.\"
+    B) \"Zudem habe ich mich in der „[2-5 Woerter]" wiedergefunden, da es zu meiner Arbeit bei [Firma] gehoerte.\"
+    C) \"Auch in meiner Rolle bei [Firma] habe ich „[2-5 Woerter]" direkt umgesetzt.\"
+    D) \"Ebenso zeigte mir meine Zeit bei [Firma], dass [konkreter Inhalt zur Job-Anforderung].\"
+    E) \"Was ich noch einbringen kann, ist meine Erfahrung bei [Firma] im Bereich [konkretes Thema].\"
+    F) \"Da ${isDuForm ? 'eure' : 'Ihre'} Ausschreibung [Thema] betont, kann ich mit meiner Zeit bei [Firma] anknuepfen, wo ich [konkretes Achievement].\"
 
-    → ERSTER Stations-Absatz:
-      - \"„[2-5 Woerter Kernaufgabe]“, genau an diesem Thema habe ich bei [Firma] taeglich gearbeitet.\"
-      - \"Zudem habe ich mich in der „[2-5 Woerter Aufgabe]“ sehr wiedergefunden, da es zu meiner taeglichen Arbeit bei [Firma] gehoerte.\"
-    → ZWEITER Stations-Absatz:
-      - \"Zudem habe ich bei [Firma] genau das gemacht, was ${isDuForm ? 'ihr' : 'Sie'} mit „[2-5 Woerter]“ ${isDuForm ? 'beschreibt' : 'beschreiben'}.\"
-      - \"Ebenso zeigte mir meine Zeit bei [Firma], dass [konkreter Inhalt zur Job-Anforderung].\"
-      - \"Auch in meiner Rolle bei [Firma] habe ich „[2-5 Woerter]“ direkt umgesetzt.\"
-      ❌ VERBOTEN: \"Zudem kann ich mit meiner Zeit bei [Firma] anknuepfen.\" alleine — IMMER ein \"da/weil/was\" mit konkretem Inhalt anhaengen.
-    → LETZTER Stations-Absatz (wenn 3+ Stationen):
-      - \"Schliesslich moechte ich auch meine Erfahrung bei [Firma] erwaehnen.\"
-      - \"Was ich noch einbringen kann, ist meine Erfahrung bei [Firma].\"
-      - \"Abschliessend zeigt meine Zeit bei [Firma]...\"
-      ❌ VERBOTEN fuer letzten Block: \"Als ich die Stellenbeschreibung las...\" — das ist ein Intro-Opener.
+    VERBOTEN: \"Zudem kann ich mit meiner Zeit bei [Firma] anknuepfen.\" alleine — IMMER \"da/weil/was\" mit konkretem Inhalt.
+    VERBOTEN: \"Weil ${isDuForm ? 'ihr jemanden sucht' : 'Sie jemanden suchen'}\" / \"Da ${isDuForm ? 'ihr' : 'Sie'} jemanden ${isDuForm ? 'sucht' : 'suchen'}, der...\" — Meta-Formulierung.
+    VERBOTEN: \"Moechte ich...\"/\"Kann ich hier anmerken...\"/\"Darf ich erwaehnen...\" als Satzanfang.
+    VERBOTEN: \"Als ich die Stellenbeschreibung las, fielen mir Parallelen zu...\" — generisch.
+    VERBOTEN: Stations-Absatz mit \"Bei [Firma] habe ich...\" starten OHNE Bezug zum WARUM.
 
-    FALLBACK (wenn KEINE Kernaufgaben extrahiert wurden):
-      - "Da ${isDuForm ? 'eure' : 'Ihre'} Ausschreibung besonders [Thema] betont, kann ich mit meiner Zeit bei [Firma] anknuepfen."
-
-    ❌ ABSOLUTE VERBOTE fuer Station-Opener:
-    - "Weil ${isDuForm ? 'ihr jemanden sucht' : 'Sie jemanden suchen'}" — Meta-Formulierung. Zitiere stattdessen die KONKRETE AUFGABE.
-    - "Da ${isDuForm ? 'ihr' : 'Sie'} jemanden ${isDuForm ? 'sucht' : 'suchen'}, der..." — ebenfalls Meta, nicht Aufgaben-spezifisch.
-    - "Moechte ich mein Projekt bei [Firma] beleuchten" — grammatikalisch falscher Aussagesatz.
-    - "Moechte ich..."/"Kann ich hier anmerken..."/"Darf ich erwaehnen..." als Satzanfang — invertierte Modalsaetze sind als Aussagesatz verboten.
-    - "Als ich die Stellenbeschreibung las, fielen mir Parallelen zu..." — generisch, kein CV-Bezug.
-
-    INHALTLICHE KOHAERENZ (ABSOLUT PFLICHT):
-    Der gewaehlte Opener MUSS inhaltlich zur tatsaechlichen Stationsarbeit passen!
-    ❌ FALSCH: "Da ihr Beratung sucht, kann ich mit meiner Zeit bei Ingrano anknuepfen." → Dann aber CRM/Sales-Bullets.
-    ✅ RICHTIG: "Da ihr Beratung sucht, kann ich mit meiner Zeit bei Fraunhofer anknuepfen." → Dann konkrete Beratungsinhalte.
-    WENN die Station die genannte Anforderung NICHT belegt: Waehle eine andere Anforderung die wirklich passt — oder steige ohne falschen Bezug direkt ein.
-    ❌ VERBOTEN: Den Stations-Absatz mit "Bei [Firma] habe ich..." starten OHNE Bezug zum WARUM.`;
+    INHALTLICHE KOHAERENZ: Opener MUSS zur tatsaechlichen Stationsarbeit passen. Wenn Station die Anforderung NICHT belegt: andere Anforderung waehlen oder ohne falschen Bezug einsteigen.`;
         }).join('\n');
     } else {
         stationsSection = 'Nutze die relevantesten Erfahrungen aus dem CV und beweise damit deinen Wert für das Unternehmen.';
@@ -390,7 +361,7 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
     let bodyIntegrationGuidance = '';
 
     const focus = ctx?.introFocus || 'quote';
-    // hasQuote already declared above toneInstructions (needed for philosophisch preset)
+    // hasQuote already declared above toneInstructions (needed for quote-based presets)
     const hasHook = !!ctx?.selectedHook?.content;
     const hasNews = !!ctx?.selectedNews;
     // WHY: enablePingPong is used inside the quoteIntroBlock template literal (evaluated at declaration).
@@ -864,7 +835,7 @@ STATTDESSEN: ICH-Perspektive mit Quelle: "Auf eurer Website habe ich gelesen, da
 
 ${isCustomStyle ? '' : styleSection}
 
-${buildBlacklistPromptSection()}
+${buildLeanBlacklistSection()}
 
 ${t(`[AUTHENTIZITÄTS-REGELN]
 VERBOTEN — Generische Kompetenz-Phrasen:
@@ -959,19 +930,10 @@ Wenn der Jobtitel "Junior", "Trainee", "Werkstudent" oder "Einstiegsposition" en
 → ERLAUBT: Demütige Zuversicht ("Ich freue mich darauf, von eurer Expertise zu lernen")
 → VERBOTEN: Sich als Experte positionieren, der der Firma sagt, was funktioniert und was nicht.
 
-[RHETORISCHE STILMITTEL — OPTIONALE WÜRZUNG]
-Rhetorik ist wie Salz beim Kochen: Richtig dosiert hebt es den Geschmack aller Zutaten; überdosiert ruiniert es das Gericht.
-Nutze diese Stilmittel NUR wenn sie den Lesefluss verbessern — NIEMALS erzwingen. Max. 2 Stilmittel pro Anschreiben gesamt.
-
-TRIKOLON (Dreiergruppe — optional):
-Drei parallele Glieder in einem Satz, die einen Rhythmus erzeugen.
-✅ "...wie man komplexe Konzepte analysiert, visuell verankert und in spielerische Handlungsschritte übersetzt."
-Nutze Trikolon bevorzugt bei Aufzählungen von Kompetenzen oder Tätigkeiten. Max. 1x pro Anschreiben.
-
-ASYNDETON & KLIMAX (Aufzählung ohne Bindewort — optional):
-Weglassen von "und"/"oder" beschleunigt das Lesetempo.
-✅ "Workshop-Facilitation, agile Produktentwicklung, der Aufbau interdisziplinärer Teams; das sind die Werkzeuge, die ich mitbringen kann."
-Nutze Asyndeton bevorzugt im Zusammenfassungs-Absatz. Max. 1x pro Anschreiben.
+[RHETORISCHE STILMITTEL — OPTIONAL, Max. 2 pro Anschreiben]
+Nutze Stilmittel NUR wenn sie den Lesefluss verbessern — NIEMALS erzwingen. Storytelling-Preset: mindestens 1 bevorzugt.
+TRIKOLON: Drei parallele Glieder (z.B. "analysiert, verankert und übersetzt"). Max. 1x.
+ASYNDETON: Aufzählung ohne "und" (z.B. "Facilitation, Produktentwicklung, Teamaufbau; das bringe ich mit"). Max. 1x.
 
 [WORT-WIEDERHOLUNGS-SCHUTZ (PFLICHT)]
 Dasselbe Substantiv darf in zwei aufeinanderfolgenden Absätzen NICHT wiederholt werden.
@@ -1063,60 +1025,15 @@ ${t('[STELLENANZEIGE-ZITIERUNG (PFLICHT)]\\nWenn du ein Fragment aus der Stellen
 === SEKTION 4: KARRIERE-BEWEISE (FOLGENDE ABSÄTZE) ===
 Integriere diese Stationen als fließende Prosa — WICHTIG: Erstelle für jede gewählte Station einen eigenen Absatz.
 
-${t(`[SUBJEKT-BEZOGENE FIRMENREFERENZEN (ANTI-ALLWISSEND)]
-VERBOTEN sind Sätze, in denen der Bewerber allwissend über die Firma spricht:
-❌ "Da ${companyName} genau an dieser Schnittstelle zwischen X und Y agiert..."
-❌ "Dass Sicherheit bei ${companyName} nicht als isoliertes Thema, sondern als integraler Bestandteil..."
-❌ Jeder Satz mit dem Firmennamen als Subjekt, der Firmenkultur/Strategie als Tatsache darstellt.
+${t(`[VERBOTENE WÖRTER UND MUSTER (immer, in JEDEM Kontext)]
+❌ "Schnittstelle" — KOMPLETT VERBOTEN. Nutze: "Verbindung", "Brücke", "Berührungspunkt".
+❌ "dass ihr ... dass ihr" / "dass Sie ... dass Sie" im selben Satz/Absatz — Doppel umformulieren.
+❌ "nicht nur X, sondern Y" — rhetorisch aufgeblasen. Stattdessen: Direkt beschreiben was du schätzt.`,
+`[FORBIDDEN WORDS AND PATTERNS (always, in EVERY context)]
+❌ Do not use "intersection" as company descriptor. Use: "connection", "bridge".
+❌ "not only X, but also Y" — rhetorically inflated. Instead: Directly describe what you value.`)}
 
-ABSOLUT VERBOTENE WÖRTER UND MUSTER (immer, in JEDEM Kontext):
-❌ Das Wort "Schnittstelle" — KOMPLETT VERBOTEN. Nutze stattdessen: "Verbindung", "Brücke", "Berührungspunkt", oder schreibe den Sachverhalt konkret aus.
-❌ "dass ihr ... dass ihr" oder "dass Sie ... dass Sie" im selben Satz oder Absatz — Ausdrucksfehler. Formuliere so um, dass das Doppel verschwindet.
-❌ "echten Mehrwert" / "echter Mehrwert"
-❌ "nicht nur X, sondern Y" — KOMPLETT VERBOTEN. Dieses Konstrukt klingt rhetorisch aufgeblasen und setzt beim Bewerber implizit Allwissen voraus ("nicht nur verkauft, sondern als strategisches Asset begreift"). Stattdessen: Beschreibe direkt, was du schätzt ("An eurem Ansatz schätze ich besonders, dass..."). Sage was ist, nicht was es "nicht nur" ist.
 
-STATTDESSEN — Subjekt-bezogenes Schreiben (PFLICHT):
-✅ "Nach meiner Recherche zu Ihren Projekten im Bereich X sehe ich Parallelen zu meiner Erfahrung bei..."
-✅ "Mit Blick auf Ihre aktuellen Herausforderungen in Y erkenne ich, dass..."
-✅ "Auf Ihrer Website/LinkedIn sind mir Ihre Beiträge zu X aufgefallen, die mich an meine Arbeit bei Y erinnern."
-✅ "Ein Kollege erwähnte kürzlich [Branchenthema], und ich sehe Parallelen zu meiner Erfahrung bei..."
-LOGIK: Der Bewerber beschreibt seine EIGENE Beobachtung/Recherche. Der Leser soll denken: "Der hat sich mit uns beschäftigt", NICHT: "Woher weiß der das alles?"`,
-`[SUBJECT-ANCHORED COMPANY REFERENCES (ANTI-OMNISCIENT)]
-FORBIDDEN: Sentences where the applicant speaks omnisciently about the company:
-❌ "Since ${companyName} operates at the intersection of X and Y..."
-❌ Any sentence with the company name as subject describing culture/strategy as fact
-INSTEAD — Subject-anchored writing (MANDATORY):
-✅ "Looking at your projects in X, I see parallels to my experience at..."
-✅ "On your website I noticed your focus on X, which resonates with my work at..."
-✅ "A colleague mentioned your work in [topic], which reminded me of..."
-LOGIC: The applicant describes their OWN observation/research, not what the company "is".`,
-`[REFERENCIAS ANCLADAS AL SUJETO]
-PROHIBIDO: Oraciones donde el candidato habla de forma omnisciente sobre la empresa.
-EN CAMBIO: "Al investigar sus proyectos en X, encontré paralelos con mi experiencia en..."
-LÓGICA: El candidato describe su PROPIA observación, no lo que la empresa "es".`)}
-
-${t(`[LOGISCHE KOHÄRENZ (PFLICHT)]
-Wenn du eine Firmeneigenschaft (z.B. "Nachhaltigkeit") als Brücke zu einer CV-Station nutzt, MUSS die Station diesen Aspekt TATSÄCHLICH belegen.
-BEISPIEL FALSCH: "EYs Fokus auf Nachhaltigkeit erinnert mich an meine Arbeit im Vertrieb" (Vertrieb ≠ Nachhaltigkeit)
-BEISPIEL RICHTIG: "EYs Fokus auf Nachhaltigkeit erinnert mich an meine Zeit als Co-Founder, wo ich die Nachhaltigkeitsstrategie verantwortete"
-Wenn die Station keinen logischen Bezug hat: Wähle eine ANDERE Firmeneigenschaft oder steige direkt mit der Station ein.`,
-`[LOGICAL COHERENCE (MANDATORY)]
-When using a company trait (e.g. "sustainability") as a bridge to a CV station, the station MUST actually demonstrate that trait.
-If the station has no logical connection: Choose a DIFFERENT company trait or lead directly with the station.`)}
-
-${preset !== 'formal' ? t(`[RHETORISCHE FRAGE ALS ÜBERGANG (OPTIONAL)]
-Du DARFST (nicht: MUSST) den Übergang von der Einleitung zum ersten Stations-Absatz mit einer kurzen rhetorischen Frage oder einem reflexiven Einleitungssatz gestalten.
-GENERIERE die Frage NUR wenn: 1) Sie einen KONKRETEN Bezug zur CV-Station hat 2) Sie max. 20 Wörter lang ist 3) Sie den Lesefluss verbessert
-BEISPIELE:
-- "Bei [Station] habe ich mich gefragt, wie wir das Thema [X] nicht als Last, sondern als wertvolle Ressource positionieren."
-- "Als ich bei [Station] angefangen habe, mussten wir erstmal verstehen, wie wir [A] und [B] miteinander verknüpfen."
-VERBOTEN: Mehr als 1 rhetorische Frage im gesamten Anschreiben. Generische Fragen ohne konkreten Bezug.`,
-`[RHETORICAL QUESTION AS TRANSITION (OPTIONAL)]
-You MAY (not: MUST) use a short rhetorical question or reflective opening to bridge from introduction to the first station paragraph.
-GENERATE ONLY if: 1) It has a CONCRETE link to the CV station 2) Max 20 words 3) It improves reading flow
-EXAMPLES:
-- "At [Station], I asked myself how we could position [topic] not as a burden, but as a valuable resource."
-FORBIDDEN: More than 1 rhetorical question in the entire letter. Generic questions without concrete reference.`) : ''}
 
 ANTI-REPETITIONS-REGEL (KRITISCH):
 Jeder Stations-Absatz MUSS mit einem ANDEREN Einleitungssatz beginnen.
@@ -1146,16 +1063,6 @@ Every stated fact (activity, tool, result) MUST have a direct connection to the 
 FORBIDDEN: Isolated facts without explaining WHY they matter to the recruiter.
 RULE: If you mention a fact and cannot connect it to the job, LEAVE IT OUT.`)}
 
-${t(`[FIRMEN-REFERENZEN — QUELLENANGABE (PFLICHT)]
-Wenn du eine Eigenschaft des Unternehmens erwähnst, MUSS erkennbar sein, WOHER du das weißt.
-GUT: "Auf eurer Website habe ich gelesen, dass...", "In einem Blogbeitrag von euch las ich...", "Euer Wert 'Effektive Innovationen' zeigt mir...", "Die Tatsache, dass ihr in X investiert..."
-VERBOTEN: Allwissende Firmenbeschreibungen wie "[Firma] stellt sich ins Zentrum der nächsten Revolution" oder "[Firma] gestaltet gemeinsam mit Kunden erfolgreiche Geschäftsmodelle."
-LOGIK: Du bist ein Bewerber, kein Journalist. Du kannst nur wissen, was ÖFFENTLICH auf der Website, in News oder in der Stellenanzeige steht. Alles andere ist Spekulation.`,
-`[COMPANY REFERENCES — SOURCE ATTRIBUTION (MANDATORY)]
-When mentioning a company trait, it MUST be clear WHERE you learned it.
-GOOD: "On your website, I read that...", "Your value of 'X' shows me..."
-FORBIDDEN: Omniscient descriptions like "[Company] stands at the center of the next revolution."
-LOGIC: You are an applicant, not a journalist. You can only know what is PUBLICLY available.`)}
 
 ${t(`[ZERTIFIKATE UND QUALIFIKATIONEN ALS BRÜCKEN-ELEMENTE]
 Wenn der Lebenslauf Zertifikate, Fortbildungen oder anerkannte Qualifikationen enthält (z.B. Design Thinking, Scrum Master, ITIL, Six Sigma), nutze diese als Brücken zum Unternehmen oder zur Stelle.

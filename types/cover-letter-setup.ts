@@ -4,7 +4,7 @@
 import type { HiringPersona } from '@/lib/services/hiring-manager-resolver';
 
 export type HookType = 'news' | 'value' | 'quote' | 'linkedin' | 'manual' | 'vision' | 'project' | 'funding';
-export type TonePreset = 'data-driven' | 'storytelling' | 'formal' | 'philosophisch';
+export type TonePreset = 'data-driven' | 'storytelling' | 'formal';
 export type TargetLanguage = 'de' | 'en' | 'es';
 
 // ─── Step A Output ────────────────────────────────────────────────

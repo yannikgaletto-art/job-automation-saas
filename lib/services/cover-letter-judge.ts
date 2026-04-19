@@ -111,14 +111,14 @@ Optionale Verbesserungshinweise (max. 2 weaknesses — nur wenn aufgefallen):
 Achte besonders auf:
 (a) Passive Stations-Übergänge: „ist meine Erfahrung bei X relevant" → besser: „kann ich mit meiner Zeit bei X anknüpfen" / „möchte ich mein Projekt bei X beleuchten"
 (b) Generisches Closing: Wenn der Abschluss wie ein Verkaufs-Pitch klingt → besser: „Ich hoffe, ihr konntet einen kleinen Eindruck von mir gewinnen. Ich bin die nächsten Wochen flexibel und freue mich darauf, euch kennenzulernen."
-(c) Wiederholte Lernkurven-Phrase: Wenn im Text mehrfach dieselbe Lernkurven-Formulierung auftaucht → besser: Variiere aus Pool: „Mir wurde klar, dass..." / „Ich wurde eines Besseren belehrt:" / „Rückblickend erkenne ich:" / „Erst durch [Event] verstand ich:"`;
+(c) Wiederholte Lernkurven-Phrase: Wenn im Text mehrfach dieselbe Lernkurven-Formulierung auftaucht → besser: Variiere aus Pool: „Erst durch [konkretes Event] verstand ich, dass [Einsicht]." / „Diese Erfahrung zeigte mir, dass [konkreter Schluss]." / „Anfangs unterschätzte ich [X]; durch [Y] wurde deutlich, dass [Z]."`;
 
 const WEAKNESS_HINTS_EN = `
 Optional improvement suggestions (max. 2 weaknesses — only if noticed):
 Watch especially for:
 (a) Passive station transitions: "my experience at X is relevant" → better: "I can build on my time at X" / "I would like to highlight my project at X"
 (b) Generic closing: If the closing reads like a sales pitch → better: "I hope this gave you a small impression of who I am. I'm flexible over the coming weeks and look forward to meeting you."
-(c) Repeated learning-curve phrase: If the same learning-curve formulation appears multiple times → better: vary from pool: "I realized that..." / "I was proven wrong:" / "Looking back, I recognize:" / "It was only through [Event] that I understood:"`;
+(c) Repeated learning-curve phrase: If the same learning-curve formulation appears multiple times → better: vary from pool: "It was only through [concrete event] that I understood that [insight]." / "This experience showed me that [concrete conclusion]." / "At first I underestimated [X]; working with [Y] made it clear that [Z]."`;
 
 // ─── Judge ────────────────────────────────────────────────────────────────────
 export async function judgeCoverLetter(

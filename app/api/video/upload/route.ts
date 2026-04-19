@@ -23,9 +23,10 @@ export async function POST(request: NextRequest) {
         }
 
         const log = logger.forRequest(requestId, user.id, '/api/video/upload');
-        const { jobId, action } = await request.json() as {
+        const { jobId, action, mimeType } = await request.json() as {
             jobId: string;
             action: 'get-signed-url' | 'confirm-upload';
+            mimeType?: string; // e.g. 'video/webm;codecs=vp9', 'video/mp4'
         };
 
         if (!jobId || !action) {
@@ -52,8 +53,11 @@ export async function POST(request: NextRequest) {
                     .remove([existing.storage_path]);
             }
 
-            // Generate storage path and signed URL
-            const storagePath = `${userId}/${jobId}.webm`;
+            // Derive extension from browser-reported MIME type.
+            // Safari records video/mp4; Chrome/FF record video/webm.
+            // Storing the correct extension is critical for playback signed URLs.
+            const ext = mimeType?.includes('mp4') ? 'mp4' : 'webm';
+            const storagePath = `${userId}/${jobId}.${ext}`;
             const { data: signedData, error: signedError } = await supabaseAdmin.storage
                 .from('videos')
                 .createSignedUploadUrl(storagePath);
@@ -91,6 +95,7 @@ export async function POST(request: NextRequest) {
                 signedUrl: signedData.signedUrl,
                 token: signedData.token,
                 storagePath,
+                ext, // Pass back to client so confirm-upload uses the same extension
             });
 
         } else if (action === 'confirm-upload') {
@@ -99,7 +104,9 @@ export async function POST(request: NextRequest) {
             const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
             // Safety: re-set storage_path atomically here to handle edge cases
             // where the get-signed-url DB write was not yet committed.
-            const storagePath = `${userId}/${jobId}.webm`;
+            // Use correct extension from mimeType — Safari uses mp4.
+            const ext = mimeType?.includes('mp4') ? 'mp4' : 'webm';
+            const storagePath = `${userId}/${jobId}.${ext}`;
 
             // UPSERT as defense-in-depth: if get-signed-url's upsert
             // failed or was skipped, this still creates the row.
@@ -136,6 +143,20 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'Upload verification failed', requestId }, { status: 500 });
             }
 
+            // §3 Guarantee: access_token must never be null.
+            // gen_random_uuid() default only fires on INSERT, not on UPSERT update.
+            // If somehow null (e.g. old row without token), generate one here.
+            let finalToken = verify.access_token;
+            if (!finalToken) {
+                finalToken = crypto.randomUUID();
+                await supabaseAdmin
+                    .from('video_approaches')
+                    .update({ access_token: finalToken, updated_at: new Date().toISOString() })
+                    .eq('user_id', userId)
+                    .eq('job_id', jobId);
+                log.info('access_token was null — generated and saved', { finalToken });
+            }
+
             // Fire Inngest scheduled deletion
             await inngest.send({
                 name: 'video/schedule-deletion',
@@ -148,7 +169,7 @@ export async function POST(request: NextRequest) {
                 success: true,
                 requestId,
                 expiresAt,
-                accessToken: verify.access_token,
+                accessToken: finalToken,
             });
         }
 

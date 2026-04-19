@@ -201,11 +201,11 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
         setUploadProgress(0);
 
         try {
-            // Step 1: Get signed URL
+            // Step 1: Get signed URL — send mimeType so server can store correct extension
             const urlRes = await fetch('/api/video/upload', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId, action: 'get-signed-url' }),
+                body: JSON.stringify({ jobId, action: 'get-signed-url', mimeType: recordedBlob.type }),
             });
             const urlData = await urlRes.json();
             if (!urlRes.ok || !urlData.success) {
@@ -229,11 +229,11 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
 
             setUploadProgress(80);
 
-            // Step 3: Confirm upload
+            // Step 3: Confirm upload — send mimeType again so confirm also derives correct path
             const confirmRes = await fetch('/api/video/upload', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId, action: 'confirm-upload' }),
+                body: JSON.stringify({ jobId, action: 'confirm-upload', mimeType: recordedBlob.type }),
             });
             const confirmData = await confirmRes.json();
             if (!confirmRes.ok || !confirmData.success) {
