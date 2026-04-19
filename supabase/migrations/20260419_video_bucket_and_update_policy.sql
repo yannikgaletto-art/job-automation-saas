@@ -42,6 +42,9 @@ CREATE POLICY "Users can update own videos"
     AND (storage.foldername(name))[1] = auth.uid()::text
   );
 
--- Note: Service role (admin client) bypasses RLS entirely.
--- The signed URL upload uses the anon/authenticated role for the PUT itself,
--- so the RLS policy is enforced and must allow both INSERT and UPDATE.
+-- Note: Signed upload URLs (created by service_role admin client) BYPASS RLS.
+-- The primary upload flow works without these policies.
+-- These RLS policies exist for:
+--   1. Defense-in-depth (if someone uploads via client library directly)
+--   2. Audit clarity (explicit contract of who can do what)
+--   3. Re-record flows where client-direct operations might occur

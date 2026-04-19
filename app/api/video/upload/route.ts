@@ -95,11 +95,10 @@ export async function POST(request: NextRequest) {
                 signedUrl: signedData.signedUrl,
                 token: signedData.token,
                 storagePath,
-                ext, // Pass back to client so confirm-upload uses the same extension
             });
 
         } else if (action === 'confirm-upload') {
-            log.info('Confirming video upload', { jobId });
+            log.info('Confirming video upload', { jobId, mimeType: mimeType || 'not-sent' });
 
             const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
             // Safety: re-set storage_path atomically here to handle edge cases

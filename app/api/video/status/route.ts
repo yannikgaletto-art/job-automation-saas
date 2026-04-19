@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { inngest } from '@/lib/inngest/client';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -68,6 +70,13 @@ export async function GET(request: NextRequest) {
                     })
                     .eq('user_id', user.id)
                     .eq('job_id', jobId);
+
+                // QA fix: Also fire Inngest deletion — without this, reconciled
+                // videos only get cleaned up by pg_cron (no user notification).
+                inngest.send({
+                    name: 'video/schedule-deletion',
+                    data: { userId: user.id, jobId, locale: await getUserLocale(user.id) },
+                }).catch(() => { /* best-effort — pg_cron is the hard fallback */ });
 
                 return NextResponse.json({
                     status: 'uploaded',
