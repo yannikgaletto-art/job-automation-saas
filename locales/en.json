@@ -506,7 +506,8 @@
       "no_account": "Don't have an account?",
       "sign_up": "Sign up",
       "error_invalid": "Invalid credentials",
-      "forgot_password": "Forgot password?"
+      "forgot_password": "Forgot your password?",
+      "forgot_password_prompt": "Forgot your"
     },
     "forgot_password": {
       "title": "Reset password",

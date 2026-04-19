@@ -505,7 +505,8 @@
       "no_account": "¿No tienes cuenta?",
       "sign_up": "Registrarse",
       "error_invalid": "Credenciales inválidas",
-      "forgot_password": "¿Olvidaste tu contraseña?"
+      "forgot_password": "¿contraseña?",
+      "forgot_password_prompt": "¿Olvidaste tu"
     },
     "forgot_password": {
       "title": "Restablecer contraseña",

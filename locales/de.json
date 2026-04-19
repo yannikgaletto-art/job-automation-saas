@@ -506,7 +506,8 @@
       "no_account": "Noch kein Konto?",
       "sign_up": "Registrieren",
       "error_invalid": "Ungültige Anmeldedaten",
-      "forgot_password": "Passwort vergessen?"
+      "forgot_password": "Passwort vergessen?",
+      "forgot_password_prompt": "Hast du dein"
     },
     "forgot_password": {
       "title": "Passwort zurücksetzen",

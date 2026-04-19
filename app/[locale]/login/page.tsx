@@ -211,16 +211,7 @@ function LoginForm() {
                     </div>
 
                     <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <label className="block text-sm font-medium text-[#37352F]">{t('login.password_label')}</label>
-                            <button
-                                type="button"
-                                onClick={() => { setView('forgot'); setError("") }}
-                                className="text-xs text-[#012e7a] hover:underline font-medium"
-                            >
-                                {t('login.forgot_password')}
-                            </button>
-                        </div>
+                        <label className="block text-sm font-medium mb-2 text-[#37352F]">{t('login.password_label')}</label>
                         <Input
                             type="password"
                             value={password}
@@ -238,7 +229,18 @@ function LoginForm() {
                     </Button>
                 </form>
 
-                <p className="mt-6 text-sm text-center text-[#73726E]">
+                <p className="mt-4 text-sm text-center text-[#73726E]">
+                    {t('login.forgot_password_prompt')}{" "}
+                    <button
+                        type="button"
+                        onClick={() => { setView('forgot'); setError("") }}
+                        className="text-[#012e7a] hover:underline font-medium"
+                    >
+                        {t('login.forgot_password')}
+                    </button>
+                </p>
+
+                <p className="mt-3 text-sm text-center text-[#73726E]">
                     {t('login.no_account')}{" "}
                     <Link href="/signup" className="text-[#012e7a] hover:underline font-medium">
                         {t('login.sign_up')}
