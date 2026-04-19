@@ -1415,10 +1415,12 @@ function AddToQueueButton({ job, onJobAdded }: { job: EnrichedJob; onJobAdded: (
                     setPreviewData(data.job);
                 }
             } else {
-                console.error('[AddToQueue] Failed:', res.status);
+                // §QA: Surface server errors to user — was a silent block before
+                setVerificationWarning('Die Stelle konnte nicht verarbeitet werden. Bitte versuche es erneut.');
             }
         } catch (err) {
             console.error('[AddToQueue] Network error:', err);
+            setVerificationWarning('Netzwerkfehler. Bitte prüfe deine Verbindung und versuche es erneut.');
         } finally {
             setAdding(false);
         }
@@ -1582,15 +1584,21 @@ function SteckbriefPreviewModal({
     const [tasks, setTasks] = useState<string[]>(data.tasks || []);
     const [requirements, setRequirements] = useState<string[]>(data.hard_requirements || []);
     const [confirming, setConfirming] = useState(false);
+    const [confirmError, setConfirmError] = useState<string | null>(null);
     const [editingField, setEditingField] = useState<string | null>(null);
     const [newItem, setNewItem] = useState('');
     const [tasksOpen, setTasksOpen] = useState(true);
     const [reqsOpen, setReqsOpen] = useState(true);
 
+    // §QA: Track if user has added any data — block confirm if completely empty
+    const isEmpty = tasks.length === 0 && requirements.length === 0;
+
     const stelleUrl = data.source_url || data.apply_link || jobApplyLink;
 
     const handleConfirm = async () => {
+        if (isEmpty) return; // Guard: should not be reachable (button disabled)
         setConfirming(true);
+        setConfirmError(null);
         try {
             const res = await fetch('/api/jobs/confirm', {
                 method: 'POST',
@@ -1605,9 +1613,12 @@ function SteckbriefPreviewModal({
             });
             if (res.ok) {
                 onConfirm();
+            } else {
+                setConfirmError(t('preview_confirm_error'));
             }
         } catch (err) {
             console.error('[SteckbriefPreview] Confirm failed:', err);
+            setConfirmError(t('preview_confirm_error'));
         } finally {
             setConfirming(false);
         }
@@ -1675,6 +1686,15 @@ function SteckbriefPreviewModal({
 
                     {/* Content */}
                     <div className="p-6 space-y-4">
+                        {/* §QA: Empty data hint — guide user to add manually */}
+                        {isEmpty && (
+                            <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <p className="text-xs text-amber-800 leading-relaxed">
+                                    {t('preview_empty_hint')}
+                                </p>
+                            </div>
+                        )}
                         {/* Aufgaben — Toggleable */}
                         <div className="border border-slate-200 rounded-xl overflow-hidden">
                             <button
@@ -1809,25 +1829,32 @@ function SteckbriefPreviewModal({
                     </div>
 
                     {/* Footer */}
-                    <div className="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 rounded-b-2xl flex items-center justify-between">
-                        <button
-                            onClick={onCancel}
-                            className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-                        >
-                            {t('preview_cancel')}
-                        </button>
-                        <button
-                            onClick={handleConfirm}
-                            disabled={confirming}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-[#002e7a] text-white text-sm font-medium rounded-lg hover:bg-[#001e5a] disabled:opacity-50 transition-colors"
-                        >
-                            {confirming ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <CheckCircle2 className="w-4 h-4" />
-                            )}
-                            {t('preview_confirm')}
-                        </button>
+                    <div className="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 rounded-b-2xl">
+                        {confirmError && (
+                            <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg">
+                                <p className="text-xs text-red-600">{confirmError}</p>
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                            <button
+                                onClick={onCancel}
+                                className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                            >
+                                {t('preview_cancel')}
+                            </button>
+                            <button
+                                onClick={handleConfirm}
+                                disabled={confirming || isEmpty}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-[#002e7a] text-white text-sm font-medium rounded-lg hover:bg-[#001e5a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {confirming ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <CheckCircle2 className="w-4 h-4" />
+                                )}
+                                {t('preview_confirm')}
+                            </button>
+                        </div>
                     </div>
                 </motion.div>
             </motion.div>

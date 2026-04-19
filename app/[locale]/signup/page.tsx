@@ -163,6 +163,13 @@ export default function SignupPage() {
         setLoading(true)
         setError("")
 
+        // §Security: Frontend guard — password must be ≥ 8 chars
+        if (password.length < 8) {
+            setError(t('error_min_length'))
+            setLoading(false)
+            return
+        }
+
         const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ")
 
         try {
@@ -354,7 +361,7 @@ export default function SignupPage() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                minLength={6}
+                                minLength={8}
                                 placeholder="••••••••"
                                 className="border-[#E7E7E5]"
                             />
