@@ -504,7 +504,33 @@
       "submitting": "Iniciando sesión…",
       "no_account": "¿No tienes cuenta?",
       "sign_up": "Registrarse",
-      "error_invalid": "Credenciales inválidas"
+      "error_invalid": "Credenciales inválidas",
+      "forgot_password": "¿Olvidaste tu contraseña?"
+    },
+    "forgot_password": {
+      "title": "Restablecer contraseña",
+      "subtitle": "Ingresa tu correo electrónico y te enviaremos un enlace.",
+      "submit": "Enviar enlace",
+      "submitting": "Enviando…",
+      "success_title": "¡Correo enviado!",
+      "success_message": "Revisa tu bandeja de entrada. El enlace es válido por 24 horas.",
+      "back_to_login": "Volver al inicio de sesión",
+      "link_expired_title": "Enlace expirado",
+      "link_expired_message": "El enlace ha expirado o ya fue utilizado. Por favor, solicita uno nuevo.",
+      "error": "Error al restablecer. Por favor, inténtalo de nuevo."
+    },
+    "update_password": {
+      "title": "Establecer nueva contraseña",
+      "subtitle": "Elige una contraseña segura con al menos 8 caracteres.",
+      "password_label": "Nueva contraseña",
+      "confirm_label": "Confirmar contraseña",
+      "submit": "Cambiar contraseña",
+      "submitting": "Guardando…",
+      "error_mismatch": "Las contraseñas no coinciden.",
+      "error_min_length": "Se requieren al menos 8 caracteres.",
+      "error_generic": "No se pudo cambiar la contraseña.",
+      "success": "¡Contraseña cambiada con éxito!",
+      "redirect_message": "Redirigiendo al panel…"
     },
     "signup": {
       "title": "Crear cuenta",
@@ -515,7 +541,7 @@
       "email_label": "Correo electrónico",
       "email_placeholder": "juan@ejemplo.com",
       "password_label": "Contraseña",
-      "password_hint": "Mínimo 6 caracteres",
+      "password_hint": "Mínimo 8 caracteres",
       "submit": "Registrarse",
       "submitting": "Creando cuenta…",
       "has_account": "¿Ya tienes cuenta?",

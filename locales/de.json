@@ -505,7 +505,33 @@
       "submitting": "Wird angemeldet…",
       "no_account": "Noch kein Konto?",
       "sign_up": "Registrieren",
-      "error_invalid": "Ungültige Anmeldedaten"
+      "error_invalid": "Ungültige Anmeldedaten",
+      "forgot_password": "Passwort vergessen?"
+    },
+    "forgot_password": {
+      "title": "Passwort zurücksetzen",
+      "subtitle": "Gib deine E-Mail-Adresse ein und wir senden dir einen Link.",
+      "submit": "Link senden",
+      "submitting": "Wird gesendet…",
+      "success_title": "E-Mail gesendet!",
+      "success_message": "Bitte prüfe dein Postfach. Der Link ist 24 Stunden gültig.",
+      "back_to_login": "Zurück zum Login",
+      "link_expired_title": "Link abgelaufen",
+      "link_expired_message": "Der Link zum Zurücksetzen ist abgelaufen oder wurde bereits verwendet. Bitte fordere einen neuen an.",
+      "error": "Zurücksetzen fehlgeschlagen. Bitte versuche es erneut."
+    },
+    "update_password": {
+      "title": "Neues Passwort festlegen",
+      "subtitle": "Wähle ein sicheres Passwort mit mindestens 8 Zeichen.",
+      "password_label": "Neues Passwort",
+      "confirm_label": "Passwort bestätigen",
+      "submit": "Passwort ändern",
+      "submitting": "Wird gespeichert…",
+      "error_mismatch": "Die Passwörter stimmen nicht überein.",
+      "error_min_length": "Mindestens 8 Zeichen erforderlich.",
+      "error_generic": "Passwort konnte nicht geändert werden.",
+      "success": "Passwort erfolgreich geändert!",
+      "redirect_message": "Du wirst zum Dashboard weitergeleitet…"
     },
     "signup": {
       "title": "Konto erstellen",
@@ -516,7 +542,7 @@
       "email_label": "E-Mail",
       "email_placeholder": "max@beispiel.de",
       "password_label": "Passwort",
-      "password_hint": "Mindestens 6 Zeichen",
+      "password_hint": "Mindestens 8 Zeichen",
       "submit": "Registrieren",
       "submitting": "Konto wird erstellt…",
       "has_account": "Bereits registriert?",

@@ -505,7 +505,33 @@
       "submitting": "Signing in…",
       "no_account": "Don't have an account?",
       "sign_up": "Sign up",
-      "error_invalid": "Invalid credentials"
+      "error_invalid": "Invalid credentials",
+      "forgot_password": "Forgot password?"
+    },
+    "forgot_password": {
+      "title": "Reset password",
+      "subtitle": "Enter your email address and we'll send you a reset link.",
+      "submit": "Send link",
+      "submitting": "Sending…",
+      "success_title": "Email sent!",
+      "success_message": "Please check your inbox. The link is valid for 24 hours.",
+      "back_to_login": "Back to login",
+      "link_expired_title": "Link expired",
+      "link_expired_message": "The reset link has expired or was already used. Please request a new one.",
+      "error": "Reset failed. Please try again."
+    },
+    "update_password": {
+      "title": "Set new password",
+      "subtitle": "Choose a secure password with at least 8 characters.",
+      "password_label": "New password",
+      "confirm_label": "Confirm password",
+      "submit": "Change password",
+      "submitting": "Saving…",
+      "error_mismatch": "Passwords do not match.",
+      "error_min_length": "At least 8 characters required.",
+      "error_generic": "Password could not be changed.",
+      "success": "Password changed successfully!",
+      "redirect_message": "Redirecting to dashboard…"
     },
     "signup": {
       "title": "Create account",
@@ -516,7 +542,7 @@
       "email_label": "Email",
       "email_placeholder": "john@example.com",
       "password_label": "Password",
-      "password_hint": "At least 6 characters",
+      "password_hint": "At least 8 characters",
       "submit": "Sign up",
       "submitting": "Creating account…",
       "has_account": "Already registered?",

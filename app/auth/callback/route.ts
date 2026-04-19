@@ -39,10 +39,17 @@ export async function GET(request: Request) {
 
         // Code exchange failed — most likely cross-device PKCE mismatch.
         // The email IS confirmed in Supabase, but we can't establish a session here.
-        // Redirect to a friendly page instead of login.
         console.log('⚠️ [auth/callback] Code exchange failed (likely cross-device):', error.message)
 
-        // Redirect to login with a special flag that shows a helpful message
+        // Differentiate: password reset vs. signup confirmation
+        if (next.includes('update-password')) {
+            // Password reset link failed → expired or cross-device
+            return NextResponse.redirect(
+                `${origin}/${locale}/login?error=reset_link_expired`
+            )
+        }
+
+        // Signup confirmation cross-device → show helpful message
         return NextResponse.redirect(
             `${origin}/${locale}/login?confirmed=true`
         )
