@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { jobId, companyName, companyValues, companyVision, jobTitle, language } = await req.json();
+        const { jobId, companyName, companyValues, companyVision, jobTitle, language, categoryOverride } = await req.json();
         if (!jobId || !companyName) {
             return NextResponse.json({ error: 'Missing jobId or companyName' }, { status: 400 });
         }
@@ -52,13 +52,14 @@ export async function POST(req: NextRequest) {
             console.warn(`⚠️ [Quotes] Failed to fetch industry_segment:`, err);
         }
 
-        console.log(`🔍 [Quotes] Search for "${companyName}" | title="${jobTitle}" | industry="${industrySegment || 'unknown'}" | ${values.length} values`);
+        console.log(`🔍 [Quotes] Search for "${companyName}" | title="${jobTitle}" | industry="${industrySegment || 'unknown'}" | ${values.length} values${categoryOverride ? ` | override="${categoryOverride}"` : ''}`);
 
         const ctx: QuoteContext = {
             jobTitle: jobTitle || companyName,
             companyValues: values,
             companyVision: companyVision || undefined,
             industrySegment,
+            categoryOverride: categoryOverride || undefined,
             // Defensive mapping: only 'de' yields German. 'en', 'es', or any other locale → 'en'.
             // Prevents 'es' from silently falling back to 'de' (old === 'en' check had this bug).
             language: (language === 'de' ? 'de' : 'en') as 'de' | 'en',

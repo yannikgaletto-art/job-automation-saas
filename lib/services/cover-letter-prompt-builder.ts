@@ -188,9 +188,12 @@ VERBOTEN: Aufzaehlungen, Bullet-Points-Stil, trockene Fakten ohne Kontext, "Mein
 
 --- FEW-SHOT REFERENZ-BEISPIELE (Storytelling) ---
 BEISPIEL INTRO (mit Zitat, Du-Form):
-"beim Lesen des Telekom-Cases liess mich der Loop Approach hellhoerig werden; denn er erinnerte mich an das Zitat von Saint-Exupery: [ZITAT]. Die Sehnsucht nach dem eigenen Gestalten und damit Teams zu befaehigen sich selbst zu steuern begleiten mich durch viele Stationen in meiner Karriere. Gestalten braucht aber einen Ort, der das zulaesst und diesen Ort erkenne ich in Eurer Arbeit. Deshalb moechte ich mich kurz vorstellen."
+"beim Lesen des Telekom-Cases fiel mir auf, wie praezise ein Gedanke diesen Perspektivwechsel trifft:
+[ZITAT]
+– [Autor]
+Die Sehnsucht nach dem eigenen Gestalten und damit Teams zu befaehigen sich selbst zu steuern begleiten mich durch viele Stationen in meiner Karriere. Gestalten braucht aber einen Ort, der das zulaesst und diesen Ort erkenne ich in Eurer Arbeit. Deshalb moechte ich mich kurz vorstellen."
 
-BEISPIEL STATIONS-ABSATZ (narrativ):
+BEISPIEL STATIONS-ABSATZ (narrativ, mit JD-Fragment):
 "Fuer mich bedeutet 'zwischen Technologie und Mensch vermittelt', die Faehigkeit zu besitzen, zwei Sprachen zu sprechen. Diese Uebersetzungsleistung habe ich als Projektleiter einer Quantum-Computing-Gruppe bei Fraunhofer FOKUS taeglich angewendet. Dort unterstuetzte ich Softwareentwickler dabei, ihre Ideen in marktfaehige Business-Modelle zu uebersetzen; mit Kickoffs, OKR-Roadmaps und Stakeholdermanagement. Die zentrale Frage war dabei immer: Loesen wir das, was der Nutzer wirklich braucht?"
 --- ENDE FEW-SHOT ---`,
 
@@ -336,6 +339,7 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
     VERBOTEN: Stations-Absatz mit \"Bei [Firma] habe ich...\" starten OHNE Bezug zum WARUM.
     VERBOTEN: Denselben Einleitungstyp fuer zwei aufeinanderfolgende Absaetze verwenden.
 
+    PFLICHT-FRAGMENT: Integriere in GENAU EINEM Stations-Opener ein woertliches Fragment (2-5 Woerter) aus den Kernaufgaben (Sektion STELLEN-ANFORDERUNGEN) in Anfuehrungszeichen. Pruefe vorher: Steht das Fragment EXAKT so in den Kernaufgaben? Wenn nein: paraphrasiere OHNE Anfuehrungszeichen.
     FALLBACK (wenn kein userContext und keine matchedRequirement vorhanden): Beginne mit dem konkreten Ergebnis der Station und erklaere, warum es fuer ${companyName} relevant ist.
     INHALTLICHE KOHAERENZ: Opener MUSS zur tatsaechlichen Stationsarbeit passen.`;
         }).join('\n');
@@ -1081,17 +1085,15 @@ ${hasQuote && preset === 'storytelling'
     ? '- KLAMMER-OPTION: Du DARFST im letzten Satz auf den Gedanken aus der Einleitung zurückgreifen — als inhaltliche Klammer. Kein wörtliches Zitieren, sondern eine kurze Rück-Referenz. Nur wenn es sich natürlich anfühlt.'
     : '- FORBIDDEN: Do NOT repeat the quote or hook from the opening paragraph.'}
 
-[ZUSAMMENFASSUNGS-ABSATZ — VOR dem CTA]
-Fuege EINEN kurzen Absatz (2-3 Saetze) ein, der die Bewerbung in eigenen Worten zusammenfasst:
-- Formuliere, was du MITBRINGST und worauf du dich FREUST.
-- Nenne 1-2 konkrete Technologien/Aufgaben aus der Stellenanzeige, in die du dich einarbeiten willst.
-- Zeige Zuversicht OHNE Arroganz: "zuversichtlich" oder "gespannt" statt "ueberzeugt" oder "Experte".
-- VERBOTEN im Closing: "wissenschaftliche Exzellenz", "strategische Exzellenz", "unternehmerische Exzellenz", "Exzellenz" allgemein — zu pompoes und nicht authentisch.
-- ABSOLUT VERBOTEN: "schnell den Sprung von [X] zur [Y] schaffe" oder jede Variante davon — sofort erkennbar als KI-Schablone. NIEMALS verwenden.
-- ABSOLUT VERBOTEN: "Ich bin zuversichtlich, dass ich durch eure/Ihre Expertise ... schnell den Sprung" — das vollstaendige Konstrukt ist gesperrt.
-${isEnglish ? '- Example: "To sum up: I bring [X] from my projects, especially [concrete skill]. I look forward to diving deeper into [specific tech/task from job ad]."'
-  : isDuForm ? '- Beispiel: "Um diese Gedanken zusammenzufassen: Ich bringe [X] aus meinen Projekten mit, besonders [konkrete Kompetenz aus CV]. Zudem freue ich mich darauf, mich tiefer in [konkrete Tech/Aufgabe aus Stellenanzeige] einzuarbeiten."'
-  : '- Beispiel: "Zusammenfassend bringe ich [X] aus meinen Projekten mit und freue ich mich darauf, mich in [konkrete Tech/Aufgabe] einzuarbeiten."'}
+[SCHLUSS-ABSATZ — VORFREUDE STATT ZUSAMMENFASSUNG]
+VERBOTEN: Fasse am Ende NICHT zusammen, was du "mitbringst" oder "an Erfahrung hast". Das Anschreiben hat es bereits bewiesen.
+VERBOTEN: "Ich bringe mit", "Ich bringe also", "Ich verfuege ueber", "Meine Erfahrung zeigt", "bildet eine solide Grundlage".
+VERBOTEN: "wissenschaftliche Exzellenz", "strategische Exzellenz", "Exzellenz" allgemein.
+VERBOTEN: "schnell den Sprung von [X] zur [Y] schaffe" — KI-Schablone.
+STATTDESSEN: Formuliere echte Vorfreude auf EINE konkrete Aufgabe oder ein Thema aus der Stellenanzeige.
+${isEnglish ? '- Example: "I am particularly curious about [specific topic from job ad]. I look forward to diving deeper into [concrete area]."'
+  : isDuForm ? '- Beispiel: "Besonders gespannt bin ich auf [konkretes Thema aus Stellenanzeige]. Zudem freue ich mich darauf, ueber [Programm/Initiative] tiefer in [Fachthema] einzutauchen."'
+  : '- Beispiel: "Besonders gespannt bin ich auf [konkretes Thema aus Stellenanzeige]. Zudem freue ich mich darauf, mich in [Fachthema] zu vertiefen."'}
 
 - The closing sentence AFTER the summary is SHORT and WARM. Wähle den Ton:
   BEVORZUGT (warm, bescheiden): ${isEnglish ? '"I hope this gives you a small impression of who I am. I am available over the coming weeks and would love to get to know you."' : isDuForm ? '"Ich hoffe, ihr konntet einen kleinen Eindruck von mir gewinnen. Ich bin die nächsten Wochen flexibel und freue mich darauf, euch kennenzulernen."' : '"Ich hoffe, Sie konnten einen ersten Eindruck von mir gewinnen. Ich stehe die nächsten Wochen flexibel zur Verfügung und freue mich auf ein Gespräch."'}

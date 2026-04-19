@@ -23,6 +23,7 @@ export interface QuoteContext {
     companyValues: string[];     // e.g. ["Innovation", "Nachhaltigkeit"]
     companyVision?: string;      // e.g. "Wir wollen die Mobilität revolutionieren"
     industrySegment?: string;    // e.g. "HealthTech" — from Perplexity intel_data (primary signal)
+    categoryOverride?: string;   // e.g. "IT_Tech_Software_SaaS" — user-selected category from UI picker
     language: 'de' | 'en';      // Target language for the cover letter
 }
 
@@ -316,10 +317,11 @@ export async function findRelevantQuotes(
 ): Promise<QuoteResult[]> {
     const supabase = getSupabase();
     const searchTerm = buildSearchTerm(ctx);
-    const category = inferCategory(ctx.jobTitle, ctx.industrySegment);
+    // User-selected category takes priority over auto-inference
+    const category = ctx.categoryOverride || inferCategory(ctx.jobTitle, ctx.industrySegment);
     const matchedValue = ctx.companyValues[0] || ctx.jobTitle;
 
-    console.log(`🔍 [QuoteService] Searching: term="${searchTerm}", category="${category}", industry="${ctx.industrySegment || 'none'}", lang=${ctx.language}`);
+    console.log(`🔍 [QuoteService] Searching: term="${searchTerm}", category="${category}"${ctx.categoryOverride ? ' (USER OVERRIDE)' : ''}, industry="${ctx.industrySegment || 'none'}", lang=${ctx.language}`);
 
     // ── Tier 1: FTS + Category (DB) ──────────────────────────────────
     try {

@@ -33,6 +33,39 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     const [validationWarning, setValidationWarning] = useState<string | null>(null);
     const [quoteRefreshCount, setQuoteRefreshCount] = useState(0);
 
+    // ─── Quote Category Picker ────────────────────────────────────
+    const QUOTE_CATEGORIES: { key: string; labelKey: string; keywords: string[] }[] = [
+        { key: 'Beratung_Business_Management_Strategie', labelKey: 'quote_cat_consulting', keywords: ['berater', 'consultant', 'strategy', 'strategie', 'management', 'business', 'projektmanager', 'project manager'] },
+        { key: 'Engineering_Produktion_Industrie_Operations', labelKey: 'quote_cat_engineering', keywords: ['engineer', 'ingenieur', 'produktion', 'operations', 'supply chain', 'logistik'] },
+        { key: 'Finanzen_Banking_Investment_Controlling', labelKey: 'quote_cat_finance', keywords: ['finance', 'finanz', 'banking', 'controlling', 'accountant', 'audit'] },
+        { key: 'HR_People_Culture_Leadership', labelKey: 'quote_cat_hr', keywords: ['hr', 'human resources', 'people', 'recruiter', 'personal', 'leadership', 'training'] },
+        { key: 'Healthcare_Medizin_Pflege_PublicHealth', labelKey: 'quote_cat_healthcare', keywords: ['health', 'medizin', 'pflege', 'pharma', 'biotech', 'medical'] },
+        { key: 'IT_Tech_Software_SaaS', labelKey: 'quote_cat_it', keywords: ['software', 'developer', 'entwickler', 'tech', 'saas', 'devops', 'frontend', 'backend', 'cloud', 'data engineer'] },
+        { key: 'Kreativbranche_Design_Medien_Kommunikation', labelKey: 'quote_cat_creative', keywords: ['design', 'kreativ', 'creative', 'medien', 'content', 'ux', 'ui', 'brand', 'video'] },
+        { key: 'Nachhaltigkeit_SocialImpact_CSR_ESG', labelKey: 'quote_cat_sustainability', keywords: ['nachhaltigkeit', 'sustainability', 'esg', 'csr', 'umwelt', 'energie'] },
+        { key: 'Politik_PublicSector_NGO_InternationaleZusammenarbeit', labelKey: 'quote_cat_politics', keywords: ['politik', 'political', 'ngo', 'verwaltung', 'government'] },
+        { key: 'Sales_Vertrieb_Customersuccess_Marketing', labelKey: 'quote_cat_sales', keywords: ['sales', 'vertrieb', 'marketing', 'customer success', 'account manager', 'business development', 'e-commerce'] },
+        { key: 'Wissenschaft_Forschung_Data_Bildung', labelKey: 'quote_cat_science', keywords: ['wissenschaft', 'research', 'forschung', 'data', 'bildung', 'education', 'analytics', 'data scientist', 'ai '] },
+    ];
+
+    // Auto-detect category from job title (mirrors quote-service.ts CATEGORY_KEYWORDS)
+    const autoDetectedCategory = useMemo(() => {
+        const title = (setupData.jobTitle || '').toLowerCase();
+        if (!title) return null;
+        let bestCat: string | null = null;
+        let bestScore = 0;
+        for (const cat of QUOTE_CATEGORIES) {
+            let score = 0;
+            for (const kw of cat.keywords) {
+                if (title.includes(kw)) score++;
+            }
+            if (score > bestScore) { bestScore = score; bestCat = cat.key; }
+        }
+        return bestCat;
+    }, [setupData.jobTitle]);
+
+    const [selectedQuoteCategory, setSelectedQuoteCategory] = useState<string | null>(autoDetectedCategory);
+
     // ─── State Machine: resume at correct phase ────────────────────
     const getInitialPhase = (): Phase => {
         // If user already selected a hook (returning from Step 2), show results
@@ -158,6 +191,8 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     // Quote language follows UI locale, NOT job language.
                     // de → German quotes, en/es → English quotes (per product spec 2026-03-30)
                     language: quoteLanguage,
+                    // User-selected category override (null = auto-detect)
+                    categoryOverride: selectedQuoteCategory || undefined,
                 })
             });
             if (!res.ok) throw new Error('Quote search failed');
@@ -405,6 +440,35 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                             </div>
                         </div>
                     </div>
+
+                    {/* ─── Quote Category Picker (Chips) ─── */}
+                    <div>
+                        <label className="text-[10px] font-medium text-[#73726E] mb-1.5 block">
+                            {t('quote_category_label')}
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                            {QUOTE_CATEGORIES.map(cat => (
+                                <button
+                                    key={cat.key}
+                                    type="button"
+                                    onClick={() => setSelectedQuoteCategory(
+                                        selectedQuoteCategory === cat.key ? null : cat.key
+                                    )}
+                                    className={[
+                                        'px-2.5 py-1 rounded-full text-[10px] font-medium transition-all border',
+                                        selectedQuoteCategory === cat.key
+                                            ? 'bg-[#002e7a] text-white border-[#002e7a]'
+                                            : cat.key === autoDetectedCategory && !selectedQuoteCategory
+                                                ? 'bg-[#f0f4ff] text-[#002e7a] border-[#002e7a]/30'
+                                                : 'bg-white text-[#73726E] border-[#E7E7E5] hover:border-[#002e7a]/30 hover:text-[#37352F]',
+                                    ].join(' ')}
+                                >
+                                    {t(cat.labelKey)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="flex gap-2">
                         <button
                             type="button"
