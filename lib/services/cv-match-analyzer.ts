@@ -148,12 +148,21 @@ Every gap statement MUST begin with a reference to the CV document, never with a
 **STEP 0 — GAP CENSUS (MANDATORY — do this BEFORE any scoring):**
 Count ONLY requirements explicitly stated in the job description above.
 
-majorGaps: Count core requirements (first in requirements list, repeated in description, or marked as essential/required) with ZERO evidence in ${cvRef} — not even partial.
-minorGaps: Count secondary/nice-to-have/"wünschenswert" requirements missing from ${cvRef}.
+majorGaps: Count core requirements (marked as essential/required/must-have, or stated unconditionally without qualifier words) with ZERO evidence in ${cvRef} — not even partial.
+minorGaps: Count secondary/qualified/nice-to-have requirements missing from ${cvRef}.
+
+⚠️ QUALIFIER GATE (MANDATORY — read BEFORE counting):
+A requirement introduced or modified by ANY of these words can NEVER be a majorGap — it is ALWAYS a minorGap at most:
+DE: "idealerweise", "vorzugsweise", "bevorzugt", "wünschenswert", "von Vorteil", "gerne", "gerne gesehen", "optional", "plus", "keine Fremdwörter"
+EN: "ideally", "preferably", "nice to have", "a plus", "desired", "bonus", "preferred"
+This applies even if the qualified requirement appears first in the list or is repeated elsewhere in the description.
+
+⚠️ EMPLOYER TRAINING SIGNAL: If the job's Benefits/Wir-bieten section OFFERS training or certification in a skill that is also listed as a requirement, that requirement is NEVER a majorGap. The employer expects to train candidates on this skill.
 
 CALIBRATION (apply MECHANICALLY based on your count — NO exceptions):
   0 major, 0 minor  → overallScore: 85–100
   0 major, 1-2 minor → overallScore: 70–84
+  0 major, 3+ minor  → overallScore: 65–74
   1 major, 0 minor   → overallScore: 55–69
   1 major, 1+ minor  → overallScore: 40–54
   2+ major           → overallScore: 25–39
