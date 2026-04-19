@@ -70,10 +70,15 @@ VERBOTEN — niemals generieren:
 ❌ Passivkonstruktionen ohne Substanz: "wurde mir bewusst", "konnte ich feststellen"
 ❌ Sätze, die mit "Ich bin" + reinem Adjektiv beginnen:
    z.B. "Ich bin leidenschaftlich", "Ich bin überzeugt"
-❌ Sätze über 30 Wörter ohne Komma
+❌ Sätze über 25 Wörter (ABSOLUTES LIMIT). Bei komplexen Gedanken: Punkt setzen.
+❌ "nicht nur [X], sondern [Y]" (rhetorisch aufgeblasen)
+❌ "Genau das ist [Thema]" / "Die Kombination aus" (allwissend / generisch)
+❌ Selbstlob: "wie treffend / wie präzise ein Gedanke"
 ❌ "Mit freundlichen Grüßen" nur wenn explizit kein anderer Gruß extrahiert
 ❌ Alle Floskeln: "hiermit bewerbe ich mich", "mit großem Interesse",
    "I am excited to apply", "I am writing to apply"
+❌ Kein Doppelpunkt am Satzende, gefolgt von Zeilenumbruch.
+❌ Gedankenstrich (– oder —) im Fließtext VERBOTEN. Einzige Ausnahme: Zitat-Signatur.
 ❌ Abgehobene Allgemeinplätze die wie Kalenderweisheiten klingen
 ❌ Sätze die bei einem Leser den Gedanken auslösen: "Das hat ChatGPT geschrieben"
 ```
@@ -88,15 +93,15 @@ Passagen durch konkrete, belegbare Aussagen aus dem User-Profil."
 **Problem:** Zitate werden eingequetscht, sind nicht relevant für Firma,
 haben keine Begründung.
 
-**Pflicht-Format für jedes Zitat:**
+**Pflicht-Format für jedes Zitat (Einleitungs-Absatz):**
 ```
-[Absatz Ende]
-
-„[Zitat in voller Länge auf eigener Zeile]“
+„[Zitat in voller Länge in Anführungszeichen]“
 — [Autor, Kontext]
 
 [Begründungs-Satz: Warum dieses Zitat, warum diese Firma, warum jetzt]
 ```
+
+> **WICHTIG (Absatz-Zählung):** Der gesamte Einleitungsblock (Einleitungssatz + Zitat + Signatur + Brücke) zählt als **GENAU EIN Absatz**. Keine Leerzeilen zwischen diesen Elementen. Das gesamte Anschreiben darf maximal 4-5 Absätze lang sein (inklusive Schluss und Gruß).
 
 **Zitat-Relevanz-Anforderungen:**
 - Muss direkt zur Firmen-Mission ODER aktuellen News ODER Stellenbeschreibung passen
@@ -157,10 +162,9 @@ if (jobData.contact_person) {
 ## 🟡 BATCH 2 — Die Qualitäts-Pipeline
 *Voraussetzung: Batch 1 vollständig und stabil.*
 
-### B2.1 — ~~Drei-Agenten-Pipeline~~ [DEPRECATED seit 2026-04-09]
+### B2.1 — Automatisierte QA & Multi-Agent Switch [Aktualisiert 2026-04-19]
 
-> **Status:** Entfernt — Multi-Agent Pipeline (Haiku overwriting Sonnet) verursachte Qualitätsregression.
-> **Aktuell:** Sync-Loop: Claude Sonnet Generation → Haiku Judge (Pass/Fail) → ggf. Re-Generation mit Feedback.
+> **Aktuell:** Wir nutzen ein 17-Punkte **E2E-Qualitätsscoring-System** (`test-generation-quality.ts`). Alle Prompts (Claude Sonnet 4.6) müssen 7 Extreme-Szenarien zu >90% bestehen. Dies ersetzt flache Language Judges durch systematisches Prompt-Hardening und Post-Generation-Scans (FluffScanResult).
 
 ~~**Architektur:**~~
 ```
