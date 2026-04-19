@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
         }).parse(await request.json());
 
         // §12.5: Whitelist-spread — only allowed fields from edits
-        const safeEdits: Record<string, any> = { status: 'steckbrief_confirmed' };
+        // Transition: pending_review → pending (confirmed, enters queue)
+        const safeEdits: Record<string, any> = { status: 'pending' };
         if (edits?.tasks) safeEdits.tasks = edits.tasks;
         if (edits?.hard_requirements) safeEdits.requirements = edits.hard_requirements;
         if (edits?.ats_keywords) safeEdits.buzzwords = edits.ats_keywords;
