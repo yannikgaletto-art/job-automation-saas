@@ -41,7 +41,7 @@ const supabaseAdmin = createAdminClient(
 );
 
 // Conversation: Sonnet 4.5 (quality critical — CLAUDE.md: Sonnet = Generation, Haiku = Judge)
-const COACHING_MODEL = 'claude-sonnet-4-6-20260220';
+const COACHING_MODEL = 'claude-sonnet-4-5-20250929';
 // Hints: Haiku 3 (cheap, quality uncritical)
 const HINT_MODEL = 'claude-haiku-4-5-20251001';
 interface SendMessageResult {

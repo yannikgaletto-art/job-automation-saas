@@ -46,7 +46,7 @@ export async function optimizeCV(request: CVOptimizationRequest): Promise<CVOpti
             success: false,
             error_message: error.message,
             latency_ms: Date.now() - startTime,
-            model_name: 'claude-sonnet-4-6-20260220' // Default or unknown
+            model_name: 'claude-sonnet-4-5-20250929' // Default or unknown
         });
 
         throw error;
@@ -138,7 +138,7 @@ ATS_SCORE: <0-100>
         user_id: request.userId,
         job_id: request.jobId,
         generation_type: 'cv_optimization',
-        model_name: result.model || 'claude-sonnet-4-6-20260220',
+        model_name: result.model || 'claude-sonnet-4-5-20250929',
         prompt_tokens: 0, // Model router doesn't always return this cleanly yet, improvement for later
         completion_tokens: result.tokensUsed || 0,
         total_tokens: result.tokensUsed || 0, // Approx

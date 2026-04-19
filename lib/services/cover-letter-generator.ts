@@ -233,7 +233,7 @@ REGELN:
 
     try {
         const message = await anthropic.messages.create({
-            model: 'claude-sonnet-4-6-20260220',
+            model: 'claude-sonnet-4-5-20250929',
             max_tokens: 1500,
             temperature: 0.5,
             messages: [{ role: 'user', content: prompt }]
@@ -317,7 +317,7 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
         }
 
         const message = await anthropic.messages.create({
-            model: 'claude-sonnet-4-6-20260220',
+            model: 'claude-sonnet-4-5-20250929',
             max_tokens: 2000,
             temperature: 0.7,
             system: 'You are a senior career advisor and expert cover letter writer. Output ONLY the letter body. No explanations, no markdown, no preamble.',
