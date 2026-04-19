@@ -458,6 +458,26 @@ export const BLACKLIST_PATTERNS: BlacklistPattern[] = [
         category: 'ai_marker',
     },
     {
+        pattern: 'nur gelingen, wenn',
+        reason: 'Allwissende Wenn-dann-Wahrheit (ohne „dann"-Variante).',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'nur greifen, wenn',
+        reason: 'Allwissende Wenn-dann-Wahrheit (ohne „dann"-Variante).',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'nur wirken, wenn',
+        reason: 'Allwissende Wenn-dann-Wahrheit (ohne „dann"-Variante).',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'nur funktionieren, wenn',
+        reason: 'Allwissende Wenn-dann-Wahrheit (ohne „dann"-Variante).',
+        category: 'ai_marker',
+    },
+    {
         pattern: 'funktioniert nur, wenn',
         reason: 'Allwissende Wenn-dann-Wahrheit — der Bewerber stellt keine Regeln auf.',
         category: 'ai_marker',

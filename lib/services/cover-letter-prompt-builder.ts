@@ -232,27 +232,9 @@ TONALITÄT:
 SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Umgangssprache, Emojis, Interjektionen, "Ich brenne für", persönliche Anekdoten.`,
 
-        // WHY: Philosophisch-Preset darf KEINE eigene Zitat-Formatierung vorgeben,
-        // wenn der Wizard bereits ein quoteIntroBlock in Sektion 3 injiziert.
-        // CONFLICTS RESOLVED: Red Flag #3 — zwei konkurrierende Zitat-Format-Anweisungen.
-        'philosophisch': `STIL: INTELLEKTUELL & KONZEPTIONELL
-${hasQuote ? 'ÖFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhänger) gesteuert. Deine Aufgabe hier: Schreibe nach dem Zitat einen konzeptionellen Begründungssatz, der die Brücke zwischen der Aussage des Zitats und deiner beruflichen Erfahrung schlägt.' : `ÖFFNUNG (OHNE ZITAT — mit intellektuellem Firmenbezug):
-Starte mit einer relevanten Beobachtung über das Unternehmen aus der Unternehmensanalyse, die die Brücke zu deiner Berufserfahrung schlägt.
-Beispiel: "Euer Ansatz bei [konkretes Thema aus Analyse] hat mich angesprochen, weil ich bei [eigene Firma] eine ähnliche Herausforderung erlebt habe."
-❌ VERBOTEN: Allwissende Branchen-Statements, "echten Mehrwert", Akademiker-Jargon ohne konkreten Bezug.`}
-ABSATZ-STRUKTUR: Konzept → Beweis → Reflexion
-- Jeder Absatz beginnt mit einer These oder Beobachtung
-- Dann folgt der konkrete Beweis aus der eigenen Karriere
-- Abschluss: Kurze Reflexion, was das für die Zielposition bedeutet
-INTELLEKTUELLER RAHMEN:
-- Zeige Denktiefe: "Wie" und "Warum" statt nur "Was"
-- Erlaube 1 Zitat (vom User gewählt oder aus dem Kontext passend)
-- Verbinde branchenspezifische Trends mit persönlicher Erfahrung
-- Nutze Analogien und Querverweise: "Wie in der [Disziplin/Branche], zeigt sich auch hier..."
-- Die konzeptionelle Ebene zeigt Senioritität und strategisches Denken
-RHETORISCHE WÜRZUNG (PFLICHT in diesem Stil): Verwende MINDESTENS 1 rhetorisches Stilmittel (Trikolon, Asyndeton oder Anadiplose) an einer Stelle wo es den Lesefluss natürlich verbessert. Max. 2 gesamt.
-SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
-VERBOTEN: Oberflächliche Name-Dropping von Philosophen ohne Bezug, Arroganz, akademischer Jargon, mehr als 1 Zitat.`,
+        // WHY: Philosophisch-Preset removed (user decision 2026-04-19) — too niche, overlaps with Storytelling,
+        // and dilutes prompt quality. Best elements (analogies, Querverweise) merged into Storytelling.
+        // Original text moved to comment for rollback potential.
     };
     const activeTone = toneInstructions[ctx?.tone.preset ?? 'formal'];
 
@@ -472,11 +454,12 @@ FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
   ❌ VERBOTEN: Mehr als 2 Saetze vor dem Zitat — Komm schnell auf den Punkt.
 - Das Zitat MUSS auf einer EIGENEN Zeile stehen, in Anfuehrungszeichen.
 
-AUTOR-NENNUNG (EXKLUSIV-REGEL — genau 1x im gesamten Einleitungsblock):
-Der Autor-Name darf im Einleitungsblock nur EINMAL vorkommen — ENTWEDER:
-  Option A: Im Einleitungssatz (z.B. "...erinnerte mich an ein Zitat von ${ctx!.selectedQuote!.author}:") → dann KEINE Signatur-Zeile unter dem Zitat.
-  Option B: Als Signatur-Zeile unter dem Zitat ("– ${ctx!.selectedQuote!.author}") → dann KEIN Autorenname im Einleitungssatz.
-BEIDES GLEICHZEITIG IST VERBOTEN (Dopplung).
+AUTOR-NENNUNG (PFLICHT — NICHT VERHANDELBAR):
+Das Zitat MUSS IMMER eine Signatur-Zeile unter dem Zitat haben:
+"– ${ctx!.selectedQuote!.author}"
+Diese Signatur-Zeile ist PFLICHT und darf NIEMALS weggelassen werden.
+Der Autorenname darf ZUSAETZLICH im Einleitungssatz vorkommen (z.B. "...erinnerte mich an ein Zitat von ${ctx!.selectedQuote!.author}:"), ist dort aber OPTIONAL.
+NIEMALS das Zitat OHNE Autor-Zuordnung lassen — das ist ein KRITISCHER FEHLER.
 
   [Zitat-Bruecke — DIREKT NACH dem Zitat]
 
@@ -498,6 +481,8 @@ BEIDES GLEICHZEITIG IST VERBOTEN (Dopplung).
 - Die Bruecke darf KEINE negative Kritik an frueheren Arbeitgebern enthalten.
 - KEINE leeren Floskeln wie 'Genau diese Haltung treibt mich an'.
 - ANTI-DOPPLUNG: Die Zitat-Bruecke und der ERSTE Satz von Absatz 2 duerfen sich INHALTLICH NICHT ueberschneiden.
+- ANTI-DOPPEL-FIRMA: Die Zitat-Bruecke darf KEINE CV-Station namentlich nennen, die im Hauptteil einen eigenen Absatz bekommt. Wenn du in der Bruecke "Bei Fraunhofer" schreibst und Fraunhofer auch einen eigenen Absatz hat, klingt es redundant.
+- STRUKTUR: Die Zitat-Bruecke + der Bewerbungssatz gehoeren zum EINLEITUNGSBLOCK. Sie sind KEIN eigener Absatz. Nach dem Bewerbungssatz kommt eine Leerzeile, dann der ERSTE Stations-Absatz.
 
 [COMPANY-BEZUG — SOURCED REFERENZ mit Unternehmensanalyse]
 Nutze IMMER eine sourced Referenz für den Firmenbezug. Die Daten für diesen Satz kommen aus der Unternehmensanalyse (Perplexity-Research), die oben im Prompt als Kontext bereitgestellt wurde.
@@ -1211,7 +1196,7 @@ ${personaSection}
 === SECTION 5: CLOSING & CALL TO ACTION ===
 [RULE: CLOSING]
 - FORBIDDEN: Do NOT summarize career stations or experience again at the end. That is filler.
-${hasQuote && (preset === 'storytelling' || preset === 'philosophisch')
+${hasQuote && preset === 'storytelling'
     ? '- KLAMMER-OPTION: Du DARFST im letzten Satz auf den Gedanken aus der Einleitung zurückgreifen — als inhaltliche Klammer. Kein wörtliches Zitieren, sondern eine kurze Rück-Referenz. Nur wenn es sich natürlich anfühlt.'
     : '- FORBIDDEN: Do NOT repeat the quote or hook from the opening paragraph.'}
 

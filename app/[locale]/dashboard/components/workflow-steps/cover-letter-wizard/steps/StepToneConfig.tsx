@@ -13,7 +13,7 @@ interface Props {
     onGenerate: () => void;
 }
 
-const toneOptionIds: TonePreset[] = ['data-driven', 'storytelling', 'formal', 'philosophisch'];
+const toneOptionIds: TonePreset[] = ['data-driven', 'storytelling', 'formal'];
 
 function formatDate(dateStr: string, locale: string) {
     return new Date(dateStr).toLocaleDateString(locale, {
