@@ -320,26 +320,24 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
   → ROTER FADEN (PFLICHT für JEDEN Stations-Absatz):
     Beginne JEDEN Stations-Absatz mit einer Verknüpfung, die dem Recruiter erklärt WARUM diese Erfahrung relevant ist.
 
-    §STATIONS-OPENER (waehle fuer JEDEN Absatz EINE andere Variante — nie dieselbe zweimal):
+    §STATIONS-OPENER — QUALITAETSPRINZIP (statt starrem Varianten-Pool):
 
-    Wenn Kernaufgaben extrahiert wurden, zitiere ein KURZES FRAGMENT (2-5 Woerter) in Anfuehrungszeichen als Bruecke.
-    HALLUZINATIONS-SCHUTZ: Max. 5 Woerter, NUR Arbeitsthemen (nicht Teamstrukturen/Organisationsformen). Unsicher? Paraphrasiere OHNE Anfuehrungszeichen.
+    Leite JEDEN Stations-Absatz mit EINEM einleitenden Gedanken ein, der erklaert WARUM diese Erfahrung fuer die Stelle relevant ist.
+    Formuliere organisch und individuell — orientiere dich am Ton der FEW-SHOT BEISPIELE oben (Sektion 2 — STIL).
 
-    VARIANTEN-POOL (waehle passend zum Inhalt, nie nach Position):
-    A) \"„[2-5 Woerter Kernaufgabe]", genau an diesem Thema habe ich bei [Firma] gearbeitet.\"
-    B) \"Zudem habe ich mich in der „[2-5 Woerter]" wiedergefunden, da es zu meiner Arbeit bei [Firma] gehoerte.\"
-    C) \"Auch in meiner Rolle bei [Firma] habe ich „[2-5 Woerter]" direkt umgesetzt.\"
-    D) \"Ebenso zeigte mir meine Zeit bei [Firma], dass [konkreter Inhalt zur Job-Anforderung].\"
-    E) \"Was ich noch einbringen kann, ist meine Erfahrung bei [Firma] im Bereich [konkretes Thema].\"
-    F) \"Da ${isDuForm ? 'eure' : 'Ihre'} Ausschreibung [Thema] betont, kann ich mit meiner Zeit bei [Firma] anknuepfen, wo ich [konkretes Achievement].\"
+    ERLAUBTE TECHNIKEN (als Inspiration, nicht als Schablone):
+    - Ein Konzept oder eine Idee aus der Stellenanzeige aufgreifen und mit der eigenen Erfahrung verbinden
+    - Eine zentrale Erkenntnis an den Anfang stellen, die dann durch die Station belegt wird
+    - Ein kurzes JD-Fragment (2-5 Woerter) in Anfuehrungszeichen als Bruecke nutzen
+    HALLUZINATIONS-SCHUTZ: JD-Fragmente max. 5 Woerter, NUR Arbeitsthemen. Unsicher? Paraphrasiere OHNE Anfuehrungszeichen.
 
-    VERBOTEN: \"Zudem kann ich mit meiner Zeit bei [Firma] anknuepfen.\" alleine — IMMER \"da/weil/was\" mit konkretem Inhalt.
+    VERBOTEN: Template-Saetze wie \"Genau daran habe ich bei [Firma] gearbeitet\" oder \"Zudem habe ich mich in X wiedergefunden\".
     VERBOTEN: \"Weil ${isDuForm ? 'ihr jemanden sucht' : 'Sie jemanden suchen'}\" / \"Da ${isDuForm ? 'ihr' : 'Sie'} jemanden ${isDuForm ? 'sucht' : 'suchen'}, der...\" — Meta-Formulierung.
-    VERBOTEN: \"Moechte ich...\"/\"Kann ich hier anmerken...\"/\"Darf ich erwaehnen...\" als Satzanfang.
-    VERBOTEN: \"Als ich die Stellenbeschreibung las, fielen mir Parallelen zu...\" — generisch.
     VERBOTEN: Stations-Absatz mit \"Bei [Firma] habe ich...\" starten OHNE Bezug zum WARUM.
+    VERBOTEN: Denselben Einleitungstyp fuer zwei aufeinanderfolgende Absaetze verwenden.
 
-    INHALTLICHE KOHAERENZ: Opener MUSS zur tatsaechlichen Stationsarbeit passen. Wenn Station die Anforderung NICHT belegt: andere Anforderung waehlen oder ohne falschen Bezug einsteigen.`;
+    FALLBACK (wenn kein userContext und keine matchedRequirement vorhanden): Beginne mit dem konkreten Ergebnis der Station und erklaere, warum es fuer ${companyName} relevant ist.
+    INHALTLICHE KOHAERENZ: Opener MUSS zur tatsaechlichen Stationsarbeit passen.`;
         }).join('\n');
     } else {
         stationsSection = 'Nutze die relevantesten Erfahrungen aus dem CV und beweise damit deinen Wert für das Unternehmen.';
@@ -381,29 +379,10 @@ FORMATIERUNG DES ZITATS (UNBEDINGT EINHALTEN):
   Ein reines CV-Erlebnis OHNE Bezug zur Ziel-Firma ist als Einleitungssatz VERBOTEN.
   Reihenfolge: Firmenbezug → Zitat → CV-Bruecke. NICHT: CV → Zitat → Firma.
 
-  Waehle EINE der folgenden Strategien — nicht immer dieselbe:
-
-  STRATEGIE A — Firmenbeobachtung fuehrt zum Zitat (BEVORZUGT):
-  Beschreibe in 1 Satz, was du in der Unternehmensanalyse oder auf der Website entdeckt hast, und leite daraus zum Zitat ueber.
-  Der Uebergang zum Zitat soll NATUERLICH klingen — als wuerdest du einem Freund erzaehlen, woran dich das erinnert hat.
-  MOEGLICHE Uebergaenge (als INSPIRATION, NIEMALS 1:1 kopieren — formuliere jedes Mal NEU):
-  - Ein Gedanke, der aufkam / aufgefallen ist
-  - Eine Erinnerung an ein Zitat
-  - Ein Zusammenhang, den du siehst
-  - Eine Parallele, die dir bewusst wurde
-  PFLICHT: Der Firmenbezug MUSS aus einer der folgenden Quellen stammen (Prioritaet absteigend):
-  1. Unternehmensanalyse (Werte, Projekte, News, Challenges) — BEVORZUGT
-  2. Stellenanzeige (Kernaufgaben, Anforderungen, Teamkontext)
-  3. FALLBACK (nur wenn 1 und 2 leer): Subjektiver Bezug auf die Stelle selbst — ICH-Perspektive, ehrlich, ohne erfundene Fakten.
-  NIEMALS: Firmenfakten erfinden, die oben im Prompt nicht stehen.
-
-  STRATEGIE B — Stellenanzeigen-Fragment als Bruecke (BEVORZUGT wenn JD detailliert):
-  Nimm 2-5 Woerter EXAKT aus der Stellenanzeige (in Anfuehrungszeichen) und baue daraus die Bruecke zum Zitat.
-  PFLICHT: Das Fragment MUSS EXAKT aus den KERNAUFGABEN oder dem Stellen-Kontext stammen.
-
-  STRATEGIE C — CV-Erlebnis mit expliziter Firmen-Verknuepfung (Fallback wenn Analyse-Daten duenn):
-  Starte mit einer konkreten Erfahrung aus deinem CV und verknuepfe sie explizit mit ${companyName}.
-  PFLICHT: Die Verknuepfung MUSS explizit sein. Allein stehend = VERBOTEN.
+  Leite zum Zitat ueber mit einem konkreten Bezug zu ${companyName} oder zur Stellenanzeige (max. 1 Satz, ICH-Perspektive).
+  Der Uebergang soll NATUERLICH klingen — orientiere dich am Ton der FEW-SHOT BEISPIELE oben.
+  PFLICHT: Der Firmenbezug MUSS auf realen Daten basieren (Unternehmensanalyse, Stellenanzeige). NIEMALS Firmenfakten erfinden.
+  FALLBACK (wenn Analyse-Daten duenn): Subjektiver Bezug auf die Stelle selbst — ICH-Perspektive, ehrlich.
 
   VARIANZ-PFLICHT (KRITISCH): Jeder Einleitungssatz MUSS einzigartig formuliert sein.
   VERBOTEN: Dieselbe Satzstruktur oder Formulierung in verschiedenen Anschreiben wiederverwenden.
@@ -421,7 +400,7 @@ AUTOR-NENNUNG (PFLICHT — NICHT VERHANDELBAR):
 Das Zitat MUSS IMMER eine Signatur-Zeile unter dem Zitat haben:
 "– ${ctx!.selectedQuote!.author}"
 Diese Signatur-Zeile ist PFLICHT und darf NIEMALS weggelassen werden.
-Der Autorenname darf ZUSAETZLICH im Einleitungssatz vorkommen (z.B. "...erinnerte mich an ein Zitat von ${ctx!.selectedQuote!.author}:"), ist dort aber OPTIONAL.
+VERBOTEN: Den Autorennamen ZUSAETZLICH im Fliesstext nennen (z.B. \"fiel mir ein Zitat von ${ctx!.selectedQuote!.author} ein\" ist VERBOTEN). Die Signatur-Zeile ist die EINZIGE Nennung.
 NIEMALS das Zitat OHNE Autor-Zuordnung lassen — das ist ein KRITISCHER FEHLER.
 
   [Zitat-Bruecke — DIREKT NACH dem Zitat]
@@ -459,8 +438,10 @@ ${enablePingPong ? `
 [PING-PONG EINLEITUNG — DU BIST NOCH IN DER EINLEITUNG, NICHT in Absatz 2]
 Nach dem Zitat und dem Brückensatz fügst du ZWEI weitere Sätze hinzu (Antithese + Synthese):
 
-ANTITHESE (1 Satz): Beschreibe, wie du diesen Gedanken früher ANDERS gesehen hast.
-→ Formuliere es als Lernkurve oder Erkenntnisgewinn: "${t('Bei [CV-Station] dachte ich zunächst, dass...', 'At [CV-Station] I initially thought that...')}"
+ANTITHESE (1 Satz): Beschreibe, wie du diesen Gedanken frueher ANDERS gesehen hast.
+→ Formuliere es als abstrakte Lernkurve OHNE einen Firmennamen zu nennen.
+→ VERBOTEN: Namentliche Nennung einer CV-Station hier (z.B. \"Bei Xorder dachte ich zunächst...\"). Firmennamen sind den Hauptteil-Absaetzen vorbehalten.
+→ ERLAUBT: \"${t('Frueher dachte ich, dass schnelle Produktentwicklung vor allem Geschwindigkeit bedeutet.', 'I used to think that fast product development mainly meant speed.')}\" (abstrakt, ohne Firma)
 → NIEMALS negativ über frühere Arbeitgeber klingen. Das ist VERBOTEN.
 → KEIN echter Fehler, kein Versagen — eine Perspektiventwicklung.
 → KEIN Pseudo-Kontrast wie "${t('Ich sah das ähnlich, aber jetzt noch mehr so.', 'I saw it similarly, but now even more so.')}" — Das ist VERBOTEN.

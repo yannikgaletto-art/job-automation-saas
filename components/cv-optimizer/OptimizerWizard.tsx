@@ -158,11 +158,41 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                     .eq('id', jobId)
                     .single();
 
-                const { data: userRes } = await supabase
+                // BUG-FIX: Destructure error — previously swallowed, causing false
+                // "Kein Lebenslauf gefunden" screen when session is still initializing.
+                let { data: userRes, error: profileError } = await supabase
                     .from('user_profiles')
                     .select('cv_structured_data, preferred_cv_template')
                     .eq('id', user.id)
                     .single();
+
+                // If profile query failed (e.g. session not fully hydrated after
+                // fresh login, RLS timing, transient network error): retry once
+                // after a short delay. This is the simplest fix that covers the
+                // observed race condition without adding retry-utility complexity.
+                if (profileError || !userRes) {
+                    console.warn('⚠️ [OptimizerWizard] user_profiles query failed, retrying in 500ms', {
+                        userId: user.id,
+                        code: profileError?.code,
+                        message: profileError?.message,
+                    });
+                    await new Promise(r => setTimeout(r, 500));
+                    const retry = await supabase
+                        .from('user_profiles')
+                        .select('cv_structured_data, preferred_cv_template')
+                        .eq('id', user.id)
+                        .single();
+                    userRes = retry.data;
+                    profileError = retry.error;
+
+                    if (profileError || !userRes) {
+                        console.error('❌ [OptimizerWizard] user_profiles retry also failed', {
+                            userId: user.id,
+                            code: profileError?.code,
+                            message: profileError?.message,
+                        });
+                    }
+                }
 
                 if (isMounted) {
                     if (jobRes) {
