@@ -66,7 +66,8 @@ export type CreditEventType =
     | 'refund'
     | 'admin_adjustment'
     | 'feedback_bonus'
-    | 'beta_refill';
+    | 'beta_refill'
+    | 'referral_bonus';
 
 // ============================================================================
 // CREDIT INFO (returned to frontend)

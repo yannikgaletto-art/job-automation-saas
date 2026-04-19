@@ -611,6 +611,20 @@
     "tabs": {
       "account": "Account",
       "privacy": "Privacy & Security"
+    },
+    "referral": {
+      "card_title": "Invite Friends",
+      "card_description": "Recommend Pathly and earn bonus credits for you and your friend.",
+      "title": "Invite Friends",
+      "subtitle": "+5 credits for you. +3 for your friend.",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "share": "Share",
+      "share_text": "I use Pathly for my job applications — personalized cover letters and interview coaching with AI. Try it out and we both get bonus credits!",
+      "stats_used": "{count} of {max} referrals",
+      "stats_earned": "+{amount} credits earned",
+      "limit_reached": "Maximum reached — thanks for your support!",
+      "error": "Could not load referral link."
     }
   },
   "legal": {

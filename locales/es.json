@@ -610,6 +610,20 @@
     "tabs": {
       "account": "Cuenta",
       "privacy": "Privacidad y seguridad"
+    },
+    "referral": {
+      "card_title": "Invitar amigos",
+      "card_description": "Recomienda Pathly y obtén créditos bonus para ti y tu amigo.",
+      "title": "Invitar amigos",
+      "subtitle": "+5 créditos para ti. +3 para tu amigo.",
+      "copy": "Copiar",
+      "copied": "¡Copiado!",
+      "share": "Compartir",
+      "share_text": "Uso Pathly para mis solicitudes de empleo — cartas personalizadas y coaching con IA. ¡Pruébalo y ambos recibiremos créditos bonus!",
+      "stats_used": "{count} de {max} referidos",
+      "stats_earned": "+{amount} créditos ganados",
+      "limit_reached": "Máximo alcanzado — ¡gracias por tu apoyo!",
+      "error": "No se pudo cargar el enlace de referido."
     }
   },
   "legal": {

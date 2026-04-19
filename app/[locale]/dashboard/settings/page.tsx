@@ -3,9 +3,10 @@ import { LanguageToggleCard } from "./language-toggle-card"
 import { CheckinSettingsCard } from "./checkin-settings-card"
 import { TourResetCard } from "./tour-reset-card"
 import { CreditUsageCard } from "./credit-usage-card"
+import { ReferralCard } from "./referral-card"
 import { SettingsTabs } from "./settings-tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Globe, GraduationCap, Zap } from "lucide-react"
+import { FileText, Globe, GraduationCap, Zap, Gift } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { getTranslations } from "next-intl/server"
@@ -49,7 +50,21 @@ export default async function SettingsPage() {
                     </CardContent>
                 </Card>
 
-                {/* Language Settings Section */}
+                {/* Referral CTA — directly below Credits */}
+                <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
+                            <Gift className="h-5 w-5 text-[#012e7a]" />
+                            {t('referral.card_title')}
+                        </CardTitle>
+                        <CardDescription className="text-[#73726E]">
+                            {t('referral.card_description')}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ReferralCard />
+                    </CardContent>
+                </Card>
                 <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">
                     <CardHeader className="pb-4">
                         <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">

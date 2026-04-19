@@ -611,6 +611,20 @@
     "tabs": {
       "account": "Konto",
       "privacy": "Datenschutz & Sicherheit"
+    },
+    "referral": {
+      "card_title": "Freunde einladen",
+      "card_description": "Empfehle Pathly und erhalte Bonus-Credits für dich und deinen Freund.",
+      "title": "Freunde einladen",
+      "subtitle": "+5 Credits für dich. +3 für deinen Freund.",
+      "copy": "Kopieren",
+      "copied": "Kopiert!",
+      "share": "Teilen",
+      "share_text": "Ich nutze Pathly für meine Bewerbungen — personalisierte Anschreiben und Interview-Coaching mit KI. Probier es aus und wir bekommen beide Bonus-Credits!",
+      "stats_used": "{count} von {max} Empfehlungen",
+      "stats_earned": "+{amount} Credits verdient",
+      "limit_reached": "Maximum erreicht — danke für deine Unterstützung!",
+      "error": "Empfehlungslink konnte nicht geladen werden."
     }
   },
   "legal": {

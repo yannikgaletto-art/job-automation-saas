@@ -112,6 +112,22 @@ export async function POST(request: NextRequest) {
             goals: onboarding_goals?.length ?? 0,
         });
 
+        // ── 4. Referral Claim (NON-BLOCKING — like onboarding_goals) ──
+        // Reads referral_code from user_metadata (set during signup via ?ref= URL)
+        const referralCode = user.user_metadata?.referral_code;
+        if (referralCode && typeof referralCode === 'string') {
+            try {
+                const { claimReferral } = await import('@/lib/services/referral-service');
+                const claimResult = await claimReferral(user.id, referralCode);
+                if (claimResult.success) {
+                    console.log(`[onboarding/complete] Referral claimed: +${claimResult.bonusCredits} credits for new user`);
+                }
+            } catch (err) {
+                // Silent: Referral is bonus, never blocks onboarding completion
+                console.warn('[onboarding/complete] Referral claim failed (non-blocking):', err);
+            }
+        }
+
         return NextResponse.json({ success: true }); // NUR hier — nach verifiziertem Read-Back
     } catch (error: unknown) {
         console.error('[onboarding/complete] Fatal:', error);

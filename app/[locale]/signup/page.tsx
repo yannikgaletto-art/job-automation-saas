@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, usePathname } from "@/i18n/navigation"
+import { useSearchParams } from "next/navigation"
 import { useTranslations, useLocale } from "next-intl"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/motion/button"
@@ -33,6 +34,8 @@ export default function SignupPage() {
     const supabase = createClient()
     const t = useTranslations('auth.signup')
     const currentLocale = useLocale()
+    const searchParams = useSearchParams()
+    const referralCode = searchParams.get('ref') || ''
 
     // Refs to keep credentials stable across polls (avoid stale closures)
     const emailRef = useRef(email)
@@ -170,6 +173,9 @@ export default function SignupPage() {
                     emailRedirectTo: `${window.location.origin}/auth/callback`,
                     data: {
                         full_name: fullName,
+                        // Referral: persisted in raw_user_meta_data,
+                        // survives OAuth redirects (no sessionStorage needed)
+                        ...(referralCode ? { referral_code: referralCode } : {}),
                     },
                 }
             })
