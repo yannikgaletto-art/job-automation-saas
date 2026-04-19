@@ -62,7 +62,6 @@ export function PersonaPanel({
 
     const STYLE_LABELS: Record<string, string> = {
         'storytelling': 'Narrativ',
-        'data-driven': 'Datengetrieben',
         'formal': 'Klassisch',
     }
 

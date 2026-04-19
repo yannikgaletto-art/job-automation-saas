@@ -163,78 +163,70 @@ ${JSON.stringify(cvDataForPrompt, null, 2)}`;
 
     // ─── Tone Instructions (B1.5: Jeder Stil verändert GESAMTE Prompt-Struktur) ─
     const toneInstructions: Record<string, string> = {
-        'data-driven': `STIL: DATENGETRIEBEN & PRÄZISE
-${hasQuote ? 'ÖFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhänger) gesteuert. Starte NACH dem Zitat-Block mit einem konkreten, quantifizierbaren Fakt oder messbaren Ergebnis — ohne nochmal auf das Zitat zurückzugreifen.' : `ÖFFNUNG (OHNE ZITAT — mit Firmenbezug):
-Beginne mit einem KONKRETEN Bezug zum Unternehmen aus der Unternehmensanalyse. Max. 2 Sätze.
-MÖGLICHE OPENER:
-- "Als ich euer Projekt [X] sah / eure Website las / euren Artikel [Y] las, ..."
-- "Da ihr [konkreten Fakt aus Analyse] vorantreibt, ..."
-- "Euer Ansatz bei [konkretes Thema aus Analyse/Stellenanzeige] hat mich angesprochen, weil ..."
-
-Danach: Erkläre in 1 Satz, WARUM dich das persönlich anspricht und leite zur Vorstellung über.
-❌ VERBOTEN: Allwissende Branchen-Statements wie "X stehen und fallen damit...", "In der heutigen Zeit...", "Die Branche steht vor..."
-❌ VERBOTEN: "echten Mehrwert" — was ist schon "echt"? Sei konkreter.
-❌ VERBOTEN: "möchte ich mich" doppelt im selben Absatz.
-❌ VERBOTEN: Mehr als 3 Sätze in der Einleitung.`}
-ABSATZ-STRUKTUR: Jeder Hauptabsatz folgt dem Schema: Claim → Beweis (Zahl/KPI/Ergebnis) → Implikation für den neuen Arbeitgeber.
-BEWEISFÜHRUNG:
-- Nutze konkrete Zahlen, Prozentsätze und messbare Resultate in JEDEM Absatz
-- Struktur pro Achievement: "Ich habe [X] durch [Y] erreicht, was [Z] bewirkte"
-- Aktive Verben: implementiert, gesteigert, reduziert, aufgebaut, verantwortet, optimiert
-- Keine vagen Formulierungen wie "sehr erfolgreich" — immer quantifizieren
-- Mindestens 3 konkrete Zahlen im gesamten Anschreiben
-SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
-VERBOTEN: Adjektive ohne Beleg, Superlative ohne Beweis, "leidenschaftlich", "motiviert", "engagiert" ohne konkretes Beispiel.`,
-
-        'storytelling': `STIL: NARRATIV & PERSÖNLICH
-${hasQuote ? 'ÖFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhänger) gesteuert. Starte NACH dem Zitat-Block — beginne direkt mit der Brücke zwischen dem Zitat und deiner persönlichen Erfahrung, ohne nochmals ein Zitat zu eröffnen.' : `ÖFFNUNG (OHNE ZITAT — mit Firmenbezug):
-Beginne mit einem KONKRETEN Bezug zum Unternehmen oder zur Stellenanzeige. Max. 2-3 Sätze.
-MÖGLICHE OPENER (wähle EINE Variante):
+        'storytelling': `STIL: NARRATIV & PERSOENLICH
+${hasQuote ? 'OEFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhaenger) gesteuert. Starte NACH dem Zitat-Block — beginne direkt mit der Bruecke zwischen dem Zitat und deiner persoenlichen Erfahrung, ohne nochmals ein Zitat zu eroeffnen.' : `OEFFNUNG (OHNE ZITAT — mit Firmenbezug):
+Beginne mit einem KONKRETEN Bezug zum Unternehmen oder zur Stellenanzeige. Max. 2-3 Saetze.
+MOEGLICHE OPENER (waehle EINE Variante):
 - "Als ich auf eurer Website las, dass [konkreter Fakt]..." / "Als ich euer Projekt [X] sah..."
-- "Da ihr Unterstützung in [Bereich aus Stellenanzeige] sucht, sind mir einige Parallelen zu meinen Stationen aufgefallen..."
-- "Euer Ansatz bei [Thema aus Analyse] hat mich angesprochen, weil ich bei [eigene Firma] ähnliches erlebt habe."
+- "Da ihr Unterstuetzung in [Bereich aus Stellenanzeige] sucht, sind mir einige Parallelen zu meinen Stationen aufgefallen..."
+- "Euer Ansatz bei [Thema aus Analyse] hat mich angesprochen, weil ich bei [eigene Firma] aehnliches erlebt habe."
 
-Danach: Erkläre kurz WARUM dich das anspricht und leite zur Vorstellung über ("Daher möchte ich mich kurz vorstellen.").
-❌ VERBOTEN: Allwissende Branchen-Statements wie "[Branche] steht und fällt damit...", "In der heutigen Zeit ist..."
-❌ VERBOTEN: "echten Mehrwert" / "echte Werte" — zu vage und leer.
-❌ VERBOTEN: "möchte ich mich" doppelt im selben Absatz.
-❌ VERBOTEN: Mehr als 3 Sätze in der Einleitung.`}
-ABSATZ-STRUKTUR: Jede CV-Station wird als Mini-Geschichte erzählt:
+Danach: Erklaere kurz WARUM dich das anspricht und leite zur Vorstellung ueber ("Daher moechte ich mich kurz vorstellen.").
+VERBOTEN: Allwissende Branchen-Statements, "echten Mehrwert", "moechte ich mich" doppelt, mehr als 3 Saetze.`}
+ABSATZ-STRUKTUR: Jede CV-Station wird als Mini-Geschichte erzaehlt:
 - Situation (1 Satz): Was war der Kontext/die Herausforderung?
 - Handlung (1 Satz): Was hast du konkret getan?
 - Ergebnis (1 Satz): Was kam dabei heraus; und was hat es dir beigebracht?
 DRAMATURGIE:
-- Verbinde die Stationen zu einem kohärenten Karriere-Narrativ: Jede Station baut auf der vorherigen auf
+- Verbinde die Stationen zu einem kohaerenten Karriere-Narrativ: Jede Station baut auf der vorherigen auf
 - Das "Warum" ist wichtiger als das "Was" — zeige Motivation und Entwicklung
-- Erlaube 1-2 persönliche Aussagen zur Motivation (aber kein Pathos)
-- Nutze Zeitwörter: "Zunächst", "Im nächsten Schritt", "Daraus entwickelte sich"
-- Die rote Linie: Alle Absätze führen logisch zur Bewerbung bei DIESER Firma
-RHETORISCHE WÜRZUNG (PFLICHT in diesem Stil): Verwende MINDESTENS 1 rhetorisches Stilmittel (Trikolon, Asyndeton oder Anadiplose) an einer Stelle wo es den Lesefluss natürlich verbessert. Max. 2 gesamt.
+- Erlaube 1-2 persoenliche Aussagen zur Motivation (aber kein Pathos)
+- Die rote Linie: Alle Absaetze fuehren logisch zur Bewerbung bei DIESER Firma
+RHETORISCHE WUERZUNG (PFLICHT in diesem Stil): Verwende MINDESTENS 1 rhetorisches Stilmittel (Trikolon, Asyndeton oder Anadiplose). Max. 2 gesamt.
 SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
-VERBOTEN: Aufzählungen, Bullet-Points-Stil, trockene Fakten ohne Kontext, "Mein Werdegang zeigt..."`,
+VERBOTEN: Aufzaehlungen, Bullet-Points-Stil, trockene Fakten ohne Kontext, "Mein Werdegang zeigt..."
 
-        'formal': `STIL: KLASSISCH-FORMELL
-${hasQuote ? 'ÖFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhänger) gesteuert. Starte NACH dem Zitat-Block mit einer direkten, sachlichen Bezügnahme auf die Stelle.' : `ÖFFNUNG (OHNE ZITAT — mit Stellen-/Firmenbezug):
-Beginne mit einer direkten, höflichen Bezügnahme auf die Stelle und einem konkreten Firmenbezug aus der Unternehmensanalyse. Max. 2-3 Sätze.
-Beispiel: "Die ausgeschriebene Position als [Titel] bei [Firma] verbindet [Kompetenzfeld A] mit [Kompetenzfeld B] — eine Verbindung, die meine bisherige Laufbahn prägt."
-❌ VERBOTEN: Allwissende Branchen-Statements, "echten Mehrwert", "möchte ich mich" doppelt.`}
-ABSATZ-STRUKTUR: Konservative 4-Absatz-Struktur:
-1. Einstieg + Motivation (2-3 Sätze)
-2. Fachliche Qualifikation mit Belegen (3-4 Sätze)
-3. Unternehmens-Passung + kulturelle Verbindung (2-3 Sätze)
-4. Souveräner Abschluss (1-2 Sätze)
-TONALITÄT:
-- Vollständige Formulierungen, keine Kontraktionen
-- Passiv vermeiden, aber formelle Anrede konsequent beibehalten (Sie, Ihnen, Ihr)
-- Keine Ausrufezeichen, keine rhetorischen Fragen
-- Konjunktiv I für höfliche Formulierungen erlaubt
-- Seriöse Übergänge: "Darüber hinaus", "In gleicher Weise", "Vor diesem Hintergrund"
+--- FEW-SHOT REFERENZ-BEISPIELE (Storytelling) ---
+BEISPIEL INTRO (mit Zitat, Du-Form):
+"beim Lesen des Telekom-Cases liess mich der Loop Approach hellhoerig werden; denn er erinnerte mich an das Zitat von Saint-Exupery: [ZITAT]. Die Sehnsucht nach dem eigenen Gestalten und damit Teams zu befaehigen sich selbst zu steuern begleiten mich durch viele Stationen in meiner Karriere. Gestalten braucht aber einen Ort, der das zulaesst und diesen Ort erkenne ich in Eurer Arbeit. Deshalb moechte ich mich kurz vorstellen."
+
+BEISPIEL STATIONS-ABSATZ (narrativ):
+"Fuer mich bedeutet 'zwischen Technologie und Mensch vermittelt', die Faehigkeit zu besitzen, zwei Sprachen zu sprechen. Diese Uebersetzungsleistung habe ich als Projektleiter einer Quantum-Computing-Gruppe bei Fraunhofer FOKUS taeglich angewendet. Dort unterstuetzte ich Softwareentwickler dabei, ihre Ideen in marktfaehige Business-Modelle zu uebersetzen; mit Kickoffs, OKR-Roadmaps und Stakeholdermanagement. Die zentrale Frage war dabei immer: Loesen wir das, was der Nutzer wirklich braucht?"
+--- ENDE FEW-SHOT ---`,
+
+        'formal': `STIL: STRUKTURIERT & PRAEZISE (vereint klassisch-formelle Haltung mit datengetriebener Argumentation)
+${hasQuote ? 'OEFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhaenger) gesteuert. Starte NACH dem Zitat-Block mit einer direkten, sachlichen Bezugnahme auf die Stelle.' : `OEFFNUNG (OHNE ZITAT — mit Stellen-/Firmenbezug):
+Beginne mit einer direkten, hoeflichen Bezugnahme auf die Stelle und einem konkreten Firmenbezug aus der Unternehmensanalyse. Max. 2-3 Saetze.
+Beispiel: "Die ausgeschriebene Position als [Titel] bei [Firma] verbindet [Kompetenzfeld A] mit [Kompetenzfeld B] — eine Verbindung, die meine bisherige Laufbahn praegt."
+VERBOTEN: Allwissende Branchen-Statements, "echten Mehrwert", "moechte ich mich" doppelt.`}
+ABSATZ-STRUKTUR: Jeder Hauptabsatz folgt dem Schema: Claim -> Beweis (Zahl/KPI/konkretes Ergebnis) -> Implikation fuer den neuen Arbeitgeber.
+Konservative 4-Absatz-Struktur:
+1. Einstieg + Motivation (2-3 Saetze)
+2. Fachliche Qualifikation mit Belegen (3-4 Saetze)
+3. Unternehmens-Passung + kulturelle Verbindung (2-3 Saetze)
+4. Souveraener Abschluss (1-2 Saetze)
+BEWEISFUEHRUNG:
+- Nutze konkrete Zahlen, Prozentsaetze und messbare Resultate wenn im CV vorhanden
+- Struktur pro Achievement: "Ich habe [X] durch [Y] erreicht, was [Z] bewirkte"
+- Aktive Verben: implementiert, gesteigert, reduziert, aufgebaut, verantwortet, optimiert
+TONALITAET:
+- Vollstaendige Formulierungen, keine Kontraktionen
+- Passiv vermeiden, aber formelle Anrede konsequent beibehalten (Sie/Ihnen/Ihr bei Sie-Form)
+- Keine Ausrufezeichen, keine rhetorischen Fragen (ausser mit Zitat-Bridging)
+- Serioese Uebergaenge: "Darueber hinaus", "In gleicher Weise", "Vor diesem Hintergrund"
 SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
-VERBOTEN: Umgangssprache, Emojis, Interjektionen, "Ich brenne für", persönliche Anekdoten.`,
+VERBOTEN: Umgangssprache, Emojis, "Ich brenne fuer", persoenliche Anekdoten ohne Stellenbezug, Adjektive ohne Beleg.
 
-        // WHY: Philosophisch-Preset removed (user decision 2026-04-19) — too niche, overlaps with Storytelling,
-        // and dilutes prompt quality. Best elements (analogies, Querverweise) merged into Storytelling.
-        // Original text moved to comment for rollback potential.
+--- FEW-SHOT REFERENZ-BEISPIELE (Formal) ---
+BEISPIEL INTRO (ohne Zitat, Sie-Form):
+"Ihre Ausschreibung beschreibt eine Rolle, die ich aus verschiedenen Blickwinkeln kenne: als Berater bei Fraunhofer FOKUS, als Co-Founder bei Xorder Menues und zuletzt im B2B-Vertrieb bei Ingrano Solutions. Dabei stand haeufig dieselbe Frage im Mittelpunkt: Wie uebersetzt man eine gute Idee in etwas, das Menschen wirklich nutzen? Ich glaube, das ist genau das, was Sie mit der 'Bruecke zwischen Strategie und Umsetzung' meinen — und deshalb bewerbe ich mich als [Jobtitel] bei Ihnen."
+
+BEISPIEL STATIONS-ABSATZ (strukturiert):
+"B2B-Kunden mit regulatorischem Handlungsbedarf zu identifizieren, Audit-Mandate strategisch zu platzieren und Stakeholder-Analysen fuer die Fuehrungsebene aufzubereiten, beschreibt meinen Alltag bei Ingrano Solutions. Zwei Dinge nehme ich aus dieser Zeit mit: Vertrieb funktioniert dann, wenn man das Problem des Kunden frueher versteht als er selbst. Und wirksame Angebote entstehen fast immer aus der Qualitaet der Fragen, die davor gestellt wurden."
+
+BEISPIEL INTRO (mit Zitat, Sie-Form):
+"Ihre Ausschreibung nennt 'strategische Empfehlungen entwickeln und dabei unterschiedliche Perspektiven integrieren'. Nach meiner Erfahrung gelingt das nur, wenn man versteht, warum jede Perspektive so denkt wie sie denkt. Simon Sinek hat das auf einen Satz gebracht: [ZITAT]. Mit anderen Worten: Wer nur fragt was eine Organisation tut, versteht ihre Entscheidungen nicht. In jedem Projekt, das ich begleitet habe — von der KI-Strategieberatung bei Fraunhofer FOKUS bis zur B2B-Transformation bei Ingrano Solutions — war der Einstieg immer derselbe: erst das Warum verstehen, dann die Loesung entwickeln."
+--- ENDE FEW-SHOT ---`,
     };
     const activeTone = toneInstructions[ctx?.tone.preset ?? 'formal'];
 
@@ -1035,23 +1027,24 @@ ${t(`[VERBOTENE WÖRTER UND MUSTER (immer, in JEDEM Kontext)]
 
 
 
-ANTI-REPETITIONS-REGEL (KRITISCH):
-Jeder Stations-Absatz MUSS mit einem ANDEREN Einleitungssatz beginnen.
-VERBOTEN: Denselben Einleitungstyp oder dieselbe Satzstruktur für zwei aufeinanderfolgende Absätze zu verwenden.
-Beispiel VERBOTEN: „Die Verbindung von X und Y bei Firma A..." gefolgt von „Die Verbindung von X und Y bei Firma B..."
-Jeder Absatz muss einen eigenen Einstieg haben: Mal ein konkretes Ergebnis, mal ein Kontext-Setting, mal eine Problemstellung.
+${t(`[ANTI-WIEDERHOLUNGS-SCHUTZ (KRITISCH — 2 EBENEN)]
 
-${t(`[ANTI-SATZANFANG-WIEDERHOLUNG (PFLICHT)]
-NIEMALS zwei aufeinanderfolgende Sätze mit demselben Subjekt oder Verb beginnen.
-VERBOTEN: "Habe ich..." gefolgt von "Habe ich..." oder "Zudem habe ich..." gefolgt von "Daher habe ich..."
-VERBOTEN: "Ich konnte..." gefolgt von "Ich konnte..."
-JEDER Satz muss mit einem ANDEREN Einstieg beginnen. Variiere: Zeitangabe, Kontext, Ergebnis, Vergleich, Konkretes Beispiel.
-BEISPIEL FALSCH: "Bei X habe ich... Zudem habe ich... Daher habe ich gelernt..."
-BEISPIEL RICHTIG: "Bei X übernahm ich die Steuerung von Y. Der Fokus lag auf Z. Deshalb freue ich mich, diese Erfahrung einzubringen."`,
-`[ANTI-SENTENCE-START REPETITION (MANDATORY)]
-NEVER start two consecutive sentences with the same subject or verb.
-FORBIDDEN: "I was able to..." followed by "I was also able to..."
-EVERY sentence must start with a DIFFERENT opening. Vary: time reference, context, result, comparison, concrete example.`)}
+EBENE 1 — ABSATZ-EROEFFNUNG: Jeder Stations-Absatz MUSS mit einem ANDEREN Einleitungstyp beginnen.
+VERBOTEN: Dieselbe Satzstruktur fuer aufeinanderfolgende Absaetze (z.B. \"Die Verbindung von X und Y bei Firma A\" gefolgt von \"Die Verbindung von X und Y bei Firma B\").
+Variiere: Ergebnis, Kontext-Setting, Problemstellung, JD-Fragment-Zitat.
+
+EBENE 2 — SATZANFAENGE INNERHALB EINES ABSATZES: Keine zwei aufeinanderfolgenden Saetze mit demselben Subjekt/Verb.
+VERBOTEN: \"Habe ich...\" + \"Zudem habe ich...\" + \"Daher habe ich gelernt...\"
+RICHTIG: \"Bei X uebernahm ich die Steuerung von Y. Der Fokus lag auf Z. Deshalb freue ich mich, diese Erfahrung einzubringen.\"`,
+`[ANTI-REPETITION GUARD (CRITICAL — 2 LEVELS)]
+
+LEVEL 1 — PARAGRAPH OPENING: Each station paragraph MUST start with a DIFFERENT opening type.
+FORBIDDEN: Same sentence structure for consecutive paragraphs.
+Vary: result, context-setting, problem statement, JD fragment quote.
+
+LEVEL 2 — SENTENCE STARTS WITHIN A PARAGRAPH: No two consecutive sentences with the same subject/verb.
+FORBIDDEN: \"I was able to...\" followed by \"I was also able to...\"
+RIGHT: \"At X I took charge of Y. The focus was on Z. That is why I look forward to bringing this experience.\"`)}
 
 ${t(`[RELEVANZ-PFLICHT — JEDER FAKT BRAUCHT EIN "WARUM"]
 Jeder genannte Fakt (Tätigkeit, Tool, Ergebnis) MUSS einen direkten Bezug zur Stellenbeschreibung oder zum Unternehmenswert haben.

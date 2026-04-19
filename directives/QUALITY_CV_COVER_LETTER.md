@@ -35,7 +35,7 @@ nach dem Upload von Referenz-Anschreiben.
 **Extrahierte Style-Marker (Pflicht):**
 ```typescript
 interface StyleAnalysis {
-  tone: 'professional' | 'storytelling' | 'data-driven';
+  tone: 'professional' | 'storytelling' | 'formal';
   sentence_length: 'short' | 'medium' | 'long'; // avg Wörter
   conjunctions: string[];     // Top-5: ["Daher", "Deshalb", "Zudem"...]
   greeting: string;           // z.B. "Liebe Anna-Nicole" / "Sehr geehrte..."

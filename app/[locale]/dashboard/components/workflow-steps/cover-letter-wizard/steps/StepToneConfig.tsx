@@ -13,7 +13,7 @@ interface Props {
     onGenerate: () => void;
 }
 
-const toneOptionIds: TonePreset[] = ['data-driven', 'storytelling', 'formal'];
+const toneOptionIds: TonePreset[] = ['storytelling', 'formal'];
 
 function formatDate(dateStr: string, locale: string) {
     return new Date(dateStr).toLocaleDateString(locale, {
@@ -29,7 +29,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const { setTone, setOptInModule, isStepComplete, tone, optInModules } = useCoverLetterSetupStore();
 
     const toneOptions = useMemo(() => toneOptionIds.map(id => {
-        const key = id.replace(/-/g, '_') as 'tone_data_driven' | 'tone_storytelling' | 'tone_formal';
+        const key = id.replace(/-/g, '_') as 'tone_storytelling' | 'tone_formal';
         return {
             id,
             label: t(`tone_${key}` as typeof key),
@@ -37,7 +37,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             previewText: t(`tone_${key}_preview` as `${typeof key}_preview`),
         };
     }), [t]);
-    const [selectedPreset, setSelectedPreset] = useState<TonePreset>(tone?.preset || 'data-driven');
+    const [selectedPreset, setSelectedPreset] = useState<TonePreset>(tone?.preset || 'formal');
     const [language, setLanguage] = useState<TargetLanguage>(tone?.targetLanguage || setupData.detectedJobLanguage);
     const [contactPerson, setContactPerson] = useState(tone?.contactPerson || '');
     const [formality, setFormality] = useState<'sie' | 'du'>(tone?.formality || 'sie');
@@ -116,7 +116,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
         if (source === 'custom-style') {
             // Fix: Ghost-Preset — reset hidden preset to data-driven
             if (selectedPreset === 'formal') {
-                setSelectedPreset('data-driven');
+                setSelectedPreset('storytelling');
             }
             // Always open the picker so user can choose/confirm
             setShowDocPicker(true);
@@ -124,7 +124,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             if (docsWithStyle.length === 1) {
                 const doc = docsWithStyle[0];
                 setSelectedDocId(doc.id);
-                syncTone('custom-style', selectedPreset === 'formal' ? 'data-driven' : selectedPreset, doc.id);
+                syncTone('custom-style', selectedPreset === 'formal' ? 'storytelling' : selectedPreset, doc.id);
             }
         } else {
             setSelectedDocId(undefined);
