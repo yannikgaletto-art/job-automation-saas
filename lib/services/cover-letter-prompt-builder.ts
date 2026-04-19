@@ -187,13 +187,13 @@ SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Aufzaehlungen, Bullet-Points-Stil, trockene Fakten ohne Kontext, "Mein Werdegang zeigt..."
 
 --- FEW-SHOT REFERENZ-BEISPIELE (Storytelling) ---
-BEISPIEL INTRO (mit Zitat, Du-Form):
-"beim Lesen des Telekom-Cases fiel mir auf, wie praezise ein Gedanke diesen Perspektivwechsel trifft:
+BEISPIEL INTRO (mit Zitat, Du-Form — BESCHEIDEN, nicht selbstlobend):
+"beim Lesen des Telekom-Cases erinnerte ich mich an ein Zitat, das ich mit Euch teilen moechte:
 [ZITAT]
 – [Autor]
 Die Sehnsucht nach dem eigenen Gestalten und damit Teams zu befaehigen sich selbst zu steuern begleiten mich durch viele Stationen in meiner Karriere. Gestalten braucht aber einen Ort, der das zulaesst und diesen Ort erkenne ich in Eurer Arbeit. Deshalb moechte ich mich kurz vorstellen."
 
-BEISPIEL STATIONS-ABSATZ (narrativ, mit JD-Fragment):
+BEISPIEL STATIONS-ABSATZ (narrativ, mit JD-Fragment — ICH-Perspektive, nie allwissend):
 "Fuer mich bedeutet 'zwischen Technologie und Mensch vermittelt', die Faehigkeit zu besitzen, zwei Sprachen zu sprechen. Diese Uebersetzungsleistung habe ich als Projektleiter einer Quantum-Computing-Gruppe bei Fraunhofer FOKUS taeglich angewendet. Dort unterstuetzte ich Softwareentwickler dabei, ihre Ideen in marktfaehige Business-Modelle zu uebersetzen; mit Kickoffs, OKR-Roadmaps und Stakeholdermanagement. Die zentrale Frage war dabei immer: Loesen wir das, was der Nutzer wirklich braucht?"
 --- ENDE FEW-SHOT ---`,
 
@@ -372,18 +372,22 @@ Zitat (WORTWÖRTLICH übernehmen, NICHT übersetzen — Sprache beibehalten wie 
 (Autor: ${ctx!.selectedQuote!.author})
 
 AUFBAU (max. 80 Wörter ohne Zitat):
-1. EINLEITUNGSSATZ (1 Satz): Bezug auf Stellenanzeige oder Kernaufgabe, endet mit Überleitung zum Zitat.
-   ✅ "Als ich eure Ausschreibung als [Jobtitel] las, fiel mir ein Gedanke ein:"
-   ✅ "Eure Stelle spricht von '[2-5 Wort JD-Fragment]'; das trifft es präzise:"
-   ✅ "Beim Lesen der Stelle als [Jobtitel] fiel mir auf, wie treffend ein Gedanke diesen Anspruch beschreibt:"
-   PFLICHT: Formuliere aus ICH-Perspektive. Fakten aus Unternehmensanalyse erlaubt.
+1. EINLEITUNGSSATZ (1 Satz): Bezug auf Stellenanzeige oder Kernaufgabe, endet mit bescheidener Überleitung zum Zitat.
+   ✅ "Als ich eure Stelle als [Jobtitel] las, erinnerte ich mich an ein Zitat:"
+   ✅ "Beim Lesen eurer Ausschreibung fiel mir ein Gedanke ein, den ich mit euch teilen möchte:"
+   ✅ "Da ich auf eurer Website las, dass [konkreter Fakt], musste ich an ein Zitat denken:"
+   ❌ NIEMALS: "wie treffend", "wie präzise", "wie passend ein Gedanke" — das ist Selbstlob.
+   PFLICHT: Formuliere BESCHEIDEN aus ICH-Perspektive. Nicht bewerten, nur teilen.
 
 2. ZITAT: Eigene Zeile, in Anführungszeichen. Darunter Signatur-Zeile:
    "– ${ctx!.selectedQuote!.author}"
    Die Signatur-Zeile ist PFLICHT. Autor NICHT zusätzlich im Fließtext nennen.
 
-3. BRÜCKE (1-2 Sätze): Verbinde den KONKRETEN GEDANKEN des Zitats mit der Stelle.
-   ✅ "[Zitat-Bezug]. Deshalb möchte ich mich als [Jobtitel] bei ${isDuForm ? 'euch' : 'Ihnen'} kurz vorstellen."
+3. BRÜCKE (1-2 Sätze): Verbinde den KONKRETEN GEDANKEN des Zitats mit der Stelle — IMMER in ICH-Perspektive.
+   ✅ "Für mich bedeutet [Zitat-Kerngedanke], dass [persönliche Reflexion]. Deshalb möchte ich mich als [Jobtitel] bei ${isDuForm ? 'euch' : 'Ihnen'} kurz vorstellen."
+   ✅ "[Zitat-Kerngedanke] begleitet mich durch viele Stationen. Deshalb möchte ich mich kurz vorstellen."
+   ❌ NIEMALS: "Genau das ist [Thema]" / "Das ist die Definition von" — das ist allwissend und anmaßend.
+   ❌ NIEMALS: Objekte oder Konzepte definieren. Immer persönlich: "Für mich bedeutet...", "Dieser Gedanke begleitet mich..."
    TEST: Passt der Brückensatz nur zu DIESEM Zitat? Wenn er zu jedem Zitat passt → neu schreiben.
    STRUKTUR: Brücke + Bewerbungssatz gehören zum Einleitungsblock (kein eigener Absatz).
 ${enablePingPong ? `
@@ -630,15 +634,16 @@ OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
             // überschreitet das Anschreiben eine DIN-A4-Seite. Der Haupttext wird daher
             // auf max. 340 Wörter begrenzt, sodass der Gesamtbrief bei 350-400 Wörtern bleibt.
             ? '260–340 Wörter (exkl. 90-Tage-Block), 4–5 Absätze. Der 90-Tage-Plan ist ein eigener, kompakter Absatz (max. 60W) und zählt NICHT zum Haupttext.'
-            : '280–380 Wörter, 4–5 Absätze'
+            : '280–380 Wörter, 4–5 inhaltliche Absätze. Anrede und Grußformel sind KEINE eigenen Absätze. Zitat + Brücke gehören zum Einleitungs-Absatz — KEIN separater Absatz für das Zitat allein.'
         }
-- Absätze getrennt durch eine Leerzeile
+- Absätze getrennt durch eine Leerzeile. MAXIMAL 5 Absätze (inkl. Schluss). Gruß im letzten Absatz integrieren.
 - Beginne direkt mit der Anrede: ${contactPersonGreeting}${ctx?.tone.contactPerson ? ` — ZWINGEND: Nutze EXAKT diese Anrede. NIEMALS auf generische Alternativen wie "Dear Hiring Manager", "Sehr geehrte Damen und Herren" etc. ausweichen. Der Name des Ansprechpartners ist gesetzt.` : ''}
 - Anrede-Form: ${isDuForm ? 'DU-FORM (du/dein/euch/dir). Wende diese Du-Form STRIKT auf das GESAMTE Anschreiben an. Kein "Sie" oder "Ihnen" — NIEMALS.' : 'SIE-FORM (Sie/Ihr/Ihnen). Wende diese Sie-Form STRIKT auf das GESAMTE Anschreiben an.'}
-- ${t('Maximale Satzlänge: 25 Wörter. Bei komplexen Gedanken: Zwei kurze Sätze statt einem langen.', 'Maximum sentence length: 25 words. For complex thoughts: Two short sentences instead of one long one.', 'Longitud máxima por oración: 25 palabras. Para ideas complejas: Dos oraciones cortas.')}
+- ${t('ABSOLUTE SATZLÄNGE: Max. 25 Wörter pro Satz. Kein einziger Satz darf 25 Wörter überschreiten. Wenn ein Gedanke zu lang wird: Punkt setzen und neuen Satz beginnen.', 'ABSOLUTE SENTENCE LENGTH: Max. 25 words per sentence. Not a single sentence may exceed 25 words. If a thought gets too long: use a period and start a new sentence.', 'LONGITUD ABSOLUTA: Máx. 25 palabras por oración. Ninguna oración puede exceder 25 palabras.')}
 - ${t('Max. 2 Kommas pro Satz. Mehr Kommas = Satz aufteilen.', 'Max. 2 commas per sentence. More commas = split the sentence.')}
 - ${t('KEIN Gedankenstrich (– oder —) im Fließtext. EINZIGE AUSNAHME: Die Zitat-Signatur-Zeile (z.B. "– Autor"). Überall sonst: Nutze Semikolon (;) oder Punkt statt Gedankenstrich.', 'NO em-dash (– or —) in body text. ONLY EXCEPTION: The quote attribution line ("– Author"). Everywhere else: Use semicolons (;) or periods instead.', 'PROHIBIDO el guión largo (– o —) en el texto. ÚNICA EXCEPCIÓN: La línea de atribución de cita. Usa punto y coma (;) o punto.')}
-- ${t('TONALITÄT: Eloquenz + Bescheidenheit. Sei zuversichtlich aber nicht abgehoben. Zeige Lernbereitschaft statt Allwissenheit. GUT: "Ich gehe zuversichtlich ran", "Ich freue mich, von Ihrer Expertise zu lernen". VERBOTEN: "Ich bringe eine solide Grundlage", "Meine Erfahrung befähigt mich".', 'TONE: Eloquence + Humility. Be confident yet grounded. Show eagerness to learn, not omniscience. GOOD: "I approach this with confidence", "I look forward to learning from your expertise". FORBIDDEN: "I bring a solid foundation", "My experience qualifies me".', 'TONO: Elocuencia + Humildad. Sé seguro pero sin arrogancia. Muestra disposición a aprender.')}
+- ${t('TONALITÄT: Eloquenz + Bescheidenheit. Sei zuversichtlich aber nicht abgehoben. Zeige Lernbereitschaft statt Allwissenheit. GUT: "Ich gehe zuversichtlich ran", "Ich freue mich, von Ihrer Expertise zu lernen". VERBOTEN: "Ich bringe eine solide Grundlage", "Meine Erfahrung befähigt mich", "Genau das ist", "Die Kombination aus", "Diese Kombination aus".', 'TONE: Eloquence + Humility. Be confident yet grounded. Show eagerness to learn, not omniscience. GOOD: "I approach this with confidence", "I look forward to learning from your expertise". FORBIDDEN: "I bring a solid foundation", "My experience qualifies me", "That is exactly what".', 'TONO: Elocuencia + Humildad. Sé seguro pero sin arrogancia. PROHIBIDO: "Exactamente eso es".')}
+- ${t('DOPPELPUNKTE: Kein Satz darf mit einem Doppelpunkt enden, gefolgt von Zeilenumbruch. EINZIGE AUSNAHME: Die Zitat-Signatur-Zeile.', 'COLONS: No sentence may end with a colon followed by a line break. ONLY EXCEPTION: The quote attribution line.')}
 
 === SEKTION 2: TONALITÄT & STIL (HÖCHSTE PRIORITÄT) ===
 

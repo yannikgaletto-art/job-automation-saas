@@ -349,6 +349,36 @@ export const BLACKLIST_PATTERNS: BlacklistPattern[] = [
         category: 'ai_marker',
     },
 
+    // ─── T1 Audit (2026-04-19): Selbstlob, Allwissend-Brücke, nicht-nur-sondern ──
+    {
+        pattern: 'wie treffend ein Gedanke',
+        reason: 'Selbstlobend — das Zitat soll geteilt, nicht bewertet werden',
+        category: 'ai_marker',
+        feedback: 'Ersetze durch: "erinnerte ich mich an ein Zitat" oder "fiel mir ein Gedanke ein, den ich teilen möchte"',
+    },
+    {
+        pattern: 'wie präzise ein Gedanke',
+        reason: 'Selbstlobend — Variante von "wie treffend"',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'wie passend ein Gedanke',
+        reason: 'Selbstlobend — Variante von "wie treffend"',
+        category: 'ai_marker',
+    },
+    {
+        pattern: 'Genau das ist',
+        reason: 'Allwissend — definiert Konzepte statt persönlicher Reflexion. Besser: "Für mich bedeutet..."',
+        category: 'ai_marker',
+        feedback: 'Ersetze durch: "Für mich bedeutet [Konzept]..." oder "[Konzept] begleitet mich..."',
+    },
+    {
+        pattern: 'nicht nur',
+        reason: 'Rhetorisch aufgeblasen ("nicht nur X, sondern Y"). Besser: Direkt beschreiben.',
+        category: 'ai_marker',
+        feedback: 'Formuliere den Satz um: Beschreibe direkt, was du schätzt, statt einen Kontrast aufzubauen.',
+    },
+
     // ─── NEW: Merged from Judge DE_BLACKLIST / EN_BLACKLIST (2026-04-09) ──────────
     {
         pattern: 'an der Schnittstelle zwischen',
@@ -578,6 +608,10 @@ const T1_TIER_PATTERNS: string[] = [
     'Doch ich lernte schnell',
     'schnell den Sprung',
     'hat mich ein Gedanke begleitet',
+    'nicht nur',         // T1-V4: Most frequent blacklist leaker
+    'Genau das ist',     // T1-V4: Bypasses ICH-perspective rule
+    'wie treffend',      // T1-V4: Self-praise pattern
+    'schärfte meinen Blick', // T1-V5: Frequent leaker from Run 3
 ];
 
 /**
