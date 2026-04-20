@@ -33,19 +33,8 @@ interface GeneratedBlock {
     sortOrder: number;
 }
 
-// ── Fixed Vorstellung Script — T2 style (short, authentic, ~10s) ───────────────────────────────
-// These are shown as editable defaults. [Name] = Hiring Manager, [Dein Name] = Applicant.
-const INTRO_DEFAULTS: Record<string, string> = {
-    de: 'Hallo [Name], ich bin [Dein Name]. Ein kurzes Video sagt oft mehr als ein langes Anschreiben. Ich stelle mich kurz vor, damit ihr einen besseren Eindruck habt, wer hinter dem Lebenslauf steckt.',
-    en: 'Hi [Name], I am [Your Name]. A short video often says more than a long cover letter. Let me quickly introduce myself so you get a better sense of who is behind the CV.',
-    es: 'Hola [Nombre], soy [Tu Nombre]. Un video corto dice mas que una larga carta. Me presento brevemente para que tengan una mejor idea de quien esta detras del CV.',
-};
-// Localized title of the intro block (must match TITLE_MAPS)
-const INTRO_TITLES: Record<string, string> = {
-    de: 'Vorstellung',
-    en: 'Introduction',
-    es: 'Introducción',
-};
+
+
 
 /**
  * POST /api/video/scripts/generate
@@ -74,14 +63,10 @@ export async function POST(request: NextRequest) {
         const {
             jobId,
             force,
-            applicant_archetype,
-            tone_mode,
             locale: requestLocale,
         } = await request.json() as {
             jobId: string;
             force?: boolean;
-            applicant_archetype?: string;
-            tone_mode?: 'standard' | 'direct' | 'initiative';
             locale?: string;
         };
         if (!jobId) {
@@ -101,7 +86,7 @@ export async function POST(request: NextRequest) {
             locale = settings?.language || 'de';
         }
 
-        log.info('Generating video script', { jobId, force: !!force, applicant_archetype, tone_mode, locale });
+        log.info('Generating video script', { jobId, force: !!force, locale });
 
         // Fix 1: Check for existing script before overwriting
         const { data: existingScript } = await supabaseAdmin
@@ -226,8 +211,6 @@ export async function POST(request: NextRequest) {
             uniqueKeywords,
             applicantContext,
             contextSource,
-            applicant_archetype,
-            tone_mode,
             templates || [],
         );
 
@@ -277,16 +260,6 @@ export async function POST(request: NextRequest) {
             };
         });
 
-        // ── Always override Vorstellung with the fixed default script ────────────────
-        // The user requested a fixed, personal intro template — AI generates only the
-        // other blocks (Erfahrung, Motivation, Abschluss). The intro placeholders
-        // [Name] and [Dein Name] are filled in by the user before recording.
-        const introTitle = INTRO_TITLES[locale!] || INTRO_TITLES.de;
-        const introDefault = INTRO_DEFAULTS[locale!] || INTRO_DEFAULTS.de;
-        const introBlock = blocks.find(b => b.title === introTitle);
-        if (introBlock) {
-            introBlock.content = introDefault;
-        }
         // Upsert video_scripts row
         const { error: upsertError } = await supabaseAdmin
             .from('video_scripts')
@@ -373,8 +346,6 @@ function getPromptByLocale(
     uniqueKeywords: string[],
     applicantContext: string,
     contextSource: 'cover_letter' | 'cv_data' | 'none',
-    applicantArchetype: string | undefined,
-    toneMode: 'standard' | 'direct' | 'initiative' | undefined,
     templates: { name: string; default_duration_seconds: number }[],
 ): PromptResult {
     const TITLE_MAPS: Record<string, Record<string, string>> = {
@@ -385,52 +356,14 @@ function getPromptByLocale(
     const titleMap = TITLE_MAPS[locale] || TITLE_MAPS.de;
     const blockList = templates.map(t => `- ${titleMap[t.name] || t.name} (${t.default_duration_seconds}s)`).join('\n');
     const descSnippet = job.description ? (job.description as string).substring(0, 1500) : '';
-    const tm = toneMode ?? 'direct';
 
-    // Tone calibration per locale
-    const toneCalibrations: Record<string, Record<string, string>> = {
-        de: {
-            standard: 'TONE_MODE: standard\n- "Sie"-Anrede im Abschluss erlaubt\n- Eröffnung mit Namen + Position',
-            direct: 'TONE_MODE: direct\n- "du/ihr"-Anrede\n- Erfahrungs-Block mit konkreter Zahl',
-            initiative: 'TONE_MODE: initiative\n- Vorstellung beginnt mit Beobachtung über die Firma, NICHT mit dem Namen\n- Abschluss schlägt konkreten nächsten Schritt vor',
-        },
-        en: {
-            standard: 'TONE_MODE: standard\n- Formal "you" address\n- Open with name + position',
-            direct: 'TONE_MODE: direct\n- Casual "you" address\n- Experience block with a concrete number or date',
-            initiative: 'TONE_MODE: initiative\n- Introduction starts with an observation about the company, NOT with your name\n- Closing proposes a concrete next step',
-        },
-        es: {
-            standard: 'TONE_MODE: standard\n- Tratamiento formal "usted"\n- Apertura con nombre + puesto',
-            direct: 'TONE_MODE: direct\n- Tratamiento informal "tú"\n- Bloque de experiencia con número concreto',
-            initiative: 'TONE_MODE: initiative\n- Introducción comienza con observación sobre la empresa, NO con tu nombre\n- Cierre propone un siguiente paso concreto',
-        },
+    // Tone calibration: always "direct" — clean, natural spoken language
+    const toneCalibration: Record<string, string> = {
+        de: 'TONFALL: Direkt & klar.\n- "du/ihr"-Anrede\n- Erfahrungs-Block mit konkreter Zahl',
+        en: 'TONE: Direct & clear.\n- Casual "you" address\n- Experience block with a concrete number or date',
+        es: 'TONO: Directo y claro.\n- Tratamiento informal "tú"\n- Bloque de experiencia con número concreto',
     };
-    const toneCalibration = (toneCalibrations[locale] || toneCalibrations.de)[tm] || '';
-
-    // Archetype hints per locale
-    const archetypeHints: Record<string, Record<string, string>> = {
-        de: {
-            builder: 'ARCHETYPE: Builder — Ergebnisse, Zahlen, gebaute Dinge betonen.',
-            strategist: 'ARCHETYPE: Stratege — Analyse, Denkweise, Klarheit betonen.',
-            teamplayer: 'ARCHETYPE: Teamplayer — Zusammenarbeit, gemeinsame Erfolge betonen.',
-            specialist: 'ARCHETYPE: Spezialist — Fachtiefe, technisches Wissen betonen.',
-        },
-        en: {
-            builder: 'ARCHETYPE: Builder — Emphasize results, numbers, things built.',
-            strategist: 'ARCHETYPE: Strategist — Emphasize analysis, thinking, clarity.',
-            teamplayer: 'ARCHETYPE: Team Player — Emphasize collaboration, shared wins.',
-            specialist: 'ARCHETYPE: Specialist — Emphasize depth, technical expertise.',
-        },
-        es: {
-            builder: 'ARCHETYPE: Builder — Enfatizar resultados, números, cosas construidas.',
-            strategist: 'ARCHETYPE: Estratega — Enfatizar análisis, pensamiento, claridad.',
-            teamplayer: 'ARCHETYPE: Team Player — Enfatizar colaboración, logros compartidos.',
-            specialist: 'ARCHETYPE: Especialista — Enfatizar profundidad, conocimiento técnico.',
-        },
-    };
-    const archetypeHint = applicantArchetype
-        ? (archetypeHints[locale] || archetypeHints.de)[applicantArchetype] || ''
-        : '';
+    const tone = toneCalibration[locale] || toneCalibration.de;
 
     // Build locale-specific prompt
     if (locale === 'en') {
@@ -462,9 +395,8 @@ ${applicantContext ? `\nApplicant background (source: ${contextSource}):\n${appl
 You may ONLY mention experience, technologies, and companies that appear in the "Applicant background" section above.
 DO NOT invent technologies, companies, or projects.
 ${!applicantContext ? 'No background was provided. Use the station names from the job and write generic talking points the applicant can personalize later.' : 'Match the applicant\'s stations to the job requirements. Stay factual.'}
-${archetypeHint ? `\n${archetypeHint}` : ''}
 
-${toneCalibration}
+${tone}
 
 ═══ FORBIDDEN CONSTRUCTIONS ═══
 ❌ "I look forward to bringing my expertise"
@@ -528,9 +460,8 @@ ${applicantContext ? `\nPerfil del candidato (fuente: ${contextSource}):\n${appl
 Solo puedes mencionar experiencia, tecnologías y empresas que aparezcan en el "Perfil del candidato" de arriba.
 NO inventes tecnologías, empresas ni proyectos.
 ${!applicantContext ? 'No se proporcionó perfil. Usa los nombres de las estaciones del puesto y escribe puntos genéricos que el candidato pueda personalizar.' : 'Conecta las estaciones del candidato con los requisitos del puesto. Mantente factual.'}
-${archetypeHint ? `\n${archetypeHint}` : ''}
 
-${toneCalibration}
+${tone}
 
 ═══ CONSTRUCCIONES PROHIBIDAS ═══
 ❌ "Espero con ilusión aportar mi experiencia"
@@ -600,14 +531,13 @@ ${applicantContext ? `\nBewerber-Hintergrund (Quelle: ${contextSource}):\n${appl
 NUR Erfahrungen, Technologien und Firmen nennen, die im Bewerber-Hintergrund stehen.
 ERFINDE NICHTS.
 ${!applicantContext ? 'Kein Hintergrund vorhanden. Nutze Platzhalter wie [CV-Station 1], [Konkrete Handlung], die der Bewerber personalisieren kann.' : 'Matche die Stationen des Bewerbers mit den Job-Anforderungen.'}
-${archetypeHint ? `\n${archetypeHint}` : ''}
 
-${toneCalibration}
+${tone}
 
 === BLOCK-STRUKTUR (T2-Format) ===
 Generiere genau diese 4 Bloecke mit dem angegebenen Timing:
 
-1. Vorstellung (10s, ~20 Woerter): NICHT generieren -- wird vom System vorgefuellt.
+1. Vorstellung (10s, ~20 Woerter): Persoenliche Begruessung, Name + Position nennen.
 
 2. Motivation (15s, ~33 Woerter):
    - Beginne mit: Was hat mich an dieser Firma abgeholt?

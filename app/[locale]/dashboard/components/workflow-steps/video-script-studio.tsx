@@ -12,7 +12,7 @@ import { ModeToggle } from './script-studio/mode-toggle';
 import { BlockEditor, type ScriptBlock } from './script-studio/block-editor';
 import { KeywordSidebar } from './script-studio/keyword-sidebar';
 import { ScriptPreview } from './script-studio/script-preview';
-import { PreGenerationModal, type PreGenParams } from './script-studio/pre-generation-modal';
+import type { PreGenParams } from './script-studio/pre-generation-modal';
 import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
 
 // --- Types ---
@@ -36,7 +36,6 @@ interface ScriptState {
     warnings: string[];
     error: string | null;
     lastSaved: string | null;
-    preGenParams: PreGenParams | null;
 }
 
 type ScriptAction =
@@ -53,7 +52,7 @@ type ScriptAction =
     | { type: 'SAVED'; timestamp: string }
     | { type: 'SHOW_OVERWRITE_CONFIRM' }
     | { type: 'HIDE_OVERWRITE_CONFIRM' }
-    | { type: 'SET_PRE_GEN_PARAMS'; params: PreGenParams }
+    | { type: 'SET_PRE_GEN_PARAMS'; params: PreGenParams } // no-op, kept for TS compat
     | { type: 'LOAD_SCRIPT'; script: { mode: string; blocks: ScriptBlock[]; wpmSpeed: number; categorizedKeywords: CategorizedKeywords } };
 
 const initialState: ScriptState = {
@@ -69,7 +68,6 @@ const initialState: ScriptState = {
     warnings: [],
     error: null,
     lastSaved: null,
-    preGenParams: null,
 };
 
 function reducer(state: ScriptState, action: ScriptAction): ScriptState {
@@ -84,8 +82,7 @@ function reducer(state: ScriptState, action: ScriptAction): ScriptState {
             return { ...state, categorizedKeywords: action.keywords };
         case 'SET_MIRROR_PHRASES':
             return { ...state, mirrorPhrases: action.phrases };
-        case 'SET_PRE_GEN_PARAMS':
-            return { ...state, preGenParams: action.params };
+        case 'SET_PRE_GEN_PARAMS': return state; // No-op: archetype/tone removed
         case 'SET_WPM':
             return { ...state, wpmSpeed: action.wpm };
         case 'TOGGLE_PREVIEW':
@@ -209,6 +206,20 @@ function GeneratingProgress() {
     );
 }
 
+// Wrapper that fires generation on mount (avoids useEffect-in-conditional)
+function AutoGenerateTrigger({ onGenerate }: { onGenerate: () => void }) {
+    const t = useTranslations('video_letter');
+    useEffect(() => {
+        onGenerate();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return (
+        <div className="p-12 flex flex-col items-center gap-3">
+            <LoadingSpinner className="w-8 h-8 text-[#012e7a]" />
+            <p className="text-sm text-[#73726E]">{t('gen_title')}</p>
+        </div>
+    );
+}
+
 // --- Component ---
 
 interface VideoScriptStudioProps {
@@ -221,7 +232,6 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
     const t = useTranslations('video_letter');
     const locale = useLocale();
     const [state, dispatch] = useReducer(reducer, initialState);
-    const [showPreGenModal, setShowPreGenModal] = useState(false);
     const { showPaywall } = useCreditExhausted();
 
     // Initial load
@@ -284,28 +294,14 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
         load();
     }, [jobId]);
 
-    // Generate script — with optional pre-gen params
-    const handleGenerate = useCallback(async (force = false, params?: PreGenParams) => {
-        // Store params in state for potential force-overwrite reuse
-        if (params) {
-            dispatch({ type: 'SET_PRE_GEN_PARAMS', params });
-        }
-        const activeParams = params || state.preGenParams;
-
+    // Generate script — fire and forget, no archetype/tone params needed
+    const handleGenerate = useCallback(async (force = false) => {
         dispatch({ type: 'SET_PHASE', phase: 'generating' });
         try {
             const res = await fetch('/api/video/scripts/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jobId,
-                    force,
-                    locale,
-                    ...(activeParams && {
-                        applicant_archetype: activeParams.applicant_archetype,
-                        tone_mode: activeParams.tone_mode,
-                    }),
-                }),
+                body: JSON.stringify({ jobId, force, locale }),
             });
             const data = await res.json();
             if (!res.ok || !data.success) {
@@ -332,7 +328,7 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
         } catch (err) {
             dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : t('error_generic') });
         }
-    }, [jobId, state.preGenParams]);
+    }, [jobId, locale]);
 
     // Auto-save (debounced)
     const handleSave = useCallback(async () => {
@@ -380,21 +376,11 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
         );
     }
 
-    // Empty state — auto-open modal (consent screen already served as intro)
+    // Empty state — auto-generate immediately (no modal friction)
     if (state.phase === 'empty') {
-        return (
-            <PreGenerationModal
-                open={true}
-                onClose={() => {
-                    // Navigate back — let parent handle via window history or state reset
-                    window.history.back();
-                }}
-                onConfirm={(params) => {
-                    handleGenerate(false, params);
-                }}
-                jobId={jobId}
-            />
-        );
+        // Trigger generation on first render of empty state
+        // useEffect inside conditional is not allowed — use a wrapper
+        return <AutoGenerateTrigger onGenerate={() => handleGenerate(false)} />;
     }
 
     // Generating state — step-by-step progress indicator
@@ -469,7 +455,7 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
                             </p>
                             <div className="flex gap-2 shrink-0">
                                 <button
-                                    onClick={() => { dispatch({ type: 'HIDE_OVERWRITE_CONFIRM' }); handleGenerate(true, state.preGenParams || undefined); }}
+                                    onClick={() => { dispatch({ type: 'HIDE_OVERWRITE_CONFIRM' }); handleGenerate(true); }}
                                     className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-md transition"
                                 >
                                     {t('editor_overwrite_btn')}
