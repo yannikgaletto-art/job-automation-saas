@@ -13,7 +13,7 @@ import { saveCvDecisions } from "@/app/actions/save-cv-decisions"
 import { createClient } from '@/lib/supabase/client'
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { CustomDialog } from "@/components/ui/custom-dialog"
-import { Check, Settings, Sparkles, Layout, Pencil, CheckCheck, Minimize2, Maximize2, Video, Loader2, FileText, ArrowRight } from "lucide-react"
+import { Check, Settings, Sparkles, Layout, Pencil, CheckCheck, Minimize2, Maximize2, ToggleLeft, ToggleRight, Video, Loader2, FileText, ArrowRight } from "lucide-react"
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
