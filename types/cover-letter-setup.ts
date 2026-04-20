@@ -131,4 +131,9 @@ export interface SetupDataResponse {
         createdAt: string;
         hasStyleAnalysis: boolean;
     }>;
+
+    // Returning user detection: true if user has previously generated a cover letter.
+    // Used to hide first-time onboarding tips (e.g. quote example box).
+    // Inferred from documents count — no new DB state needed.
+    isReturningUser: boolean;
 }

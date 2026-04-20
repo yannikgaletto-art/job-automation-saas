@@ -417,7 +417,7 @@ async function generateAiQuoteFallback(ctx: QuoteContext): Promise<QuoteResult[]
 
     try {
         const message = await anthropic.messages.create({
-            model: 'claude-haiku-4-5-20250929',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 800,
             temperature: 0.7,
             system: 'Du bist ein Experte für Vordenker und Intellektuelle aus allen Epochen und Disziplinen. Antworte AUSSCHLIESSLICH mit validem JSON. Kein Markdown, kein Text davor oder danach.',

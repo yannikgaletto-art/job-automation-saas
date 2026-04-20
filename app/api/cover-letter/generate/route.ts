@@ -5,8 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import { logger } from '@/lib/logging';
-import { inngest } from '@/lib/inngest/client';
-import { getUserLocale } from '@/lib/i18n/get-user-locale';
+
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
 import { parseGenerateRequest } from '@/lib/schemas/cover-letter-schema';
@@ -110,7 +109,8 @@ export async function POST(request: NextRequest) {
                 setup_context: setupContext ?? null,
                 cost_cents: result.costCents,
                 fluff_warning: result.fluffWarning ?? false,
-                polish_status: 'pending', // Will be updated by Inngest cover-letter/polish job
+                polish_status: 'done',
+                polish_improved: false,
             },
             origin: 'generated', // Data Hygiene: distinguish AI drafts from user uploads
             pii_encrypted: {}
@@ -139,35 +139,16 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // P5: Update job_queue status so stepper and other features know CL is done
-        const { error: statusError } = await supabaseAdmin
-            .from('job_queue')
-            .update({ status: 'cover_letter_done', updated_at: new Date().toISOString() })
-            .eq('id', jobId)
-            .eq('user_id', userId);
+        // P5: Update job_queue status — ONLY if draft was persisted (§7 Contract Guard)
+        if (draftId) {
+            const { error: statusError } = await supabaseAdmin
+                .from('job_queue')
+                .update({ status: 'cover_letter_done', updated_at: new Date().toISOString() })
+                .eq('id', jobId)
+                .eq('user_id', userId);
 
-        if (statusError) {
-            console.warn(`[${requestId}] ⚠️ Failed to update job_queue status: ${statusError.message}`);
-        }
-
-        // ─── Dispatch Inngest cover-letter/polish for async metadata update ────────
-        // Polish no longer processes content (K2-Fix: Lost Edit Prevention).
-        // It only writes polish_status + audit trail to documents.metadata.
-        if (draftId && fixMode !== 'targeted') {
-            try {
-                await inngest.send({
-                    name: 'cover-letter/polish',
-                    data: {
-                        draftId,
-                        userId,
-                        locale: await getUserLocale(userId),
-                        fluffFound: result.fluffWarning ?? false,
-                    },
-                });
-                console.log(`[${requestId}] ✅ Polish job dispatched for draft ${draftId}`);
-            } catch (inngestErr) {
-                // Non-fatal: polish is best-effort metadata update
-                console.warn(`[${requestId}] ⚠️ Failed to dispatch polish job:`, inngestErr);
+            if (statusError) {
+                console.warn(`[${requestId}] ⚠️ Failed to update job_queue status: ${statusError.message}`);
             }
         }
 

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
     try {
         // ─── Parallel Queries ─────────────────────────────────────────
-        const [jobRes, docsRes, profileRes, allCLDocsRes] = await Promise.all([
+        const [jobRes, docsRes, profileRes, allCLDocsRes, generatedCLCountRes] = await Promise.all([
             supabase
                 .from('job_queue')
                 .select('requirements, metadata, company_name, company_website, job_title, cv_optimization_proposal')
@@ -46,6 +46,15 @@ export async function GET(req: NextRequest) {
                 .neq('origin', 'generated')
                 .order('created_at', { ascending: false })
                 .limit(15),
+
+            // Fix 3: Count generated cover letters to detect returning users
+            // If count > 0, user has been through the wizard before → hide onboarding tips
+            supabase
+                .from('documents')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+                .eq('document_type', 'cover_letter')
+                .eq('origin', 'generated'),
         ]);
 
         if (jobRes.error || !jobRes.data) {
@@ -342,6 +351,7 @@ export async function GET(req: NextRequest) {
             styleAnalysisSummary,
             detectedJobLanguage,
             availableStyleDocs,
+            isReturningUser: (generatedCLCountRes.count ?? 0) > 0,
         };
 
         console.log(`✅ [SetupData] Built for job ${jobId}: ${hooks.length} hooks, ${mappedCvStations.length} stations (from ${cvData.length} raw)`);

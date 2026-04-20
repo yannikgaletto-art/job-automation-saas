@@ -513,19 +513,49 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                         <h4 className="text-xs font-semibold text-[#37352F]">
                             {t('quote_results_title', { count: fetchedQuotes.length })}
                         </h4>
-                        <button
-                            type="button"
-                            onClick={handleQuoteSearch}
-                            disabled={quoteRefreshCount >= 2}
-                            className={`text-[10px] flex items-center gap-1 ${quoteRefreshCount >= 2 ? 'text-[#D0CFC8] cursor-not-allowed' : 'text-[#73726E] hover:text-[#002e7a]'}`}
-                        >
-                            <RefreshCw className="w-3 h-3" /> {t('btn_new_quotes')} {quoteRefreshCount >= 2 ? `(${t('limit_reached') || 'max.'})` : quoteRefreshCount > 0 ? `(${2 - quoteRefreshCount}/2)` : '(max.)'}
-                        </button>
                     </div>
+
+                    {/* Category picker + Refresh — allows topic change before refreshing */}
+                    <div>
+                        <label className="text-[10px] font-medium text-[#73726E] mb-1.5 block">
+                            {t('quote_category_label')}
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                            {QUOTE_CATEGORIES.map(cat => (
+                                <button
+                                    key={cat.key}
+                                    type="button"
+                                    onClick={() => setSelectedQuoteCategory(
+                                        selectedQuoteCategory === cat.key ? null : cat.key
+                                    )}
+                                    className={[
+                                        'px-2.5 py-1 rounded-full text-[10px] font-medium transition-all border',
+                                        selectedQuoteCategory === cat.key
+                                            ? 'bg-[#002e7a] text-white border-[#002e7a]'
+                                            : cat.key === autoDetectedCategory && !selectedQuoteCategory
+                                                ? 'bg-[#f0f4ff] text-[#002e7a] border-[#002e7a]/30'
+                                                : 'bg-white text-[#73726E] border-[#E7E7E5] hover:border-[#002e7a]/30 hover:text-[#37352F]',
+                                    ].join(' ')}
+                                >
+                                    {t(cat.labelKey)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={handleQuoteSearch}
+                        disabled={quoteRefreshCount >= 2}
+                        className={`text-[10px] flex items-center gap-1 ${quoteRefreshCount >= 2 ? 'text-[#D0CFC8] cursor-not-allowed' : 'text-[#73726E] hover:text-[#002e7a]'}`}
+                    >
+                        <RefreshCw className="w-3 h-3" /> {t('btn_new_quotes')} {quoteRefreshCount >= 2 ? `(${t('limit_reached') || 'max.'})` : quoteRefreshCount > 0 ? `(${2 - quoteRefreshCount}/2)` : '(max.)'}
+                    </button>
 
                     <div className="grid grid-cols-1 gap-2">
 
-                        {/* Info-Box: So wirkt ein Zitat */}
+                        {/* Info-Box: So wirkt ein Zitat — only for first-time users */}
+                        {!setupData.isReturningUser && (
                         <div className="bg-[#FFFBE6] border border-[#F5E6A3] rounded-lg p-3 mb-1">
                             <p className="text-xs font-semibold text-[#8B7000] mb-1.5">{t('quote_example_title')}</p>
                             <p className="text-xs text-[#5C4A00] leading-relaxed mb-1">
@@ -538,6 +568,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                                 {t('quote_example_outro')}
                             </p>
                         </div>
+                        )}
                         {fetchedQuotes.map((q, i) => (
                             <motion.button
                                 key={i}
