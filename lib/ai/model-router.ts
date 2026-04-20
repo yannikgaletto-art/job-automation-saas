@@ -206,13 +206,34 @@ export async function complete(
 
     if (model.provider === 'anthropic') {
         const client = getAnthropicClient();
-        const response = await client.messages.create({
-            model: model.id,
-            max_tokens: request.maxTokens ?? 4096,
-            temperature: request.temperature ?? 0,
-            system: request.systemPrompt,
-            messages: [{ role: 'user', content: request.prompt }],
-        });
+        let response: Anthropic.Messages.Message;
+        try {
+            response = await client.messages.create({
+                model: model.id,
+                max_tokens: request.maxTokens ?? 4096,
+                temperature: request.temperature ?? 0,
+                system: request.systemPrompt,
+                messages: [{ role: 'user', content: request.prompt }],
+            });
+        } catch (proxyError: any) {
+            // If connection fails (likely Helicone proxy down), retry with direct Anthropic
+            const isConnectionError = proxyError?.message?.toLowerCase()?.includes('connection') 
+                || proxyError?.message?.toLowerCase()?.includes('econnrefused')
+                || proxyError?.message?.toLowerCase()?.includes('fetch failed');
+            if (isConnectionError && process.env.HELICONE_API_KEY) {
+                console.warn(`⚠️ [ModelRouter] Helicone proxy failed ("${proxyError.message}") — retrying direct to Anthropic for task="${request.taskType}"`);
+                const directClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+                response = await directClient.messages.create({
+                    model: model.id,
+                    max_tokens: request.maxTokens ?? 4096,
+                    temperature: request.temperature ?? 0,
+                    system: request.systemPrompt,
+                    messages: [{ role: 'user', content: request.prompt }],
+                });
+            } else {
+                throw proxyError; // Not a connection error — rethrow
+            }
+        }
 
         const text = response.content
             .filter((block): block is Anthropic.TextBlock => block.type === 'text')
