@@ -138,7 +138,7 @@ export function getAnthropicClient() {
             // Helicone proxy: transparent cost tracking, prompt history, latency monitoring.
             // When HELICONE_API_KEY is absent (e.g. local dev), falls back to direct Anthropic.
             ...(heliconeKey ? {
-                baseURL: 'https://eu.anthropic.helicone.ai',
+                baseURL: 'https://anthropic.helicone.ai',
                 defaultHeaders: {
                     'Helicone-Auth': `Bearer ${heliconeKey}`,
                     'Helicone-Property-App': 'pathly-v2',
