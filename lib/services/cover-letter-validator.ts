@@ -98,6 +98,25 @@ export function validateCoverLetter(
         warnings.push(`${shortParagraphs.length} paragraphs are very short (< 20 words)`);
     }
 
+    // 4b. VERB-PHRASE REPETITION CHECK (Defect #6: "zeigte mir" × 3)
+    // Catches repeated verb phrases like "zeigte mir", "hat mir gezeigt", "wurde mir klar"
+    const VERB_PHRASES_DE = [
+        /zeigte mir/gi, /hat mir gezeigt/gi, /wurde mir klar/gi,
+        /habe ich gelernt/gi, /konnte ich/gi, /durfte ich/gi,
+        /hat mich gelehrt/gi, /wurde mir bewusst/gi,
+    ];
+    const VERB_PHRASES_EN = [
+        /showed me/gi, /taught me/gi, /made me realize/gi,
+        /I was able to/gi, /I learned that/gi,
+    ];
+    const verbPhrases = [...VERB_PHRASES_DE, ...VERB_PHRASES_EN];
+    for (const vp of verbPhrases) {
+        const matches = coverLetter.match(vp);
+        if (matches && matches.length > 1) {
+            warnings.push(`Verb-phrase "${matches[0]}" appears ${matches.length}x (max 1x recommended)`);
+        }
+    }
+
     // 5. JD CITATION FRAGMENT LENGTH CHECK (Anti-Halluzination)
     // Detects when Claude quotes full sentences from the job ad instead of 2-5 word fragments.
     // German quotation marks: „..." (U+201E / U+201C) or regular "..."

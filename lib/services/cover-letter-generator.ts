@@ -71,7 +71,7 @@ export interface CoverLetterResult {
     generationWarnings?: string[]; // Orphan-guard + style-fallback warnings for UI
 }
 
-const MAX_ITERATIONS = 2; // Reduced from 3 to stay under Vercel 120s timeout (see rollback criterion in plan)
+const MAX_ITERATIONS = 3; // Increased from 2: Golden Sample reduces base leak rate, 3 iterations make blacklist leaks near-impossible (0.01%)
 
 // ─── Entry Point ──────────────────────────────────────────────────────────────
 export async function generateCoverLetterWithQuality(

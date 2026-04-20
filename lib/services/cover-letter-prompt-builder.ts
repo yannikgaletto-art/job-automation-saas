@@ -8,6 +8,7 @@
 import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import type { StyleAnalysis } from './writing-style-analyzer';
 import { buildLeanBlacklistSection } from './anti-fluff-blacklist';
+import { buildGoldenSampleSection } from './golden-samples';
 import { DEFAULT_OPT_IN_MODULES } from '@/types/cover-letter-setup';
 import type { HiringPersona } from './hiring-manager-resolver';
 
@@ -608,8 +609,15 @@ ${feedback.map(f => `- ${f}`).join('\n')}
 ${wordCountFeedback ? `\n${wordCountFeedback}` : ''}`
         : '';
 
+    // ─── Golden Sample Section (Primacy — goes FIRST in prompt) ──────────────
+    const goldenSampleSection = (!isCustomStyle && (preset === 'storytelling' || preset === 'formal'))
+        ? buildGoldenSampleSection(preset as 'storytelling' | 'formal', isEnglish)
+        : '';
+
     // ─── MASTER PROMPT ASSEMBLY ───────────────────────────────────────────────
     return `
+${goldenSampleSection}
+
 === ${t('SEKTION 1: ROLLE & OUTPUT-FORMAT', 'SECTION 1: ROLE & OUTPUT FORMAT')} ===
 ${t('Du bist ein Senior-Karriereberater und exzellenter Schreiber.', 'You are a senior career advisor and excellent writer.')}
 ${t(`Deine Aufgabe: Schreibe ein Anschreiben für die Stelle "${jobTitle}" bei "${companyName}".`, `Your task: Write a cover letter for the position "${jobTitle}" at "${companyName}".`)}
@@ -742,70 +750,26 @@ ${isCustomStyle ? '' : styleSection}
 
 ${buildLeanBlacklistSection()}
 
-${t(`[STIL-QUALITÄT]
-STATTDESSEN — Persönliche Reflexion:
-✅ "Aus diesen Erfahrungen habe ich gelernt, sowohl X als auch Y einzunehmen."
-✅ "Der nächste Schritt ist für mich, diese Kompetenzen zu vertiefen und zugleich von Ihrer Branchenerfahrung zu lernen."
-✅ "Daher gehe ich zuversichtlich ran."
-✅ "Zudem freue ich mich, über [Programm/Academy] tiefer in [Thema] einzutauchen."
-
-[LERNKURVEN-VARIANZ — PFLICHT]
-Wähle EINEN aus diesem Pool und SCHLIESSE ihn zu einem vollständigen Satz ab:
-✅ "Erst durch [konkretes Event] verstand ich, dass [Einsicht]."
-✅ "Diese Erfahrung zeigte mir, dass [konkreter Schluss]."
-✅ "Anfangs unterschaetzte ich [X]; die Zusammenarbeit mit [Y] zeigte, dass [Z]."
-REGEL: Der Lernkurven-Satz ist immer ein vollständiger Aussagesatz — nie mit Doppelpunkt enden.`,
-`[STYLE QUALITY]
-INSTEAD — Personal reflection:
-✅ "From these experiences I learned to consider both the commercial and technical perspective."
-✅ "My next step is to deepen these skills while learning from your industry expertise."
-✅ "That is why I approach this role with confidence."
-
-[LEARNING-CURVE VARIETY — MANDATORY]
-Choose ONE from this pool and complete it into a FULL SENTENCE:
-✅ "It was only through [concrete event] that I understood that [insight]."
-✅ "This experience showed me that [concrete conclusion]."
-✅ "At first I underestimated [X]; it was only through [Y] that it became clear that [Z]."
-RULE: Always a complete statement. The insight follows DIRECTLY in the same sentence.`,
-`[CALIDAD DE ESTILO]
-EN CAMBIO — Reflexión personal:
-✅ "De estas experiencias aprendí a considerar tanto la perspectiva comercial como la técnica."
-✅ "Mi siguiente paso es profundizar estas competencias mientras aprendo de su experiencia."
-
-[VARIEDAD EN CURVAS DE APRENDIZAJE — OBLIGATORIO]
-Elige UNA y conviértela en una oración COMPLETA:
-✅ "Solo a través de [evento concreto] entendí que [aprendizaje]."
-✅ "Esta experiencia me mostró que [conclusión concreta]."`)}
-
-
-
-[GRAMMATIK-PFLICHT — AUSSAGE-KONSTRUKTE]
-VERBOTEN: "schärfte meinen Blick dafür, wie X nur dann Y, wenn..." → "wie" leitet Art und Weise ein, NICHT Aussagen.
-RICHTIG: "schärfte meinen Blick dafür, dass X nur dann Y, wenn..."
-VERBOTEN: "erkenne ich, wie wichtig..." → RICHTIG: "erkenne ich, dass..."
-REGEL: Nach "erkennen/verstehen/zeigen/wissen/schärfen" + Nebensatz → immer "dass", nie "wie" (wenn eine Aussage folgt, keine Art-und-Weise-Beschreibung).
-
-[ABSATZ-ENDEN] Beende Absätze mit konkretem Ergebnis oder Zuversicht statt Erkenntnissätzen.
-✅ "Daher gehe ich zuversichtlich an diese Aufgabe."
-✅ "Deshalb freue ich mich darauf, diese Erfahrung bei ${companyName} einzubringen."
-
-[LEVEL-AWARENESS — JUNIOR/SENIOR TONALITÄT]
-Wenn der Jobtitel "Junior", "Trainee", "Werkstudent" oder "Einstiegsposition" enthält:
-→ ERLAUBT: Lernperspektive ("Gerade dieser Perspektivwechsel kann für einen Junior Consultant hilfreich sein")
-→ ERLAUBT: Demütige Zuversicht ("Ich freue mich darauf, von eurer Expertise zu lernen")
-
-[RHETORISCHE STILMITTEL — OPTIONAL, Max. 2 pro Anschreiben]
-Nutze Stilmittel NUR wenn sie den Lesefluss verbessern — NIEMALS erzwingen. Storytelling-Preset: mindestens 1 bevorzugt.
-TRIKOLON: Drei parallele Glieder (z.B. "analysiert, verankert und übersetzt"). Max. 1x.
-ASYNDETON: Aufzählung ohne "und" (z.B. "Facilitation, Produktentwicklung, Teamaufbau; das bringe ich mit"). Max. 1x.
-
-[WORT-WIEDERHOLUNGS-SCHUTZ (PFLICHT)]
-Dasselbe Substantiv darf in zwei aufeinanderfolgenden Absätzen NICHT wiederholt werden.
-Häufige Fallen:
-- "Fokus" → Synonyme: "Ausrichtung", "Schwerpunkt", "Ansatz"
-- "Erfahrung" → Synonyme: "Praxis", "Arbeit", "Zeit bei [Firma]"
-- "Team" → Synonyme: "Gruppe", "Kollegium", "Mannschaft"
-Prüfe VOR dem Schreiben: Wurde das Wort bereits im vorherigen Absatz verwendet? Wenn ja → Synonym wählen.
+${t(`[KONDENSIERTE QUALITAETSREGELN]
+1. LERNKURVE: Max 1x im gesamten Text. Vollstaendiger Aussagesatz — nie mit Doppelpunkt enden.
+2. GRAMMATIK: Nach erkennen/verstehen/zeigen/wissen → "dass", nie "wie" (wenn Aussage folgt).
+3. ABSATZ-ENDEN: Konkretes Ergebnis oder Zuversicht. Nie abstrakte Erkenntnisse.
+4. VERB-PHRASEN: Max 1x "zeigte mir" / "hat mir gezeigt" / "wurde mir klar" im gesamten Text.
+5. SUBSTANTIV-WIEDERHOLUNG: Dasselbe Substantiv nie in 2 aufeinanderfolgenden Absaetzen.
+6. SATZANFAENGE: Nie 2 aufeinanderfolgende Saetze mit demselben Subjekt/Verb.
+7. ABSATZ-EROEFFNUNGEN: Jeder Stations-Absatz mit ANDEREM Einleitungstyp (Ergebnis, Kontext, Problem, JD-Fragment).
+8. STILMITTEL: Optional, max. 2 (Trikolon, Asyndeton). Nur wenn natuerlich — nie erzwingen.
+9. LEVEL-AWARENESS: Bei Junior/Trainee → Lernperspektive erlaubt und erwuenscht.`,
+`[CONDENSED QUALITY RULES]
+1. LEARNING CURVE: Max 1x total. Complete sentence — never end with a colon.
+2. GRAMMAR: After recognize/understand/show → "that", not "how" (when a statement follows).
+3. PARAGRAPH ENDINGS: Concrete result or confidence. Never abstract insights.
+4. VERB PHRASES: Max 1x "showed me" / "made me realize" in the entire text.
+5. NOUN REPETITION: Same noun never in 2 consecutive paragraphs.
+6. SENTENCE STARTS: Never 2 consecutive sentences with same subject/verb.
+7. PARAGRAPH OPENINGS: Each station paragraph with DIFFERENT opening type.
+8. RHETORICAL DEVICES: Optional, max 2 (tricolon, asyndeton). Only when natural.
+9. LEVEL AWARENESS: For Junior/Trainee → learning perspective allowed and encouraged.`)}
 
 === SEKTION 3: AUFHÄNGER (KURZ & PRÄGNANT) ===
 ${introGuidance || t(
@@ -853,9 +817,7 @@ ${introGuidance && hasQuote && focus === 'quote'
             : 'Der gesamte erste Absatz (Aufhänger + Motivation) darf MAXIMAL 2 SÄTZE lang sein! Keine generischen Abhandlungen über Innovation. Kurz, knackig, direkt zum Punkt.'
         }
 
-[MANDATORY — TRANSITION SENTENCE]: ${introGuidance && hasQuote && focus === 'quote' ? (isEnglish ? 'The INTRODUCTION (after the quote and the bridging sentence)' : 'Die EINLEITUNG (nach dem Zitat und dem Begründungssatz)') : (isEnglish ? 'The FIRST paragraph' : 'Der ERSTE Absatz')} MUST end with a sentence that bridges to the main body AND mentions the job title.
-${isEnglish ? `Choose one: "That is why I would like to briefly introduce myself as ${jobTitle}." or "...and that is why I am applying as ${jobTitle}."` : isSpanish ? `Elige una: "Por eso me gustaría presentarme brevemente como ${jobTitle}." o "...y por eso me postulo como ${jobTitle}."` : isDuForm ? `Wähle eine: "Daher möchte ich mich als ${jobTitle} bei euch kurz vorstellen." oder "...und genau deshalb bewerbe ich mich als ${jobTitle}."` : `Wähle eine: "Daher möchte ich mich als ${jobTitle} bei Ihnen kurz vorstellen." oder "...und genau deshalb bewerbe ich mich als ${jobTitle}."`}
-This sentence is NOT optional. It bridges to the main body AND anchors the reader on the specific position.
+[UEBERGANG ZUM HAUPTTEIL]: ${introGuidance && hasQuote && focus === 'quote' ? (isEnglish ? 'The INTRODUCTION (after the quote bridge)' : 'Die EINLEITUNG (nach dem Zitat-Brueckensatz)') : (isEnglish ? 'The FIRST paragraph' : 'Der ERSTE Absatz')} ${t('MUSS organisch zum Hauptteil ueberleiten und den Jobtitel erwaehnen. Formuliere EIGENE Worte — kopiere KEINE Vorlage.', 'MUST organically transition to the main body and mention the job title. Use YOUR OWN words — do NOT copy any template.')}
 
 ${newsSection}
 
@@ -955,31 +917,14 @@ ${vulnerabilitySection}
 ${personaSection}
 
 === SECTION 5: CLOSING & CALL TO ACTION ===
-[RULE: CLOSING]
-- FORBIDDEN: Do NOT summarize career stations or experience again at the end. That is filler.
+${t('SCHLUSS-REGELN (komprimiert):', 'CLOSING RULES (condensed):')}
+- ${t('VERBOTEN: Karriere-Zusammenfassung am Ende. Das ist Fuelltext.', 'FORBIDDEN: Career summary at the end. That is filler.')}
 ${hasQuote && preset === 'storytelling'
-    ? '- KLAMMER-OPTION: Du DARFST im letzten Satz auf den Gedanken aus der Einleitung zurückgreifen — als inhaltliche Klammer. Kein wörtliches Zitieren, sondern eine kurze Rück-Referenz. Nur wenn es sich natürlich anfühlt.'
-    : '- FORBIDDEN: Do NOT repeat the quote or hook from the opening paragraph.'}
-
-[SCHLUSS — VORFREUDE AUF EINE KONKRETE AUFGABE]
-Formuliere echte Vorfreude auf EINE konkrete Aufgabe oder ein Thema aus der Stellenanzeige.
-${isEnglish ? '- Example: "I am particularly curious about [specific topic from job ad]. I look forward to diving deeper into [concrete area]."'
-  : isDuForm ? '- Beispiel: "Besonders gespannt bin ich auf [konkretes Thema aus Stellenanzeige]. Zudem freue ich mich darauf, ueber [Programm/Initiative] tiefer in [Fachthema] einzutauchen."'
-  : '- Beispiel: "Besonders gespannt bin ich auf [konkretes Thema aus Stellenanzeige]. Zudem freue ich mich darauf, mich in [Fachthema] zu vertiefen."'}
-
-- The closing sentence AFTER the summary is SHORT and WARM. Wähle den Ton:
-  BEVORZUGT (warm, bescheiden): ${isEnglish ? '"I hope this gives you a small impression of who I am. I am available over the coming weeks and would love to get to know you."' : isDuForm ? '"Ich hoffe, ihr konntet einen kleinen Eindruck von mir gewinnen. Ich bin die nächsten Wochen flexibel und freue mich darauf, euch kennenzulernen."' : '"Ich hoffe, Sie konnten einen ersten Eindruck von mir gewinnen. Ich stehe die nächsten Wochen flexibel zur Verfügung und freue mich auf ein Gespräch."'}
-  ALTERNATIV A (persoenlich, Wellenlaenge): ${isEnglish
-    ? '"I hope this gives you a small impression of who I am. I would love to find out in a call whether we are also on the same wavelength personally."'
-    : isDuForm
-        ? '"Ich hoffe, ihr konntet einen kleinen Eindruck von mir gewinnen. Ich wuerde mich freuen, in einem Call herauszufinden, ob wir auch menschlich auf einer Wellenlaenge sind."'
-        : '"Ich hoffe, Sie konnten einen Eindruck von mir gewinnen. Ich wuerde mich freuen, in einem Gespraech herauszufinden, ob wir auch persoenlich auf einer Wellenlaenge sind."'}
-  ALTERNATIV B (verbindlich): ${isEnglish
-    ? '"I would welcome the opportunity to discuss in a brief call how I could contribute to ' + companyName + '."'
-    : isDuForm
-        ? '"Ich würde mich freuen, in einem kurzen Gespräch zu zeigen, wie ich euch unterstützen kann."'
-        : '"Lassen Sie uns in einem kurzen Gespräch ausloten, wie ich Sie unterstützen kann."'}
-- Sign-off: ${isEnglish ? 'End with "Kind regards," or "Best regards," — NEVER use German closing formulas like "Mit freundlichen Grüßen".' : isSpanish ? 'Termina con "Cordialmente," o "Un cordial saludo," — NUNCA uses fórmulas de cierre alemanas.' : 'Beende mit "Mit freundlichen Grüßen" oder (bei Du-Form) "Viele Grüße".'}
+    ? `- ${t('KLAMMER-OPTION: Du DARFST im letzten Satz auf den Gedanken aus der Einleitung zurueckgreifen — als inhaltliche Klammer.', 'BRACKET OPTION: You MAY reference the opening thought in the closing — as a thematic bracket.')}`
+    : `- ${t('VERBOTEN: Zitat oder Hook aus der Einleitung NICHT wiederholen.', 'FORBIDDEN: Do NOT repeat the quote or hook from the opening.')}`}
+- ${t('Formuliere Vorfreude auf EINE konkrete Aufgabe aus der Stellenanzeige. Eigene Worte — KEINE kopierten Vorlagen.', 'Express genuine anticipation for ONE specific task from the job ad. Own words — NO copied templates.')}
+- ${t('Schlusssatz: Warm + bescheiden + Verfuegbarkeit. Kein Verkaufs-CTA.', 'Closing sentence: Warm + humble + availability. No sales CTA.')}
+- Sign-off: ${isEnglish ? 'End with "Kind regards," or "Best regards,".' : isSpanish ? 'Termina con "Cordialmente,".' : isDuForm ? '"Viele Grüße"' : '"Mit freundlichen Grüßen"'}
 
 === ${t('SEKTION 6: VERBESSERUNGS-FEEDBACK', 'SECTION 6: IMPROVEMENT FEEDBACK')} ===
 ${feedbackSection || t('Erste Version — kein vorheriges Feedback.', 'First version — no previous feedback.')}
