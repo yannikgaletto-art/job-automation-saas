@@ -104,13 +104,17 @@ export default async function VideoLandingPage({ params }: PageProps) {
                 {/* Video Player */}
                 <div className="bg-black rounded-xl overflow-hidden shadow-2xl">
                     <video
-                        src={signedUrl.signedUrl}
                         controls
                         autoPlay={false}
                         playsInline
                         className="w-full aspect-video"
                         controlsList="nodownload"
-                    />
+                    >
+                        <source
+                            src={signedUrl.signedUrl}
+                            type={video.storage_path?.endsWith('.mp4') ? 'video/mp4' : 'video/webm'}
+                        />
+                    </video>
                 </div>
 
                 {/* Info */}

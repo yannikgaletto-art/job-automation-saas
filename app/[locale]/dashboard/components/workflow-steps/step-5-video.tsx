@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useLocale } from 'next-intl';
 import { motion } from 'framer-motion';
-import { Video, Mic, Square, Upload, RefreshCw, AlertTriangle, CheckCircle2, Trash2, ExternalLink, Eye } from 'lucide-react';
+import { Video, Mic, Square, Upload, RefreshCw, AlertTriangle, Trash2, ExternalLink, Eye } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { createClient } from '@/lib/supabase/client';
 import { VideoScriptStudio } from './video-script-studio';
@@ -299,6 +299,68 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
         };
     }, [previewUrl]);
 
+    // Has an active uploaded video? (survives handleReRecord — accessToken is not cleared)
+    const hasActiveVideo = accessToken !== null && state !== 'done' && state !== 'loading' && state !== 'consent';
+
+    // Delete from banner (stay in current state, don't go back to script-studio)
+    const handleDeleteFromBanner = async () => {
+        setIsDeleting(true);
+        try {
+            const res = await fetch('/api/video/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setError(data.error || t('error_generic'));
+                return;
+            }
+            setAccessToken(null);
+            setExpiresAt(null);
+            setViewCount(0);
+            setFirstViewedAt(null);
+        } catch {
+            setError(t('error_generic'));
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    // Compact banner showing active video stats while user is re-recording
+    const activeVideoBanner = hasActiveVideo ? (
+        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-4 text-xs text-slate-600 min-w-0">
+                <span className="flex items-center gap-1.5 shrink-0">
+                    <Eye className="w-3.5 h-3.5 text-slate-400" />
+                    <strong className="text-slate-800">{viewCount}</strong> {viewCount === 1 ? t('done_monitor_view_singular') : t('done_monitor_view_plural')}
+                </span>
+                {expiresAt && (
+                    <span className="text-slate-400 truncate">
+                        {t('banner_expires', { date: new Date(expiresAt).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) })}
+                    </span>
+                )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+                <a
+                    href={`/v/${accessToken}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-[#012e7a] hover:underline"
+                >
+                    <ExternalLink className="w-3 h-3" /> {t('banner_preview')}
+                </a>
+                <button
+                    onClick={handleDeleteFromBanner}
+                    disabled={isDeleting}
+                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition disabled:opacity-50"
+                >
+                    <Trash2 className="w-3 h-3" /> {t('banner_delete')}
+                </button>
+            </div>
+        </div>
+    ) : null;
+
     // --- RENDER ---
 
     if (state === 'loading') {
@@ -338,6 +400,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
             >
+                {activeVideoBanner}
                 <VideoScriptStudio
                     jobId={jobId}
                     onReady={handleScriptReady}
@@ -354,6 +417,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                 animate={{ opacity: 1, y: 0 }}
                 className="p-6 bg-white border border-gray-200 rounded-xl max-w-2xl mx-auto space-y-5"
             >
+                {activeVideoBanner}
                 {/* Fix 3: Camera View with Script Overlay positioned OVER the video */}
                 <div className="relative bg-black rounded-xl overflow-hidden aspect-video">
                     <video
@@ -421,6 +485,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                 animate={{ opacity: 1, y: 0 }}
                 className="p-6 bg-white border border-gray-200 rounded-xl max-w-2xl mx-auto space-y-5"
             >
+                {activeVideoBanner}
                 <h3 className="text-lg font-semibold text-gray-900 text-center">{t('preview_title')}</h3>
 
                 <div className="bg-black rounded-xl overflow-hidden aspect-video">

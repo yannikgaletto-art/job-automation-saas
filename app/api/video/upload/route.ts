@@ -106,6 +106,21 @@ export async function POST(request: NextRequest) {
             const ext = mimeType?.includes('mp4') ? 'mp4' : 'webm';
             const storagePath = `${userId}/${jobId}.${ext}`;
 
+            // §1 Pre-Flight: Verify the file actually exists in storage before marking as uploaded.
+            // Without this, a failed browser PUT (CORS, timeout, empty blob) silently creates
+            // a ghost entry: DB says 'uploaded' but storage is empty → black video player.
+            const { data: fileList } = await supabaseAdmin.storage
+                .from('videos')
+                .list(userId, { search: `${jobId}.${ext}` });
+
+            if (!fileList || fileList.length === 0) {
+                log.error('Storage verification failed — file not found after upload', { storagePath });
+                return NextResponse.json({
+                    error: 'Video file not found in storage. Upload may have failed.',
+                    requestId,
+                }, { status: 400 });
+            }
+
             // UPSERT as defense-in-depth: if get-signed-url's upsert
             // failed or was skipped, this still creates the row.
             const { error: updateError } = await supabaseAdmin
