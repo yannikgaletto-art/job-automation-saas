@@ -14,9 +14,10 @@ interface DownloadButtonProps {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
+    pageBreakBeforeEducation?: boolean;
 }
 
-function resolveDocument(data: CvStructuredData, templateId: string, qrBase64: string | undefined, labels: CvTemplateLabels) {
+function resolveDocument(data: CvStructuredData, templateId: string, qrBase64: string | undefined, labels: CvTemplateLabels, pageBreakBeforeEducation?: boolean) {
     switch (templateId) {
         case 'tech':
             return <TechTemplate data={data} qrBase64={qrBase64} labels={labels} />;
@@ -24,11 +25,11 @@ function resolveDocument(data: CvStructuredData, templateId: string, qrBase64: s
         case 'classic':  // deprecated → Valley
         case 'modern':   // deprecated → Valley
         default:
-            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} />;
+            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} pageBreakBeforeEducation={pageBreakBeforeEducation} />;
     }
 }
 
-export default function DownloadButton({ data, templateId, qrBase64 }: DownloadButtonProps) {
+export default function DownloadButton({ data, templateId, qrBase64, pageBreakBeforeEducation }: DownloadButtonProps) {
     const [isDownloading, setIsDownloading] = React.useState(false);
     const [downloadError, setDownloadError] = React.useState<string | null>(null);
     const locale = useLocale();
@@ -46,7 +47,7 @@ export default function DownloadButton({ data, templateId, qrBase64 }: DownloadB
             // prevents double-registration, making this call always safe.
             registerPdfFonts();
 
-            const document = resolveDocument(data, templateId, qrBase64, labels);
+            const document = resolveDocument(data, templateId, qrBase64, labels, pageBreakBeforeEducation);
             const blob = await pdf(document).toBlob();
 
             const url = URL.createObjectURL(blob);

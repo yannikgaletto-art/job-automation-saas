@@ -14,9 +14,10 @@ interface PdfViewerWrapperProps {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
+    pageBreakBeforeEducation?: boolean;
 }
 
-function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: string | undefined, labels: CvTemplateLabels) {
+function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: string | undefined, labels: CvTemplateLabels, pageBreakBeforeEducation?: boolean) {
     switch (templateId) {
         case 'tech':
             return <TechTemplate data={data} qrBase64={qrBase64} labels={labels} />;
@@ -24,7 +25,7 @@ function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: s
         case 'classic':  // deprecated — fallback to Valley
         case 'modern':   // deprecated — fallback to Valley
         default:
-            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} />;
+            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} pageBreakBeforeEducation={pageBreakBeforeEducation} />;
     }
 }
 
@@ -39,11 +40,12 @@ function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: s
  * The blob URL is managed via useRef + useEffect cleanup to prevent
  * memory leaks (URL.revokeObjectURL on unmount or re-render).
  */
-function DesktopPdfViewer({ data, templateId, qrBase64, labels }: {
+function DesktopPdfViewer({ data, templateId, qrBase64, labels, pageBreakBeforeEducation }: {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
     labels: CvTemplateLabels;
+    pageBreakBeforeEducation?: boolean;
 }) {
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -63,7 +65,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels }: {
 
             try {
                 registerPdfFonts();
-                const document = resolveTemplate(data, templateId, qrBase64, labels);
+                const document = resolveTemplate(data, templateId, qrBase64, labels, pageBreakBeforeEducation);
                 const blob = await pdf(document).toBlob();
 
                 if (cancelled || generation !== generationRef.current) return;
@@ -97,7 +99,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels }: {
                 blobUrlRef.current = null;
             }
         };
-    }, [data, templateId, qrBase64, labels]);
+    }, [data, templateId, qrBase64, labels, pageBreakBeforeEducation]);
 
     if (loading) {
         return (
@@ -123,7 +125,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels }: {
                         setError(null);
                         generationRef.current++;
                         const gen = generationRef.current;
-                        const document = resolveTemplate(data, templateId, qrBase64, labels);
+                        const document = resolveTemplate(data, templateId, qrBase64, labels, pageBreakBeforeEducation);
                         pdf(document).toBlob().then(blob => {
                             if (gen !== generationRef.current) return;
                             if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
@@ -158,7 +160,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels }: {
     );
 }
 
-export default function PdfViewerWrapper({ data, templateId, qrBase64 }: PdfViewerWrapperProps) {
+export default function PdfViewerWrapper({ data, templateId, qrBase64, pageBreakBeforeEducation }: PdfViewerWrapperProps) {
     const [isMobile, setIsMobile] = useState(false);
     const [hasMounted, setHasMounted] = useState(false);
     const locale = useLocale();
@@ -181,21 +183,22 @@ export default function PdfViewerWrapper({ data, templateId, qrBase64 }: PdfView
     }
 
     if (isMobile) {
-        return <MobileDownload data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} />;
+        return <MobileDownload data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} pageBreakBeforeEducation={pageBreakBeforeEducation} />;
     }
 
-    return <DesktopPdfViewer data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} />;
+    return <DesktopPdfViewer data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} pageBreakBeforeEducation={pageBreakBeforeEducation} />;
 }
 
 /**
  * Mobile fallback: uses pdf().toBlob() to generate a download link.
  * Same proven approach as DownloadButton.
  */
-function MobileDownload({ data, templateId, qrBase64, labels }: {
+function MobileDownload({ data, templateId, qrBase64, labels, pageBreakBeforeEducation }: {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
     labels: CvTemplateLabels;
+    pageBreakBeforeEducation?: boolean;
 }) {
     const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -206,7 +209,7 @@ function MobileDownload({ data, templateId, qrBase64, labels }: {
         async function generate() {
             try {
                 registerPdfFonts();
-                const document = resolveTemplate(data, templateId, qrBase64, labels);
+                const document = resolveTemplate(data, templateId, qrBase64, labels, pageBreakBeforeEducation);
                 const blob = await pdf(document).toBlob();
                 if (cancelled) return;
                 setDownloadUrl(URL.createObjectURL(blob));

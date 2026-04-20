@@ -84,7 +84,7 @@ const RenderBullet = ({ text }: { text: string }) => {
 };
 
 
-export function ValleyTemplate({ data, qrBase64, labels }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels }) {
+export function ValleyTemplate({ data, qrBase64, labels, pageBreakBeforeEducation }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels; pageBreakBeforeEducation?: boolean }) {
     const pi = data.personalInfo;
     const hasSkills = data.skills.length > 0;
     const hasLanguages = data.languages.length > 0;
@@ -164,7 +164,7 @@ export function ValleyTemplate({ data, qrBase64, labels }: { data: CvStructuredD
 
                 {/* ===== EDUCATION ===== */}
                 {data.education.length > 0 && (
-                    <View style={s.sectionContainer} minPresenceAhead={80}>
+                    <View style={s.sectionContainer} minPresenceAhead={80} break={!!pageBreakBeforeEducation}>
                         <Text style={s.sectionTitle}>{labels.education}</Text>
                         {data.education.map((edu) => {
                             // Split description into sub-items (split on '. ' or ', ')

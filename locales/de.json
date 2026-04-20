@@ -1007,6 +1007,7 @@
     "btn_layout_fix_used": "Korrektur bereits genutzt",
     "btn_layout_fix_desc": "Wenn Titel und Zusammenfassung zu viel Platz einnehmen.",
     "error_free_retry_exhausted": "Die kostenlose Korrektur wurde bereits genutzt.",
+    "layout_break_education": "Ausbildung auf nächste Seite",
     "preview_tour_title": "Formatierungsfehler? Kein Problem.",
     "preview_tour_body": "Falls dein Lebenslauf zu viel Weißraum hat oder Abschnitte verschoben sind, klicke auf <b>\"Formatierung korrigieren\"</b>. Pathly überarbeitet das Layout automatisch. <b>Einmalig und kostenlos</b> pro Job."
   },

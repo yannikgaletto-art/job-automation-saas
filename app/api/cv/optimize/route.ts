@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
         const log = logger.forRequest(undefined, user.id, '/api/cv/optimize');
 
         const body = await req.json();
-        const { cv_structured_data, cv_match_result, template_id, job_id, station_metrics, cv_opt_settings, locale: rawLocale, layoutFix } = body;
+        const { cv_structured_data, cv_match_result, template_id, job_id, station_metrics, cv_opt_settings, locale: rawLocale } = body;
         const locale: SupportedLocale = (['de', 'en', 'es'].includes(rawLocale) ? rawLocale : 'de') as SupportedLocale;
         const lang = getLanguageName(locale);
 
@@ -181,32 +181,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'error_no_match' }, { status: 400 });
         }
 
-        log.info('CV Optimize requested', { job_id, layoutFix: !!layoutFix });
+        log.info('CV Optimize requested', { job_id });
 
         // §3: User-scoped — always use session user.id, never trust body
         const user_id = user.id;
-
-        // ── P1: Layout-fix free retry check ────────────────────────────
-        // If layoutFix=true, check if the free retry has already been used.
-        // Uses admin client with user_id filter (SICHERHEITSARCHITEKTUR §3).
-        let isLayoutFixRequest = false;
-        if (layoutFix) {
-            const { data: jobRow } = await supabaseAdmin
-                .from('job_queue')
-                .select('metadata')
-                .eq('id', job_id)
-                .eq('user_id', user_id) // PFLICHT — nie ohne user_id-Filter
-                .single();
-
-            if (jobRow?.metadata?.cv_opt_free_retry_used) {
-                return NextResponse.json(
-                    { success: false, error: 'free_retry_exhausted' },
-                    { status: 422 }
-                );
-            }
-            isLayoutFixRequest = true;
-            log.info('Layout-fix retry requested (credit-free)', { job_id });
-        }
 
         // ── Pass 1: Translate CV to target language if needed ───────────
         // cv-parser stores content verbatim (e.g. German bullets from a German CV).
@@ -376,73 +354,23 @@ Must conform to the following Zod schema:
     }
   ]
 }
-${isLayoutFixRequest ? `
-[LAYOUT-FIX RETRY — FORMATTING ERROR DETECTED BY USER]
-The previous output caused page 1 overflow. Title and summary covered >80% of page 1.
-
-HARD CONSTRAINTS — Tighter than normal run:
-
-SUMMARY (most common overflow cause):
-- MAX 2 sentences. MAX 35 words total.
-- No sentence longer than 18 words.
-- Do NOT repeat bullet content. Summary = positioning statement only.
-
-BULLETS:
-- MAX 2 bullets per experience entry (not 3)
-- MAX 15 words per bullet (not 20)
-- If ≥4 experience entries: entries 3+ get MAX 1 bullet
-- Complete short sentences only — no hanging phrases
-
-SKILLS:
-- MAX 2 categories, MAX 6 items per category
-
-EDUCATION:
-- MAX 1 line description — Degree + Institution only.
-
-CERTIFICATIONS:
-- MAX 4 certifications (not 6)
-
-ORPHAN PREVENTION:
-- Do NOT start a new experience block if <3 bullets fit remaining space
-- Shorten existing entries instead of adding another
-
-ATS-TONE:
-- Do NOT add keywords if they make bullets longer
-- Priority: Compactness > ATS coverage in this retry
-
-Do NOT generate new content. ONLY restructure and shorten existing content.
-This is a layout correction — not an optimization round.
-` : ''}
 `;
 
         // §BILLING: Credit Gate — debit 0.5 credits, auto-refund on AI failure
-        // Layout-fix requests bypass the credit gate (1 free retry per job)
         let response;
         try {
-            if (isLayoutFixRequest) {
-                // Free retry: no credit deduction
-                response = await complete({
+            response = await withCreditGate(
+                user.id,
+                CREDIT_COSTS.cv_optimize,
+                'cv_optimize',
+                () => complete({
                     taskType: 'optimize_cv',
                     prompt,
                     temperature: 0,
                     maxTokens: 8000, // Increased: 5000 caused truncation on large CVs with 12 changes
-                });
-                // Wrap in the same shape withCreditGate returns
-                response = { text: response.text, ...(response as any) };
-            } else {
-                response = await withCreditGate(
-                    user.id,
-                    CREDIT_COSTS.cv_optimize,
-                    'cv_optimize',
-                    () => complete({
-                        taskType: 'optimize_cv',
-                        prompt,
-                        temperature: 0,
-                        maxTokens: 8000, // Increased: 5000 caused truncation on large CVs with 12 changes
-                    }),
-                    job_id
-                );
-            }
+                }),
+                job_id
+            );
         } catch (aiErr: any) {
             const billingResponse = handleBillingError(aiErr);
             if (billingResponse) return billingResponse;
@@ -680,8 +608,8 @@ This is a layout correction — not an optimization round.
         const { error: dbError } = await supabaseAdmin
             .from('job_queue')
             .update({
-                cv_optimization_proposal: validated,
-                ...(isLayoutFixRequest ? {} : { cv_optimization_user_decisions: null }),
+            cv_optimization_proposal: validated,
+            cv_optimization_user_decisions: null,
             })
             .eq('id', job_id)
             .eq('user_id', user_id);
@@ -710,15 +638,7 @@ This is a layout correction — not an optimization round.
             );
         }
 
-        // P1: After successful layout-fix, set the free-retry flag (JSONB read-modify-write)
-        if (isLayoutFixRequest) {
-            const existingMeta = readBack?.metadata ?? {};
-            await supabaseAdmin
-                .from('job_queue')
-                .update({ metadata: { ...existingMeta, cv_opt_free_retry_used: true } })
-                .eq('id', job_id)
-                .eq('user_id', user_id); // PFLICHT — nie ohne user_id-Filter
-        }
+
 
         return NextResponse.json({
             success: true,

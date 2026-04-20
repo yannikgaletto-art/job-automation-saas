@@ -16,6 +16,8 @@ export interface CVOptSettings {
     showLanguages: boolean;
     /** Active template ID. FAANG-optimized template. Default: 'valley' */
     templateId: 'tech' | 'valley';
+    /** Force page break before Education section (Valley template only). Default: false */
+    pageBreakBeforeEducation: boolean;
 }
 
 export const DEFAULT_CV_OPT_SETTINGS: CVOptSettings = {
@@ -24,6 +26,7 @@ export const DEFAULT_CV_OPT_SETTINGS: CVOptSettings = {
     showCertificates: true,
     showLanguages: true,
     templateId: 'valley',
+    pageBreakBeforeEducation: false,
 };
 
 /** Station-specific metrics provided by the user for the Numbers Check Flow */

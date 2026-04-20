@@ -20,8 +20,6 @@ import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
 import { cn } from '@/lib/utils';
 import QRCode from 'qrcode';
 import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
-import { useDashboardTour } from '@/app/[locale]/dashboard/hooks/useDashboardTour';
-import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
 
 
 const DynamicPdfViewer = dynamic(
@@ -116,10 +114,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     const [jobData, setJobData] = useState<any>(null);
     const [templateId, setTemplateId] = useState<string>("valley");
 
-    // P1: Layout-fix free retry state — read from jobData.metadata, no extra query
-    const [freeRetryUsed, setFreeRetryUsed] = useState(false);
-    const [isLayoutFixing, setIsLayoutFixing] = useState(false);
-    const [layoutFixError, setLayoutFixError] = useState<string | null>(null);
+
 
     // CVOptSettings — client-side only, not persisted to DB
     const [cvOptSettings, setCvOptSettings] = useState<CVOptSettings>(DEFAULT_CV_OPT_SETTINGS);
@@ -197,10 +192,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                 if (isMounted) {
                     if (jobRes) {
                         setJobData(jobRes);
-                        // P1: Read free-retry flag from metadata (no extra query, QA-7)
-                        if (jobRes.metadata?.cv_opt_free_retry_used) {
-                            setFreeRetryUsed(true);
-                        }
+
 
                         // Restore state: proposal is always restored if it exists.
                         // If decisions also exist → full restore (Step 2 skip below).
@@ -401,19 +393,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
         }
     };
 
-    // ── CV Preview Tour — fires once per user, when step===2 ---
-    const CV_PREVIEW_TOUR_STEPS = [
-        {
-            targetSelector: '#cv-format-fix-btn',
-            position: 'top' as const,
-            titleKey: 'cv_preview_format_title',
-            bodyKey: 'cv_preview_format_body',
-        },
-    ];
-    const previewTour = useDashboardTour('cv-preview-format-hint', CV_PREVIEW_TOUR_STEPS, {
-        delayMs: 800,
-        enabled: step === 2,
-    });
+
 
     // -- Step 2: Template Switcher --
     const applyTemplateSwitch = async (newId: string) => {
@@ -460,65 +440,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
         setPendingTechSwitch(null);
     };
 
-    // -- Layout-Fix Retry: free, once per job --
-    const handleLayoutFixRetry = async () => {
-        if (freeRetryUsed || isLayoutFixing) return;
-        setIsLayoutFixing(true);
-        setLayoutFixError(null);
-        try {
-            // FIX: Always send the RAW original CV from user_profiles, never the
-            // display-filtered editablePdfData. Display filters (showLanguages=false etc.)
-            // must not be baked into the API payload — the Integrity Guard in route.ts
-            // uses cv_structured_data as the PII/structure restoration source.
-            const currentCv = cvData;
-            const res = await fetch('/api/cv/optimize', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    cv_structured_data: currentCv,
-                    cv_match_result: jobData?.metadata?.cv_match,
-                    template_id: templateId,
-                    job_id: jobId,
-                    user_id: userId,
-                    locale,
-                    layoutFix: true,
-                    cv_opt_settings: { showSummary: cvOptSettings.showSummary, summaryMode: cvOptSettings.summaryMode },
-                }),
-            });
-            const data = await res.json();
 
-            // ── Credit Exhaustion on layout-fix (should not happen — it's free — but guard anyway)
-            if (res.status === 402 && data.error === 'CREDITS_EXHAUSTED') {
-                showPaywall('credits', { remaining: data.remaining ?? 0 });
-                return;
-            }
-
-            if (!res.ok) {
-                if (data.error === 'free_retry_exhausted') {
-                    setFreeRetryUsed(true);
-                    setLayoutFixError(t('error_free_retry_exhausted'));
-                } else {
-                    setLayoutFixError(data.details || t('error_failed'));
-                }
-                return;
-            }
-            if (data.proposal) {
-                    // BUG-FIX: Use proposal.optimized directly — the backend already
-                    // computes the final result via applyCvChanges(). Re-applying old
-                    // decisions on a new base fails silently when the KI removes bullets
-                    // that the old decision IDs reference (zero-update bug).
-                    const fixedFinalCv = data.proposal.optimized ?? data.proposal.translated ?? cvData;
-                    setFinalCv(fixedFinalCv);
-                    setProposal(data.proposal);
-                    setFreeRetryUsed(true);
-                    // Stay on step 2 — user sees the updated preview immediately, no review loop
-                }
-        } catch {
-            setLayoutFixError(t('error_failed'));
-        } finally {
-            setIsLayoutFixing(false);
-        }
-    };
 
     // -- QR-Video: Button opens dialog or toggles off --
     const handleQrToggle = () => {
@@ -937,10 +859,26 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                             </button>
                         </div>
 
+                        {/* Layout Controls — deterministic, no AI */}
+                        {templateId === 'valley' && (
+                            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
+                                <span className="text-sm text-gray-600">{t('layout_break_education')}</span>
+                                <button
+                                    onClick={() => setCvOptSettings(s => ({ ...s, pageBreakBeforeEducation: !s.pageBreakBeforeEducation }))}
+                                    className="text-gray-500 hover:text-[#012e7a] transition"
+                                    aria-label={t('layout_break_education')}
+                                >
+                                    {cvOptSettings.pageBreakBeforeEducation
+                                        ? <ToggleRight className="w-7 h-7 text-[#012e7a]" />
+                                        : <ToggleLeft className="w-7 h-7 text-gray-400" />}
+                                </button>
+                            </div>
+                        )}
+
                         {/* PDF Preview + optional editor panel */}
                         {isEditing ? (
                             <div className="grid grid-cols-[1fr_480px] gap-4 items-start">
-                                <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} />
+                                <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} pageBreakBeforeEducation={cvOptSettings.pageBreakBeforeEducation} />
                                 <div className="sticky top-4 bg-white rounded-xl border border-slate-200 p-4 h-[800px]">
                                     <InlineCvEditor
                                         data={activePdfData}
@@ -950,7 +888,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                 </div>
                             </div>
                         ) : (
-                            <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} />
+                            <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} pageBreakBeforeEducation={cvOptSettings.pageBreakBeforeEducation} />
                         )}
 
                         <div className="flex flex-col sm:flex-row justify-between items-center py-4 border-t border-gray-100 mt-6 mb-8 gap-4 pb-4">
@@ -962,31 +900,8 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                             </button>
 
                             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                                <div className="flex flex-col items-center sm:items-start w-full sm:w-auto">
-                                    <button
-                                        id="cv-format-fix-btn"
-                                        onClick={handleLayoutFixRetry}
-                                        disabled={freeRetryUsed || isLayoutFixing}
-                                        title={freeRetryUsed ? t('btn_layout_fix_used') : t('btn_layout_fix_tooltip')}
-                                        className={[
-                                            'px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors w-full sm:w-auto justify-center',
-                                            freeRetryUsed || isLayoutFixing
-                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-                                        ].join(' ')}
-                                    >
-                                        {isLayoutFixing ? (
-                                            <><Loader2 className="w-4 h-4 animate-spin" /> {t('optimizing_title')} (~30-75s)</>
-                                        ) : (
-                                            <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> {freeRetryUsed ? t('btn_layout_fix_used') : t('btn_layout_fix')}</>
-                                        )}
-                                    </button>
-                                    {isLayoutFixing && (
-                                        <span className="text-[10px] text-gray-400 mt-1 text-center">{t('optimizing_duration')}</span>
-                                    )}
-                                </div>
                                 <div className="w-full sm:w-auto">
-                                    <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} />
+                                    <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} pageBreakBeforeEducation={cvOptSettings.pageBreakBeforeEducation} />
                                 </div>
                                 <button
                                     onClick={() => onGoToCoverLetter?.()}
@@ -996,25 +911,13 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                     {t('cover_letter')}
                                 </button>
                             </div>
-                            {layoutFixError && (
-                                <p className="text-xs text-red-600 mt-1 w-full text-center sm:text-right">{layoutFixError}</p>
-                            )}
                         </div>
 
                     </div>
                 )}
             </motion.div>
 
-            {/* CV Preview Format Tour */}
-            {previewTour.isActive && previewTour.step && (
-                <GuidedTourOverlay
-                    step={previewTour.step}
-                    currentStep={previewTour.currentStep}
-                    totalSteps={previewTour.totalSteps}
-                    onNext={previewTour.nextStep}
-                    onSkip={previewTour.skipTour}
-                />
-            )}
+
 
             {/* QR-Video Consent Dialog */}
             <CustomDialog
