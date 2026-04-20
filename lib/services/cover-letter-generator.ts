@@ -8,6 +8,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '@/lib/ai/model-router';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { validateCoverLetter, logValidation } from './cover-letter-validator';
 import { enrichCompany, linkEnrichmentToJob } from './company-enrichment';
@@ -18,7 +19,11 @@ import { buildSystemPrompt, type UserProfileData, type JobData, type CompanyRese
 import { judgeCoverLetter, type JudgeResult } from './cover-letter-judge';
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
+// WHY: Uses Helicone-aware singleton from model-router (not a raw client).
+// This routes all CL generation through the Helicone proxy for cost tracking.
+// model-router.getAnthropicClient() lazily initializes with Helicone baseURL
+// when HELICONE_API_KEY is present; falls back to direct Anthropic otherwise.
+const anthropic = getAnthropicClient();
 
 const supabaseAdmin = getSupabaseAdmin();
 

@@ -16,6 +16,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '@/lib/ai/model-router';
 import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import type { StyleAnalysis } from './writing-style-analyzer';
 import { buildJudgeBlacklistSection } from './anti-fluff-blacklist';
@@ -139,7 +140,8 @@ export async function judgeCoverLetter(
         return FALLBACK;
     }
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    // WHY: Uses shared Helicone-aware singleton — same proxy as generator.
+    const anthropic = getAnthropicClient();
 
     const isEnglish = setupContext?.tone?.targetLanguage === 'en';
     const companyName = job?.company_name || (isEnglish ? 'the company' : 'das Unternehmen');

@@ -129,7 +129,7 @@ export interface CompletionResponse {
 
 let anthropicClient: Anthropic | null = null;
 
-function getAnthropicClient() {
+export function getAnthropicClient() {
     if (!anthropicClient) {
         const heliconeKey = process.env.HELICONE_API_KEY?.trim();
 
