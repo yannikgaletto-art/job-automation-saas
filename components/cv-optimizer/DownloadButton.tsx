@@ -9,15 +9,16 @@ import { Download, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { getCvTemplateLabels, CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
+import { LayoutMode } from '@/types/cv-opt-settings';
 
 interface DownloadButtonProps {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
-    pageBreakBeforeEducation?: boolean;
+    layoutMode?: LayoutMode;
 }
 
-function resolveDocument(data: CvStructuredData, templateId: string, qrBase64: string | undefined, labels: CvTemplateLabels, pageBreakBeforeEducation?: boolean) {
+function resolveDocument(data: CvStructuredData, templateId: string, qrBase64: string | undefined, labels: CvTemplateLabels, layoutMode?: LayoutMode) {
     switch (templateId) {
         case 'tech':
             return <TechTemplate data={data} qrBase64={qrBase64} labels={labels} />;
@@ -25,11 +26,11 @@ function resolveDocument(data: CvStructuredData, templateId: string, qrBase64: s
         case 'classic':  // deprecated → Valley
         case 'modern':   // deprecated → Valley
         default:
-            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} pageBreakBeforeEducation={pageBreakBeforeEducation} />;
+            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} />;
     }
 }
 
-export default function DownloadButton({ data, templateId, qrBase64, pageBreakBeforeEducation }: DownloadButtonProps) {
+export default function DownloadButton({ data, templateId, qrBase64, layoutMode }: DownloadButtonProps) {
     const [isDownloading, setIsDownloading] = React.useState(false);
     const [downloadError, setDownloadError] = React.useState<string | null>(null);
     const locale = useLocale();
@@ -47,7 +48,7 @@ export default function DownloadButton({ data, templateId, qrBase64, pageBreakBe
             // prevents double-registration, making this call always safe.
             registerPdfFonts();
 
-            const document = resolveDocument(data, templateId, qrBase64, labels, pageBreakBeforeEducation);
+            const document = resolveDocument(data, templateId, qrBase64, labels, layoutMode);
             const blob = await pdf(document).toBlob();
 
             const url = URL.createObjectURL(blob);

@@ -9,15 +9,16 @@ import { Download, Loader2, RefreshCw } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { getCvTemplateLabels, CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
+import { LayoutMode } from '@/types/cv-opt-settings';
 
 interface PdfViewerWrapperProps {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
-    pageBreakBeforeEducation?: boolean;
+    layoutMode?: LayoutMode;
 }
 
-function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: string | undefined, labels: CvTemplateLabels, pageBreakBeforeEducation?: boolean) {
+function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: string | undefined, labels: CvTemplateLabels, layoutMode?: LayoutMode) {
     switch (templateId) {
         case 'tech':
             return <TechTemplate data={data} qrBase64={qrBase64} labels={labels} />;
@@ -25,7 +26,7 @@ function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: s
         case 'classic':  // deprecated — fallback to Valley
         case 'modern':   // deprecated — fallback to Valley
         default:
-            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} pageBreakBeforeEducation={pageBreakBeforeEducation} />;
+            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} />;
     }
 }
 
@@ -40,12 +41,12 @@ function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: s
  * The blob URL is managed via useRef + useEffect cleanup to prevent
  * memory leaks (URL.revokeObjectURL on unmount or re-render).
  */
-function DesktopPdfViewer({ data, templateId, qrBase64, labels, pageBreakBeforeEducation }: {
+function DesktopPdfViewer({ data, templateId, qrBase64, labels, layoutMode }: {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
     labels: CvTemplateLabels;
-    pageBreakBeforeEducation?: boolean;
+    layoutMode?: LayoutMode;
 }) {
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -65,7 +66,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels, pageBreakBeforeE
 
             try {
                 registerPdfFonts();
-                const document = resolveTemplate(data, templateId, qrBase64, labels, pageBreakBeforeEducation);
+                const document = resolveTemplate(data, templateId, qrBase64, labels, layoutMode);
                 const blob = await pdf(document).toBlob();
 
                 if (cancelled || generation !== generationRef.current) return;
@@ -99,7 +100,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels, pageBreakBeforeE
                 blobUrlRef.current = null;
             }
         };
-    }, [data, templateId, qrBase64, labels, pageBreakBeforeEducation]);
+    }, [data, templateId, qrBase64, labels, layoutMode]);
 
     if (loading) {
         return (
@@ -125,7 +126,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels, pageBreakBeforeE
                         setError(null);
                         generationRef.current++;
                         const gen = generationRef.current;
-                        const document = resolveTemplate(data, templateId, qrBase64, labels, pageBreakBeforeEducation);
+                        const document = resolveTemplate(data, templateId, qrBase64, labels, layoutMode);
                         pdf(document).toBlob().then(blob => {
                             if (gen !== generationRef.current) return;
                             if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
@@ -160,7 +161,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels, pageBreakBeforeE
     );
 }
 
-export default function PdfViewerWrapper({ data, templateId, qrBase64, pageBreakBeforeEducation }: PdfViewerWrapperProps) {
+export default function PdfViewerWrapper({ data, templateId, qrBase64, layoutMode }: PdfViewerWrapperProps) {
     const [isMobile, setIsMobile] = useState(false);
     const [hasMounted, setHasMounted] = useState(false);
     const locale = useLocale();
@@ -183,22 +184,22 @@ export default function PdfViewerWrapper({ data, templateId, qrBase64, pageBreak
     }
 
     if (isMobile) {
-        return <MobileDownload data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} pageBreakBeforeEducation={pageBreakBeforeEducation} />;
+        return <MobileDownload data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} />;
     }
 
-    return <DesktopPdfViewer data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} pageBreakBeforeEducation={pageBreakBeforeEducation} />;
+    return <DesktopPdfViewer data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} />;
 }
 
 /**
  * Mobile fallback: uses pdf().toBlob() to generate a download link.
  * Same proven approach as DownloadButton.
  */
-function MobileDownload({ data, templateId, qrBase64, labels, pageBreakBeforeEducation }: {
+function MobileDownload({ data, templateId, qrBase64, labels, layoutMode }: {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
     labels: CvTemplateLabels;
-    pageBreakBeforeEducation?: boolean;
+    layoutMode?: LayoutMode;
 }) {
     const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -209,7 +210,7 @@ function MobileDownload({ data, templateId, qrBase64, labels, pageBreakBeforeEdu
         async function generate() {
             try {
                 registerPdfFonts();
-                const document = resolveTemplate(data, templateId, qrBase64, labels, pageBreakBeforeEducation);
+                const document = resolveTemplate(data, templateId, qrBase64, labels, layoutMode);
                 const blob = await pdf(document).toBlob();
                 if (cancelled) return;
                 setDownloadUrl(URL.createObjectURL(blob));

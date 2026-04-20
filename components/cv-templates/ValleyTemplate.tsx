@@ -7,88 +7,116 @@ import { CertGrid } from './shared/CertGrid';
 import { RenderMarkdownText } from './shared/RenderMarkdownText';
 import { truncateDescription, normalizeDateRangeText } from '@/lib/utils/cv-template-helpers';
 import { CvTemplateLabels } from '@/lib/utils/cv-template-labels';
+import { LayoutMode } from '@/types/cv-opt-settings';
 
 /**
  * ValleyTemplate — FAANG-optimized, single-column, black & white CV.
- * V3: ATS-safe plaintext skills/languages, single-column flow, internal multi-col grids.
+ * V4: Hard 2-page guardrails, bidirectional layoutMode (compact/default/spacious).
+ *
+ * HARD CAPS (always enforced, regardless of AI output):
+ * - Experience bullets: max 3 per entry (matches AI prompt constraint)
+ * - Certifications: max 6 total (matches AI prompt constraint)
+ * These prevent 3-page overflow even when QR code adds header height.
  */
 
 const DARK = '#000000';
 const MUTED = '#444444';
 const DIVIDER = '#CCCCCC';
 
-const s = StyleSheet.create({
-    page: {
-        fontFamily: 'Helvetica',
-        fontSize: 9,
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 48,
-        paddingTop: 36,
-        paddingBottom: 36,
-        color: DARK,
-        lineHeight: 1.3,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        marginBottom: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1.5,
-        borderBottomColor: DARK,
-    },
-    headerName: { fontSize: 22, fontWeight: 700, color: DARK, letterSpacing: 0.5 },
-    headerContact: { alignItems: 'flex-end' },
-    contactLine: { fontSize: 8.5, color: MUTED, marginBottom: 2.5, textAlign: 'right' },
-    sectionContainer: { marginBottom: 12 },
-    sectionTitle: {
-        fontSize: 10.5, fontWeight: 700, color: DARK, textTransform: 'uppercase',
-        letterSpacing: 2, paddingBottom: 4, borderBottomWidth: 0.75,
-        borderBottomColor: DIVIDER, marginBottom: 8,
-    },
-    expBlock: { marginBottom: 10 },
-    expTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 1.5 },
-    expRole: { fontSize: 10, fontWeight: 700, color: DARK, flex: 1, paddingRight: 8 },
-    expDate: { fontSize: 8.5, color: '#888888', fontWeight: 'normal', flexShrink: 0 },
-    expCompany: { fontSize: 9, color: MUTED, marginBottom: 4 },
-    // Bullet: paddingRight reserves space for the date column so text doesn't run edge-to-edge
-    bulletRow: { flexDirection: 'row', marginBottom: 2, paddingLeft: 2, paddingRight: 80 },
-    bulletDot: { width: 10, fontSize: 9, color: DARK },
-    bulletText: { flex: 1, fontSize: 9, color: DARK, lineHeight: 1.4 },
-    eduBlock: { marginBottom: 8 },
-    eduTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 1.5 },
-    eduDegree: { fontSize: 10, fontWeight: 700, color: DARK, flex: 1, paddingRight: 8 },
-    eduDate: { fontSize: 8.5, color: '#888888', fontWeight: 'normal', flexShrink: 0 },
-    eduInstitution: { fontSize: 9, color: MUTED, marginBottom: 3 },
-    eduSubRow: { flexDirection: 'row', marginBottom: 1.5, paddingLeft: 0 },
-    eduSubLabel: { fontSize: 8.5, fontWeight: 700, color: DARK },
-    eduSubText: { fontSize: 8.5, color: MUTED, flex: 1, lineHeight: 1.4 },
-    eduSubItem: { fontSize: 8.5, color: MUTED, lineHeight: 1.4, paddingLeft: 8 },
-    skillCategoryLabel: {
-        fontSize: 8.5, fontWeight: 700, color: DARK, textTransform: 'uppercase',
-        letterSpacing: 0, marginBottom: 2,
-    },
-});
+/** Max bullets per experience entry — HARD CAP, matches AI prompt rule */
+const MAX_BULLETS_DEFAULT = 3;
+const MAX_BULLETS_COMPACT = 2;
+/** Max certifications — HARD CAP, matches AI prompt rule */
+const MAX_CERTS = 6;
+
+/**
+ * Build styles dynamically based on layoutMode.
+ * compact = tighter spacing to fit more on page 1.
+ * spacious/default = standard spacing.
+ */
+function buildStyles(mode: LayoutMode) {
+    const isCompact = mode === 'compact';
+
+    return StyleSheet.create({
+        page: {
+            fontFamily: 'Helvetica',
+            fontSize: 9,
+            backgroundColor: '#FFFFFF',
+            paddingHorizontal: 48,
+            paddingTop: isCompact ? 28 : 36,
+            paddingBottom: isCompact ? 28 : 36,
+            color: DARK,
+            lineHeight: 1.3,
+        },
+        header: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            marginBottom: isCompact ? 10 : 16,
+            paddingBottom: isCompact ? 8 : 12,
+            borderBottomWidth: 1.5,
+            borderBottomColor: DARK,
+        },
+        headerName: { fontSize: 22, fontWeight: 700, color: DARK, letterSpacing: 0.5 },
+        headerContact: { alignItems: 'flex-end' },
+        contactLine: { fontSize: 8.5, color: MUTED, marginBottom: 2.5, textAlign: 'right' as const },
+        sectionContainer: { marginBottom: isCompact ? 8 : 12 },
+        sectionTitle: {
+            fontSize: 10.5, fontWeight: 700, color: DARK, textTransform: 'uppercase' as const,
+            letterSpacing: 2, paddingBottom: isCompact ? 3 : 4, borderBottomWidth: 0.75,
+            borderBottomColor: DIVIDER, marginBottom: isCompact ? 5 : 8,
+        },
+        expBlock: { marginBottom: isCompact ? 6 : 10 },
+        expTopRow: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'baseline' as const, marginBottom: 1.5 },
+        expRole: { fontSize: 10, fontWeight: 700, color: DARK, flex: 1, paddingRight: 8 },
+        expDate: { fontSize: 8.5, color: '#888888', fontWeight: 'normal' as const, flexShrink: 0 },
+        expCompany: { fontSize: 9, color: MUTED, marginBottom: isCompact ? 2 : 4 },
+        // Bullet: paddingRight reserves space for the date column so text doesn't run edge-to-edge
+        bulletRow: { flexDirection: 'row' as const, marginBottom: 2, paddingLeft: 2, paddingRight: 80 },
+        bulletDot: { width: 10, fontSize: 9, color: DARK },
+        bulletText: { flex: 1, fontSize: 9, color: DARK, lineHeight: 1.4 },
+        eduBlock: { marginBottom: isCompact ? 5 : 8 },
+        eduTopRow: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'baseline' as const, marginBottom: 1.5 },
+        eduDegree: { fontSize: 10, fontWeight: 700, color: DARK, flex: 1, paddingRight: 8 },
+        eduDate: { fontSize: 8.5, color: '#888888', fontWeight: 'normal' as const, flexShrink: 0 },
+        eduInstitution: { fontSize: 9, color: MUTED, marginBottom: isCompact ? 2 : 3 },
+        eduSubRow: { flexDirection: 'row' as const, marginBottom: 1.5, paddingLeft: 0 },
+        eduSubLabel: { fontSize: 8.5, fontWeight: 700, color: DARK },
+        eduSubText: { fontSize: 8.5, color: MUTED, flex: 1, lineHeight: 1.4 },
+        eduSubItem: { fontSize: 8.5, color: MUTED, lineHeight: 1.4, paddingLeft: 8 },
+        skillCategoryLabel: {
+            fontSize: 8.5, fontWeight: 700, color: DARK, textTransform: 'uppercase' as const,
+            letterSpacing: 0, marginBottom: 2,
+        },
+    });
+}
 
 const RenderBullet = ({ text }: { text: string }) => {
     const idx = text.indexOf(':');
     if (idx !== -1 && idx < 40) {
         return (
-            <Text style={s.bulletText}>
+            <Text style={{ flex: 1, fontSize: 9, color: DARK, lineHeight: 1.4 }}>
                 <Text style={{ fontWeight: 700 }}>{text.slice(0, idx + 1)}</Text>
                 {text.slice(idx + 1)}
             </Text>
         );
     }
-    return <Text style={s.bulletText}>{text}</Text>;
+    return <Text style={{ flex: 1, fontSize: 9, color: DARK, lineHeight: 1.4 }}>{text}</Text>;
 };
 
 
-export function ValleyTemplate({ data, qrBase64, labels, pageBreakBeforeEducation }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels; pageBreakBeforeEducation?: boolean }) {
+export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels; layoutMode?: LayoutMode }) {
     const pi = data.personalInfo;
     const hasSkills = data.skills.length > 0;
     const hasLanguages = data.languages.length > 0;
     const hasCerts = data.certifications && data.certifications.length > 0;
+
+    const s = buildStyles(layoutMode);
+
+    // HARD CAPS — prevent 3-page overflow regardless of AI output
+    const maxBullets = layoutMode === 'compact' ? MAX_BULLETS_COMPACT : MAX_BULLETS_DEFAULT;
+    const cappedCerts = hasCerts ? data.certifications!.slice(0, MAX_CERTS) : [];
+    const forceBreak = layoutMode === 'spacious';
 
     return (
         <Document>
@@ -151,7 +179,7 @@ export function ValleyTemplate({ data, qrBase64, labels, pageBreakBeforeEducatio
                                         {exp.company}{exp.location ? ` \u2022 ${exp.location}` : ''}
                                     </Text>
                                 )}
-                                {exp.description?.slice(0, 5).map((b) => (
+                                {exp.description?.slice(0, maxBullets).map((b) => (
                                     <View key={b.id} style={s.bulletRow}>
                                         <Text style={s.bulletDot}>{'\u2022'}</Text>
                                         <RenderBullet text={b.text} />
@@ -164,7 +192,7 @@ export function ValleyTemplate({ data, qrBase64, labels, pageBreakBeforeEducatio
 
                 {/* ===== EDUCATION ===== */}
                 {data.education.length > 0 && (
-                    <View style={s.sectionContainer} minPresenceAhead={80} break={!!pageBreakBeforeEducation}>
+                    <View style={s.sectionContainer} minPresenceAhead={80} break={forceBreak}>
                         <Text style={s.sectionTitle}>{labels.education}</Text>
                         {data.education.map((edu) => {
                             // Split description into sub-items (split on '. ' or ', ')
@@ -229,11 +257,11 @@ export function ValleyTemplate({ data, qrBase64, labels, pageBreakBeforeEducatio
                     </View>
                 )}
 
-                {/* ===== CERTIFICATES (full-width, CertGrid 2-col) ===== */}
-                {hasCerts && (
+                {/* ===== CERTIFICATES (full-width, CertGrid 2-col, HARD CAP: 6) ===== */}
+                {cappedCerts.length > 0 && (
                     <View style={s.sectionContainer} minPresenceAhead={40}>
                         <Text style={s.sectionTitle}>{labels.certificates}</Text>
-                        <CertGrid certs={data.certifications!} maxColumns={2} />
+                        <CertGrid certs={cappedCerts} maxColumns={2} />
                     </View>
                 )}
 

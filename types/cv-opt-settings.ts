@@ -5,6 +5,15 @@
  * NOT persisted to Supabase. No user-tracking.
  * See: directives/AGENT_4.3_CV_TEMPLATE_EVOLUTION.md
  */
+
+/**
+ * Layout mode for the Valley template.
+ * - 'default': Standard auto-layout (react-pdf decides page breaks)
+ * - 'compact': Tighter spacing, max 2 bullets per experience → pulls content to page 1
+ * - 'spacious': Force page break before Education → spreads content across 2 pages
+ */
+export type LayoutMode = 'default' | 'compact' | 'spacious';
+
 export interface CVOptSettings {
     /** Whether to show the professional summary section. Default: true */
     showSummary: boolean;
@@ -16,8 +25,8 @@ export interface CVOptSettings {
     showLanguages: boolean;
     /** Active template ID. FAANG-optimized template. Default: 'valley' */
     templateId: 'tech' | 'valley';
-    /** Force page break before Education section (Valley template only). Default: false */
-    pageBreakBeforeEducation: boolean;
+    /** Layout density control (Valley template only). Default: 'default' */
+    layoutMode: LayoutMode;
 }
 
 export const DEFAULT_CV_OPT_SETTINGS: CVOptSettings = {
@@ -26,7 +35,7 @@ export const DEFAULT_CV_OPT_SETTINGS: CVOptSettings = {
     showCertificates: true,
     showLanguages: true,
     templateId: 'valley',
-    pageBreakBeforeEducation: false,
+    layoutMode: 'default',
 };
 
 /** Station-specific metrics provided by the user for the Numbers Check Flow */

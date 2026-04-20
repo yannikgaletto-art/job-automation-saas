@@ -7,13 +7,13 @@ import { motion } from "framer-motion"
 import { DiffReview } from "./DiffReview"
 import { InlineCvEditor } from "./InlineCvEditor"
 import { CvStructuredData, CvOptimizationProposal, UserDecisions } from "@/types/cv"
-import { CVOptSettings, DEFAULT_CV_OPT_SETTINGS, StationMetrics } from "@/types/cv-opt-settings"
+import { CVOptSettings, DEFAULT_CV_OPT_SETTINGS, StationMetrics, LayoutMode } from "@/types/cv-opt-settings"
 import { applyCVOptSettings } from "@/lib/utils/cv-settings-filter"
 import { saveCvDecisions } from "@/app/actions/save-cv-decisions"
 import { createClient } from '@/lib/supabase/client'
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { CustomDialog } from "@/components/ui/custom-dialog"
-import { Check, Settings, Sparkles, Layout, Pencil, CheckCheck, ToggleLeft, ToggleRight, Video, Loader2, FileText, ArrowRight } from "lucide-react"
+import { Check, Settings, Sparkles, Layout, Pencil, CheckCheck, Minimize2, Maximize2, Video, Loader2, FileText, ArrowRight } from "lucide-react"
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
@@ -859,26 +859,38 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                             </button>
                         </div>
 
-                        {/* Layout Controls — deterministic, no AI */}
+                        {/* Layout Controls — deterministic, no AI, bidirectional */}
                         {templateId === 'valley' && (
-                            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
-                                <span className="text-sm text-gray-600">{t('layout_break_education')}</span>
-                                <button
-                                    onClick={() => setCvOptSettings(s => ({ ...s, pageBreakBeforeEducation: !s.pageBreakBeforeEducation }))}
-                                    className="text-gray-500 hover:text-[#012e7a] transition"
-                                    aria-label={t('layout_break_education')}
-                                >
-                                    {cvOptSettings.pageBreakBeforeEducation
-                                        ? <ToggleRight className="w-7 h-7 text-[#012e7a]" />
-                                        : <ToggleLeft className="w-7 h-7 text-gray-400" />}
-                                </button>
+                            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
+                                <span className="text-sm text-gray-600 mr-1">{t('layout_mode_label')}</span>
+                                {(['compact', 'default', 'spacious'] as LayoutMode[]).map((mode) => {
+                                    const isActive = cvOptSettings.layoutMode === mode;
+                                    const icon = mode === 'compact'
+                                        ? <Minimize2 size={14} />
+                                        : mode === 'spacious'
+                                            ? <Maximize2 size={14} />
+                                            : <Layout size={14} />;
+                                    return (
+                                        <button
+                                            key={mode}
+                                            onClick={() => setCvOptSettings(s => ({ ...s, layoutMode: mode }))}
+                                            className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all
+                                                ${isActive
+                                                    ? 'bg-[#012e7a] text-white shadow-sm'
+                                                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
+                                        >
+                                            {icon}
+                                            {t(`layout_mode_${mode}`)}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
 
                         {/* PDF Preview + optional editor panel */}
                         {isEditing ? (
                             <div className="grid grid-cols-[1fr_480px] gap-4 items-start">
-                                <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} pageBreakBeforeEducation={cvOptSettings.pageBreakBeforeEducation} />
+                                <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
                                 <div className="sticky top-4 bg-white rounded-xl border border-slate-200 p-4 h-[800px]">
                                     <InlineCvEditor
                                         data={activePdfData}
@@ -888,7 +900,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                 </div>
                             </div>
                         ) : (
-                            <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} pageBreakBeforeEducation={cvOptSettings.pageBreakBeforeEducation} />
+                            <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
                         )}
 
                         <div className="flex flex-col sm:flex-row justify-between items-center py-4 border-t border-gray-100 mt-6 mb-8 gap-4 pb-4">
@@ -901,7 +913,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
 
                             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                                 <div className="w-full sm:w-auto">
-                                    <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} pageBreakBeforeEducation={cvOptSettings.pageBreakBeforeEducation} />
+                                    <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
                                 </div>
                                 <button
                                     onClick={() => onGoToCoverLetter?.()}
