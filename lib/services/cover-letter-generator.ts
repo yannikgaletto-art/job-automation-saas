@@ -7,7 +7,6 @@
  * Multi-Agent Pipeline: DEPRECATED (2026-04-09) — Haiku overwriting Sonnet = quality regression.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { getAnthropicClient } from '@/lib/ai/model-router';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { validateCoverLetter, logValidation } from './cover-letter-validator';

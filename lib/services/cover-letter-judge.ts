@@ -15,7 +15,6 @@
  * Fallback: pass: false — bei Haiku-Timeout kein ungeprüfter Text durchgelassen.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { getAnthropicClient } from '@/lib/ai/model-router';
 import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import type { StyleAnalysis } from './writing-style-analyzer';
