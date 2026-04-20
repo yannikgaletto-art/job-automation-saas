@@ -542,23 +542,12 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                 animate={{ opacity: 1, y: 0 }}
                 className="p-8 bg-white border border-gray-200 rounded-xl max-w-md mx-auto space-y-5"
             >
-                {/* Success header */}
-                <div className="text-center space-y-3">
-                    <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto">
-                        <CheckCircle2 className="w-7 h-7 text-green-600" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('done_title')}</h3>
-                        <p className="text-sm text-gray-500 leading-relaxed">
-                            {t('done_description')}
-                        </p>
-                    </div>
-
-                    {/* LIVE badge */}
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-xs font-semibold text-green-700">{t('done_live_badge')}</span>
-                    </div>
+                {/* Success header — left-aligned, no icon */}
+                <div className="space-y-1">
+                    <h3 className="text-lg font-semibold text-gray-900">{t('done_title')}</h3>
+                    <p className="text-sm text-gray-500 leading-relaxed">
+                        {t('done_description')}
+                    </p>
                 </div>
 
                 {/* Monitoring panel */}
@@ -628,7 +617,7 @@ export function Step5Video({ jobId, onScriptFound }: Step5VideoProps) {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex justify-center gap-3 pt-1">
+                <div className="flex gap-3 pt-1">
                     <button
                         onClick={handleReRecord}
                         className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition flex items-center gap-1.5"
