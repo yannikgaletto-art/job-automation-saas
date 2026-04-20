@@ -51,11 +51,8 @@ function buildStyles(mode: LayoutMode) {
         header: {
             flexDirection: 'row',
             justifyContent: 'space-between',
-            alignItems: 'flex-end',
+            alignItems: 'flex-start',
             marginBottom: isCompact ? 10 : 16,
-            paddingBottom: isCompact ? 8 : 12,
-            borderBottomWidth: 1.5,
-            borderBottomColor: DARK,
         },
         headerName: { fontSize: 22, fontWeight: 700, color: DARK, letterSpacing: 0.5 },
         headerContact: { alignItems: 'flex-end' },
