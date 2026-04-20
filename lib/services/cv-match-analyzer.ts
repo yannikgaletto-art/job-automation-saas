@@ -273,8 +273,8 @@ For each card, produce:
 
 3. **level**: Assessment based on CV evidence for this dimension:
    - "strong": Direct experience documented in CV, >6 months or clear project evidence
-   - "solid": Related experience in CV, brief touchpoints, or only tangentially relevant  
-   - "gap": No evidence found in the CV document
+   - "solid": Related experience in CV, brief touchpoints, or transferable competence from an adjacent domain (e.g. LLM usage → LLM orchestration, Vertragsrecht → M&A, Datenanalyse → Business Intelligence)
+   - "gap": ZERO related experience found in the CV document — not even tangentially. If ANY related skill, tool, or domain experience exists → use "solid" instead.
 
 4. **relevantChips**: Array of 1–4 SHORT skill/experience labels found in ${cvRef}.
    Format: ["Python (Basic)", "Make (No-code)", "3 Jahre PM"]
@@ -359,7 +359,10 @@ Classify EVERY provided ATS keyword as either "found" or "missing".
 Every keyword from the input list MUST appear in either keywordsFound or keywordsMissing.
 - "found": The keyword, a direct synonym, or a clearly documented related activity appears in ${cvRef}.
 - "missing": The keyword does NOT appear in ${cvRef} — not even implicitly.
-STRICT: Do NOT infer. Using "make.com" does NOT mean "Sales Automation". "Project Management" does NOT mean "Enterprise Sales". Match literally or by direct synonym only.
+STRICT: Do NOT infer abstract skills from unrelated experience. "Project Management" does NOT mean "Enterprise Sales".
+HOWEVER: Tool names ARE direct evidence of their category — this is not inference, it is definition:
+Close.io/HubSpot/Salesforce/Pipedrive = CRM. Make.com/N8N/Zapier = API-Integration & Workflow-Automation. Bubble/Webflow = No-Code. LangChain/AutoGen/CrewAI = Agentenframework.
+If a tool name appears in the CV, its category is confirmed as "found".
 ⛔ CLOSED SET (MANDATORY): keywordsFound and keywordsMissing MUST together contain EXACTLY the same keywords as the ATS Keywords input list above — no more, no less. Adding ANY keyword that was not in the input list is a critical error.
 `}
 ***
@@ -500,6 +503,43 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
         // Log for audit trail
         const jobCategory = (firstResult as any)._jobCategory ?? 'N/A';
         console.log(`📊 [CV Match] Category: ${jobCategory}, Score: ${firstResult.overallScore}, MajorGaps: ${gapCensus?.majorGaps ?? 'n/a'}, MinorGaps: ${gapCensus?.minorGaps ?? 'n/a'}`);
+
+        // CHIPS-LEVEL CONSISTENCY GUARDRAIL
+        // If a requirement card has relevantChips (= evidence found) but level is "gap" (= no evidence),
+        // that's a logical contradiction. Force level to "solid" deterministically.
+        // DB proof: Card "KI-Tools, LLMs" had 2 chips but level "gap" — this guardrail fixes it.
+        let guardrailFixCount = 0;
+        if (Array.isArray(firstResult.requirementRows)) {
+            for (const row of firstResult.requirementRows) {
+                if (row.level === 'gap' && Array.isArray(row.relevantChips) && row.relevantChips.length > 0) {
+                    console.log(`🛡️ [CV Match] Chips-consistency fix: "${row.title}" had ${row.relevantChips.length} chips but level="gap" → upgraded to "solid"`);
+                    row.level = 'solid';
+                    guardrailFixCount++;
+                }
+            }
+        }
+
+        // If guardrail changed any cards, recount gap census and recompute score
+        // so that the score matches the visible card levels in the UI.
+        if (guardrailFixCount > 0 && gapCensus) {
+            const newMajor = Math.max(0, gapCensus.majorGaps - guardrailFixCount);
+            const newMinor = gapCensus.minorGaps ?? 0;
+            console.log(`🛡️ [CV Match] Gap census corrected: majorGaps ${gapCensus.majorGaps} → ${newMajor} (${guardrailFixCount} cards upgraded)`);
+            gapCensus.majorGaps = newMajor;
+            (firstResult as any)._gapCensus = gapCensus;
+
+            // Recompute deterministic score with corrected gap census
+            let correctedScore: number;
+            if (newMajor === 0 && newMinor === 0) correctedScore = 92;
+            else if (newMajor === 0 && newMinor <= 2) correctedScore = 77;
+            else if (newMajor === 0 && newMinor >= 3) correctedScore = 72;
+            else if (newMajor === 1 && newMinor === 0) correctedScore = 62;
+            else if (newMajor === 1 && newMinor >= 1) correctedScore = 55;
+            else correctedScore = 32;
+
+            console.log(`🛡️ [CV Match] Score corrected: ${firstResult.overallScore} → ${correctedScore}`);
+            firstResult.overallScore = correctedScore;
+        }
 
         // SICHERHEITSARCHITEKTUR §Golden Rule — Defense-in-Depth: ATS Closed-Set Enforcement
         // The prompt instructs the LLM not to invent keywords. This code layer GUARANTEES it.

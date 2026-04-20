@@ -93,6 +93,15 @@ export async function preMatchKeywords(
             if (exp.role && typeof exp.role === 'string') {
                 cvSkillsFlat.push(exp.role.trim().toLowerCase());
             }
+            // Also include: description bullet texts (e.g. "KI (Fokus: GenAI, LLMs)")
+            // Without this, keywords mentioned only in role descriptions are never found.
+            if (Array.isArray(exp.description)) {
+                for (const bullet of exp.description) {
+                    if (bullet?.text && typeof bullet.text === 'string' && bullet.text.trim().length >= 5) {
+                        cvSkillsFlat.push(bullet.text.trim().toLowerCase());
+                    }
+                }
+            }
         }
     }
 
