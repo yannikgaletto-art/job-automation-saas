@@ -1505,9 +1505,10 @@
     "submit_button": "Abschicken →",
     "submitting": "Wird gesendet…",
     "success_message": "Danke, {name}. Ich schaue es mir gleich an.",
-    "question_1": "Was gefällt dir an Pathly am besten?",
+    "question_1": "Was nutzt dir bei Pathly am meisten?",
     "question_2": "Was frustriert dich oder was fehlt dir noch?",
     "question_3": "Hast du einen Tipp, den ich sofort umsetzen sollte?",
+    "question_4": "Wenn du dir ein eigenes Wunschpaket für 10 € schnüren könntest: was muss es können, damit sich der Preis für dich fair anfühlt?",
     "error_rate_limit": "Du hast gerade mehrmals Feedback gesendet. Bitte warte ein paar Minuten.",
     "error_generic": "Leider ist ein Fehler aufgetreten. Bitte versuche es erneut."
   },

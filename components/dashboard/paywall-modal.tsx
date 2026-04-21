@@ -24,7 +24,7 @@ import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Zap, Mic, Search, Gift, ArrowUpCircle, CreditCard } from 'lucide-react';
+import { Loader2, Mic, Search, Gift, ArrowUpCircle, CreditCard } from 'lucide-react';
 import type { PaywallReason } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
 
 type ModalPhase = 'pricing' | 'granting' | 'surprise';
@@ -162,7 +162,7 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
         reason === 'search' ? t('search_limit_desc', { total: String(PLAN_CONFIG.free.jobSearches) }) :
         t('exhausted_thanks', { total: String(PLAN_CONFIG.free.credits) });
 
-    const IconComponent = reason === 'coaching' ? Mic : reason === 'search' ? Search : Zap;
+
 
     return (
         <Dialog.Root open={open} onOpenChange={handleOpenChange}>
@@ -180,10 +180,7 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
                                 exit={{ opacity: 0, y: -10 }}
                                 transition={{ duration: 0.2 }}
                             >
-                                {/* Icon */}
-                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10">
-                                    <IconComponent className="w-7 h-7 text-amber-600" />
-                                </div>
+                                {/* No icon — clean modal */}
 
                                 <Dialog.Title className="text-center text-lg font-semibold text-foreground mb-1">
                                     {title}
@@ -205,16 +202,16 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
                                     {reason === 'credits' && (
                                         <button
                                             onClick={handleFeedbackNav}
-                                            className="w-full flex items-center gap-3 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all group"
+                                            className="w-full flex items-center gap-3 p-3 rounded-xl border border-[#012e7a]/30 bg-[#012e7a]/5 hover:border-[#012e7a]/50 hover:bg-[#012e7a]/10 transition-all group"
                                         >
-                                            <span className="flex-shrink-0 h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                <Gift className="w-5 h-5 text-emerald-600" />
+                                            <span className="flex-shrink-0 h-10 w-10 rounded-lg bg-[#012e7a]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <Gift className="w-5 h-5 text-[#012e7a]" />
                                             </span>
                                             <div className="text-left">
                                                 <p className="text-sm font-medium text-foreground">{t('feedback_cta_title')}</p>
                                                 <p className="text-xs text-muted-foreground">{t('feedback_cta_desc')}</p>
                                             </div>
-                                            <span className="ml-auto text-sm font-semibold text-emerald-600">+2</span>
+                                            <span className="ml-auto text-sm font-semibold text-[#012e7a]">+2</span>
                                         </button>
                                     )}
 

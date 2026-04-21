@@ -1505,9 +1505,10 @@
     "submit_button": "Send feedback →",
     "submitting": "Sending…",
     "success_message": "Thanks, {name}. I'll take a look right away.",
-    "question_1": "What do you like most about Pathly?",
+    "question_1": "What helps you the most with Pathly?",
     "question_2": "What frustrates you or what is still missing?",
     "question_3": "Do you have a tip I should act on immediately?",
+    "question_4": "If you could build your own dream package for €10: what features would it need to feel fair to you?",
     "error_rate_limit": "You've sent multiple feedbacks recently. Please wait a few minutes.",
     "error_generic": "Something went wrong. Please try again."
   },

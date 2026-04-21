@@ -485,7 +485,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             </div>
 
             {/* Formality Toggle — DE: Sie/Du, ES: Usted/Tú, EN: always hidden */}
-            {language !== 'en' && locale !== 'en' && (
+            {language !== 'en' && (
                 <div className="pt-2">
                     <label className="block text-xs font-semibold text-[#37352F] mb-1.5">
                         {t('formality_label')}

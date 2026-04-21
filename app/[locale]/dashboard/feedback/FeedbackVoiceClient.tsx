@@ -11,8 +11,8 @@ type FormState = 'idle' | 'submitting' | 'done' | 'error';
 type RecordingState = 'idle' | 'recording' | 'transcribing';
 
 // Organic drift for the pills (horizontal only, no checkmarks)
-const DRIFT = [0, 28, 8];
-const ROT   = [-0.8, 1.5, -1.2];
+const DRIFT = [0, 28, 8, 20];
+const ROT   = [-0.8, 1.5, -1.2, 0.6];
 
 // Max recording duration: 5 minutes (300 000 ms)
 const MAX_RECORDING_MS = 5 * 60 * 1000;
@@ -67,6 +67,7 @@ export function FeedbackVoiceClient() {
         t('question_1'),
         t('question_2'),
         t('question_3'),
+        t('question_4'),
     ];
 
     // ── Submit ───────────────────────────────────────────────────────────────

@@ -1488,9 +1488,10 @@
     "submit_button": "Enviar →",
     "submitting": "Enviando…",
     "success_message": "Gracias, {name}. Lo reviso enseguida.",
-    "question_1": "¿Qué es lo que más te gusta de Pathly?",
+    "question_1": "¿Qué es lo que más te ayuda de Pathly?",
     "question_2": "¿Qué te frustra o qué sientes que falta?",
     "question_3": "¿Tienes un consejo que debería aplicar de inmediato?",
+    "question_4": "Si pudieras armar tu propio paquete ideal por 10 €: ¿qué debería incluir para que el precio te parezca justo?",
     "error_rate_limit": "Has enviado varias veces recientemente. Espera unos minutos.",
     "error_generic": "Algo salió mal. Por favor, inténtalo de nuevo."
   },
