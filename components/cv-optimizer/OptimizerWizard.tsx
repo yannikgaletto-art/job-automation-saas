@@ -13,7 +13,7 @@ import { saveCvDecisions } from "@/app/actions/save-cv-decisions"
 import { createClient } from '@/lib/supabase/client'
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { CustomDialog } from "@/components/ui/custom-dialog"
-import { Check, Settings, Sparkles, Layout, Pencil, CheckCheck, Minimize2, Maximize2, ToggleLeft, ToggleRight, Video, Loader2, FileText, ArrowRight } from "lucide-react"
+import { Check, Settings, Sparkles, Layout, Pencil, CheckCheck, Minimize2, ToggleLeft, ToggleRight, Video, Loader2, FileText, ArrowRight } from "lucide-react"
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
@@ -863,13 +863,11 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                         {templateId === 'valley' && (
                             <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
                                 <span className="text-sm text-gray-600 mr-1">{t('layout_mode_label')}</span>
-                                {(['compact', 'default', 'spacious'] as LayoutMode[]).map((mode) => {
+                                {(['compact', 'default'] as LayoutMode[]).map((mode) => {
                                     const isActive = cvOptSettings.layoutMode === mode;
                                     const icon = mode === 'compact'
                                         ? <Minimize2 size={14} />
-                                        : mode === 'spacious'
-                                            ? <Maximize2 size={14} />
-                                            : <Layout size={14} />;
+                                        : <Layout size={14} />;
                                     return (
                                         <button
                                             key={mode}

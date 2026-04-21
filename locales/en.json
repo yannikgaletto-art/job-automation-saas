@@ -1007,11 +1007,9 @@
     "btn_layout_fix_used": "Correction already used",
     "btn_layout_fix_desc": "If the title and summary take up too much space.",
     "error_free_retry_exhausted": "The free correction has already been used.",
-    "layout_break_education": "Education on next page",
     "layout_mode_label": "Page layout",
     "layout_mode_compact": "Standard",
     "layout_mode_default": "Detailed",
-    "layout_mode_spacious": "Spread",
     "preview_tour_title": "Layout issue? Easy fix.",
     "preview_tour_body": "If your CV has too much white space or sections look off, click <b>\"Fix Formatting\"</b>. Pathly automatically corrects the layout. <b>Free and one-time</b> per job."
   },

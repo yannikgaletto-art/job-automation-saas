@@ -11,7 +11,7 @@ import { LayoutMode } from '@/types/cv-opt-settings';
 
 /**
  * ValleyTemplate — FAANG-optimized, single-column, black & white CV.
- * V4: Hard 2-page guardrails, bidirectional layoutMode (compact/default/spacious).
+ * V4: Hard 2-page guardrails, bidirectional layoutMode (compact/default).
  *
  * HARD CAPS (always enforced, regardless of AI output):
  * - Experience bullets: max 3 per entry (matches AI prompt constraint)
@@ -32,7 +32,7 @@ const MAX_CERTS = 6;
 /**
  * Build styles dynamically based on layoutMode.
  * compact = tighter spacing to fit more on page 1.
- * spacious/default = standard spacing.
+ * default = standard spacing.
  */
 function buildStyles(mode: LayoutMode) {
     const isCompact = mode === 'compact';
@@ -113,7 +113,7 @@ export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' 
     // HARD CAPS — prevent 3-page overflow regardless of AI output
     const maxBullets = layoutMode === 'compact' ? MAX_BULLETS_COMPACT : MAX_BULLETS_DEFAULT;
     const cappedCerts = hasCerts ? data.certifications!.slice(0, MAX_CERTS) : [];
-    const forceBreak = layoutMode === 'spacious';
+
 
     return (
         <Document>
@@ -189,7 +189,7 @@ export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' 
 
                 {/* ===== EDUCATION ===== */}
                 {data.education.length > 0 && (
-                    <View style={s.sectionContainer} minPresenceAhead={80} break={forceBreak}>
+                    <View style={s.sectionContainer} minPresenceAhead={80}>
                         <Text style={s.sectionTitle}>{labels.education}</Text>
                         {data.education.map((edu) => {
                             // Split description into sub-items (split on '. ' or ', ')

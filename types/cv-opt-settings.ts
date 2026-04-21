@@ -10,10 +10,9 @@
  * Layout mode for the Valley template.
  * - 'compact': Tighter spacing, content-dense — maximum page utilization (UI: "Standard")
  * - 'default': Normal spacing, more breathing room (UI: "Ausführlich")
- * - 'spacious': Force page break before Education — spreads content across 2 pages (UI: "Verteilt")
  * NOTE: All modes render 3 bullets per experience entry. The difference is only spacing density.
  */
-export type LayoutMode = 'default' | 'compact' | 'spacious';
+export type LayoutMode = 'default' | 'compact';
 
 export interface CVOptSettings {
     /** Whether to show the professional summary section. Default: true */
