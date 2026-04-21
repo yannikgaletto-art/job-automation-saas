@@ -4,7 +4,7 @@
  *
  * Feature-Silo: billing
  *
- * Allows free users to earn 5 bonus credits by submitting feedback.
+ * Allows free users to earn 2 bonus credits by submitting feedback.
  * Uses atomic RPC (grant_feedback_credits) — no race condition possible.
  * One-time per user lifetime.
  *
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         // If the RPC fails, we return an error BEFORE touching feedback.
         const { data: rpcResult, error: rpcError } = await admin.rpc('grant_feedback_credits', {
             p_user_id: user.id,
-            p_amount: 5.0,
+            p_amount: 2.0,
         });
 
         if (rpcError) {
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        console.log(`🎁 [FeedbackCredits] Granted 5 credits to user ${user.id.slice(0, 8)}… | New balance: ${result.new_balance}`);
+        console.log(`[FeedbackCredits] Granted 2 credits to user ${user.id.slice(0, 8)}… | New balance: ${result.new_balance}`);
 
         // ── STEP 2: Save feedback (B3 fix: uses locale from frontend, B5: non-blocking) ──
         // Fire-and-forget: feedback storage is auxiliary. Credits were already granted.
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            creditsGranted: 5,
+            creditsGranted: 2,
             newBalance: result.new_balance,
             alreadyClaimed: false,
         });

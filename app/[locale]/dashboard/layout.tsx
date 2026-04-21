@@ -273,8 +273,10 @@ function DashboardLayoutInner({
             {/* Global Paywall Modal — triggered from any component via useCreditExhausted() */}
             <PaywallModalBridge />
 
-            {/* Referral Notification — shows welcome/bonus popup after referral claim */}
-            <ReferralNotificationOverlay />
+            {/* Referral Notification — hidden during Free Trial testing phase */}
+            {process.env.NEXT_PUBLIC_BONUSES_ENABLED === 'true' && (
+                <ReferralNotificationOverlay />
+            )}
 
         </>
     );

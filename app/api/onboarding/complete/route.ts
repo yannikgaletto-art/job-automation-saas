@@ -71,6 +71,55 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // ── 2b. §WAITLIST: Enforce registration cap ──────────────────────
+        // If the testing cohort is full, place user on waitlist (0 credits)
+        // but still complete consent recording (DSGVO compliance).
+        const FREE_USER_CAP = parseInt(process.env.FREE_USER_CAP || '35', 10);
+        const { count: freeUserCount } = await supabaseAdmin
+            .from('user_credits')
+            .select('user_id', { count: 'exact', head: true })
+            .in('plan_type', ['free', 'starter', 'durchstarter']); // All active users
+
+        if ((freeUserCount ?? 0) >= FREE_USER_CAP) {
+            // Zero out credits — user gets account but no AI access
+            await supabaseAdmin
+                .from('user_credits')
+                .update({
+                    plan_type: 'waitlist',
+                    credits_total: 0,
+                    coaching_sessions_total: 0,
+                    job_searches_total: 0,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('user_id', user.id);
+
+            // Still mark onboarding as complete (consent is valid)
+            const now = new Date().toISOString();
+            await supabaseAdmin
+                .from('user_settings')
+                .upsert(
+                    {
+                        user_id: user.id,
+                        onboarding_completed: true,
+                        onboarding_step: step || 2,
+                        onboarding_completed_at: now,
+                        ...(language && ['de', 'en', 'es'].includes(language) ? { language } : {}),
+                        updated_at: now,
+                    },
+                    { onConflict: 'user_id' }
+                );
+
+            // §ANALYTICS: Track waitlist placement
+            const { captureServerEvent } = await import('@/lib/posthog/server');
+            captureServerEvent(user.id, 'waitlisted', {
+                cohort_size: freeUserCount,
+                cap: FREE_USER_CAP,
+            });
+
+            console.log(`[onboarding/complete] User ${user.id} waitlisted (cohort: ${freeUserCount}/${FREE_USER_CAP})`);
+            return NextResponse.json({ success: true, waitlisted: true });
+        }
+
         // ── 3. Mark onboarding as complete in user_settings ──
         const now = new Date().toISOString();
         const { error } = await supabaseAdmin

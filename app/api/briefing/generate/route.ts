@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { complete } from '@/lib/ai/model-router';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,6 +27,9 @@ export async function GET() {
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const rateLimited = await checkUpstashLimit(rateLimiters.briefing, user.id);
+        if (rateLimited) return rateLimited;
 
         const today = new Date().toISOString().split('T')[0];
         const userName = user.user_metadata?.full_name?.split(' ')[0] || 'Hey';

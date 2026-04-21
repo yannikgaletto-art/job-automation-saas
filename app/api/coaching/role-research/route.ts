@@ -20,6 +20,7 @@ import { getCVText } from '@/lib/services/cv-text-retriever';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
 import { getLanguageInstruction } from '@/lib/prompts/coaching-prompt-i18n';
 import type { AboutRole } from '@/types/coaching';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 // Vercel timeout protection
 export const maxDuration = 60;
@@ -49,6 +50,9 @@ export async function POST(request: Request) {
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const rateLimited = await checkUpstashLimit(rateLimiters.roleResearch, user.id);
+        if (rateLimited) return rateLimited;
 
         const body = await request.json();
         const { sessionId, category = 'all', force = false } = body as {

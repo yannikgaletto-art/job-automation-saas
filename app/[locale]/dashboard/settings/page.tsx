@@ -50,7 +50,8 @@ export default async function SettingsPage() {
                     </CardContent>
                 </Card>
 
-                {/* Referral CTA — directly below Credits */}
+                {/* Referral CTA — hidden during Free Trial testing phase */}
+                {process.env.NEXT_PUBLIC_BONUSES_ENABLED === 'true' && (
                 <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">
                     <CardHeader className="pb-4">
                         <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
@@ -65,6 +66,7 @@ export default async function SettingsPage() {
                         <ReferralCard />
                     </CardContent>
                 </Card>
+                )}
                 <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">
                     <CardHeader className="pb-4">
                         <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">

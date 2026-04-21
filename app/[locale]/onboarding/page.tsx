@@ -121,11 +121,17 @@ export default function OnboardingPage() {
                     ],
                 }),
             });
-            const data = await res.json() as { success: boolean; error?: string };
+            const data = await res.json() as { success: boolean; error?: string; waitlisted?: boolean };
 
             if (!res.ok || !data.success) {
                 setCompletionError(t('step2.error_save'));
                 setCompleting(false);
+                return;
+            }
+
+            // §WAITLIST: If cohort is full, redirect to waitlist page
+            if (data.waitlisted) {
+                router.push('/dashboard/waitlist');
                 return;
             }
 

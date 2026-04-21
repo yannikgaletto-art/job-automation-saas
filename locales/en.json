@@ -1641,13 +1641,13 @@
     "popular_badge": "Popular",
     "exhausted_title": "Your credits are exhausted",
     "exhausted_thanks": "Thanks for trying Pathly! You've used all {total} free credits.",
-    "feedback_cta_title": "5 credits for your feedback",
-    "feedback_cta_desc": "Help us with your feedback and receive 5 bonus credits.",
+    "feedback_cta_title": "2 credits for your feedback",
+    "feedback_cta_desc": "Help us with your feedback and receive 2 bonus credits.",
     "feedback_rating_label": "How satisfied are you with Pathly?",
     "feedback_message_placeholder": "What can we improve? (optional)",
     "feedback_submit": "Submit feedback & get credits",
     "feedback_submitting": "Submitting…",
-    "feedback_success_title": "5 bonus credits activated! 🎉",
+    "feedback_success_title": "2 bonus credits activated!",
     "feedback_success_desc": "Thanks for your feedback — let's keep going!",
     "feedback_already_claimed": "You've already received your feedback credits.",
     "feedback_error": "Error submitting. Please try again.",
@@ -1802,5 +1802,11 @@
     "referrer_message": "Thanks for recommending us. As a small thank you, you receive 5 credits. We hope we can support you on your next career step.",
     "someone": "a friend",
     "dismiss": "Got it"
+  },
+  "waitlist": {
+    "title": "You're on the Waitlist",
+    "description": "Thank you for your interest in Pathly. Our testing phase is currently at capacity. We'll notify you by email as soon as a spot opens up.",
+    "status": "Preparing your spot",
+    "cta": "Back to Homepage"
   }
 }

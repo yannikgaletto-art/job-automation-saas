@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { enrichCompany, linkEnrichmentToJob } from "@/lib/services/company-enrichment"
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash'
 
 // Jina scrape (5-15s) + Claude extraction (3-5s) + DB write = needs 20-25s
 export const maxDuration = 45;
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest) {
         if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
+
+        const rateLimited = await checkUpstashLimit(rateLimiters.jobEnrich, user.id)
+        if (rateLimited) return rateLimited
 
         // 1. Trigger enrichment with optional Steckbrief context (Stufe 0)
         const enrichContext = {

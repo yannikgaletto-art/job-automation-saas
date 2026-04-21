@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,6 +24,9 @@ export async function GET() {
         if (authError || !user) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
         }
+
+        const rateLimited = await checkUpstashLimit(rateLimiters.suggestTitles, user.id);
+        if (rateLimited) return rateLimited;
 
         // Fetch user's CV text
         const { data: doc } = await supabaseAdmin

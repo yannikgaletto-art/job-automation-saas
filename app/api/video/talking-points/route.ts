@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { logger } from '@/lib/logging';
 import Anthropic from '@anthropic-ai/sdk';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = getSupabaseAdmin();
 
@@ -19,6 +20,9 @@ export async function POST(request: NextRequest) {
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized', requestId }, { status: 401 });
         }
+
+        const rateLimited = await checkUpstashLimit(rateLimiters.talkingPoints, user.id);
+        if (rateLimited) return rateLimited;
 
         const log = logger.forRequest(requestId, user.id, '/api/video/talking-points');
         const { jobId } = await request.json() as { jobId: string };

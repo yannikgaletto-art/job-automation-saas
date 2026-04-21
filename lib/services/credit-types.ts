@@ -14,9 +14,9 @@
 //   If you change values here, you MUST update the trigger SQL and deploy it.
 export const PLAN_CONFIG = {
     free: {
-        credits: 15.0,       // Free plan: 15 credits (~10 full applications)
-        coachingSessions: 3, // 3 coaching sessions ("Reinschnuppern")
-        jobSearches: 15,     // 15 unique SerpAPI queries (cache hits are free)
+        credits: 5.0,        // Free Trial: 5 credits (~2 full applications)
+        coachingSessions: 3,  // 3 coaching sessions ("Reinschnuppern")
+        jobSearches: 3,       // 3 unique SerpAPI queries (stays within SerpAPI Free Tier)
         label: 'Free',
     },
     starter: {

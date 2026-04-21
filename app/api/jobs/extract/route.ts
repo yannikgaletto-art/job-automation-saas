@@ -6,6 +6,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { inngest } from '@/lib/inngest/client';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 /**
  * POST /api/jobs/extract — Smart Trigger
@@ -63,6 +64,9 @@ export async function POST(request: NextRequest) {
         if (authError || !user) {
             return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
         }
+
+        const rateLimited = await checkUpstashLimit(rateLimiters.jobExtract, user.id);
+        if (rateLimited) return rateLimited;
 
         const { jobId } = Schema.parse(await request.json());
 

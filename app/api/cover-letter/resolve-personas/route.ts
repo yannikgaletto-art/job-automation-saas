@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { resolveHiringPersona } from '@/lib/services/hiring-manager-resolver';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 /**
  * POST /api/cover-letter/resolve-personas
@@ -25,6 +26,9 @@ export async function POST(request: NextRequest) {
                 { status: 401 }
             );
         }
+
+        const rateLimited = await checkUpstashLimit(rateLimiters.resolvePersonas, user.id);
+        if (rateLimited) return rateLimited;
 
         const body = await request.json() as {
             jobDescription?: string;

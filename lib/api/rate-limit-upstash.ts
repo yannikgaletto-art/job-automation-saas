@@ -90,6 +90,18 @@ function getLimiters() {
         // DSGVO self-service endpoints (abuse protection)
         accountDelete: createLimiter('rl:account-delete', 1, '10 m'),
         dataExport: createLimiter('rl:data-export', 3, '10 m'),
+
+        // ── Trial Hardening (2026-04-21) ──────────────────────────────
+        // Previously unprotected AI-calling routes — cost-spike protection
+        quotes: createLimiter('rl:quotes', 5, '1 m'),
+        roleResearch: createLimiter('rl:role-research', 5, '1 m'),
+        resolvePersonas: createLimiter('rl:resolve-personas', 5, '1 m'),
+        briefing: createLimiter('rl:briefing', 5, '1 m'),
+        jobExtract: createLimiter('rl:job-extract', 5, '1 m'),
+        jobEnrich: createLimiter('rl:job-enrich', 5, '1 m'),
+        suggestTitles: createLimiter('rl:suggest-titles', 5, '1 m'),
+        talkingPoints: createLimiter('rl:talking-points', 5, '1 m'),
+        jobSearchProcess: createLimiter('rl:job-search-process', 10, '1 m'),
     };
     return _limiters;
 }

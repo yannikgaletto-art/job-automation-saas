@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { findRelevantQuotes, type QuoteContext } from '@/lib/services/quote-service';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 // DB-query typical <200ms. AI fallback (Claude Haiku) can take 3-5s on niche jobs.
 export const maxDuration = 30;
@@ -11,6 +12,9 @@ export async function POST(req: NextRequest) {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const rateLimited = await checkUpstashLimit(rateLimiters.quotes, user.id);
+        if (rateLimited) return rateLimited;
 
         const { jobId, companyName, companyValues, companyVision, jobTitle, language, categoryOverride } = await req.json();
         if (!jobId || !companyName) {

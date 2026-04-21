@@ -19,6 +19,7 @@ import {
     type SerpApiJob,
     type UserValues,
 } from '@/lib/services/job-search-pipeline';
+import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,6 +37,9 @@ export async function POST(request: NextRequest) {
         if (authError || !user) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
         }
+
+        const rateLimited = await checkUpstashLimit(rateLimiters.jobSearchProcess, user.id);
+        if (rateLimited) return rateLimited;
 
         const body = await request.json();
         const { serpApiJob, searchQuery } = body as {

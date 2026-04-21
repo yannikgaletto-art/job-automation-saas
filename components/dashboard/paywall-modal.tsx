@@ -24,7 +24,7 @@ import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Zap, Mic, Search, Gift, ArrowUpCircle, CreditCard } from 'lucide-react';
 import type { PaywallReason } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
 
 type ModalPhase = 'pricing' | 'granting' | 'surprise';
@@ -162,7 +162,7 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
         reason === 'search' ? t('search_limit_desc', { total: String(PLAN_CONFIG.free.jobSearches) }) :
         t('exhausted_thanks', { total: String(PLAN_CONFIG.free.credits) });
 
-    const icon = reason === 'coaching' ? '🎯' : reason === 'search' ? '🔍' : '⚡';
+    const IconComponent = reason === 'coaching' ? Mic : reason === 'search' ? Search : Zap;
 
     return (
         <Dialog.Root open={open} onOpenChange={handleOpenChange}>
@@ -182,7 +182,7 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
                             >
                                 {/* Icon */}
                                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10">
-                                    <span className="text-3xl">{icon}</span>
+                                    <IconComponent className="w-7 h-7 text-amber-600" />
                                 </div>
 
                                 <Dialog.Title className="text-center text-lg font-semibold text-foreground mb-1">
@@ -207,24 +207,25 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
                                             onClick={handleFeedbackNav}
                                             className="w-full flex items-center gap-3 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all group"
                                         >
-                                            <span className="flex-shrink-0 h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-                                                🎁
+                                            <span className="flex-shrink-0 h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <Gift className="w-5 h-5 text-emerald-600" />
                                             </span>
                                             <div className="text-left">
                                                 <p className="text-sm font-medium text-foreground">{t('feedback_cta_title')}</p>
                                                 <p className="text-xs text-muted-foreground">{t('feedback_cta_desc')}</p>
                                             </div>
-                                            <span className="ml-auto text-sm font-semibold text-emerald-600">+5</span>
+                                            <span className="ml-auto text-sm font-semibold text-emerald-600">+2</span>
                                         </button>
                                     )}
 
                                     {/* Upgrade → Beta Grant (tracks "upgrade_intent_starter") */}
+                                    {process.env.NEXT_PUBLIC_BONUSES_ENABLED === 'true' && (
                                     <button
                                         onClick={() => handleBetaGrant('starter')}
                                         className="w-full flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-violet-600/10 to-indigo-600/10 border border-violet-500/20 hover:border-violet-500/40 transition-all group"
                                     >
-                                        <span className="flex-shrink-0 h-10 w-10 rounded-lg bg-violet-500/10 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-                                            🚀
+                                        <span className="flex-shrink-0 h-10 w-10 rounded-lg bg-violet-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <ArrowUpCircle className="w-5 h-5 text-violet-500" />
                                         </span>
                                         <div className="text-left">
                                             <p className="text-sm font-medium text-foreground">{t('paywall_upgrade_title')}</p>
@@ -232,15 +233,16 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
                                         </div>
                                         <span className="ml-auto text-xs text-violet-400">→</span>
                                     </button>
+                                    )}
 
                                     {/* Topup → Beta Grant (tracks "upgrade_intent_topup") */}
-                                    {reason === 'credits' && (
+                                    {reason === 'credits' && process.env.NEXT_PUBLIC_BONUSES_ENABLED === 'true' && (
                                         <button
                                             onClick={() => handleBetaGrant('topup')}
                                             className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/60 hover:border-border hover:bg-muted/20 transition-all group"
                                         >
-                                            <span className="flex-shrink-0 h-10 w-10 rounded-lg bg-muted/30 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-                                                💳
+                                            <span className="flex-shrink-0 h-10 w-10 rounded-lg bg-muted/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <CreditCard className="w-5 h-5 text-muted-foreground" />
                                             </span>
                                             <div className="text-left">
                                                 <p className="text-sm font-medium text-foreground">{t('paywall_topup_title')}</p>
