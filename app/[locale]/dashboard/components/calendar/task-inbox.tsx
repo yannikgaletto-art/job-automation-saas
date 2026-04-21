@@ -58,12 +58,22 @@ function DraggableTaskItem({ task }: { task: CalendarTask }) {
         : null;
 
     const handleDurationChange = async (minutes: number) => {
-        updateTask(task.id, { estimated_minutes: minutes });
+        const updates: Partial<CalendarTask> = { estimated_minutes: minutes };
+        const patchBody: Record<string, unknown> = { id: task.id, estimated_minutes: minutes };
+
+        // Recalculate scheduled_end so the calendar block resizes
+        if (task.scheduled_start) {
+            const newEnd = new Date(new Date(task.scheduled_start).getTime() + minutes * 60000).toISOString();
+            updates.scheduled_end = newEnd;
+            patchBody.scheduled_end = newEnd;
+        }
+
+        updateTask(task.id, updates);
         setShowDuration(false);
         await fetch('/api/tasks', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: task.id, estimated_minutes: minutes }),
+            body: JSON.stringify(patchBody),
         });
     };
 
