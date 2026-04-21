@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
             .insert({
                 user_id: user.id,
                 feedback: trimmed,
-                name: name?.trim() || null,
+                name: null, // Always anonymous — DSGVO privacy-first
                 locale: locale && ['de', 'en', 'es'].includes(locale) ? locale : 'de',
             });
 
@@ -68,9 +68,8 @@ export async function POST(request: NextRequest) {
         // ── Resend email notification (awaited — fire-and-forget kills in Vercel) ──
         const resendKey = process.env.RESEND_API_KEY;
         if (resendKey) {
-            const fullName = name?.trim() || user.email || 'Anonymous';
-            const senderDisplay = fullName.split(' ')[0]; // First name only
             const timestamp = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' });
+            const shortId = user.id.slice(0, 8); // Anonymized trace ID
 
             try {
                 const resendRes = await fetch('https://api.resend.com/emails', {
@@ -82,7 +81,7 @@ export async function POST(request: NextRequest) {
                     body: JSON.stringify({
                         from: 'Pathly Feedback <noreply@path-ly.eu>',
                         to: ['contact@path-ly.eu'],
-                        subject: `💬 Neues Feedback von ${senderDisplay}`,
+                        subject: `💬 Neues anonymes Feedback`,
                         html: `
                             <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#FAFAF8;border-radius:12px;">
                               <h2 style="color:#1C1917;font-size:22px;font-weight:600;margin:0 0 4px 0;">Neues Feedback erhalten 💬</h2>
@@ -91,9 +90,8 @@ export async function POST(request: NextRequest) {
                                 <p style="color:#1C1917;font-size:15px;line-height:1.75;margin:0;">${trimmed.replace(/\n/g, '<br>')}</p>
                               </div>
                               <table style="width:100%;border-collapse:collapse;font-size:13px;">
-                                <tr><td style="padding:5px 0;color:#9A9086;width:80px;">Von</td><td style="padding:5px 0;color:#1C1917;font-weight:500;">${senderDisplay}</td></tr>
-                                <tr><td style="padding:5px 0;color:#9A9086;">E-Mail</td><td style="padding:5px 0;color:#1C1917;">${user.email ?? '—'}</td></tr>
-                                <tr><td style="padding:5px 0;color:#9A9086;">User ID</td><td style="padding:5px 0;color:#A8A29E;font-size:11px;font-family:monospace;">${user.id}</td></tr>
+                                <tr><td style="padding:5px 0;color:#9A9086;width:80px;">Von</td><td style="padding:5px 0;color:#1C1917;font-weight:500;">Anonym</td></tr>
+                                <tr><td style="padding:5px 0;color:#9A9086;">Ref</td><td style="padding:5px 0;color:#A8A29E;font-size:11px;font-family:monospace;">${shortId}…</td></tr>
                               </table>
                             </div>
                         `,

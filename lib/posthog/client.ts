@@ -30,15 +30,17 @@ export function initPostHog(): typeof posthog {
     }
 
     posthog.init(key, {
-        api_host: host,
-        capture_pageview: false,      // Manual for Next.js App Router (route changes)
-        capture_pageleave: true,       // Track session duration
-        persistence: 'localStorage',   // DSGVO: no cookies
+        api_host: '/ingest',                // Reverse proxy — bypasses ad blockers
+        ui_host: host,                       // Toolbar + feature flags still use direct host
+        capture_pageview: false,             // Manual for Next.js App Router (route changes)
+        capture_pageleave: true,             // Track session duration
+        persistence: 'localStorage',         // DSGVO: no cookies
         disable_session_recording: false,
         session_recording: {
-            maskAllInputs: true,       // DSGVO: mask form inputs
-            maskTextSelector: '*',     // Mask all text in recordings
+            maskAllInputs: true,             // DSGVO: mask form inputs
+            maskTextSelector: '*',           // Mask all text in recordings
         },
+        capture_performance: true,           // $web_vitals: LCP, INP, CLS
         // Note: no ph.debug() — that escalates RemoteConfig network errors to
         // unhandled Next.js errors which pollute the error overlay.
     });

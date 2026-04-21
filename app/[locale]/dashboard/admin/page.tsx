@@ -553,10 +553,17 @@ function TabAI({ obs }: { obs: ObsData | null }) {
             {/* Helicone Model Table */}
             {!obs.helicone.ok ? (
                 <SourceUnavailable name="Helicone" error={obs.helicone.error} />
-            ) : (
+            ) : (() => {
+                const isDBFallback = obs.helicone.data.by_model.every(m => m.avg_latency === 0);
+                return (
                 <div className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden mb-6">
                     <div className="px-5 py-3 bg-[#FAFAF9] border-b border-[#E7E7E5] flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-[#37352F]">Kosten nach Modell (7 Tage)</h3>
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-semibold text-[#37352F]">Kosten nach Modell (7 Tage)</h3>
+                            {isDBFallback && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200" title="Helicone Query API nicht erreichbar — Kosten werden aus generation_logs berechnet">DB-Fallback</span>
+                            )}
+                        </div>
                         <span className="text-xs text-[#73726E]">Gesamt: €{obs.helicone.data.total_cost_eur} · {obs.helicone.data.total_requests} Req</span>
                     </div>
                     <table className="w-full text-sm">
@@ -582,7 +589,8 @@ function TabAI({ obs }: { obs: ObsData | null }) {
                         </tbody>
                     </table>
                 </div>
-            )}
+                );
+            })()}
 
             {/* Per-Feature AI Breakdown (from internal DB) */}
             <div className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden mb-6">

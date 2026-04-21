@@ -68,13 +68,26 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://logo.clearbit.com https://*.supabase.co",
-              "connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://api.anthropic.com https://api.openai.com https://api.mistral.ai https://api.perplexity.ai https://serpapi.com https://r.jina.ai https://api.firecrawl.dev https://*.sentry.io https://*.ingest.sentry.io https://*.inngest.com https://eu.i.posthog.com https://eu.posthog.com",
+              "connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://api.anthropic.com https://api.openai.com https://api.mistral.ai https://api.perplexity.ai https://serpapi.com https://r.jina.ai https://api.firecrawl.dev https://*.sentry.io https://*.ingest.sentry.io https://*.inngest.com https://eu.i.posthog.com https://eu.posthog.com https://us-assets.i.posthog.com",
               "frame-src 'self' blob: https://js.stripe.com https://tally.so",
               "worker-src 'self' blob:",
               "media-src 'self' blob: https://*.supabase.co",
             ].join('; '),
           },
         ],
+      },
+    ];
+  },
+  // PostHog Reverse Proxy — bypasses ad blockers for accurate analytics
+  async rewrites() {
+    return [
+      {
+        source: '/ingest/static/:path*',
+        destination: 'https://us-assets.i.posthog.com/static/:path*',
+      },
+      {
+        source: '/ingest/:path*',
+        destination: 'https://eu.i.posthog.com/:path*',
       },
     ];
   },
