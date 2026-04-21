@@ -85,6 +85,13 @@ export default function JobQueuePage() {
             titleKey: 'job_queue.empty_step1_title',
             bodyKey: 'job_queue.empty_step1_body',
         },
+        {
+            targetSelector: '[data-tour="chrome-extension-link"]',
+            position: 'bottom',
+            titleKey: 'job_queue.chrome_ext_title',
+            bodyKey: 'job_queue.chrome_ext_body',
+            imageUrl: '/images/chrome-extension-onboarding.png',
+        },
     ];
 
     // Full branch: Step 1 = compact row, Steps 2-5 = tab CONTENT panels
@@ -403,6 +410,7 @@ export default function JobQueuePage() {
                         href="https://chromewebstore.google.com/detail/pathly-%E2%80%94-job-copilot/iebipapmekiemcgdonmnmlpbobfonkki"
                         target="_blank"
                         rel="noopener noreferrer"
+                        data-tour="chrome-extension-link"
                         className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#002e7a]/30 text-[#002e7a] text-sm font-medium bg-[#f0f4ff] hover:bg-[#e0eaff] transition-colors"
                     >
                         <Puzzle className="w-4 h-4" />

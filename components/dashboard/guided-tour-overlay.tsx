@@ -259,6 +259,18 @@ export function GuidedTourOverlay({
                         {t(step.titleKey)}
                     </h3>
 
+                    {/* Optional image */}
+                    {step.imageUrl && (
+                        <div className="mb-3 rounded-lg overflow-hidden border border-[#E7E7E5]">
+                            <img
+                                src={step.imageUrl}
+                                alt=""
+                                className="w-full h-auto"
+                                loading="eager"
+                            />
+                        </div>
+                    )}
+
                     {/* Body — supports <b>bold</b> via next-intl rich text */}
                     <p className="text-sm text-[#73726E] leading-relaxed mb-5">
                         {t.rich(step.bodyKey, {

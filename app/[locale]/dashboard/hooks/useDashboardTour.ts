@@ -19,6 +19,8 @@ export interface TourStep {
     position: 'left' | 'right' | 'top' | 'bottom';
     titleKey: string;
     bodyKey: string;
+    /** Optional image URL (from /public) to show above the body text */
+    imageUrl?: string;
 }
 
 interface UseDashboardTourReturn {
