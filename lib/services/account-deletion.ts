@@ -54,6 +54,7 @@ async function cleanupStripe(stripeCustomerId: string): Promise<{ success: boole
 async function cleanupStorage(userId: string): Promise<void> {
     const admin = getSupabaseAdmin();
     try {
+        // 1. Cleanup 'documents' bucket
         for (const subdir of [undefined, 'cv', 'cover_letter'] as const) {
             const path = subdir ? `${userId}/${subdir}` : userId;
             const { data: files } = await admin.storage.from('documents').list(path);
@@ -61,6 +62,13 @@ async function cleanupStorage(userId: string): Promise<void> {
                 const paths = files.map(f => `${path}/${f.name}`);
                 await admin.storage.from('documents').remove(paths);
             }
+        }
+        
+        // 2. Cleanup 'videos' bucket (new video-letter feature)
+        const { data: videoFiles } = await admin.storage.from('videos').list(userId);
+        if (videoFiles && videoFiles.length > 0) {
+            const videoPaths = videoFiles.map(f => `${userId}/${f.name}`);
+            await admin.storage.from('videos').remove(videoPaths);
         }
     } catch (err) {
         // Non-blocking — storage cleanup failure must not prevent account deletion
