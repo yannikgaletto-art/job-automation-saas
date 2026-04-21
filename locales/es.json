@@ -1557,10 +1557,12 @@
       "step2_body": "El perfil te muestra todo lo que Pathly encontró sobre el puesto. Lo más importante son las <b>palabras clave ATS</b>. Estos términos son escaneados por los sistemas y determinan si recibes una invitación.",
       "step3_title": "¿Encaja el puesto contigo?",
       "step3_body": "Pathly compara tu perfil con los requisitos y te muestra tus puntos fuertes y lagunas. Usamos este análisis para <b>adaptar tu CV y carta de presentación con exactitud</b>.",
-      "step4_title": "CV y Video Letter",
-      "step4_body": "Aquí puedes <b>añadir palabras clave ATS faltantes con el botón de más</b>. Pathly las integra de forma natural. También generas aquí tu <b>QR Video Letter</b>. Se imprime directamente en tu CV y aumenta las tasas de respuesta entre un 20 y un 38 por ciento.",
+      "step4_title": "CV Optimizer",
+      "step4_body": "Aquí puedes <b>añadir palabras clave ATS faltantes con el botón de más</b>. Pathly las integra de forma natural en tu CV. Tú mantienes el control total sobre cada cambio.",
       "step5_title": "No genérico. Realmente tú.",
-      "step5_body": "La carta se redacta a partir de tus optimizaciones y <b>tu estilo personal de escritura</b>. Pathly analiza la empresa en tiempo real. Antes de enviar Pathly simula la crítica de un <b>Hiring Manager</b> real."
+      "step5_body": "La carta se redacta a partir de tus optimizaciones y <b>tu estilo personal de escritura</b>. Pathly analiza la empresa en tiempo real. Antes de enviar Pathly simula la crítica de un <b>Hiring Manager</b> real.",
+      "step6_title": "Video Letter",
+      "step6_body": "Aquí generas tu <b>QR Video Letter</b>. Se imprime directamente en tu CV y aumenta las tasas de respuesta entre un <b>20 y un 38 por ciento</b>. Los reclutadores te ven antes de la entrevista."
     },
     "job_search": {
       "empty_step1_title": "Busca puestos o misiones",

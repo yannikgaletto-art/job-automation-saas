@@ -94,38 +94,66 @@ export default function JobQueuePage() {
         },
     ];
 
-    // Full branch: Step 1 = compact row, Steps 2-5 = tab CONTENT panels
+    // Full branch: Steps 0-1 = Add Job + Chrome Extension (same as empty)
+    // Step 2 = compact row, Steps 3-7 = tab CONTENT panels
     // Each step programmatically switches to the correct tab (via useEffect below)
     const FULL_STEPS: TourStep[] = [
+        // Step 0: Add Job button
+        {
+            targetSelector: '[data-tour="job-queue-add-btn"]',
+            position: 'bottom',
+            titleKey: 'job_queue.empty_step1_title',
+            bodyKey: 'job_queue.empty_step1_body',
+        },
+        // Step 1: Chrome Extension
+        {
+            targetSelector: '[data-tour="chrome-extension-link"]',
+            position: 'bottom',
+            titleKey: 'job_queue.chrome_ext_title',
+            bodyKey: 'job_queue.chrome_ext_body',
+            imageUrl: '/images/chrome-extension-onboarding.png',
+        },
+        // Step 2: Compact row overview
         {
             targetSelector: '[data-tour="job-compact-row"]',
             position: 'bottom',
             titleKey: 'job_queue.step1_title',
             bodyKey: 'job_queue.step1_body',
         },
+        // Step 3: Steckbrief
         {
             targetSelector: '[data-tour="content-steckbrief"]',
             position: 'right',
             titleKey: 'job_queue.step2_title',
             bodyKey: 'job_queue.step2_body',
         },
+        // Step 4: CV Match
         {
             targetSelector: '[data-tour="content-cv-match"]',
             position: 'right',
             titleKey: 'job_queue.step3_title',
             bodyKey: 'job_queue.step3_body',
         },
+        // Step 5: CV Optimizer
         {
             targetSelector: '[data-tour="content-cv-opt"]',
             position: 'right',
             titleKey: 'job_queue.step4_title',
             bodyKey: 'job_queue.step4_body',
         },
+        // Step 6: Cover Letter
         {
             targetSelector: '[data-tour="content-cover-letter"]',
             position: 'right',
             titleKey: 'job_queue.step5_title',
             bodyKey: 'job_queue.step5_body',
+        },
+        // Step 7: Video Letter
+        {
+            targetSelector: '[data-tour="content-video-letter"]',
+            position: 'right',
+            titleKey: 'job_queue.step6_title',
+            bodyKey: 'job_queue.step6_body',
         },
     ];
 
@@ -144,27 +172,35 @@ export default function JobQueuePage() {
     // Mirrors the Tagesziele pattern (layout.tsx) where each step controls
     // the UI state before the overlay tries to find its target element.
     //
-    // Step 0 (compact row overview) → row collapsed, clean spotlight
-    // Steps 1-4 → row expanded, tab switched to matching content panel
+    // Steps 0-1 (Add Job + Chrome Extension) → no job interaction needed
+    // Step 2 (compact row overview) → row collapsed, clean spotlight
+    // Steps 3-7 → row expanded, tab switched to matching content panel
     useEffect(() => {
         if (!tour.isActive) return;
         if (jobs.length === 0) return;
 
-        // Step 0: Show compact row — DO NOT expand
-        if (tour.currentStep === 0) {
+        // Steps 0-1: Add Job + Chrome Extension — no job interaction
+        if (tour.currentStep <= 1) {
             setExpandedId(null);
             return;
         }
 
-        // Steps 1-4: Expand first job + click correct tab
+        // Step 2: Show compact row — DO NOT expand
+        if (tour.currentStep === 2) {
+            setExpandedId(null);
+            return;
+        }
+
+        // Steps 3-7: Expand first job + click correct tab
         setExpandedId(jobs[0].id);
 
         // Map tour step → tab button to click
         const TAB_MAP: Record<number, string> = {
-            1: '[data-tour="tab-steckbrief"]',    // Step 2 → Steckbrief
-            2: '[data-tour="tab-cv-match"]',      // Step 3 → CV Match
-            3: '[data-tour="tab-cv-opt"]',         // Step 4 → CV Opt
-            4: '[data-tour="tab-cover-letter"]',   // Step 5 → Cover Letter
+            3: '[data-tour="tab-steckbrief"]',    // Step 3 → Steckbrief
+            4: '[data-tour="tab-cv-match"]',      // Step 4 → CV Match
+            5: '[data-tour="tab-cv-opt"]',         // Step 5 → CV Opt
+            6: '[data-tour="tab-cover-letter"]',   // Step 6 → Cover Letter
+            7: '[data-tour="tab-video-letter"]',   // Step 7 → Video Letter
         };
 
         const selector = TAB_MAP[tour.currentStep];

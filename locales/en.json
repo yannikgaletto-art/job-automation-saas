@@ -1576,10 +1576,12 @@
       "step2_body": "The profile shows you everything Pathly found out about the role. Most important are the <b>ATS keywords</b>. These terms are scanned by applicant systems and often determine whether you get invited.",
       "step3_title": "Does this role fit you?",
       "step3_body": "Pathly compares your profile against the requirements and shows your strengths and gaps. We use this match to <b>tailor your CV and cover letter precisely to the role</b>.",
-      "step4_title": "CV and Video Letter",
-      "step4_body": "Here you can <b>add missing ATS keywords using the plus button</b>. Pathly weaves them in naturally. You also generate your <b>QR Video Letter</b> here. It gets printed onto your CV and increases callback rates by 20 to 38 percent.",
+      "step4_title": "CV Optimizer",
+      "step4_body": "Here you can <b>add missing ATS keywords using the plus button</b>. Pathly weaves them naturally into your CV. You stay in full control of every change.",
       "step5_title": "Not generic. Really you.",
-      "step5_body": "The cover letter is written based on your optimizations and <b>your personal writing style</b>. Pathly analyses the company in real time. Before sending Pathly simulates the critique of a real <b>Hiring Manager</b>."
+      "step5_body": "The cover letter is written based on your optimizations and <b>your personal writing style</b>. Pathly analyses the company in real time. Before sending Pathly simulates the critique of a real <b>Hiring Manager</b>.",
+      "step6_title": "Video Letter",
+      "step6_body": "Here you generate your <b>QR Video Letter</b>. It gets printed directly onto your CV and increases callback rates by <b>20 to 38 percent</b>. Recruiters see you before the interview."
     },
     "job_search": {
       "empty_step1_title": "Search for roles or for missions",

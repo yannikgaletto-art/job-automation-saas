@@ -1576,10 +1576,12 @@
       "step2_body": "Im Steckbrief findest du alles was Pathly über die Stelle herausgefunden hat. Besonders wichtig sind die <b>ATS-Keywords</b>. Diese Begriffe werden von Bewerbersystemen gescannt und entscheiden oft über eine Einladung zum Gespräch.",
       "step3_title": "Passt die Stelle zu dir?",
       "step3_body": "Pathly vergleicht dein Profil mit den Anforderungen und zeigt dir Stärken und Lücken. Dieses Match nutzen wir direkt um <b>deinen Lebenslauf und das Anschreiben passgenau zu optimieren</b>.",
-      "step4_title": "Lebenslauf und Video Letter",
-      "step4_body": "Hier kannst du <b>fehlende ATS-Keywords über das Plus-Symbol ergänzen</b>. Pathly webt diese natürlich ein. Hier generierst du auch deinen <b>QR Video Letter</b>. Er wird direkt auf den Lebenslauf gedruckt und erhöht die Rückmeldequote um 20 bis 38 Prozent.",
+      "step4_title": "CV Optimizer",
+      "step4_body": "Hier kannst du <b>fehlende ATS-Keywords über das Plus-Symbol ergänzen</b>. Pathly webt diese natürlich in deinen Lebenslauf ein. Du behältst die volle Kontrolle über jede Änderung.",
       "step5_title": "Nicht generisch. Wirklich du.",
-      "step5_body": "Das Anschreiben wird auf Basis deiner Optimierungen in <b>deinem persönlichen Schreibstil</b> verfasst. Pathly analysiert das Unternehmen in Echtzeit. Vor dem Absenden simuliert Pathly die Kritik eines echten <b>Hiring Managers</b>."
+      "step5_body": "Das Anschreiben wird auf Basis deiner Optimierungen in <b>deinem persönlichen Schreibstil</b> verfasst. Pathly analysiert das Unternehmen in Echtzeit. Vor dem Absenden simuliert Pathly die Kritik eines echten <b>Hiring Managers</b>.",
+      "step6_title": "Video Letter",
+      "step6_body": "Hier generierst du deinen <b>QR Video Letter</b>. Er wird direkt auf den Lebenslauf gedruckt und erhöht die Rückmeldequote um <b>20 bis 38 Prozent</b>. Recruiter sehen dich schon vor dem Gespräch."
     },
     "job_search": {
       "empty_step1_title": "Suche nach Stellen oder nach Missionen",

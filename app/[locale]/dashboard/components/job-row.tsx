@@ -583,7 +583,7 @@ export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onCon
 
                         {/* ===== TAB 4: VIDEO ===== */}
                         {displayTab === 4 && (
-                            <div className="p-6">
+                            <div data-tour="content-video-letter" className="p-6">
                                 <Step5Video
                                     jobId={job.id}
                                     onScriptFound={() => {
