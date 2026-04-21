@@ -334,7 +334,7 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
     - Ein kurzes JD-Fragment (2-5 Woerter) in Anfuehrungszeichen als Bruecke nutzen
     HALLUZINATIONS-SCHUTZ: JD-Fragmente max. 5 Woerter, NUR Arbeitsthemen. Unsicher? Paraphrasiere OHNE Anfuehrungszeichen.
 
-    VERBOTEN: Template-Saetze wie \"Genau daran habe ich bei [Firma] gearbeitet\" oder \"Zudem habe ich mich in X wiedergefunden\".
+    VERBOTEN: Template-Saetze wie \"Genau daran habe ich bei [Firma] gearbeitet\" oder \"Zudem habe ich mich in X wiedergefunden\" oder \"von der Expertise des Teams zu lernen\".
     VERBOTEN: \"Weil ${isDuForm ? 'ihr jemanden sucht' : 'Sie jemanden suchen'}\" / \"Da ${isDuForm ? 'ihr' : 'Sie'} jemanden ${isDuForm ? 'sucht' : 'suchen'}, der...\" — Meta-Formulierung.
     VERBOTEN: Stations-Absatz mit \"Bei [Firma] habe ich...\" starten OHNE Bezug zum WARUM.
     VERBOTEN: Denselben Einleitungstyp fuer zwei aufeinanderfolgende Absaetze verwenden.
