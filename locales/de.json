@@ -1570,6 +1570,8 @@
       "empty_step1_body": "Hier verwaltest du alle Stellen die du im Blick behalten willst. Pathly analysiert jede Stelle automatisch. <b>Du kannst bis zu 5 aktive Jobs gleichzeitig bearbeiten.</b> Klicke auf den Button um loszulegen.",
       "chrome_ext_title": "Chrome Extension",
       "chrome_ext_body": "Wir empfehlen die <b>Chrome Extension</b> zu installieren. Damit kannst du auf <b>LinkedIn, Stepstone oder Indeed</b> gehen und einfach auf 'Hinzufügen' klicken. Alles landet mit einem Klick in deiner Queue.",
+      "add_job_title": "Job hinzufügen",
+      "add_job_body": "Klicke auf diesen Button um eine neue Stelle zu deiner Queue hinzuzufügen. Füge einfach die Job-URL ein und Pathly erledigt den Rest. <b>Du kannst bis zu 5 aktive Jobs gleichzeitig bearbeiten.</b>",
       "step1_title": "Deine Bewerbungszentrale",
       "step1_body": "Hier siehst du alle Stellen an denen du gerade arbeitest. Jede Stelle durchläuft denselben Prozess von der Analyse bis zum fertigen Anschreiben. <b>Du entscheidest jeden Schritt selbst</b> und behältst immer die volle Kontrolle.",
       "step2_title": "Was steckt hinter der Stelle?",

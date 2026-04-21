@@ -1570,6 +1570,8 @@
       "empty_step1_body": "Here you manage all roles you want to track. Pathly analyses each role automatically. <b>You can work on up to 5 active jobs at a time.</b> Click the button to get started.",
       "chrome_ext_title": "Chrome Extension",
       "chrome_ext_body": "We recommend installing the <b>Chrome Extension</b>. Browse <b>LinkedIn, Stepstone or Indeed</b> and simply click 'Add'. Everything lands in your queue with one click.",
+      "add_job_title": "Add Job",
+      "add_job_body": "Click this button to add a new role to your queue. Simply paste the job URL and Pathly handles the rest. <b>You can work on up to 5 active jobs at a time.</b>",
       "step1_title": "Your application hub",
       "step1_body": "Here you see all the roles you are currently working on. Every role follows the same process from analysis to the finished cover letter. <b>You decide every step yourself</b> and stay in full control at all times.",
       "step2_title": "What's behind the role?",

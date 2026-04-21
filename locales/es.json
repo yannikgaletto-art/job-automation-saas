@@ -1551,6 +1551,8 @@
       "empty_step1_body": "Aquí gestionas todos los puestos que quieres seguir. Pathly analiza cada puesto automáticamente. <b>Puedes trabajar con hasta 5 empleos activos a la vez.</b> Haz clic en el botón para empezar.",
       "chrome_ext_title": "Chrome Extension",
       "chrome_ext_body": "Recomendamos instalar la <b>Chrome Extension</b>. Navega por <b>LinkedIn, Stepstone o Indeed</b> y simplemente haz clic en 'Añadir'. Todo llega a tu cola con un solo clic.",
+      "add_job_title": "Añadir puesto",
+      "add_job_body": "Haz clic en este botón para añadir un nuevo puesto a tu cola. Solo pega la URL del trabajo y Pathly se encarga del resto. <b>Puedes trabajar con hasta 5 empleos activos a la vez.</b>",
       "step1_title": "Tu centro de candidaturas",
       "step1_body": "Aquí ves todos los puestos en los que estás trabajando. Cada puesto sigue el mismo proceso desde el análisis hasta la carta terminada. <b>Tú decides cada paso</b> y mantienes el control en todo momento.",
       "step2_title": "¿Qué hay detrás del puesto?",
