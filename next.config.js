@@ -71,7 +71,7 @@ const nextConfig = {
               "connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://api.anthropic.com https://api.openai.com https://api.mistral.ai https://api.perplexity.ai https://serpapi.com https://r.jina.ai https://api.firecrawl.dev https://*.sentry.io https://*.ingest.sentry.io https://*.inngest.com https://eu.i.posthog.com https://eu.posthog.com",
               "frame-src 'self' blob: https://js.stripe.com https://tally.so",
               "worker-src 'self' blob:",
-              "media-src 'self' blob:",
+              "media-src 'self' blob: https://*.supabase.co",
             ].join('; '),
           },
         ],
