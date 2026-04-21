@@ -4,13 +4,30 @@ import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { logger } from '@/lib/logging';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '@/lib/ai/model-router';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
 const supabaseAdmin = getSupabaseAdmin();
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+// WHY: Uses Helicone-aware singleton from model-router (not a raw client).
+// This routes all Video Script generation through the Helicone proxy for cost tracking.
+const anthropic = getAnthropicClient();
+
+// ── Fixed intro templates ────────────────────────────────────────────────────
+// The intro block uses a personal, authentic template instead of AI generation.
+// AI generates only Motivation, Erfahrung, and Abschluss blocks.
+// Placeholders [Name] and [Dein Name] are filled in by the user before recording.
+const INTRO_DEFAULTS: Record<string, string> = {
+    de: 'Hallo [Name], ich bin [Dein Name]. Ein kurzes Video sagt oft mehr als ein langes Anschreiben. Ich stelle mich kurz vor, damit ihr einen besseren Eindruck habt, wer hinter dem Lebenslauf steckt.',
+    en: 'Hi [Name], I am [Your Name]. A short video often says more than a long cover letter. Let me quickly introduce myself so you get a better sense of who is behind the CV.',
+    es: 'Hola [Nombre], soy [Tu Nombre]. Un video corto dice mas que una larga carta. Me presento brevemente para que tengan una mejor idea de quien esta detras del CV.',
+};
+const INTRO_TITLES: Record<string, string> = {
+    de: 'Vorstellung',
+    en: 'Introduction',
+    es: 'Introducción',
+};
 
 // Vercel Serverless: Video script generation calls Claude + multiple DB ops
 export const maxDuration = 60;
@@ -259,6 +276,17 @@ export async function POST(request: NextRequest) {
                 sortOrder: i,
             };
         });
+
+        // ── Always override Vorstellung with the fixed default script ────────────────
+        // The user requested a fixed, personal intro template — AI generates only the
+        // other blocks (Erfahrung, Motivation, Abschluss). The intro placeholders
+        // [Name] and [Dein Name] are filled in by the user before recording.
+        const introTitle = INTRO_TITLES[locale!] || INTRO_TITLES.de;
+        const introDefault = INTRO_DEFAULTS[locale!] || INTRO_DEFAULTS.de;
+        const introBlock = blocks.find(b => b.title === introTitle);
+        if (introBlock) {
+            introBlock.content = introDefault;
+        }
 
         // Upsert video_scripts row
         const { error: upsertError } = await supabaseAdmin
@@ -537,7 +565,7 @@ ${tone}
 === BLOCK-STRUKTUR (T2-Format) ===
 Generiere genau diese 4 Bloecke mit dem angegebenen Timing:
 
-1. Vorstellung (10s, ~20 Woerter): Persoenliche Begruessung, Name + Position nennen.
+1. Vorstellung (10s, ~20 Woerter): NICHT generieren -- wird vom System vorgefuellt.
 
 2. Motivation (15s, ~33 Woerter):
    - Beginne mit: Was hat mich an dieser Firma abgeholt?

@@ -51,7 +51,7 @@ function buildStyles(mode: LayoutMode) {
         header: {
             flexDirection: 'row',
             justifyContent: 'space-between',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             marginBottom: isCompact ? 10 : 16,
         },
         headerName: { fontSize: 22, fontWeight: 700, color: DARK, letterSpacing: 0.5 },

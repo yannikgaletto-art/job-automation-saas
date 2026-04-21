@@ -49,6 +49,12 @@ export interface CVMatchRequest {
     preMatchedKeywords?: {
         found: string[];
         missing: string[];
+        /** Ecosystem hints: missing keywords that have related CV skills from the same product family */
+        ecosystemHints?: Array<{
+            keyword: string;
+            cvSkill: string;
+            family: string;
+        }>;
     };
 }
 
@@ -146,10 +152,16 @@ Every gap statement MUST begin with a reference to the CV document, never with a
 ***
 
 **STEP 0 — GAP CENSUS (MANDATORY — do this BEFORE any scoring):**
-Count ONLY requirements explicitly stated in the job description above.
+⚠️ CRITICAL: Count gaps at the CONSOLIDATED DIMENSION level, NOT at the individual requirement level.
+First mentally group the requirements into 3-5 competency dimensions (as you will do in Step 1).
+Then count gaps PER DIMENSION, not per individual requirement.
 
-majorGaps: Count core requirements (marked as essential/required/must-have, or stated unconditionally without qualifier words) with ZERO evidence in ${cvRef} — not even partial.
-minorGaps: Count secondary/qualified/nice-to-have requirements missing from ${cvRef}.
+Example: If the JD lists "Microsoft Dynamics 365", "Microsoft Cloud Services", and "Microsoft Copilot" separately,
+these belong to ONE dimension ("Microsoft Ecosystem"). If the CV has ZERO evidence for this entire dimension → 1 majorGap.
+Do NOT count them as 3 separate majorGaps.
+
+majorGaps: Count DIMENSIONS (not individual requirements) with ZERO evidence in ${cvRef} — not even partial.
+minorGaps: Count DIMENSIONS with partial evidence, OR dimensions where all requirements use qualifier words.
 
 ⚠️ QUALIFIER GATE (MANDATORY — read BEFORE counting):
 A requirement introduced or modified by ANY of these words can NEVER be a majorGap — it is ALWAYS a minorGap at most:
@@ -159,14 +171,16 @@ This applies even if the qualified requirement appears first in the list or is r
 
 ⚠️ EMPLOYER TRAINING SIGNAL: If the job's Benefits/Wir-bieten section OFFERS training or certification in a skill that is also listed as a requirement, that requirement is NEVER a majorGap. The employer expects to train candidates on this skill.
 
-CALIBRATION (apply MECHANICALLY based on your count — NO exceptions):
+CALIBRATION (apply MECHANICALLY based on your DIMENSION-level count — NO exceptions):
   0 major, 0 minor  → overallScore: 85–100
   0 major, 1-2 minor → overallScore: 70–84
   0 major, 3+ minor  → overallScore: 65–74
   1 major, 0 minor   → overallScore: 55–69
   1 major, 1+ minor  → overallScore: 40–54
-  2+ major           → overallScore: 25–39
-  Fundamental mismatch (wrong field/level/domain entirely) → overallScore: 0–24
+  2 major, 0 minor   → overallScore: 38–47
+  2 major, 1+ minor  → overallScore: 30–39
+  3+ major           → overallScore: 20–29
+  Fundamental mismatch (wrong field/level/domain entirely) → overallScore: 0–19
 
 Output _gapCensus in the final JSON: { "majorGaps": X, "minorGaps": Y }
 This field is for audit only — frontend does not display it.
@@ -293,9 +307,11 @@ For each card, produce:
    ONLY list gaps for requirements that are EXPLICITLY in the job description. Never invent requirements.
    Empty array if no gaps for this dimension.
 
-7. **additionalChips**: Array of 0–3 SHORT, actionable recommendations to improve the CV for this specific job.
-   Format: ["${addressForm === 'Du' ? 'CRM-Erfahrung bei [Firma] ergänzen' : addressForm === 'you' ? 'Add CRM experience from [company]' : 'Agregar experiencia CRM de [empresa]'}", "${addressForm === 'Du' ? 'Leadership aus Co-Founder-Rolle betonen' : addressForm === 'you' ? 'Highlight leadership from co-founder role' : 'Destacar liderazgo de rol cofundador'}"]
-   These are concrete suggestions for what the candidate should ADD or EMPHASIZE in their CV. Empty array if CV already covers this dimension well.
+7. **additionalChips**: Array of 1–3 SHORT, actionable recommendations. MANDATORY for ALL cards — even "strong" ones.
+   - For "gap" cards: Suggest what to add to the CV. Example: ["${addressForm === 'Du' ? 'CRM-Erfahrung bei [Firma] ergänzen' : addressForm === 'you' ? 'Add CRM experience from [company]' : 'Agregar experiencia CRM de [empresa]'}"]
+   - For "solid" cards: Suggest what to emphasize. Example: ["${addressForm === 'Du' ? 'Leadership aus Co-Founder-Rolle betonen' : addressForm === 'you' ? 'Highlight leadership from co-founder role' : 'Destacar liderazgo de rol cofundador'}"]
+   - For "strong" cards: Suggest how to maximize impact. Example: ["${addressForm === 'Du' ? 'Erfahrung hier hervorheben' : addressForm === 'you' ? 'Highlight this experience' : 'Destacar esta experiencia'}", "${addressForm === 'Du' ? 'Konkrete Zahlen ergänzen' : addressForm === 'you' ? 'Add specific metrics' : 'Agregar métricas específicas'}"]
+   NEVER return an empty array — every card must have at least 1 actionable recommendation.
 
 ***
 
@@ -348,7 +364,10 @@ Use these as GROUND TRUTH — do NOT override them:
 
 CONFIRMED FOUND (verified in CV): ${req.preMatchedKeywords.found.length > 0 ? req.preMatchedKeywords.found.join(', ') : '(none)'}
 CONFIRMED MISSING (not in CV): ${req.preMatchedKeywords.missing.length > 0 ? req.preMatchedKeywords.missing.join(', ') : '(none)'}
-
+${req.preMatchedKeywords?.ecosystemHints?.length ? `
+ECOSYSTEM HINTS (related CV skill found, but not exact match):
+${req.preMatchedKeywords.ecosystemHints.map((h) => `- "${h.keyword}" is MISSING, but CV contains "${h.cvSkill}" from the same ${h.family} ecosystem. Note this in gap analysis: the candidate has RELATED experience, not ZERO experience. Still classify as MISSING in keywordsMissing, but mention the related skill when assessing this dimension.`).join('\n')}
+` : ''}
 RULES:
 - Every keyword in CONFIRMED FOUND MUST appear in keywordsFound.
 - Every keyword in CONFIRMED MISSING MUST appear in keywordsMissing.
@@ -389,7 +408,7 @@ If a tool name appears in the CV, its category is confirmed as "found".
 **STEP 5 — SELF-CRITIQUE (mandatory before outputting):**
 Before writing the final JSON, silently check:
 1. Every "strong": backed by >6 months direct CV evidence? If not → downgrade to "solid".
-2. Score vs. Gap Census table consistent? 2+ major gaps → score MUST be ≤ 39. 1 major → ≤ 69.
+2. Score vs. Gap Census table consistent? 3+ major gaps → score MUST be ≤ 29. 2 major → ≤ 47. 1 major → ≤ 69.
 3. softSkills "strong": Is there a named, documented leadership or executive-communication situation >6 months? If only implied or brief → downgrade to "solid".
 4. Every text field is in ${lang}?
 5. Every orbitCategory is exactly one of: "technical", "soft", "experience", "domain", "language"?
@@ -459,13 +478,15 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
         // Haiku counts reliably at temperature=0 when inputs are stable.
         //
         // Score bands (fixed midpoints for maximum label stability):
-        //   0 major, 0 minor  → 92 (Starker Fit)
-        //   0 major, 1-2 minor → 77 (Starker Fit)
-        //   0 major, 3+ minor  → 72 (Starker Fit — minimal)
-        //   1 major, 0 minor   → 62 (Teilweise Fit)
-        //   1 major, 1+ minor  → 55 (Teilweise Fit)
-        //   2+ major           → 32 (Wenig passend)
-        //   Fundamental mismatch → 15 (Wenig passend)
+        //   0 major, 0 minor  → 92 (Fokus auf Nuancen)
+        //   0 major, 1-2 minor → 77 (Fokus auf Nuancen)
+        //   0 major, 3+ minor  → 72 (Fokus auf Nuancen — minimal)
+        //   1 major, 0 minor   → 62 (Grundgerüst steht)
+        //   1 major, 1+ minor  → 55 (Grundgerüst steht)
+        //   2 major, 0 minor   → 45 (Wir fixen das)
+        //   2 major, 1+ minor  → 38 (Wir fixen das)
+        //   3+ major           → 32 (Wir fixen das)
+        //   Fundamental mismatch → 15 (Wir fixen das)
         const gapCensus = (firstResult as any)._gapCensus;
         if (gapCensus && typeof gapCensus.majorGaps === 'number') {
             const major = gapCensus.majorGaps;
@@ -483,7 +504,11 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
                 deterministicScore = 62;
             } else if (major === 1 && minor >= 1) {
                 deterministicScore = 55;
-            } else if (llmRawScore <= 24) {
+            } else if (major === 2 && minor === 0) {
+                deterministicScore = 45;
+            } else if (major === 2 && minor >= 1) {
+                deterministicScore = 38;
+            } else if (llmRawScore <= 19) {
                 deterministicScore = 15;
             } else {
                 deterministicScore = 32;
@@ -494,7 +519,7 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
             }
             firstResult.overallScore = deterministicScore;
         } else {
-            // No gap census → Safety fallback. "Teilweise Fit" is the safest default:
+            // No gap census → Safety fallback. "Grundgerüst steht" is the safest default:
             // not misleadingly positive, not unfairly negative.
             console.warn(`⚠️ [CV Match] No _gapCensus in LLM output — forcing safety fallback score=50`);
             firstResult.overallScore = 50;
@@ -529,12 +554,15 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
             (firstResult as any)._gapCensus = gapCensus;
 
             // Recompute deterministic score with corrected gap census
+            // MUST mirror the primary scoring bands above (§DRY: keep in sync!)
             let correctedScore: number;
             if (newMajor === 0 && newMinor === 0) correctedScore = 92;
             else if (newMajor === 0 && newMinor <= 2) correctedScore = 77;
             else if (newMajor === 0 && newMinor >= 3) correctedScore = 72;
             else if (newMajor === 1 && newMinor === 0) correctedScore = 62;
             else if (newMajor === 1 && newMinor >= 1) correctedScore = 55;
+            else if (newMajor === 2 && newMinor === 0) correctedScore = 45;
+            else if (newMajor === 2 && newMinor >= 1) correctedScore = 38;
             else correctedScore = 32;
 
             console.log(`🛡️ [CV Match] Score corrected: ${firstResult.overallScore} → ${correctedScore}`);

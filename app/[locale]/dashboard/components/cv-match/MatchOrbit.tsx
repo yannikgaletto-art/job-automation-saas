@@ -80,8 +80,8 @@ function getFitColor(score: number) {
         glow: 'shadow-[0_0_28px_rgba(234,179,8,0.28)]',
     };
     return {
-        bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-700',
-        glow: 'shadow-[0_0_28px_rgba(239,68,68,0.28)]',
+        bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700',
+        glow: 'shadow-[0_0_28px_rgba(249,115,22,0.28)]',
     };
 }
 

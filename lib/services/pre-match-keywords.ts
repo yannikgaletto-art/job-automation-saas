@@ -24,7 +24,64 @@ const supabaseAdmin = createAdminClient(
 export interface PreMatchResult {
     found: string[];
     missing: string[];
+    /** Hints where a missing keyword has a related CV skill from the same product ecosystem */
+    ecosystemHints?: EcosystemHint[];
 }
+
+export interface EcosystemHint {
+    keyword: string;   // The missing keyword (e.g. "Microsoft Dynamics 365")
+    cvSkill: string;   // The found CV skill (e.g. "Microsoft Office")
+    family: string;    // The ecosystem name (e.g. "Microsoft")
+}
+
+/**
+ * Ecosystem clusters: product families where having experience with one
+ * tool indicates RELATED (not identical) competence with others.
+ * 
+ * KEY DESIGN RULE: This does NOT convert MISSING to FOUND.
+ * It only provides context to the AI so it can make a nuanced assessment
+ * instead of treating it as ZERO experience.
+ */
+const ECOSYSTEM_CLUSTERS: Record<string, string[]> = {
+    'Microsoft': [
+        'microsoft', 'office', 'outlook', 'powerpoint', 'excel', 'onenote', 'word',
+        'microsoft 365', 'microsoft office', 'dynamics', 'dynamics 365', 'azure',
+        'copilot', 'ai-copilot', 'sharepoint', 'teams', 'power bi', 'power automate',
+        'power platform', 'power apps',
+    ],
+    'Google': [
+        'google', 'google workspace', 'gmail', 'google docs', 'google sheets',
+        'google slides', 'google analytics', 'google ads', 'google cloud', 'gcp',
+        'bigquery', 'looker', 'firebase',
+    ],
+    'Adobe': [
+        'adobe', 'photoshop', 'illustrator', 'indesign', 'premiere', 'after effects',
+        'lightroom', 'xd', 'figma', 'adobe creative cloud', 'audition', 'acrobat',
+    ],
+    'Automation': [
+        'make', 'make.com', 'zapier', 'n8n', 'power automate', 'integromat',
+        'workato', 'tray.io', 'automate.io', 'ifttt',
+    ],
+    'CRM': [
+        'crm', 'salesforce', 'hubspot', 'pipedrive', 'close.io', 'close',
+        'zoho', 'dynamics 365', 'microsoft dynamics', 'freshsales', 'copper',
+    ],
+    'Data & Analytics': [
+        'power bi', 'tableau', 'excel', 'data analysis', 'datenanalyse',
+        'analytics', 'google analytics', 'looker', 'metabase', 'qlik',
+        'data visualization', 'datenvisualisierung',
+    ],
+    'AI/KI': [
+        'ki', 'ai', 'künstliche intelligenz', 'machine learning', 'ml',
+        'genai', 'llm', 'llms', 'chatgpt', 'claude', 'copilot', 'ai-copilot',
+        'ai-agenten', 'python', 'langchain', 'openai', 'anthropic',
+    ],
+    'Project Management': [
+        'projektmanagement', 'project management', 'scrum', 'kanban', 'agile',
+        'jira', 'confluence', 'asana', 'trello', 'monday', 'notion',
+        'okr', 'safe', 'less',
+    ],
+};
 
 // Hobby/personal skill categories to EXCLUDE from ATS matching
 const EXCLUDED_CATEGORIES = new Set([
@@ -169,5 +226,42 @@ export async function preMatchKeywords(
     if (found.length > 0) console.log(`[pre-match] Found: ${found.join(', ')}`);
     if (missing.length > 0) console.log(`[pre-match] Missing: ${missing.join(', ')}`);
 
-    return { found, missing };
+    // Ecosystem hint detection: for each MISSING keyword, check if CV has a related skill
+    // from the same product family. This does NOT change found/missing — it only adds context.
+    const ecosystemHints: EcosystemHint[] = [];
+    for (const missedKw of missing) {
+        const kwLower = missedKw.trim().toLowerCase();
+        
+        // Find which ecosystem families this keyword belongs to
+        for (const [family, terms] of Object.entries(ECOSYSTEM_CLUSTERS)) {
+            const kwBelongsToFamily = terms.some(term => 
+                kwLower.includes(term) || term.includes(kwLower)
+            );
+            if (!kwBelongsToFamily) continue;
+
+            // Check if ANY CV skill belongs to the same family
+            for (const skill of uniqueSkills) {
+                const skillBelongs = terms.some(term =>
+                    skill.includes(term) || term.includes(skill)
+                );
+                if (skillBelongs) {
+                    ecosystemHints.push({
+                        keyword: missedKw,
+                        cvSkill: skill,
+                        family,
+                    });
+                    break; // one hint per keyword per family is enough
+                }
+            }
+        }
+    }
+
+    if (ecosystemHints.length > 0) {
+        console.log(`[pre-match] 🔗 Ecosystem hints: ${ecosystemHints.length} missing keywords have related CV skills`);
+        for (const h of ecosystemHints) {
+            console.log(`  → "${h.keyword}" ↔ CV has "${h.cvSkill}" (${h.family} family)`);
+        }
+    }
+
+    return { found, missing, ecosystemHints: ecosystemHints.length > 0 ? ecosystemHints : undefined };
 }
