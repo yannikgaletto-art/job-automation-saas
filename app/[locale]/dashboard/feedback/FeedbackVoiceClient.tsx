@@ -386,7 +386,7 @@ export function FeedbackVoiceClient() {
                                 {/* Inline mic */}
                                 <div className="relative shrink-0 flex items-center justify-center">
                                     {recordingState === 'recording' && (
-                                        <span className="absolute inset-0 rounded-full animate-[voice-pulse_1.5s_ease-in-out_infinite] bg-[#012e7a]/20" />
+                                        <span className="absolute inset-0 rounded-full animate-[voice-pulse_1.5s_ease-in-out_infinite] bg-[#012e7a]/40" />
                                     )}
                                     <button
                                         type="button"
@@ -460,7 +460,7 @@ export function FeedbackVoiceClient() {
                                         {/* Mic */}
                                         <div className="relative shrink-0 flex items-center justify-center">
                                             {recordingState === 'recording' && (
-                                                <span className="absolute inset-0 rounded-full animate-[voice-pulse_1.5s_ease-in-out_infinite] bg-[#012e7a]/20" />
+                                                <span className="absolute inset-0 rounded-full animate-[voice-pulse_1.5s_ease-in-out_infinite] bg-[#012e7a]/40" />
                                             )}
                                             <button
                                                 type="button"
