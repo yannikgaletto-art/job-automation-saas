@@ -8,7 +8,7 @@ import type { OpportunityInsert } from '@/types/volunteering';
 // Uses plain fetch + regex/string parsing (no Cheerio dependency needed for MVP).
 // ============================================================================
 
-const USER_AGENT = 'Pathly/2.0 Volunteering-Aggregator (contact@pathly.de)';
+const USER_AGENT = 'Pathly/2.0 Volunteering-Aggregator (contact@path-ly.eu)';
 const FETCH_TIMEOUT = 10_000; // 10s
 
 async function fetchPage(url: string): Promise<string | null> {

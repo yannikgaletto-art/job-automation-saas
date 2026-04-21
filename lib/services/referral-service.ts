@@ -114,9 +114,11 @@ async function grantTopupCredits(
  * Code is stored in user_profiles.referral_code (stable, never changes).
  * Lazy-creates on first call.
  */
-export async function getOrCreateReferralCode(userId: string): Promise<ReferralInfo> {
+export async function getOrCreateReferralCode(
+    userId: string,
+    baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'https://app.path-ly.eu',
+): Promise<ReferralInfo> {
     const admin = getSupabaseAdmin();
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.pathly.de';
 
     // 1. Read existing code from user_profiles
     const { data: profile, error: profileError } = await admin
