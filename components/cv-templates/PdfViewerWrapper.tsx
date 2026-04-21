@@ -223,7 +223,7 @@ function MobileDownload({ data, templateId, qrBase64, labels, layoutMode }: {
         }
         generate();
         return () => { cancelled = true; };
-    }, [data, templateId, qrBase64, labels]);
+    }, [data, templateId, qrBase64, labels, layoutMode]);
 
     if (loading) {
         return (

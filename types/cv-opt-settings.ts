@@ -8,9 +8,10 @@
 
 /**
  * Layout mode for the Valley template.
- * - 'default': Standard auto-layout (react-pdf decides page breaks)
- * - 'compact': Tighter spacing, max 2 bullets per experience → pulls content to page 1
- * - 'spacious': Force page break before Education → spreads content across 2 pages
+ * - 'compact': Tighter spacing, content-dense — maximum page utilization (UI: "Standard")
+ * - 'default': Normal spacing, more breathing room (UI: "Ausführlich")
+ * - 'spacious': Force page break before Education — spreads content across 2 pages (UI: "Verteilt")
+ * NOTE: All modes render 3 bullets per experience entry. The difference is only spacing density.
  */
 export type LayoutMode = 'default' | 'compact' | 'spacious';
 
@@ -25,7 +26,7 @@ export interface CVOptSettings {
     showLanguages: boolean;
     /** Active template ID. FAANG-optimized template. Default: 'valley' */
     templateId: 'tech' | 'valley';
-    /** Layout density control (Valley template only). Default: 'default' */
+    /** Layout density control (Valley template only). Default: 'compact' (tightest, most ATS-dense) */
     layoutMode: LayoutMode;
 }
 
@@ -35,7 +36,7 @@ export const DEFAULT_CV_OPT_SETTINGS: CVOptSettings = {
     showCertificates: true,
     showLanguages: true,
     templateId: 'valley',
-    layoutMode: 'default',
+    layoutMode: 'compact',
 };
 
 /** Station-specific metrics provided by the user for the Numbers Check Flow */

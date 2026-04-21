@@ -1007,8 +1007,8 @@
     "error_free_retry_exhausted": "La corrección gratuita ya ha sido utilizada.",
     "layout_break_education": "Formación en la siguiente página",
     "layout_mode_label": "Diseño de página",
-    "layout_mode_compact": "Compacto",
-    "layout_mode_default": "Estándar",
+    "layout_mode_compact": "Estándar",
+    "layout_mode_default": "Detallado",
     "layout_mode_spacious": "Distribuido",
     "preview_tour_title": "¿Problemas de formato? Sin problema.",
     "preview_tour_body": "Si tu CV tiene demasiado espacio en blanco o las secciones están desplazadas, haz clic en <b>\"Corregir formato\"</b>. Pathly corrige el diseño automáticamente. <b>Gratis y una sola vez</b> por oferta."

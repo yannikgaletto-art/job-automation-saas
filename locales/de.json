@@ -1009,8 +1009,8 @@
     "error_free_retry_exhausted": "Die kostenlose Korrektur wurde bereits genutzt.",
     "layout_break_education": "Ausbildung auf nächste Seite",
     "layout_mode_label": "Seitenlayout",
-    "layout_mode_compact": "Kompakt",
-    "layout_mode_default": "Standard",
+    "layout_mode_compact": "Standard",
+    "layout_mode_default": "Ausführlich",
     "layout_mode_spacious": "Verteilt",
     "preview_tour_title": "Formatierungsfehler? Kein Problem.",
     "preview_tour_body": "Falls dein Lebenslauf zu viel Weißraum hat oder Abschnitte verschoben sind, klicke auf <b>\"Formatierung korrigieren\"</b>. Pathly überarbeitet das Layout automatisch. <b>Einmalig und kostenlos</b> pro Job."

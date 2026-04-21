@@ -25,7 +25,7 @@ const DIVIDER = '#CCCCCC';
 
 /** Max bullets per experience entry — HARD CAP, matches AI prompt rule */
 const MAX_BULLETS_DEFAULT = 3;
-const MAX_BULLETS_COMPACT = 2;
+const MAX_BULLETS_COMPACT = 3;
 /** Max certifications — HARD CAP, matches AI prompt rule */
 const MAX_CERTS = 6;
 
