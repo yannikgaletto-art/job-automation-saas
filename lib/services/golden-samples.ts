@@ -42,7 +42,7 @@ const STORYTELLING_ANNOTATIONS = `STIL-ANALYSE DIESES MUSTERS (was du uebernehme
 - RHETORISCHE FRAGE: "Was nuetzt das praeziseste KI-Modell, wenn niemand versteht...?" — max. 1x im Text
 - ICH-PERSPEKTIVE: Durchgehend. Keine allwissenden Firmen-Statements.
 - UEBERGAENGE: Stationen durch gemeinsame Frage oder Skill verbunden, nicht durch Aufzaehlung (Anzahl der Stationen variiert je nach User)
-- LERNKURVE: "Die eigentliche Herausforderung war dabei selten technischer Natur" — eingebettet, nicht als Erkenntnissatz
+- LERNKURVE: Eingebettete Beobachtung innerhalb der Station — nie als separater Erkenntnissatz am Absatzende. Formuliere immer eigene Worte fuer diese Technik.
 - SCHLUSS: Warm, bescheiden, keine Karriere-Zusammenfassung. Zitat-Rueckbezug + konkreter Jobtitel + Verfuegbarkeit.
 - KEINE Template-Saetze: Jede Formulierung ist einzigartig fuer diesen Kontext`;
 

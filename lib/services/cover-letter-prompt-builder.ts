@@ -201,7 +201,6 @@ BEISPIEL STATIONS-ABSATZ (narrativ, mit JD-Fragment — ICH-Perspektive, nie all
         'formal': `STIL: STRUKTURIERT & PRAEZISE (vereint klassisch-formelle Haltung mit datengetriebener Argumentation)
 ${hasQuote ? 'OEFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhaenger) gesteuert. Starte NACH dem Zitat-Block mit einer direkten, sachlichen Bezugnahme auf die Stelle.' : `OEFFNUNG (OHNE ZITAT — mit Stellen-/Firmenbezug):
 Beginne mit einer direkten, hoeflichen Bezugnahme auf die Stelle und einem konkreten Firmenbezug aus der Unternehmensanalyse. Max. 2-3 Saetze.
-Beispiel: "Die ausgeschriebene Position als [Titel] bei [Firma] verbindet [Kompetenzfeld A] mit [Kompetenzfeld B] — eine Verbindung, die meine bisherige Laufbahn praegt."
 VERBOTEN: Allwissende Branchen-Statements, "echten Mehrwert", "moechte ich mich" doppelt.`}
 ABSATZ-STRUKTUR: Jeder Hauptabsatz folgt dem Schema: Claim -> Beweis (Zahl/KPI/konkretes Ergebnis) -> Implikation fuer den neuen Arbeitgeber.
 Konservative 4-Absatz-Struktur:
@@ -691,8 +690,8 @@ SELBST-CHECK (nach dem Schreiben des Brueckensatzes):
 "Wuerde ein Personaler denken: 'Ja, das macht Sinn.' oder 'Was hat das damit zu tun?'"
 Wenn letzteres: Case B anwenden und mit uebertragbarem Skill neu formulieren.
 
-Stations-Uebergaenge: Aktiv formuliert — z.B. "kann ich mit meiner Zeit bei X anknuepfen", "habe ich mich in [Aufgabe] wiedergefunden, da es zu meiner taeglichen Arbeit gehoerte", "freue ich mich, meine Erfahrung aus X einzubringen". VERBOTEN: Passiv wie "ist meine Erfahrung bei X relevant fuer". VERBOTEN: "Moechte ich mein Projekt bei X beleuchten" — invertierter Modalsatz als Aussage.
-Closing: Warm und bescheiden — kein Verkaufs-CTA. Bevorzugt: "Ich hoffe, ihr konntet einen kleinen Eindruck von mir gewinnen. Ich bin die naechsten Wochen flexibel und freue mich darauf, euch kennenzulernen."`,
+Stations-Uebergaenge: Aktiv formuliert. VERBOTEN: Passiv wie "ist meine Erfahrung bei X relevant fuer". VERBOTEN: "Moechte ich mein Projekt bei X beleuchten". VERBOTEN: "habe ich mich in [Aufgabe] wiedergefunden".
+Closing: Warm + bescheiden + Verfuegbarkeit. Eigene Worte — keine Vorlage kopieren. Kein Verkaufs-CTA.`,
     `PARAGRAPH STRUCTURE (standard — always applies regardless of writing style):
 Intro: Open with a subjective personal observation/research about ${companyName} as anchor. I-perspective — never company description as objective fact.
 
@@ -831,11 +830,9 @@ ${resp.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 
 PFLICHT: Mindestens 2 dieser Kernaufgaben MUESSEN sich im Anschreiben EXPLIZIT widerspiegeln.
 METHODE: Zeige, dass du diese Aufgabe bereits aus deiner Karriere kennst.
-BEISPIEL-MUSTER (Wiederfinden-Pattern mit KURZEN 2-5 Woerter Fragmenten):
-Beispiel: "Zudem habe ich mich in der „strategischen Roadmap“ sehr wiedergefunden, da es zu meiner taeglichen Arbeit bei [Firma] gehoerte."
-Beispiel: "„Umsetzungsorientierte Loesungen“, genau daran habe ich bei [Firma] gearbeitet: [konkreter Beweis]."
+METHODE: Bette ein kurzes JD-Fragment (2-5 Woerter) als Arbeitsthema in deinen Stations-Absatz ein. Eigene Prosa — KEINE kopierbaren Vorlagen.
 
-${t('[STELLENANZEIGE-ZITIERUNG (PFLICHT)]\\nWenn du ein Fragment aus der Stellenanzeige verwendest, setze ein KURZES FRAGMENT (2-5 Woerter) in Anfuehrungszeichen. NIEMALS ganze Saetze zitieren.\\nDas Fragment MUSS ein ARBEITSTHEMA beschreiben (woran gearbeitet wird), NICHT eine Teamstruktur oder Organisationsform.\\nDas Fragment MUSS EXAKT so in den KERNAUFGABEN oben stehen. Wenn unsicher: Paraphrasiere OHNE Anfuehrungszeichen.\\nRICHTIG: Zudem habe ich mich in der Erstellung von Strategien wiedergefunden...\\nFALSCH: Ein ganzer Satz als Zitat ist VERBOTEN.\\nFALSCH: Organisationsformen wie in fachuebergreifenden Teams sind kein Arbeitsthema.', '[JOB AD QUOTING (MANDATORY)]\\nWhen quoting from the job ad, use a SHORT FRAGMENT (2-5 words). NEVER quote full sentences.\\nThe fragment MUST describe a WORK TOPIC, NOT a team structure.\\nThe fragment MUST appear EXACTLY in the CORE TASKS above. If unsure: paraphrase WITHOUT quotation marks.\\nCORRECT: I identified with developing strategies...\\nWRONG: Full sentences or organizational forms as quotes.', '[CITAS DE LA OFERTA (OBLIGATORIO)]\\nUsa un FRAGMENTO CORTO (2-5 palabras) entre comillas. NUNCA cites oraciones completas.\\nEl fragmento DEBE describir un TEMA DE TRABAJO, NO una estructura organizativa.')}`;
+${t('[STELLENANZEIGE-ZITIERUNG (PFLICHT)]\\nWenn du ein Fragment aus der Stellenanzeige verwendest, setze ein KURZES FRAGMENT (2-5 Woerter) in Anfuehrungszeichen. NIEMALS ganze Saetze zitieren.\\nDas Fragment MUSS ein ARBEITSTHEMA beschreiben (woran gearbeitet wird), NICHT eine Teamstruktur oder Organisationsform.\\nDas Fragment MUSS EXAKT so in den KERNAUFGABEN oben stehen. Wenn unsicher: Paraphrasiere OHNE Anfuehrungszeichen.\\nRICHTIG: Kurzes JD-Fragment als Arbeitsthema in eigener Prosa eingebettet.\\nFALSCH: Ein ganzer Satz als Zitat ist VERBOTEN.\\nFALSCH: Organisationsformen wie in fachuebergreifenden Teams sind kein Arbeitsthema.', '[JOB AD QUOTING (MANDATORY)]\\nWhen quoting from the job ad, use a SHORT FRAGMENT (2-5 words). NEVER quote full sentences.\\nThe fragment MUST describe a WORK TOPIC, NOT a team structure.\\nThe fragment MUST appear EXACTLY in the CORE TASKS above. If unsure: paraphrase WITHOUT quotation marks.\\nCORRECT: I identified with developing strategies...\\nWRONG: Full sentences or organizational forms as quotes.', '[CITAS DE LA OFERTA (OBLIGATORIO)]\\nUsa un FRAGMENTO CORTO (2-5 palabras) entre comillas. NUNCA cites oraciones completas.\\nEl fragmento DEBE describir un TEMA DE TRABAJO, NO una estructura organizativa.')}`;
     }
     // Fallback: wenn responsibilities leer — job.summary nutzen falls vorhanden
     const summaryHint = (job as any)?.summary
@@ -874,7 +871,7 @@ RIGHT: \"At X I took charge of Y. The focus was on Z. That is why I look forward
 ${t(`[RELEVANZ-PFLICHT — JEDER FAKT BRAUCHT EIN "WARUM"]
 Jeder genannte Fakt (Tätigkeit, Tool, Ergebnis) MUSS einen direkten Bezug zur Stellenbeschreibung oder zum Unternehmenswert haben.
 VERBOTEN: Isolierte Fakten wie "Zudem habe ich dort Vertriebsworkflows automatisiert und ein CRM aufgebaut." ohne Erklärung, WARUM das für den Recruiter relevant ist.
-RICHTIG: "Gleichzeitig automatisierte ich Vertriebsworkflows und baute ein CRM auf, das die Kundenbindung um 30% steigerte; eine Kompetenz, die bei eurem Fokus auf Kundenerfolg direkt einsetzbar wäre."
+RICHTIG: Fakt + konkretes Ergebnis + Bezug zur Stelle — in eigenen Worten.
 REGEL: Wenn du einen Fakt nennst und keinen Bezug zur Stelle herstellen kannst, LASS IHN WEG.`,
 `[RELEVANCE REQUIREMENT — EVERY FACT NEEDS A "WHY"]
 Every stated fact (activity, tool, result) MUST have a direct connection to the job description or company values.
@@ -884,7 +881,7 @@ RULE: If you mention a fact and cannot connect it to the job, LEAVE IT OUT.`)}
 
 ${t(`[ZERTIFIKATE UND QUALIFIKATIONEN ALS BRÜCKEN-ELEMENTE]
 Wenn der Lebenslauf Zertifikate, Fortbildungen oder anerkannte Qualifikationen enthält (z.B. Design Thinking, Scrum Master, ITIL, Six Sigma), nutze diese als Brücken zum Unternehmen oder zur Stelle.
-BEISPIEL: Wenn die Firma "Nutzerzentriertheit" als Wert hat und der Bewerber ein Design Thinking Zertifikat hat → "Mein Design Thinking Zertifikat hat mir gezeigt, dass technische Lösungen nur dann wirken, wenn sie aus der Perspektive des Nutzers gedacht werden."
+METHODE: Verknuepfe Zertifikat mit konkretem Unternehmenswert oder Stellenanforderung — eigene Worte, keine Vorlage.
 NUTZE Zertifikate NUR wenn sie einen konkreten, nachvollziehbaren Bezug zur Stelle haben. Nicht als Aufzählung.`,
 `[CERTIFICATES AND QUALIFICATIONS AS BRIDGE ELEMENTS]
 If the CV contains certifications (e.g., Design Thinking, Scrum Master, ITIL), use them as bridges to company values or job requirements.
@@ -919,10 +916,10 @@ ${personaSection}
 === SECTION 5: CLOSING & CALL TO ACTION ===
 ${t('SCHLUSS-REGELN (komprimiert):', 'CLOSING RULES (condensed):')}
 - ${t('VERBOTEN: Karriere-Zusammenfassung am Ende. Das ist Fuelltext.', 'FORBIDDEN: Career summary at the end. That is filler.')}
-${hasQuote && preset === 'storytelling'
-    ? `- ${t('KLAMMER-OPTION: Du DARFST im letzten Satz auf den Gedanken aus der Einleitung zurueckgreifen — als inhaltliche Klammer.', 'BRACKET OPTION: You MAY reference the opening thought in the closing — as a thematic bracket.')}`
+${hasQuote
+    ? `- ${t('KLAMMER-PFLICHT: Greife im Schlusssatz auf den Zitat-Gedanken zurueck — als inhaltliche Klammer. Nicht woertlich zitieren, sondern den GEDANKEN weiterentwickeln (z.B. Autor hatte recht; aber...).', 'BRACKET REQUIRED: Reference the quote idea in the closing — as a thematic bracket. Develop the THOUGHT (e.g. Author was right; but...).')}`
     : `- ${t('VERBOTEN: Zitat oder Hook aus der Einleitung NICHT wiederholen.', 'FORBIDDEN: Do NOT repeat the quote or hook from the opening.')}`}
-- ${t('Formuliere Vorfreude auf EINE konkrete Aufgabe aus der Stellenanzeige. Eigene Worte — KEINE kopierten Vorlagen.', 'Express genuine anticipation for ONE specific task from the job ad. Own words — NO copied templates.')}
+- ${t('Formuliere Vorfreude auf EINE konkrete Aufgabe aus der Stellenanzeige. Nenne dabei Jobtitel UND Firmenname im Schlusssatz. Eigene Worte.', 'Express anticipation for ONE specific task from the job ad. Include job title AND company name in the closing. Own words.')}
 - ${t('Schlusssatz: Warm + bescheiden + Verfuegbarkeit. Kein Verkaufs-CTA.', 'Closing sentence: Warm + humble + availability. No sales CTA.')}
 - Sign-off: ${isEnglish ? 'End with "Kind regards," or "Best regards,".' : isSpanish ? 'Termina con "Cordialmente,".' : isDuForm ? '"Viele Grüße"' : '"Mit freundlichen Grüßen"'}
 
