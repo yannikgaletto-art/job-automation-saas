@@ -622,6 +622,23 @@
       "es": "Español",
       "saved": "Language saved"
     },
+    "launch_waitlist": {
+      "title": "Launch Waitlist",
+      "description": "Secure your spot for the Pathly launch.",
+      "cta_title": "Join the launch waitlist",
+      "cta_desc": "Choose your plan and be the first to know when we go live.",
+      "plan_starter": "Starter",
+      "plan_starter_desc": "30 credits, 10 coaching sessions, 30 job searches",
+      "plan_durchstarter": "Durchstarter",
+      "plan_durchstarter_desc": "75 credits, 25 coaching sessions, 75 job searches",
+      "plan_quarterly": "Quarterly Package",
+      "plan_quarterly_desc": "3 months Durchstarter at a discounted rate",
+      "submit": "Reserve my spot",
+      "disclaimer": "Non-binding — you'll be notified as soon as the launch begins.",
+      "success_title": "You're on the waitlist!",
+      "success_desc": "We'll notify you as soon as your plan becomes available.",
+      "error": "Something went wrong. Please try again."
+    },
     "tours": {
       "section_title": "Guided Tours",
       "section_description": "Replay any tab tour to rediscover features.",

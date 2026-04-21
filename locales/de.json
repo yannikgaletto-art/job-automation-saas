@@ -622,6 +622,23 @@
       "es": "Español",
       "saved": "Sprache gespeichert"
     },
+    "launch_waitlist": {
+      "title": "Launch-Warteliste",
+      "description": "Sichere dir jetzt deinen Platz für den Pathly Launch.",
+      "cta_title": "Auf die Launch-Warteliste setzen",
+      "cta_desc": "Wähle deinen Wunschplan und erfahre als Erster, wenn es losgeht.",
+      "plan_starter": "Starter",
+      "plan_starter_desc": "30 Credits, 10 Coaching-Sessions, 30 Jobsuchen",
+      "plan_durchstarter": "Durchstarter",
+      "plan_durchstarter_desc": "75 Credits, 25 Coaching-Sessions, 75 Jobsuchen",
+      "plan_quarterly": "Quartalspaket",
+      "plan_quarterly_desc": "3 Monate Durchstarter zum Vorteilspreis",
+      "submit": "Platz sichern",
+      "disclaimer": "Unverbindlich — du wirst benachrichtigt, sobald der Launch startet.",
+      "success_title": "Du bist auf der Warteliste!",
+      "success_desc": "Wir benachrichtigen dich, sobald dein Plan verfügbar ist.",
+      "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+    },
     "tours": {
       "section_title": "Geführte Touren",
       "section_description": "Wiederhole jede Tab-Tour, um Features neu zu entdecken.",

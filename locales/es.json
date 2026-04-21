@@ -621,6 +621,23 @@
       "es": "Español",
       "saved": "Idioma guardado"
     },
+    "launch_waitlist": {
+      "title": "Lista de espera del lanzamiento",
+      "description": "Asegura tu lugar para el lanzamiento de Pathly.",
+      "cta_title": "Unirme a la lista de espera",
+      "cta_desc": "Elige tu plan y sé el primero en saber cuándo empezamos.",
+      "plan_starter": "Starter",
+      "plan_starter_desc": "30 créditos, 10 sesiones de coaching, 30 búsquedas",
+      "plan_durchstarter": "Durchstarter",
+      "plan_durchstarter_desc": "75 créditos, 25 sesiones de coaching, 75 búsquedas",
+      "plan_quarterly": "Paquete trimestral",
+      "plan_quarterly_desc": "3 meses de Durchstarter a precio reducido",
+      "submit": "Reservar mi lugar",
+      "disclaimer": "Sin compromiso — te avisaremos cuando comience el lanzamiento.",
+      "success_title": "¡Estás en la lista de espera!",
+      "success_desc": "Te avisaremos cuando tu plan esté disponible.",
+      "error": "Algo salió mal. Por favor, inténtalo de nuevo."
+    },
     "tours": {
       "section_title": "Tours guiados",
       "section_description": "Repite cualquier tour de pestaña para redescubrir funciones.",
