@@ -384,27 +384,32 @@ export function FeedbackVoiceClient() {
                                     autoComplete="off"
                                 />
                                 {/* Inline mic */}
-                                <button
-                                    type="button"
-                                    onClick={handleMicClick}
-                                    disabled={formState === 'submitting'}
-                                    className={`w-[44px] h-[44px] rounded-full flex items-center justify-center shrink-0 border transition-all duration-200 focus:outline-none ${
-                                        recordingState === 'recording'
-                                            ? 'bg-[#012e7a] border-[#012e7a]'
-                                            : recordingState === 'transcribing'
-                                                ? 'bg-[#F3F4F6] border-[#E7E7E5] cursor-wait'
-                                                : 'bg-transparent border-transparent hover:bg-[#E8E8E8]'
-                                    }`}
-                                    title={recordingState === 'recording' ? 'Aufnahme stoppen' : 'Sprachnotiz aufnehmen'}
-                                >
-                                    {recordingState === 'transcribing' ? (
-                                        <Loader2 className="w-4 h-4 text-[#73726E] animate-spin" />
-                                    ) : recordingState === 'recording' ? (
-                                        <MicOff className="w-4 h-4 text-white" />
-                                    ) : (
-                                        <Mic className="w-4 h-4 text-[#73726E]" />
+                                <div className="relative shrink-0 flex items-center justify-center">
+                                    {recordingState === 'recording' && (
+                                        <span className="absolute inset-0 rounded-full animate-[voice-pulse_1.5s_ease-in-out_infinite] bg-[#012e7a]/20" />
                                     )}
-                                </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleMicClick}
+                                        disabled={formState === 'submitting'}
+                                        className={`relative z-10 w-[44px] h-[44px] rounded-full flex items-center justify-center border transition-all duration-200 focus:outline-none ${
+                                            recordingState === 'recording'
+                                                ? 'bg-[#012e7a] border-[#012e7a]'
+                                                : recordingState === 'transcribing'
+                                                    ? 'bg-[#F3F4F6] border-[#E7E7E5] cursor-wait'
+                                                    : 'bg-transparent border-transparent hover:bg-[#E8E8E8]'
+                                        }`}
+                                        title={recordingState === 'recording' ? 'Aufnahme stoppen' : 'Sprachnotiz aufnehmen'}
+                                    >
+                                        {recordingState === 'transcribing' ? (
+                                            <Loader2 className="w-4 h-4 text-[#73726E] animate-spin" />
+                                        ) : recordingState === 'recording' ? (
+                                            <MicOff className="w-4 h-4 text-white" />
+                                        ) : (
+                                            <Mic className="w-4 h-4 text-[#73726E]" />
+                                        )}
+                                    </button>
+                                </div>
                                 {/* Inline send */}
                                 <button
                                     type="submit"
@@ -453,27 +458,32 @@ export function FeedbackVoiceClient() {
                                     </span>
                                     <div className="flex items-center gap-2">
                                         {/* Mic */}
-                                        <button
-                                            type="button"
-                                            onClick={handleMicClick}
-                                            disabled={formState === 'submitting'}
-                                            className={`w-[40px] h-[40px] rounded-full flex items-center justify-center shrink-0 border transition-all duration-200 focus:outline-none ${
-                                                recordingState === 'recording'
-                                                    ? 'bg-[#012e7a] border-[#012e7a]'
-                                                    : recordingState === 'transcribing'
-                                                        ? 'bg-[#F3F4F6] border-[#E7E7E5] cursor-wait'
-                                                        : 'bg-[#F3F4F6] border-[#E7E7E5] hover:bg-[#E8E8E8]'
-                                            }`}
-                                            title={recordingState === 'recording' ? 'Aufnahme stoppen' : 'Sprachnotiz aufnehmen'}
-                                        >
-                                            {recordingState === 'transcribing' ? (
-                                                <Loader2 className="w-4 h-4 text-[#73726E] animate-spin" />
-                                            ) : recordingState === 'recording' ? (
-                                                <MicOff className="w-4 h-4 text-white" />
-                                            ) : (
-                                                <Mic className="w-4 h-4 text-[#73726E]" />
+                                        <div className="relative shrink-0 flex items-center justify-center">
+                                            {recordingState === 'recording' && (
+                                                <span className="absolute inset-0 rounded-full animate-[voice-pulse_1.5s_ease-in-out_infinite] bg-[#012e7a]/20" />
                                             )}
-                                        </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleMicClick}
+                                                disabled={formState === 'submitting'}
+                                                className={`relative z-10 w-[40px] h-[40px] rounded-full flex items-center justify-center border transition-all duration-200 focus:outline-none ${
+                                                    recordingState === 'recording'
+                                                        ? 'bg-[#012e7a] border-[#012e7a]'
+                                                        : recordingState === 'transcribing'
+                                                            ? 'bg-[#F3F4F6] border-[#E7E7E5] cursor-wait'
+                                                            : 'bg-[#F3F4F6] border-[#E7E7E5] hover:bg-[#E8E8E8]'
+                                                }`}
+                                                title={recordingState === 'recording' ? 'Aufnahme stoppen' : 'Sprachnotiz aufnehmen'}
+                                            >
+                                                {recordingState === 'transcribing' ? (
+                                                    <Loader2 className="w-4 h-4 text-[#73726E] animate-spin" />
+                                                ) : recordingState === 'recording' ? (
+                                                    <MicOff className="w-4 h-4 text-white" />
+                                                ) : (
+                                                    <Mic className="w-4 h-4 text-[#73726E]" />
+                                                )}
+                                            </button>
+                                        </div>
                                         {/* Send */}
                                         <button
                                             type="submit"
