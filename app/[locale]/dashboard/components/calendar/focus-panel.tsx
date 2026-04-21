@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, SkipForward, Coffee, ArrowLeft, CheckCircle2, RotateCcw, Clock } from 'lucide-react';
+import { Play, Pause, SkipForward, Coffee, ArrowLeft, CheckCircle2, RotateCcw, Clock, Trash2 } from 'lucide-react';
 import { useCalendarStore } from '@/store/use-calendar-store';
 import { useNotification } from '@/hooks/use-notification';
 
@@ -44,48 +44,14 @@ function ProgressPanel({
     taskTitle: string;
     onClose: () => void;
 }) {
-    const { updateProgress, completeTask, carryOverTask } = useCalendarStore();
-    const notify = useNotification();
+    const { updateProgress } = useCalendarStore();
     const [percent, setPercent] = useState(50);
     const [note, setNote] = useState('');
 
-    const handleContinue = async () => {
+    // Auto-save progress when user interacts
+    const handleSaveProgress = () => {
         updateProgress(taskId, percent, note || null);
-        await syncProgress(taskId, percent, note || null);
-        onClose();
-    };
-
-    const handleCarryOver = async () => {
-        carryOverTask(taskId, percent, note || null);
-        await fetch('/api/tasks', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id: taskId,
-                status: 'carry_over',
-                carry_over_to: getNextDay(),
-                progress_percent: percent,
-                progress_note: note || null,
-            }),
-        });
-        onClose();
-    };
-
-    const handleComplete = async () => {
-        completeTask(taskId);
-        await fetch('/api/tasks', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id: taskId,
-                status: 'completed',
-                progress_percent: 100,
-                completed_at: new Date().toISOString(),
-            }),
-        });
-        fireConfetti();
-        notify('Task erledigt');
-        onClose();
+        syncProgress(taskId, percent, note || null);
     };
 
     return (
@@ -111,6 +77,8 @@ function ProgressPanel({
                         step={5}
                         value={percent}
                         onChange={(e) => setPercent(Number(e.target.value))}
+                        onMouseUp={handleSaveProgress}
+                        onTouchEnd={handleSaveProgress}
                         className="flex-1 accent-[#002e7a]"
                     />
                     <span className="text-sm font-mono font-semibold text-[#37352F] w-12 text-right">{percent}%</span>
@@ -123,32 +91,11 @@ function ProgressPanel({
                 <textarea
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
+                    onBlur={handleSaveProgress}
                     placeholder="z.B. Intro fertig, Body fehlt noch..."
                     className="w-full px-3 py-2 rounded-lg border border-[#E7E7E5] bg-white text-xs text-[#37352F] placeholder:text-[#A8A29E] resize-none focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20"
                     rows={2}
                 />
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex gap-2">
-                <button
-                    onClick={handleContinue}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#002e7a] text-white text-xs font-medium hover:bg-[#001d4f] transition-colors"
-                >
-                    <Play className="w-3 h-3" /> Weiter
-                </button>
-                <button
-                    onClick={handleCarryOver}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[#E7E7E5] text-xs font-medium text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a] transition-colors"
-                >
-                    <RotateCcw className="w-3 h-3" /> Morgen
-                </button>
-                <button
-                    onClick={handleComplete}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-green-50 text-green-700 text-xs font-medium border border-green-200 hover:bg-green-100 transition-colors"
-                >
-                    <CheckCircle2 className="w-3 h-3" /> Fertig
-                </button>
             </div>
         </motion.div>
     );
@@ -256,6 +203,16 @@ export function FocusPanel() {
         });
         fireConfetti();
         notify('Task erledigt');
+    };
+
+    const handleDelete = async () => {
+        if (!task) return;
+        useCalendarStore.setState({ timerIsActive: false });
+        useCalendarStore.getState().removeTask(task.id);
+        exitFocus();
+        try {
+            await fetch(`/api/tasks?id=${task.id}`, { method: 'DELETE' });
+        } catch {}
     };
 
     const handleToggleTimer = () => {
@@ -380,24 +337,8 @@ export function FocusPanel() {
                     )}
                 </AnimatePresence>
 
-                {/* Action buttons */}
-                <div className="flex gap-2 pt-2 border-t border-[#E7E7E5]">
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleComplete}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium border border-green-200 hover:bg-green-100 transition-colors"
-                    >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Goal erledigt
-                    </motion.button>
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setShowProgress(!showProgress)}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-[#E7E7E5] text-xs font-medium text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a] transition-colors"
-                    >
-                        <Pause className="w-3.5 h-3.5" /> Pause / Fortschritt
-                    </motion.button>
+                {/* Action buttons — Weiter / Fertig / Löschen / Fortschritt */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E7E7E5]">
                     <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
@@ -405,9 +346,33 @@ export function FocusPanel() {
                             saveNotes();
                             exitFocus();
                         }}
-                        className="px-3 py-2.5 rounded-lg border border-[#E7E7E5] text-xs text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a] transition-colors"
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-[#002e7a] text-white text-xs font-medium hover:bg-[#001d4f] transition-colors"
                     >
-                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <Play className="w-3.5 h-3.5" /> Weiter
+                    </motion.button>
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleComplete}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium border border-green-200 hover:bg-green-100 transition-colors"
+                    >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Fertig
+                    </motion.button>
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleDelete}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" /> Löschen
+                    </motion.button>
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowProgress(!showProgress)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-[#E7E7E5] text-xs font-medium text-[#73726E] hover:border-[#002e7a] hover:text-[#002e7a] transition-colors"
+                    >
+                        <Clock className="w-3.5 h-3.5" /> Fortschritt
                     </motion.button>
                 </div>
             </div>

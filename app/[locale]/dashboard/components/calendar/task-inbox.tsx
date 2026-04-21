@@ -6,7 +6,7 @@
  * Responsive: stacks below timeline on small screens.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -35,6 +35,7 @@ function DraggableTaskItem({ task }: { task: CalendarTask }) {
     const { updateTask, removeTask } = useCalendarStore();
     const [showDuration, setShowDuration] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const durationBtnRef = useRef<HTMLButtonElement>(null);
     const t = useTranslations('dashboard.calendar');
 
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -119,8 +120,9 @@ function DraggableTaskItem({ task }: { task: CalendarTask }) {
                 </div>
 
                 {/* Duration dropdown */}
-                <div className="relative shrink-0">
+                <div className="shrink-0">
                     <button
+                        ref={durationBtnRef}
                         onClick={(e) => { e.stopPropagation(); setShowDuration(!showDuration); }}
                         className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[#73726E] border border-[#E7E7E5] hover:border-[#002e7a]/30 transition-colors"
                     >
@@ -131,12 +133,17 @@ function DraggableTaskItem({ task }: { task: CalendarTask }) {
                         {showDuration && (
                             <>
                                 {/* Backdrop to close dropdown */}
-                                <div className="fixed inset-0 z-40" onClick={() => setShowDuration(false)} />
+                                <div className="fixed inset-0 z-[9998]" onClick={() => setShowDuration(false)} />
                                 <motion.div
                                     initial={{ opacity: 0, y: -4 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -4 }}
-                                    className="absolute right-0 top-full mt-1 bg-white border border-[#E7E7E5] rounded-lg shadow-lg z-50 py-1 min-w-[80px]"
+                                    className="fixed bg-white border border-[#E7E7E5] rounded-lg shadow-lg z-[9999] py-1 min-w-[80px]"
+                                    style={(() => {
+                                        const rect = durationBtnRef.current?.getBoundingClientRect();
+                                        if (!rect) return {};
+                                        return { top: rect.bottom + 4, left: rect.left };
+                                    })()}
                                 >
                                     {DURATION_OPTIONS.map((opt) => (
                                         <button

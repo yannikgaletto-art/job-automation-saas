@@ -218,37 +218,37 @@ function TaskBlock({ task }: { task: CalendarTask }) {
                         </button>
                     )}
                 </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {isFocus && (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-[#002e7a] text-white rounded-full animate-pulse">
-                            FOCUS
-                        </span>
-                    )}
-                    {/* Delete button */}
+                <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {/* Delete button — always visible */}
                     {!isCompleted && (
                         confirmDelete ? (
                             <div className="flex items-center gap-1">
                                 <button
-                            onClick={handleDelete}
-                            className="text-[10px] px-1.5 py-0.5 bg-red-500 text-white rounded font-medium hover:bg-red-600"
-                        >
-                            {t('yes')}
-                        </button>
-                        <button
-                            onClick={() => setConfirmDelete(false)}
-                            className="text-[10px] px-1.5 py-0.5 text-[#73726E] hover:text-[#37352F]"
-                        >
-                            {t('no')}
-                        </button>
+                                    onClick={handleDelete}
+                                    className="text-[10px] px-1.5 py-0.5 bg-red-500 text-white rounded font-medium hover:bg-red-600"
+                                >
+                                    {t('yes')}
+                                </button>
+                                <button
+                                    onClick={() => setConfirmDelete(false)}
+                                    className="text-[10px] px-1.5 py-0.5 text-[#73726E] hover:text-[#37352F]"
+                                >
+                                    {t('no')}
+                                </button>
                             </div>
                         ) : (
                             <button
                                 onClick={() => setConfirmDelete(true)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-[#A8A29E] hover:text-red-500"
+                                className="p-0.5 text-[#A8A29E] hover:text-red-500 transition-colors"
                             >
                                 <Trash2 className="w-3 h-3" />
                             </button>
                         )
+                    )}
+                    {isFocus && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-[#002e7a] text-white rounded-full animate-pulse">
+                            FOCUS
+                        </span>
                     )}
                 </div>
             </div>
@@ -259,7 +259,7 @@ function TaskBlock({ task }: { task: CalendarTask }) {
                     <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${task.progress_percent ?? 100}%` }}
-                        className={`h-full ${isCompleted ? 'bg-green-500' : 'bg-amber-500'}`}
+                        className={`h-full ${isCompleted ? 'bg-green-500' : 'bg-[#002e7a]'}`}
                     />
                 </div>
             )}
