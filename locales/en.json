@@ -1368,6 +1368,7 @@
     "error_generation_failed": "Generation failed",
     "error_timeout": "Timeout — please try again.",
     "btn_copy": "Copy",
+    "btn_copied": "Copied ✓",
     "btn_pdf": "PDF",
     "btn_word": "Word (.doc)",
     "btn_mark_applied": "Mark as applied",

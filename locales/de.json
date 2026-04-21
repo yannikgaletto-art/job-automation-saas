@@ -1368,6 +1368,7 @@
     "error_generation_failed": "Generierung fehlgeschlagen",
     "error_timeout": "Zeitüberschreitung — bitte erneut versuchen.",
     "btn_copy": "Kopieren",
+    "btn_copied": "Kopiert ✓",
     "btn_pdf": "PDF",
     "btn_word": "Word (.doc)",
     "btn_mark_applied": "Als beworben markieren",

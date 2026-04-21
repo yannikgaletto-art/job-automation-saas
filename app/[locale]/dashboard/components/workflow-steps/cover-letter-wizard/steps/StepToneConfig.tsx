@@ -37,7 +37,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             previewText: t(`tone_${key}_preview` as `${typeof key}_preview`),
         };
     }), [t]);
-    const [selectedPreset, setSelectedPreset] = useState<TonePreset>(tone?.preset || 'formal');
+    const [selectedPreset, setSelectedPreset] = useState<TonePreset>(tone?.preset || 'storytelling');
     const [language, setLanguage] = useState<TargetLanguage>(tone?.targetLanguage || setupData.detectedJobLanguage);
     const [contactPerson, setContactPerson] = useState(tone?.contactPerson || '');
     const [formality, setFormality] = useState<'sie' | 'du'>(tone?.formality || 'sie');
@@ -507,18 +507,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                 </div>
             )}
 
-            {toneSource !== 'custom-style' && (
-            <div className="bg-[#EEF3FF] border-l-4 border-[#002e7a] rounded-md p-3">
-                <div className="flex items-start gap-2">
-                    <Info className="w-4 h-4 text-[#002e7a] shrink-0 mt-0.5" />
-                    <p className="text-xs text-[#37352F] leading-relaxed">
-                        {setupData.hasStyleSample
-                            ? t('style_analyzed_info')
-                            : t('style_missing_info')}
-                    </p>
-                </div>
-            </div>
-            )}
+
 
             {/* First 90 Days Hypothesis Toggle */}
             <div className={`border border-[#E7E7E5] rounded-lg p-3 bg-white ${isFormal ? 'opacity-50' : ''}`}>

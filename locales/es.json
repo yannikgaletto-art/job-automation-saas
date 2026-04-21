@@ -1366,6 +1366,7 @@
     "error_generation_failed": "Generación fallida",
     "error_timeout": "Tiempo agotado — por favor, inténtalo de nuevo.",
     "btn_copy": "Copiar",
+    "btn_copied": "Copiado ✓",
     "btn_pdf": "PDF",
     "btn_word": "Word (.doc)",
     "btn_mark_applied": "Marcar como solicitado",

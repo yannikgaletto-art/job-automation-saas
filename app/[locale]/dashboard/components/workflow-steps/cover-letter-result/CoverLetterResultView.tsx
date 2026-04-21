@@ -40,11 +40,14 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
     const [isApplyPending, setIsApplyPending] = useState(false)
     const [isApplyError, setIsApplyError] = useState(false)
     const applyErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const [isCopied, setIsCopied] = useState(false)
+    const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     // Cleanup timer on unmount to prevent state-update-on-unmounted-component
     useEffect(() => {
         return () => {
             if (applyErrorTimerRef.current) clearTimeout(applyErrorTimerRef.current)
+            if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
         }
     }, [])
 
@@ -143,6 +146,9 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
 
     const handleCopy = () => {
         navigator.clipboard.writeText(currentLetter)
+        setIsCopied(true)
+        if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+        copyTimerRef.current = setTimeout(() => setIsCopied(false), 2000)
     }
 
     const handleDownloadPdf = () => {
@@ -243,9 +249,14 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
                     <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-[#E7E7E5]">
                         <button
                             onClick={handleCopy}
-                            className="bg-white border border-[#E7E7E5] px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+                            className={[
+                                'px-4 py-2 rounded-md text-sm font-medium transition-all duration-300',
+                                isCopied
+                                    ? 'bg-[#002e7a] text-white border border-[#002e7a]'
+                                    : 'bg-white border border-[#E7E7E5] hover:bg-gray-50',
+                            ].join(' ')}
                         >
-                            {t('btn_copy')}
+                            {isCopied ? t('btn_copied') : t('btn_copy')}
                         </button>
                         <button
                             onClick={handleDownloadPdf}
