@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft,
@@ -77,6 +77,7 @@ export default function CoachingAnalysisPage() {
     const router = useRouter();
     const sessionId = params.sessionId as string;
     const t = useTranslations('dashboard.coaching.analysis');
+    const locale = useLocale();
 
     const [report, setReport] = useState<FeedbackReport | null>(null);
     const [loading, setLoading] = useState(true);
@@ -877,7 +878,7 @@ export default function CoachingAnalysisPage() {
                                                     {topic.context && topic.context.length > 0 && (
                                                         <ul className="space-y-1.5 mb-3">
                                                             {topic.context.map((line, ci) => (
-                                                                <li key={ci} className="text-xs leading-relaxed flex items-start gap-2" style={{ color: MUTED }}>
+                                                                <li key={ci} className="text-xs leading-relaxed flex items-start gap-2" style={{ color: TEXT }}>
                                                                     <span className="mt-1 shrink-0" style={{ color: BLUE }}>•</span>
                                                                     <span>{line}</span>
                                                                 </li>
@@ -933,8 +934,16 @@ export default function CoachingAnalysisPage() {
 
             </div>
 
-            {/* Regenerate button (outside toggle container) */}
-            <div className="mt-4 flex justify-end">
+            {/* Action buttons (outside toggle container) */}
+            <div className="mt-4 flex justify-between">
+                <button
+                    onClick={() => router.push(`/${locale}/dashboard/coaching`)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all hover:bg-[#F0EFED]"
+                    style={{ color: BLUE, border: `1px solid ${BLUE}30`, background: 'transparent' }}
+                >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    {t('coaching_dashboard_btn')}
+                </button>
                 <button
                     onClick={regenerateReport}
                     disabled={regenerating}
