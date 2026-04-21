@@ -161,8 +161,12 @@ export const useCalendarStore = create<CalendarState>()(
                 })),
 
             // Focus mode
-            requestFocus: (taskId) =>
-                set({ showFocusConfirmation: true, pendingFocusTaskId: taskId }),
+            requestFocus: (taskId) => {
+                const state = get();
+                // If this task is already the focused task, skip the confirmation modal
+                if (state.focusedTaskId === taskId) return;
+                set({ showFocusConfirmation: true, pendingFocusTaskId: taskId });
+            },
             confirmFocus: () =>
                 set((state) => ({
                     focusedTaskId: state.pendingFocusTaskId,

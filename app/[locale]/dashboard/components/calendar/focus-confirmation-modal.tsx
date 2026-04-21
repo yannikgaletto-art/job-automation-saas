@@ -1,15 +1,15 @@
 'use client';
 
 /**
- * Focus Confirmation Modal — Shown before entering Focus Mode.
- * Includes phone focus nudge (iOS/Android) per spec.
+ * Focus Confirmation Modal — Shown once before entering Focus Mode.
  * Pomodoro duration selector (25 or 50 min).
  * Clicking "confirm" auto-starts the timer.
+ * Will NOT re-appear if the task is already in focus mode.
  */
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Smartphone, X, Timer } from 'lucide-react';
+import { Target, X, Timer } from 'lucide-react';
 import { useCalendarStore } from '@/store/use-calendar-store';
 import { useTranslations, useLocale } from 'next-intl';
 
@@ -31,7 +31,7 @@ export function FocusConfirmationModal() {
         return `${fmt(start)} – ${fmt(end)}`;
     };
 
-    const pomodoroCount = task.estimated_minutes <= 30 ? 1 : task.estimated_minutes <= 60 ? 2 : task.estimated_minutes <= 90 ? 3 : 4;
+    const pomodoroCount = selectedDuration === 25 ? 1 : 2;
 
     const handleConfirm = async () => {
         setPomodoroDuration(selectedDuration);
@@ -113,27 +113,6 @@ export function FocusConfirmationModal() {
                             <p className="text-[10px] text-[#A8A29E] mt-1.5">
                                 {selectedDuration === 25 ? t('duration_classic') : t('duration_deep')}
                             </p>
-                        </div>
-
-                        {/* Phone nudge */}
-                        <div className="border-t border-[#E7E7E5] pt-4">
-                            <div className="flex items-start gap-3">
-                                <Smartphone className="w-5 h-5 text-[#73726E] shrink-0 mt-0.5" />
-                                <div>
-                                    <p className="text-xs text-[#37352F] font-medium">{t('phone_nudge_title')}</p>
-                                    <p className="text-xs text-[#73726E] mt-1 leading-relaxed">
-                                        {t('phone_nudge_body')}
-                                    </p>
-                                    <div className="mt-2 grid grid-cols-2 gap-2">
-                                        <span className="text-[10px] text-[#A8A29E] bg-[#F7F7F5] rounded-md px-2 py-1">
-                                            {t('phone_ios')}
-                                        </span>
-                                        <span className="text-[10px] text-[#A8A29E] bg-[#F7F7F5] rounded-md px-2 py-1">
-                                            {t('phone_android')}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
                         {/* Skip checkbox */}

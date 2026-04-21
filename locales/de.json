@@ -116,7 +116,7 @@
         "phone_ios": "iOS: Einstellungen → Fokus → Nicht stören",
         "phone_android": "Android: Schnelleinstellungen → DND",
         "skip_label": "Nicht mehr fragen",
-        "confirm_button": "Ich bin bereit – Focus starten",
+        "confirm_button": "Fokus starten",
         "later_button": "Später"
       }
     },

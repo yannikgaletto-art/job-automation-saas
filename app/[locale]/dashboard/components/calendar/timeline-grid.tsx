@@ -324,7 +324,7 @@ export function TimelineGrid() {
             const res = await fetch('/api/tasks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, estimated_minutes: 60 }),
+                body: JSON.stringify({ title, estimated_minutes: 25 }),
             });
             const data = await res.json();
             if (data.success && data.task) {
@@ -333,7 +333,7 @@ export function TimelineGrid() {
                     today.getFullYear(), today.getMonth(), today.getDate(),
                     inlineCreate.hour, inlineCreate.minute
                 );
-                const endLocal = new Date(startLocal.getTime() + 60 * 60000);
+                const endLocal = new Date(startLocal.getTime() + 25 * 60000);
 
                 addTask(data.task);
                 scheduleTask(data.task.id, startLocal.toISOString(), endLocal.toISOString());

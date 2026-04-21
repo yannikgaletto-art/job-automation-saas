@@ -116,7 +116,7 @@
         "phone_ios": "iOS: Ajustes → Enfoque → No molestar",
         "phone_android": "Android: Ajustes rápidos → No molestar",
         "skip_label": "No volver a preguntar",
-        "confirm_button": "Iniciar sesión de enfoque",
+        "confirm_button": "Iniciar enfoque",
         "later_button": "Más tarde"
       }
     },

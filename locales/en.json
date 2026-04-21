@@ -116,7 +116,7 @@
         "phone_ios": "iOS: Settings → Focus → Do Not Disturb",
         "phone_android": "Android: Quick Settings → DND",
         "skip_label": "Don't ask again",
-        "confirm_button": "Start focus session",
+        "confirm_button": "Start Focus",
         "later_button": "Later"
       }
     },

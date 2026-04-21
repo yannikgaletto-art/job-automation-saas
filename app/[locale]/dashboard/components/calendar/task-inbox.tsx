@@ -18,13 +18,8 @@ import { PulseMissionPanel } from './pulse-mission-panel';
 // ─── Duration Options ────────────────────────────────────────────
 
 const DURATION_OPTIONS = [
-    { label: '15m', value: 15 },
-    { label: '30m', value: 30 },
-    { label: '45m', value: 45 },
-    { label: '1h', value: 60 },
-    { label: '1.5h', value: 90 },
-    { label: '2h', value: 120 },
-    { label: '3h', value: 180 },
+    { label: '25m', value: 25 },
+    { label: '50m', value: 50 },
 ];
 
 function formatDuration(minutes: number): string {
@@ -214,7 +209,7 @@ function AddTaskForm() {
             const res = await fetch('/api/tasks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: title.trim(), estimated_minutes: 60 }),
+                body: JSON.stringify({ title: title.trim(), estimated_minutes: 25 }),
             });
             const data = await res.json();
             if (data.success && data.task) {
@@ -333,7 +328,7 @@ export function TaskInbox() {
     const customTaskCount = inboxTasks.length + carryOverTasks.length;
 
     return (
-        <div className="bg-white border border-[#E7E7E5] rounded-xl shadow-sm overflow-hidden h-full flex flex-col">
+        <div className="bg-white border border-[#E7E7E5] rounded-xl shadow-sm h-full flex flex-col">
             {/* Header */}
             <div className="px-4 py-3 border-b border-[#E7E7E5]">
                 <div className="flex items-center justify-between">
