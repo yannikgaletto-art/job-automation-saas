@@ -178,8 +178,8 @@ export function CreditUsageCard() {
             {/* Job Queue (was "AI Credits") */}
             <PillBar
                 label={t("credits_label")}
-                used={credits.creditsUsed}
-                total={Math.round(credits.creditsTotal + credits.topupCredits)}
+                used={Math.max(credits.creditsUsed - credits.topupCredits, 0)}
+                total={credits.creditsTotal}
             />
 
             {/* Coaching */}

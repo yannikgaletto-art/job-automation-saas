@@ -1794,5 +1794,13 @@
     "vendor_purpose_job_search": "Jobsuche",
     "vendor_purpose_web_scraping": "Web Scraping",
     "vendor_purpose_web_scraping_fallback": "Web Scraping (Fallback)"
+  },
+  "referral_notification": {
+    "referred_title": "Willkommen an Bord!",
+    "referred_message": "Dank der Einladung von {name} schenken wir dir 3 Credits für deinen Start. Viel Erfolg bei deiner Bewerbung!",
+    "referrer_title": "Sharing is caring!",
+    "referrer_message": "Danke, dass du uns weiterempfohlen hast. Als kleines Dankeschön erhältst du 5 Credits. Wir hoffen, wir können dich bei deinem nächsten Karriereschritt unterstützen.",
+    "someone": "einem Freund",
+    "dismiss": "Verstanden"
   }
 }

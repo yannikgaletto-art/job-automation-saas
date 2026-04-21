@@ -18,6 +18,7 @@ import { useCalendarStore } from '@/store/use-calendar-store';
 import { createClient } from '@/lib/supabase/client';
 import { CreditExhaustedProvider, useCreditExhausted } from './hooks/credit-exhausted-context';
 import { PaywallModal } from '@/components/dashboard/paywall-modal';
+import { ReferralNotificationOverlay } from '@/components/dashboard/referral-notification-overlay';
 // ReConsentBanner removed — v2.0 consent info handled via Security page
 
 const ADMIN_EMAILS = ['galettoyannik7@gmail.com', 'yannik.galetto@gmail.com'];
@@ -271,6 +272,9 @@ function DashboardLayoutInner({
 
             {/* Global Paywall Modal — triggered from any component via useCreditExhausted() */}
             <PaywallModalBridge />
+
+            {/* Referral Notification — shows welcome/bonus popup after referral claim */}
+            <ReferralNotificationOverlay />
 
         </>
     );
