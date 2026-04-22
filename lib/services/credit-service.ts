@@ -7,7 +7,7 @@
  */
 
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
-import type { CreditInfo, DebitResult, CreditEventType } from './credit-types';
+import { PLAN_CONFIG, type CreditInfo, type DebitResult, type CreditEventType } from './credit-types';
 
 // Lazy-initialized admin client
 function getAdmin() { return getSupabaseAdmin(); }
@@ -110,15 +110,16 @@ export async function getUserCredits(userId: string): Promise<CreditInfo | null>
 
         if (isMissingTable) {
             console.warn('⚠️ [Credits] user_credits table missing — returning synthetic beta credit info');
+            const fp = PLAN_CONFIG.free;
             return {
                 planType: 'free',
-                creditsTotal: 15,
+                creditsTotal: fp.credits,
                 creditsUsed: 0,
                 topupCredits: 0,
-                creditsAvailable: 15,
-                coachingSessionsTotal: 3,
+                creditsAvailable: fp.credits,
+                coachingSessionsTotal: fp.coachingSessions,
                 coachingSessionsUsed: 0,
-                jobSearchesTotal: 15,
+                jobSearchesTotal: fp.jobSearches,
                 jobSearchesUsed: 0,
                 billingPeriodEnd: null,
                 stripeCustomerId: null,
@@ -133,18 +134,20 @@ export async function getUserCredits(userId: string): Promise<CreditInfo | null>
         // ── Lazy Row Creation (ensure-on-read) ──────────────────────
         // Pre-migration users have no user_credits row. Instead of returning null
         // (which causes synthetic fallback data), create the row now.
+        // ⚠️ SYNC: Uses PLAN_CONFIG as single source of truth (must match DB trigger).
+        const freePlan = PLAN_CONFIG.free;
         console.log(`💳 [Credits] No row for user ${userId.slice(0, 8)}… — creating free-plan row`);
         const { data: newRow, error: insertError } = await getAdmin()
             .from('user_credits')
             .upsert({
                 user_id: userId,
                 plan_type: 'free',
-                credits_total: 15.0,
+                credits_total: freePlan.credits,
                 credits_used: 0,
                 topup_credits: 0,
-                coaching_sessions_total: 3,
+                coaching_sessions_total: freePlan.coachingSessions,
                 coaching_sessions_used: 0,
-                job_searches_total: 15,
+                job_searches_total: freePlan.jobSearches,
                 job_searches_used: 0,
             }, { onConflict: 'user_id' })
             .select('*')

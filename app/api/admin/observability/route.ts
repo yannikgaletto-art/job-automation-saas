@@ -342,11 +342,13 @@ async function fetchHelicone(): Promise<SourceResult<HeliconeData>> {
 // Computes costs from generation_logs using official Anthropic pricing (USD/MTok).
 
 const MODEL_PRICING_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
-    'claude-haiku-4-5-20250929':  { input: 0.80,  output: 4.00  },
-    'claude-haiku-4-5':           { input: 0.80,  output: 4.00  },
+    'claude-haiku-4-5-20251001':  { input: 1.00,  output: 5.00  },
+    'claude-haiku-4-5-20250929':  { input: 1.00,  output: 5.00  },
+    'claude-haiku-4-5':           { input: 1.00,  output: 5.00  },
     'claude-sonnet-4-6-20260220': { input: 3.00,  output: 15.00 },
     'claude-sonnet-4-6': { input: 3.00,  output: 15.00 },
     'claude-sonnet-4-5':          { input: 3.00,  output: 15.00 },
+    'mistral-small-2503':         { input: 0.15,  output: 0.60  },
     'default':                    { input: 1.50,  output: 7.50  },
 };
 
