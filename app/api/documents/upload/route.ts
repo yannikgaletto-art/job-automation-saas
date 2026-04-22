@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
 
                             // ═══ INTEGRITY GUARD — Restore PII from Phase 1 encryption ═══
                             // document-processor runs a dedicated Haiku PII-extraction call
-                            // on the raw CV text → encryptedPii.name is more reliable than
+                            // on the raw CV text -> encryptedPii.name is more reliable than
                             // cv-parser's general-purpose extraction (which can be misled by
                             // OCR headers like "Deutsche Rentenversicherung").
                             // Name is ALWAYS overridden; email/phone only when null.
@@ -226,7 +226,8 @@ export async function POST(req: NextRequest) {
                                     try {
                                         resolvedName = decrypt(processedCv.encryptedPii.name as string);
                                         structuredCv.personalInfo.name = resolvedName;
-                                        console.log(`🔧 [integrity-guard] Name override from Phase 1 PII → "${resolvedName}"`);
+                                        console.log(`[integrity-guard] Name override from Phase 1 PII -> "${resolvedName}"`);
+
                                     } catch { /* decrypt failed — leave as-is */ }
                                 }
                                 if (!structuredCv.personalInfo.email && processedCv.encryptedPii.email) {
