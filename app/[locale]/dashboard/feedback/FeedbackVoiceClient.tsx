@@ -67,7 +67,7 @@ export function FeedbackVoiceClient() {
         t('question_1'),
         t('question_2'),
         t('question_3'),
-        t('question_4'),
+        // t('question_4'), // TODO: später einblenden (Wunschpaket 10€-Frage)
     ];
 
     // ── Submit ───────────────────────────────────────────────────────────────
