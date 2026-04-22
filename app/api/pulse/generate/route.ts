@@ -54,6 +54,8 @@ export async function GET() {
             { data: allQueueJobs },
             { data: cvDocuments },
             { data: todayPulseTasks },
+            { data: steckbriefConfirmedJobs },
+            { data: cvOptimizedJobs },
         ] = await Promise.all([
             // Jobs with pending status (need Steckbrief confirmation)
             supabaseAdmin
@@ -110,6 +112,22 @@ export async function GET() {
                 .eq('source', 'pulse')
                 .gte('created_at', `${today}T00:00:00.000Z`)
                 .lte('created_at', `${today}T23:59:59.999Z`),
+
+            // §RULE-3B: Jobs with confirmed Steckbrief (need CV Optimization)
+            supabaseAdmin
+                .from('job_queue')
+                .select('id, company_name, job_title')
+                .eq('user_id', user.id)
+                .in('status', ['steckbrief_confirmed', 'cv_matched'])
+                .limit(5),
+
+            // §RULE-4B: Jobs with CV optimized (need Cover Letter generation)
+            supabaseAdmin
+                .from('job_queue')
+                .select('id, company_name, job_title')
+                .eq('user_id', user.id)
+                .eq('status', 'cv_optimized')
+                .limit(5),
         ]);
 
         // Set of job_queue_ids already accepted today
@@ -167,6 +185,22 @@ export async function GET() {
             });
         }
 
+        // Rule 3B: Steckbrief confirmed → CV Optimization needed
+        for (const job of steckbriefConfirmedJobs || []) {
+            if (acceptedJobIds.has(job.id)) continue;
+            const company = job.company_name || job.job_title || 'Unbekannt';
+            suggestions.push({
+                id: `pulse-cv-opt-${job.id}`,
+                title: `CV Optimierung für ${company}`,
+                estimated_minutes: 15,
+                priority: 'high',
+                category: 'action',
+                job_queue_id: job.id,
+                deep_link: `/dashboard/job-queue?highlight=${job.id}`,
+                icon: 'file-search',
+            });
+        }
+
         // Rule 4: Cover Letter ready for review
         for (const job of coverLetterDoneJobs || []) {
             if (acceptedJobIds.has(job.id)) continue;
@@ -177,6 +211,22 @@ export async function GET() {
                 estimated_minutes: 20,
                 priority: 'high',
                 category: 'review',
+                job_queue_id: job.id,
+                deep_link: `/dashboard/job-queue?highlight=${job.id}`,
+                icon: 'file-text',
+            });
+        }
+
+        // Rule 4B: CV optimized → Generate Cover Letter
+        for (const job of cvOptimizedJobs || []) {
+            if (acceptedJobIds.has(job.id)) continue;
+            const company = job.company_name || job.job_title || 'Unbekannt';
+            suggestions.push({
+                id: `pulse-gen-cl-${job.id}`,
+                title: `Anschreiben für ${company} generieren`,
+                estimated_minutes: 20,
+                priority: 'high',
+                category: 'action',
                 job_queue_id: job.id,
                 deep_link: `/dashboard/job-queue?highlight=${job.id}`,
                 icon: 'file-text',
