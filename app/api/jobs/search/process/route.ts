@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
             .from('job_queue')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', user.id)
-            .not('status', 'in', '("archived","rejected")');
+            .not('status', 'in', '("archived","rejected","submitted")');
 
         if ((activeJobCount ?? 0) >= 5) {
             return NextResponse.json(

@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 // Upstash ratelimit removed (2026-03-30 Phase 2) — was only used for Perplexity API
 import { recordCacheHit, recordCacheMiss } from './cache-monitor';
-import { sanitizeForAI } from './pii-sanitizer';
+// sanitizeForAI removed — public website scrapes use light email/phone-only sanitization
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -236,8 +236,18 @@ async function fetchViaJinaAndClaude(
             .trim();
 
         // Haiku has 200K context — 15K chars ≈ 4K tokens, well within budget.
-        // PII sanitization: website scrapes may contain employee names/contact info (DSGVO Art. 25)
-        const truncatedContent = sanitizeForAI(cleaned.substring(0, 15000)).sanitized;
+        // IMPORTANT: Do NOT use sanitizeForAI() here. Company websites are 100% public.
+        // The aggressive name regex masks company names/products ("Smart Infrastructure"
+        // → __NAME_1__) which destroys Claude's ability to extract meaningful intel.
+        // Only strip emails/phones (light sanitization for employee contact info).
+        const truncatedRaw = cleaned.substring(0, 15000);
+        const truncatedContent = truncatedRaw
+            .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[EMAIL]')
+            .replace(/(\+?\d{1,4}[\s\-./]?)?\(?\d{2,5}\)?[\s\-./]?\d{3,10}[\s\-./]?\d{0,10}/g, (m) => {
+                // Only mask phone-like strings with 7+ digits (avoid masking years/zip codes)
+                const digits = m.replace(/\D/g, '');
+                return digits.length >= 7 ? '[PHONE]' : m;
+            });
         console.log(`📊 [Enrichment] Content: ${scrapedMarkdown.length} raw → ${cleaned.length} cleaned → ${truncatedContent.length} truncated for "${companyName}"`);
 
         const prompt = `Du bist ein Unternehmens-Analyst. Extrahiere strukturierte Informationen aus dem folgenden Website-Inhalt von "${companyName}" (${websiteUrl}).

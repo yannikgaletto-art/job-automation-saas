@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
             .from('job_queue')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', userId)
-            .not('status', 'in', '("archived","rejected")');
+            .not('status', 'in', '("archived","rejected","submitted")');
 
         if (!countError && (activeJobCount ?? 0) >= 5) {
             console.log(`[${requestId}] route=jobs/ingest step=limit_check blocked count=${activeJobCount}`);

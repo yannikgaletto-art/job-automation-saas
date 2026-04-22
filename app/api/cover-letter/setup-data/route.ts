@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import type { SetupDataResponse, SelectedHook, TargetLanguage } from '@/types/cover-letter-setup';
 import { enrichCompany, linkEnrichmentToJob } from '@/lib/services/company-enrichment';
 
+// Auto-enrichment (Jina scrape + Claude extraction) can take 15-25s
+export const maxDuration = 45;
+
 export async function GET(req: NextRequest) {
     const jobId = req.nextUrl.searchParams.get('jobId');
     if (!jobId) return NextResponse.json({ error: 'Missing jobId' }, { status: 400 });
@@ -94,9 +97,36 @@ export async function GET(req: NextRequest) {
                 console.log(`🔗 [SetupData] Fallback: found research for "${job.company_name}" via company_name lookup`);
             }
         }
-        // NOTE: On-demand enrichment was removed from setup-data.
-        // The user now triggers enrichment explicitly via the "Analysieren" button
-        // in StepHookSelection, which calls /api/jobs/enrich with the website URL.
+        // ─── Auto-enrich if no research exists but company_website is available ───
+        // Previously the user had to manually click "Analysieren". This caused empty
+        // hook screens when research hadn't been triggered yet.
+        if (!research && job.company_website) {
+            console.log(`🔄 [SetupData] No research for "${job.company_name}" — auto-enriching via ${job.company_website}`);
+            try {
+                const enrichResult = await enrichCompany(
+                    job.company_name,
+                    job.company_name,
+                    false, // use cache if available
+                    { website: job.company_website }
+                );
+                if (enrichResult.id) {
+                    await linkEnrichmentToJob(jobId, enrichResult.id);
+                    // Re-fetch the research after enrichment
+                    const { data: freshResearch } = await supabase
+                        .from('company_research')
+                        .select('intel_data, recent_news, linkedin_activity, perplexity_citations')
+                        .eq('id', enrichResult.id)
+                        .maybeSingle();
+                    if (freshResearch) {
+                        research = freshResearch;
+                        console.log(`✅ [SetupData] Auto-enrichment succeeded for "${job.company_name}"`);
+                    }
+                }
+            } catch (enrichErr) {
+                console.warn(`⚠️ [SetupData] Auto-enrichment failed for "${job.company_name}":`, enrichErr);
+                // Non-blocking — continue with empty hooks (manual fallback available)
+            }
+        }
 
         // ─── Build Hooks (Step A) — Company & Position focused ────────────
         // WICHTIG: Keine News-Hooks — Aufhänger soll sich auf Stelle/Unternehmen beziehen
