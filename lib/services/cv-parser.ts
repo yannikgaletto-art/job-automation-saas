@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { complete } from '@/lib/ai/model-router';
 import { CvStructuredData } from '@/types/cv';
+import { sanitizeForAI } from './pii-sanitizer';
 
 export const cvStructuredDataSchema = z.object({
   version: z.string(),
@@ -56,6 +57,10 @@ export const cvStructuredDataSchema = z.object({
 
 
 export async function parseCvTextToJson(text: string): Promise<CvStructuredData> {
+  // ═══ DSGVO Phase 2: Sanitize PII before AI call ═══
+  const { sanitized, restoreJson, warningFlags } = sanitizeForAI(text);
+  console.log(`🛡️ [cv-parser] PII sanitized before AI call. Found: [${warningFlags.join(', ')}]`);
+
   const prompt = `
 Du bist ein präziser Daten-Extraktor für Lebensläufe.
 Deine Aufgabe ist es, den folgenden rohen CV-Text in eine strikt strukturierte JSON-Repräsentation zu übersetzen.
@@ -129,7 +134,7 @@ Das JSON muss exakt diesem Schema entsprechen:
 }
 
 **CV TEXT ZUR EXTRAKTION:**
-${text}
+${sanitized}
     `;
 
   try {
@@ -145,7 +150,10 @@ ${text}
       throw new Error('Claude returned no valid JSON block');
     }
 
-    const rawJson = JSON.parse(jsonMatch[0]);
+    // ═══ DSGVO Phase 2: Restore PII tokens in JSON before parsing ═══
+    const restoredJsonString = restoreJson(jsonMatch[0]);
+    const rawJson = JSON.parse(restoredJsonString);
+    console.log(`🔐 [cv-parser] PII restored in structured JSON. Name: ${rawJson.personalInfo?.name ? '✅' : '⚠️ null'}`);
     console.log('🔍 Parsed raw JSON from Claude successfully');
 
     // Use safeParse instead of parse so a partially invalid Claude response

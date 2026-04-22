@@ -212,6 +212,32 @@ export async function POST(req: NextRequest) {
                             const { parseCvTextToJson } = await import('@/lib/services/cv-parser');
                             const structuredCv = await parseCvTextToJson(processedCv.extractedText);
 
+                            // ═══ INTEGRITY GUARD — Restore PII from Phase 1 encryption ═══
+                            // If cv-parser couldn't extract PII (e.g. CAPS name not caught by regex),
+                            // fall back to the PII that document-processor extracted in Phase 1.
+                            if (processedCv.encryptedPii) {
+                                const { decrypt } = await import('@/lib/utils/encryption');
+                                if (!structuredCv.personalInfo) structuredCv.personalInfo = {} as any;
+                                if (!structuredCv.personalInfo.name && processedCv.encryptedPii.name) {
+                                    try {
+                                        structuredCv.personalInfo.name = decrypt(processedCv.encryptedPii.name as string);
+                                        console.log(`🔧 [integrity-guard] Restored name from Phase 1 encrypted PII`);
+                                    } catch { /* decrypt failed — leave as-is */ }
+                                }
+                                if (!structuredCv.personalInfo.email && processedCv.encryptedPii.email) {
+                                    try {
+                                        structuredCv.personalInfo.email = decrypt(processedCv.encryptedPii.email as string);
+                                        console.log(`🔧 [integrity-guard] Restored email from Phase 1 encrypted PII`);
+                                    } catch { /* decrypt failed — leave as-is */ }
+                                }
+                                if (!structuredCv.personalInfo.phone && processedCv.encryptedPii.phone) {
+                                    try {
+                                        structuredCv.personalInfo.phone = decrypt(processedCv.encryptedPii.phone as string);
+                                        console.log(`🔧 [integrity-guard] Restored phone from Phase 1 encrypted PII`);
+                                    } catch { /* decrypt failed — leave as-is */ }
+                                }
+                            }
+
                             const { error: profileErr } = await supabaseAdmin
                                 .from('user_profiles')
                                 .update({

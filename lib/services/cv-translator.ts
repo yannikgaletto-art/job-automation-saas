@@ -98,6 +98,21 @@ export async function translateCvIfNeeded(
 
     console.log(`[cv-translator] Translating CV content to ${targetLanguage}...`);
 
+    // ═══ DSGVO Phase 2: Strip PII before AI call ═══
+    // Create a deep clone and remove personal contact data.
+    // The restore logic (below, lines ~180-190) will re-inject all PII
+    // from the original `cv` object after translation — fully idempotent.
+    const cvForAI: CvStructuredData = JSON.parse(JSON.stringify(cv));
+    if (cvForAI.personalInfo) {
+        cvForAI.personalInfo.name = '[REDACTED]';
+        cvForAI.personalInfo.email = undefined;
+        cvForAI.personalInfo.phone = undefined;
+        cvForAI.personalInfo.location = undefined;
+        cvForAI.personalInfo.linkedin = undefined;
+        cvForAI.personalInfo.website = undefined;
+    }
+    console.log(`🛡️ [cv-translator] PII stripped from CV before AI call`);
+
     const prompt = `You are a precise CV content translator. Translate the following CV JSON into ${targetLanguage}.
 
 RULES:
@@ -111,7 +126,7 @@ RULES:
 Return ONLY valid JSON. No markdown. No explanation. No code blocks.
 
 INPUT CV JSON:
-${JSON.stringify(cv, null, 2)}`;
+${JSON.stringify(cvForAI, null, 2)}`;
 
     try {
         const response = await complete({
