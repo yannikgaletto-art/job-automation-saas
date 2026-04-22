@@ -89,6 +89,25 @@ function DashboardLayoutInner({
     const { setCount } = useJobQueueCount();
     const timerTick = useCalendarStore((s) => s.timerTick);
 
+    // §WAITLIST-GUARD: Redirect waitlisted users to /dashboard/waitlist
+    const [isWaitlisted, setIsWaitlisted] = useState<boolean | null>(null);
+    const isOnWaitlistPage = pathname === '/dashboard/waitlist';
+
+    useEffect(() => {
+        if (isOnWaitlistPage) { setIsWaitlisted(false); return; } // Skip check on waitlist page
+        fetch('/api/credits')
+            .then(r => r.json())
+            .then(data => {
+                if (data?.planType === 'waitlist') {
+                    setIsWaitlisted(true);
+                    window.location.href = `/${locale}/dashboard/waitlist`;
+                } else {
+                    setIsWaitlisted(false);
+                }
+            })
+            .catch(() => setIsWaitlisted(false)); // Fail-open during beta
+    }, [pathname, locale, isOnWaitlistPage]);
+
     // ─── Global Pomodoro timer tick — runs on ALL pages ───────────
     useEffect(() => {
         const interval = setInterval(() => { timerTick(); }, 1000);

@@ -48,6 +48,7 @@ type ObsData = {
         feedback: { id: string; name: string | null; feedback: string; locale: string; created_at: string }[];
         onboarding_goals: Record<string, number>;
         total_users: number;
+        cohort: { active: number; waitlisted: number; cap: number };
         credits: { debits: number; refills: number; beta_grants: number };
         pipeline: { pending: number; processing: number; stale: number; ready: number; total: number };
         generation: {
@@ -398,6 +399,7 @@ export default function AdminPage() {
                             actionLoading={actionLoading}
                             handleDelete={handleDelete} handleDeleteLead={handleDeleteLead}
                             handleResetOnboarding={handleResetOnboarding}
+                            obs={obs}
                         />
                     )}
                 </>
@@ -776,6 +778,7 @@ function TabUsers({
     leads, leadsTotal, leadsConfirmed, leadsLoading, loadWaitlist,
     actionLoading,
     handleDelete, handleDeleteLead, handleResetOnboarding,
+    obs,
 }: {
     users: AdminUser[]; total: number; loading: boolean; loadUsers: () => void;
     leads: WaitlistLead[]; leadsTotal: number; leadsConfirmed: number; leadsLoading: boolean; loadWaitlist: () => void;
@@ -783,6 +786,7 @@ function TabUsers({
     handleDelete: (id: string, email: string) => void;
     handleDeleteLead: (id: string, email: string) => void;
     handleResetOnboarding: (id: string) => void;
+    obs: ObsData | null;
 }) {
     return (
         <div>
@@ -874,6 +878,43 @@ function TabUsers({
                     </table>
                 )}
             </div>
+
+            {/* Cohort Progress Bar */}
+            {obs?.internal?.cohort && (() => {
+                const { active, waitlisted, cap } = obs.internal.cohort;
+                const remaining = Math.max(0, cap - active);
+                const pct = Math.min(100, Math.round((active / cap) * 100));
+                const isFull = active >= cap;
+                return (
+                    <div className="bg-white border border-[#E7E7E5] rounded-xl p-5 mb-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-sm font-semibold text-[#37352F] flex items-center gap-2">
+                                <Zap className="w-4 h-4 text-[#012e7a]" />
+                                Testphase Belegung
+                            </h2>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${isFull ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+                                {isFull ? 'Ausgelastet' : `${remaining} Plätze frei`}
+                            </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full h-3 bg-[#E7E7E5] rounded-full overflow-hidden mb-2">
+                            <div
+                                className={`h-full rounded-full transition-all duration-500 ${isFull ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-[#012e7a]'}`}
+                                style={{ width: `${pct}%` }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-[#73726E]">
+                            <span><strong className="text-[#37352F]">{active}</strong> / {cap} aktive User</span>
+                            {waitlisted > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {waitlisted} auf Warteliste
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Waitlist Table */}
             <div className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden">

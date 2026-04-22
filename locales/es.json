@@ -1809,5 +1809,11 @@
     "referrer_message": "Gracias por recomendarnos. Como agradecimiento, recibes 5 créditos. Esperamos poder apoyarte en tu próximo paso profesional.",
     "someone": "un amigo",
     "dismiss": "Entendido"
+  },
+  "waitlist": {
+    "title": "Estás en la lista de espera",
+    "description": "Gracias por tu interés en Pathly. Nuestra fase de prueba está actualmente al máximo. Te notificaremos por correo electrónico en cuanto se abra un lugar.",
+    "status": "Preparando tu lugar",
+    "cta": "Volver a la página principal"
   }
 }

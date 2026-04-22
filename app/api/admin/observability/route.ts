@@ -63,6 +63,7 @@ interface InternalData {
     feedback: { id: string; name: string | null; feedback: string; locale: string; created_at: string }[];
     onboarding_goals: Record<string, number>;
     total_users: number;
+    cohort: { active: number; waitlisted: number; cap: number };
     credits: { debits: number; refills: number; beta_grants: number };
     pipeline: { pending: number; processing: number; stale: number; ready: number; total: number };
     generation: {
@@ -416,6 +417,7 @@ const INTERNAL_FALLBACK: InternalData = {
     feedback: [],
     onboarding_goals: {},
     total_users: 0,
+    cohort: { active: 0, waitlisted: 0, cap: parseInt(process.env.FREE_USER_CAP || '35', 10) },
     credits: { debits: 0, refills: 0, beta_grants: 0 },
     pipeline: { pending: 0, processing: 0, stale: 0, ready: 0, total: 0 },
     generation: { total_calls: 0, total_tokens: 0, by_model: {}, by_feature: [], by_user: [] },
@@ -427,7 +429,7 @@ async function fetchInternal(): Promise<InternalData> {
         const admin = getSupabaseAdmin();
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-        const [feedbackRes, profilesRes, creditsRes, pipelineRes, genLogsRes, usersRes, waitlistRes] = await Promise.all([
+        const [feedbackRes, profilesRes, creditsRes, pipelineRes, genLogsRes, usersRes, waitlistRes, cohortActiveRes, cohortWaitlistedRes] = await Promise.all([
             // Feedback inbox (latest 20, admin bypasses RLS)
             admin.from('user_feedback')
                 .select('id, name, feedback, locale, created_at')
@@ -459,6 +461,16 @@ async function fetchInternal(): Promise<InternalData> {
             // Waitlist plan intents
             admin.from('waitlist_leads')
                 .select('plan_preference'),
+
+            // §COHORT: Count active users (free/starter/durchstarter) for progress bar
+            admin.from('user_credits')
+                .select('user_id', { count: 'exact', head: true })
+                .in('plan_type', ['free', 'starter', 'durchstarter']),
+
+            // §COHORT: Count waitlisted users
+            admin.from('user_credits')
+                .select('user_id', { count: 'exact', head: true })
+                .eq('plan_type', 'waitlist'),
         ]);
 
         // Aggregate onboarding goals
@@ -558,6 +570,11 @@ async function fetchInternal(): Promise<InternalData> {
             })),
             onboarding_goals: goalCounts,
             total_users: totalUsers,
+            cohort: {
+                active: cohortActiveRes.count ?? 0,
+                waitlisted: cohortWaitlistedRes.count ?? 0,
+                cap: parseInt(process.env.FREE_USER_CAP || '35', 10),
+            },
             credits: { debits, refills, beta_grants },
             pipeline: { pending, processing, stale, ready, total: pipelineRes.data?.length ?? 0 },
             generation: {
