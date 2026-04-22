@@ -1,8 +1,8 @@
 # Pathly V2.0 - AGENT OPERATING SYSTEM
 
 **Project:** Pathly V2.0  
-**Version:** 5.7  
-**Last Updated:** 2026-04-15  
+**Version:** 5.8  
+**Last Updated:** 2026-04-22  
 **Status:** Active  
 
 ---
@@ -20,7 +20,7 @@
 |---------|------------|-----------|
 | **Job Ingest** | `app/api/jobs/ingest/route.ts` | Firecrawl scrape → Claude Haiku extract → DB insert → Inngest trigger |
 | **Job Extract (Inngest)** | `lib/inngest/extract-job-pipeline.ts` | Event `job/extract` — deep Claude re-extraction background job |
-| **Company Research** | `lib/services/company-enrichment.ts` | Perplexity Sonar Pro, 7-day cache in `company_research` |
+| **Company Research** | `lib/services/company-enrichment.ts` | Jina AI scrape → Claude Haiku extract, 7-day cache in `company_research`. Auto-triggered by `setup-data` when no research exists. Light sanitization (email/phone only — no name masking on public websites). |
 | **Cover Letter** | `lib/services/cover-letter-generator.ts` | Claude Sonnet, writing style, Inngest polish pipeline |
 | **Cover Letter Polish** | `lib/inngest/cover-letter-polish.ts` | Post-generation audit, quote injection, critique |
 | **CV Optimization** | `app/api/cv/optimize/route.ts` | Azure Document Intelligence + Claude Haiku, Valley/Tech templates |
@@ -36,6 +36,7 @@
 | **Product Analytics** | `lib/posthog/client.ts`, `server.ts` | PostHog (EU DSGVO). Next.js browser pageviews + 5 core server events (onboarding_completed, etc.). Storage mode: localStorage (no cookies), maskAllInputs: true. |
 | **Rate Limiting** | `lib/api/rate-limit-upstash.ts` | Upstash Redis. Distributed window limiter. Gracefully degrades to pass-through in local dev (if URL is missing) to prevent dev blockages. Protects 12 API routes against cost spikes. |
 | **Error Monitoring** | `sentry.client.config.ts`, `sentry.server.config.ts` | Sentry. PII stripped via `beforeSend`. Session replay disabled. EU ingest. |
+| **PII Privacy (Phase 2)** | `lib/services/pii-sanitizer.ts` | Zero-Data-Leak: DSGVO Art. 25. Mask-Restore architecture for all CV/AI calls. `sanitizeForAI()` strips NAME, PHONE, EMAIL before Claude. `restoreJson()` re-injects PII with JSON-safe escaping. CAPS_NAME_REGEX + FALSE_POSITIVE_GUARD (100+ terms) + FIRST_WORD_STOPLIST. Phase 1 fallback on failure. Stress test: `lib/__tests__/pii-stress-test.ts`. |
 
 ---
 
@@ -47,7 +48,7 @@ Authoritative source: **`supabase/migrations/`** (not `database/schema.sql` — 
 | Table | Purpose |
 |-------|---------|
 | `job_queue` | State machine: `pending → ready_for_review → ready_to_apply → submitted` |
-| `company_research` | Perplexity cache (7-day TTL) |
+| `company_research` | Jina+Claude intel cache (7-day TTL) |
 | `documents` | Generated cover letters, CVs |
 | `video_scripts` | Video Script Studio content (blocks, keywords) |
 | `script_block_templates` | System + user-defined script block templates |
