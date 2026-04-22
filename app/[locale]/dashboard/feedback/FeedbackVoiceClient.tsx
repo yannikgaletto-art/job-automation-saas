@@ -322,14 +322,14 @@ export function FeedbackVoiceClient() {
                                 mass: 0.75,
                                 delay: i * 0.11,
                             }}
-                            className="self-start flex items-center bg-white rounded-full px-5 py-3 border border-[#E7E7E5]"
+                            className="self-start flex items-center bg-white rounded-2xl px-5 py-3 border border-[#E7E7E5] max-w-[26rem]"
                             style={{
                                 marginLeft: `${DRIFT[i]}px`,
                                 boxShadow: '0 3px 12px -2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.02)',
                             }}
                         >
                             {/* No icon, no dash — clean pill (Feedback 1 + 4) */}
-                            <span className="text-[14.5px] font-semibold text-[#37352F] whitespace-nowrap tracking-tight">
+                            <span className="text-[14.5px] font-semibold text-[#37352F] tracking-tight leading-snug">
                                 {q}
                             </span>
                         </motion.div>

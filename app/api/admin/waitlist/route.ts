@@ -30,7 +30,7 @@ export async function GET() {
 
     const { data: leads, error } = await supabaseAdmin
         .from('waitlist_leads')
-        .select('id, email, source, locale, confirmed_at, created_at')
+        .select('id, email, source, locale, plan_preference, confirmed_at, created_at')
         .order('created_at', { ascending: false });
 
     if (error) {

@@ -32,6 +32,7 @@ type WaitlistLead = {
     email: string;
     source: string;
     locale: string;
+    plan_preference: string | null;
     confirmed_at: string | null;
     created_at: string;
 };
@@ -725,35 +726,7 @@ function TabGrowth({ obs }: { obs: ObsData | null }) {
                 </div>
             </div>
 
-            {/* Waitlist Plan Intents */}
-            {obs.internal?.plan_intents && Object.keys(obs.internal.plan_intents).length > 0 && (
-                <div className="bg-white border border-[#E7E7E5] rounded-xl p-5 mb-6">
-                    <h3 className="text-sm font-semibold text-[#37352F] mb-4">Warteliste — Plan-Interesse</h3>
-                    <div className="space-y-3">
-                        {Object.entries(obs.internal.plan_intents)
-                            .sort(([, a], [, b]) => b - a)
-                            .map(([plan, count]) => {
-                                const total = Object.values(obs.internal.plan_intents).reduce((a, b) => a + b, 0);
-                                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-                                const planColors: Record<string, string> = {
-                                    starter: '#3b82f6',
-                                    durchstarter: '#8b5cf6',
-                                    free: '#73726E',
-                                    'nicht angegeben': '#E7E7E5',
-                                };
-                                return (
-                                    <div key={plan} className="flex items-center gap-3">
-                                        <span className="text-sm text-[#73726E] w-36 capitalize">{plan}</span>
-                                        <div className="flex-1 h-4 bg-[#F5F5F4] rounded overflow-hidden">
-                                            <div className="h-full rounded" style={{ width: `${pct}%`, backgroundColor: planColors[plan] ?? '#012e7a' }} />
-                                        </div>
-                                        <span className="text-xs text-[#73726E] w-20 text-right">{pct}% ({count})</span>
-                                    </div>
-                                );
-                            })}
-                    </div>
-                </div>
-            )}
+
 
             {/* Feedback Inbox — expandable cards */}
             <div className="bg-white border border-[#E7E7E5] rounded-xl overflow-hidden">
@@ -932,15 +905,17 @@ function TabUsers({
                                 <tr key={lead.id} className="hover:bg-[#FAFAF9] transition-colors">
                                     <td className="px-5 py-3 font-medium text-[#37352F]">{lead.email}</td>
                                     <td className="px-5 py-3 text-center">
-                                        {(lead as WaitlistLead & { plan_preference?: string }).plan_preference ? (
+                                        {lead.plan_preference ? (
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                (lead as WaitlistLead & { plan_preference?: string }).plan_preference === 'durchstarter'
+                                                lead.plan_preference === 'durchstarter'
                                                     ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                                                    : (lead as WaitlistLead & { plan_preference?: string }).plan_preference === 'starter'
+                                                    : lead.plan_preference === 'starter'
                                                     ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                    : lead.plan_preference === 'quarterly'
+                                                    ? 'bg-teal-50 text-teal-700 border border-teal-200'
                                                     : 'bg-gray-100 text-gray-600'
                                             }`}>
-                                                {(lead as WaitlistLead & { plan_preference?: string }).plan_preference}
+                                                {lead.plan_preference === 'quarterly' ? 'Quartalspaket' : lead.plan_preference}
                                             </span>
                                         ) : (
                                             <span className="text-xs text-[#B4B4B0]">—</span>
