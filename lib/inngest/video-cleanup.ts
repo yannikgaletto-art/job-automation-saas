@@ -13,9 +13,8 @@ const supabaseAdmin = createAdminClient(
  *    legal DSGVO Art. 17 guarantee. This Inngest job is best-effort.
  */
 export const videoDeleteScheduled = inngest.createFunction(
-    { id: 'video-delete-scheduled', name: 'Video Scheduled Deletion' },
-    { event: 'video/schedule-deletion' },
-    async ({ event, step }) => {
+    { id: 'video-delete-scheduled', name: 'Video Scheduled Deletion', triggers: [{ event: 'video/schedule-deletion' }] },
+    async ({ event, step }: { event: any; step: any }) => {
         const { userId, jobId } = event.data;
 
         // Sleep 14 days
@@ -70,9 +69,8 @@ export const videoDeleteScheduled = inngest.createFunction(
  *    Runs at 3:00 AM UTC daily.
  */
 export const videoCleanupCron = inngest.createFunction(
-    { id: 'video-cleanup-cron', name: 'Video Cleanup Cron' },
-    { cron: '0 3 * * *' },
-    async ({ step }) => {
+    { id: 'video-cleanup-cron', name: 'Video Cleanup Cron', triggers: [{ cron: '0 3 * * *' }] },
+    async ({ step }: { step: any }) => {
         await step.run('cleanup-expired-videos', async () => {
             // 1. Find expired videos that still have storage files
             const { data: expiredVideos } = await supabaseAdmin

@@ -17,9 +17,9 @@ export const generateCoachingReport = inngest.createFunction(
         id: 'generate-coaching-report',
         name: 'Generate Coaching Report',
         retries: 2,
+        triggers: [{ event: 'coaching/generate-report' }],
     },
-    { event: 'coaching/generate-report' },
-    async ({ event, step }) => {
+    async ({ event, step }: { event: any; step: any }) => {
         const { sessionId, userId } = event.data;
 
         await step.run('generate-report', async () => {

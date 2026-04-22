@@ -88,9 +88,9 @@ export const analyzeCVMatch = inngest.createFunction(
                 console.error(`❌ [CV Match] Failed to write error status to DB:`, dbErr);
             }
         },
+        triggers: [{ event: 'cv-match/analyze' }],
     },
-    { event: 'cv-match/analyze' },
-    async ({ event, step }) => {
+    async ({ event, step }: { event: any; step: any }) => {
         const { jobId, userId, cvDocumentId, locale } = event.data as {
             jobId: string;
             userId: string;

@@ -20,9 +20,9 @@ export const volunteeringScraper = inngest.createFunction(
         id: 'volunteering-scraper',
         name: 'Weekly Volunteering Scraper',
         retries: 2,
+        triggers: [{ cron: 'TZ=Europe/Berlin 0 6 * * 1' }],
     },
-    { cron: 'TZ=Europe/Berlin 0 6 * * 1' }, // Monday 6:00 AM Berlin
-    async ({ step }) => {
+    async ({ step }: { step: any }) => {
         // Step 1: Fetch all source pages
         const fetchResults = await step.run('fetch-sources', async () => {
             const results: { source: string; html: string | null }[] = [];
@@ -81,7 +81,7 @@ export const volunteeringScraper = inngest.createFunction(
             // Upsert in batches of 10
             const batchSize = 10;
             for (let i = 0; i < allOpportunities.length; i += batchSize) {
-                const batch = allOpportunities.slice(i, i + batchSize).map(opp => ({
+                const batch = allOpportunities.slice(i, i + batchSize).map((opp: OpportunityInsert) => ({
                     ...opp,
                     is_active: true,
                     scraped_at: new Date().toISOString(),

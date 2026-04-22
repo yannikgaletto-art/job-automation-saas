@@ -170,9 +170,9 @@ export const generateCertificates = inngest.createFunction(
             limit: 5,
             period: '1h',
         },
+        triggers: [{ event: 'certificates/generate' }],
     },
-    { event: 'certificates/generate' },
-    async ({ event, step }) => {
+    async ({ event, step }: { event: any; step: any }) => {
         const { jobId, userId } = event.data as { jobId: string; userId: string };
         const supabase = getSupabase();
 
@@ -302,7 +302,7 @@ Antworte NUR mit einem JSON-Array von Strings:
             const rawResearchTexts = await step.run('phase-2-perplexity-research', async () => {
                 // Parallel Perplexity calls — Promise.allSettled ensures one failure doesn't crash the entire phase
                 const settled = await Promise.allSettled(
-                    skillGaps.map(kw => searchCertificates(kw, inputData.location || 'Deutschland'))
+                    skillGaps.map((kw: string) => searchCertificates(kw, inputData.location || 'Deutschland'))
                 );
                 const results: string[] = settled
                     .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled' && !!r.value)
@@ -414,7 +414,7 @@ REGELN:
                 return validated.map(rec => applyUrlFallback(rec, primaryKeyword));
             });
 
-            const validCount = validatedRecs.filter(r => r.urlValid).length;
+            const validCount = validatedRecs.filter((r: CertificateRecommendation) => r.urlValid).length;
             console.log(`[Certificates] URL validation: ${validCount}/${validatedRecs.length} valid`);
 
             // ── Generate summary text ────────────────────────────────────

@@ -39,9 +39,9 @@ export const polishCoverLetter = inngest.createFunction(
         id: 'cover-letter-polish',
         name: 'Cover Letter Polish Pipeline',
         retries: 1,
+        triggers: [{ event: 'cover-letter/polish' }],
     },
-    { event: 'cover-letter/polish' },
-    async ({ event, step }) => {
+    async ({ event, step }: { event: any; step: any }) => {
         const {
             draftId,
             userId,

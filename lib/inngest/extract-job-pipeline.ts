@@ -71,9 +71,9 @@ export const extractJob = inngest.createFunction(
             limit: 10,
             period: '1m',
         },
+        triggers: [{ event: 'job/extract' }],
     },
-    { event: 'job/extract' },
-    async ({ event, step }) => {
+    async ({ event, step }: { event: any; step: any }) => {
         const { jobId, userId, locale: rawLocale } = event.data as { jobId: string; userId: string; locale?: string };
         const locale = (rawLocale === 'en' || rawLocale === 'es' ? rawLocale : 'de') as SupportedLocale;
         const languageName = getLanguageName(locale);
