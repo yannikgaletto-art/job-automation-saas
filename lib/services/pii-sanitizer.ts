@@ -19,6 +19,11 @@ export interface SanitizeResult {
     restore: (text: string) => string;
     /** PII types found, e.g. ['NAME', 'EMAIL'] — no plaintext PII */
     warningFlags: string[];
+    /** Token→original PII mapping (e.g. '__NAME_0__' → 'Max Mustermann').
+     *  Exposed for callers that need to extract PII values locally
+     *  (e.g. document-processor encrypts PII from tokenMap instead of AI response).
+     *  ⚠️ Contains plaintext PII — handle with care, encrypt or discard immediately. */
+    tokenMap: Map<string, string>;
 }
 
 // ─── Regex Patterns (de/en/es) ──────────────────────────────────────
@@ -59,7 +64,7 @@ const FALSE_POSITIVE_GUARD = new Set([
  */
 export function sanitizeForAI(input: string): SanitizeResult {
     if (!input || input.trim() === '') {
-        return { sanitized: '', restore: (t: string) => t, warningFlags: [] };
+        return { sanitized: '', restore: (t: string) => t, warningFlags: [], tokenMap: new Map() };
     }
 
     const tokenMap = new Map<string, string>(); // token → original
@@ -121,7 +126,7 @@ export function sanitizeForAI(input: string): SanitizeResult {
         return restored;
     };
 
-    return { sanitized: result, restore, warningFlags };
+    return { sanitized: result, restore, warningFlags, tokenMap };
 }
 
 /**

@@ -3,6 +3,7 @@ import { extractTextWithAzure } from './azure-document-extractor';
 import { encrypt } from '@/lib/utils/encryption';
 import Anthropic from '@anthropic-ai/sdk';
 import { analyzeWritingStyle, StyleAnalysis, getDefaultStyleAnalysis } from './writing-style-analyzer';
+import { sanitizeForAI } from './pii-sanitizer';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -54,29 +55,37 @@ export async function processDocument(
     }
 
     // ================================================================
-    // Step 2: AI Metadata Extraction (PII + Skills)
-    // Uses Claude Haiku for metadata only. PII is immediately encrypted after.
-    // Data Minimization (DSGVO Art. 25): PII sits in the CV header (~first 3000 chars).
-    // Sending full 15k chars is unnecessary for PII+Skills extraction.
+    // Step 2: PII Extraction (LOCAL — Regex) + AI Metadata Extraction
+    // DSGVO Art. 25 (Privacy by Design):
+    //   - PII (name, email, phone) is extracted locally via sanitizeForAI() regex
+    //   - Only SANITIZED text is sent to Claude Haiku for metadata extraction
+    //   - Haiku NEVER sees real PII — only tokens like __NAME_0__, __EMAIL_0__
     // ================================================================
     const textToAnalyze = rawText.slice(0, 3000);
 
-    let analysisResult: any;
+    // Phase 1 (DSGVO): Sanitize before AI call — extract PII locally
+    const { sanitized: sanitizedText, tokenMap, warningFlags } = sanitizeForAI(textToAnalyze);
+    console.log(`🛡️ [document-processor] PII sanitized before AI call. Found: [${warningFlags.join(', ')}]`);
+
+    let metadataResult: { skills: string[]; experienceYears: number; educationLevel?: string; languages?: string[] } = {
+        skills: [], experienceYears: 0,
+    };
 
     try {
         if (!process.env.ANTHROPIC_API_KEY) {
             console.warn('⚠️ No Anthropic API Key found. Using MOCK extraction.');
-            analysisResult = mockExtraction(rawText);
+            const mock = mockExtraction(rawText);
+            metadataResult = mock.metadata;
         } else {
             const message = await anthropic.messages.create({
                 model: 'claude-haiku-4-5-20251001', // Fast & cheap
                 max_tokens: 1024,
                 temperature: 0,
-                system: "You are a specialized CV Parser. Extract Personally Identifiable Information (PII) and professional metadata from the text. Return ONLY valid JSON.",
+                system: "You are a specialized CV metadata extractor. Extract ONLY professional metadata (skills, experience, education, languages) from the text. The text has been pre-processed and personal information has been removed. Do NOT attempt to extract names, emails, or phone numbers. Return ONLY valid JSON.",
                 messages: [
                     {
                         role: "user",
-                        content: `Extract the following from this CV text:\n\n1. PII: name, email, phone, address (if present). If missing, return null.\n2. Metadata: languages (array), skills (array of tech/tools), experience_years (number, estimate if needed), education_level (e.g. 'Bachelor', 'Master').\n\nReturn ONLY a JSON object with keys: 'pii' and 'metadata'.\n\nText:\n${textToAnalyze}`
+                        content: `Extract the following professional metadata from this CV text:\n\n1. skills: array of technologies, tools, and competencies mentioned\n2. experience_years: estimated total years of professional experience (number)\n3. education_level: highest degree (e.g. 'Bachelor', 'Master', 'PhD')\n4. languages: array of spoken languages mentioned\n\nReturn ONLY a JSON object with these keys.\n\nText:\n${sanitizedText}`
                     }
                 ]
             });
@@ -85,12 +94,12 @@ export async function processDocument(
             const contentBlock = message.content[0];
             if (contentBlock.type === 'text') {
                 try {
-                    analysisResult = JSON.parse(contentBlock.text);
+                    metadataResult = JSON.parse(contentBlock.text);
                 } catch (e) {
                     // Fallback mechanism to find JSON block if Claude chatted
                     const jsonMatch = contentBlock.text.match(/\{[\s\S]*\}/);
                     if (jsonMatch) {
-                        analysisResult = JSON.parse(jsonMatch[0]);
+                        metadataResult = JSON.parse(jsonMatch[0]);
                     } else {
                         throw new Error('Could not parse JSON from Claude response');
                     }
@@ -117,22 +126,32 @@ export async function processDocument(
         }
     }
 
-    // 4. Encrypt PII
+    // ================================================================
+    // 4. Encrypt PII (from LOCAL regex extraction, NOT from AI response)
+    // DSGVO Art. 25: PII never touched external AI — extracted purely by regex
+    // ================================================================
     const encryptedPii: Record<string, string> = {};
-    const pii = analysisResult.pii || {};
 
-    for (const [key, value] of Object.entries(pii)) {
-        if (value && typeof value === 'string') {
-            encryptedPii[key] = encrypt(value);
+    // Extract PII values from tokenMap (token → original plaintext)
+    for (const [token, originalValue] of tokenMap.entries()) {
+        if (token.startsWith('__NAME_') && !encryptedPii.name) {
+            encryptedPii.name = encrypt(originalValue);
+        } else if (token.startsWith('__EMAIL_') && !encryptedPii.email) {
+            encryptedPii.email = encrypt(originalValue);
+        } else if (token.startsWith('__PHONE_') && !encryptedPii.phone) {
+            encryptedPii.phone = encrypt(originalValue);
         }
+        // IBAN is not stored as PII in document metadata
     }
+
+    console.log(`🔐 [document-processor] PII encrypted from regex: ${Object.keys(encryptedPii).join(', ') || 'none found'}`);
 
     return {
         rawText,
         extractedText: rawText, // Full text for PDF rendering & CV parsing (name stays per User-Directive)
         encryptedPii,
         metadata: {
-            ...analysisResult.metadata || { skills: [], experienceYears: 0 },
+            ...metadataResult || { skills: [], experienceYears: 0 },
             content_snippet: rawText.slice(0, 500), // For preview in cover-letter-generator
             style_analysis: styleAnalysis // Only present for cover letters
         }
