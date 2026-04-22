@@ -6,7 +6,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { HookCard } from '../cards/HookCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse, SelectedHook, SelectedQuote } from '@/types/cover-letter-setup';
-import { SlideToActionButton } from '@/components/motion/slide-action-button';
+
 import { Sparkles, ChevronRight, ChevronDown, Search, SkipForward, RefreshCw, Quote, Globe } from 'lucide-react';
 
 // ─── State Machine ─────────────────────────────────────────────────
@@ -249,11 +249,19 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                 </div>
 
                 <div className="w-full max-w-md flex justify-center">
-                    <SlideToActionButton
-                        text={t('analyze_btn', { company: companyName })}
+                    <button
+                        type="button"
+                        onClick={() => handleAnalyze()}
                         disabled={!websiteInput || websiteInput.trim().length < 4}
-                        onAction={() => handleAnalyze()}
-                    />
+                        className={[
+                            'w-full py-3.5 rounded-xl text-sm font-semibold tracking-tight transition-colors',
+                            !websiteInput || websiteInput.trim().length < 4
+                                ? 'bg-[#E7E7E5] text-[#A8A29E] cursor-not-allowed'
+                                : 'bg-[#002e7a] text-white hover:bg-[#001d4f] cursor-pointer',
+                        ].join(' ')}
+                    >
+                        {t('analyze_btn', { company: companyName })}
+                    </button>
                 </div>
 
                 {validationWarning && (

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SlideToActionButton } from '@/components/motion/slide-action-button';
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -555,12 +555,13 @@ function Step2Consent({
                     biometric data under Art. 9. Removed per CISO review April 2026. */}
             </div>
 
-            {/* CTA — Slide-to-action for premium feel */}
-            <SlideToActionButton
-                text={completing ? t('submitting') : t('submit')}
+            {/* CTA */}
+            <StepButton
+                onClick={onComplete}
                 disabled={!allAccepted || completing}
-                onAction={onComplete}
-            />
+            >
+                {completing ? t('submitting') : t('submit')}
+            </StepButton>
             {error && (
                 <p className="mt-3 text-sm text-red-500 text-center">{error}</p>
             )}
