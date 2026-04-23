@@ -213,15 +213,20 @@ export async function POST(req: NextRequest) {
                             const structuredCv = await parseCvTextToJson(processedCv.extractedText);
 
                             // ═══ INTEGRITY GUARD — Restore PII from Phase 1 encryption ═══
-                            // If cv-parser couldn't extract PII (e.g. CAPS name not caught by regex),
-                            // fall back to the PII that document-processor extracted in Phase 1.
+                            // document-processor runs a dedicated Haiku PII-extraction call
+                            // on the raw CV text → encryptedPii.name is more reliable than
+                            // cv-parser's general-purpose extraction (which can be misled by
+                            // OCR headers like "Deutsche Rentenversicherung").
+                            // Name is ALWAYS overridden; email/phone only when null.
+                            let resolvedName: string | null = null;
                             if (processedCv.encryptedPii) {
                                 const { decrypt } = await import('@/lib/utils/encryption');
                                 if (!structuredCv.personalInfo) structuredCv.personalInfo = {} as any;
-                                if (!structuredCv.personalInfo.name && processedCv.encryptedPii.name) {
+                                if (processedCv.encryptedPii.name) {
                                     try {
-                                        structuredCv.personalInfo.name = decrypt(processedCv.encryptedPii.name as string);
-                                        console.log(`🔧 [integrity-guard] Restored name from Phase 1 encrypted PII`);
+                                        resolvedName = decrypt(processedCv.encryptedPii.name as string);
+                                        structuredCv.personalInfo.name = resolvedName;
+                                        console.log(`🔧 [integrity-guard] Name override from Phase 1 PII → "${resolvedName}"`);
                                     } catch { /* decrypt failed — leave as-is */ }
                                 }
                                 if (!structuredCv.personalInfo.email && processedCv.encryptedPii.email) {
@@ -242,7 +247,8 @@ export async function POST(req: NextRequest) {
                                 .from('user_profiles')
                                 .update({
                                     cv_structured_data: structuredCv,
-                                    cv_original_file_path: cvUploadData.path
+                                    cv_original_file_path: cvUploadData.path,
+                                    ...(resolvedName ? { full_name: resolvedName } : {}),
                                 })
                                 .eq('id', userId);
 

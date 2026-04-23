@@ -48,6 +48,7 @@ export interface CvStructuredData {
         dateText?: string;
         credentialUrl?: string;  // V2: Clickable verification link
         expiryDate?: string;     // V2: "Gültig bis 2027"
+        description?: string;   // V2: Comma-separated competencies / course content
     }>;
 }
 

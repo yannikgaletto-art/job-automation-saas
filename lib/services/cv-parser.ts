@@ -52,6 +52,7 @@ export const cvStructuredDataSchema = z.object({
     dateText: z.string().nullish(),
     credentialUrl: z.string().nullish(),
     expiryDate: z.string().nullish(),
+    description: z.string().nullish(),
   })).nullish(),
 });
 
@@ -90,6 +91,43 @@ PASS 2: Ordne sie logisch zu — welche Firma gehört zu welchem Datumsbereich? 
 6. **CHRONOLOGICAL ORDER (CRITICAL):** Die \`experience\`-Einträge MÜSSEN nach Datum absteigend sortiert sein (neueste zuerst). "Heute"/"Present" = aktuellste Position = Array-Index 0. Achte auf korrekte Zuordnung: Jede Firma muss mit ihrem korrekten Datumsbereich verknüpft werden — NICHT einfach in der Reihenfolge des Textes übernehmen, sondern semantisch korrekt zuordnen.
 7. **DATE-COMPANY MATCHING**: Lies den gesamten CV-Text zuerst vollständig, bevor du die Zuordnung machst. Stelle sicher, dass jede Firma/Rolle mit dem korrekten Datumsbereich (Start - Ende) verknüpft wird. Bei OCR-extrahiertem Text kann die Textreihenfolge FALSCH sein — prüfe die logische Konsistenz.
 8. **SECTION MARKERS**: Der Text kann Markdown-artige Abschnittsmarkierungen enthalten (z.B. "## Berufserfahrung"). Nutze diese als Hilfe, um die CV-Sektionen zu unterscheiden.
+9. **PIPE-SEPARATOR "I" IN ERFAHRUNG UND SPRACHEN:**
+   - Beispiel Erfahrung: "Ingrano Solutions I AI Business Development Manager"
+     → company: "Ingrano Solutions", role: "AI Business Development Manager"
+   - Beispiel Sprachen: "Deutsch I Muttersprache" → language: "Deutsch", proficiency: "Muttersprache"
+   - Das "I" als Trennzeichen gilt nur wenn es ALLEIN steht (Leerzeichen beiderseits).
+   - NIEMALS nur den Teil vor oder nach dem "I" extrahieren — IMMER beide Seiten auswerten.
+10. **DATUM-REKONSTRUKTION (MEHRZEILIG):**
+   - OCR liefert Start- und Enddatum oft auf GETRENNTEN Zeilen, z.B.: "09.2025\nHeute" oder "11.2023\n09.2025"
+   - Diese MÜSSEN als "09.2025 - Heute" bzw. "11.2023 - 09.2025" kombiniert werden.
+   - NIEMALS nur "Heute" oder nur "11.2023" als dateRangeText speichern — IMMER vollständige Spanne.
+   - Wenn nach einer Jahreszahl eine weitere Jahreszahl oder "Heute"/"Present" auf der nächsten Zeile folgt: → kombiniere zu "START - END".
+11. **ARBEITGEBER MIT BINDESTRICH-ABTEILUNG (FIRMA - ABTEILUNG):**
+   - Format "FIRMA - ABTEILUNG" (kein Jobtitel vor dem Strich): company=FIRMA, role=ABTEILUNG.
+   - Beispiel: "KPMG - Public Sector Consulting" → company: "KPMG", role: "Public Sector Consulting"
+   - Beispiel: "KPMG - Central Services" → company: "KPMG", role: "Central Services"
+   - AUSNAHME: Wenn der Teil VOR dem Strich ein Jobtitel ist (Co-Founder, CEO, Manager, etc.): role=erster Teil, company=zweiter Teil.
+   - Beispiel: "Co-Founder - Xorder Menues" → role: "Co-Founder", company: "Xorder Menues"
+12. **ZERTIFIKATE — OCR-MUSTER:**
+   - Zeile 1: Zertifikatsname, ggf. mit Aussteller in Klammern oder nach "I"-Separator (z.B. "Design Thinking Coach (Hasso-Plattner-Institut)")
+   - Zeile 2+: Komma-getrennte Kompetenzbereiche → das ist das "description"-Feld des Zertifikats
+   - GRUPPIERTE INSTITUTION: Eine Zeile nur mit Institutionsname (z.B. "Universität Potsdam") gefolgt von mehreren Einzel-Einträgen mit Jahreszahl → ALLE sind separate Zertifikate mit issuer: "Universität Potsdam"
+   - VOLLSTÄNDIGKEIT: Erfasse JEDES Zertifikat einzeln — keines darf fehlen oder übersprungen werden.
+13. **RAUSCHEN IGNORIEREN:**
+   - "Sprachen", "Zertifikate", "Certifications", "Niveau", "Level", "Muttersprache" allein sind KEINE eigenständigen Einträge.
+   - Abschnittsüberschriften wie "Weitere Kompetenzen", "Berufserfahrung", "Bildungsweg" sind KEINE Daten, sondern Strukturmarkierungen — ignorieren.
+14. **ROLE-FELD: NIEMALS Datumsmarker:**
+   - Das Feld \`role\` enthält NUR die Berufsbezeichnung — NIEMALS Datumsangaben.
+   - VERBOTEN in role: "Heute", "Present", "Actualidad", "seit 2023", "09.2025", "09.2025 - Heute".
+   - Diese Angaben gehören ausschließlich ins Feld \`dateRangeText\`.
+   - Beispiel FALSCH: role = "AI Business Development Manager\\nHeute"
+   - Beispiel RICHTIG: role = "AI Business Development Manager", dateRangeText = "09.2025 - Heute"
+15. **SPRACHEN vs. ZERTIFIKATE — 2-SPALTEN-TRENNUNG:**
+   - Viele CVs haben Sprachen und Zertifikate NEBENEINANDER in zwei Spalten.
+   - Die OCR interleavt dann die Zellen: "Zertifikate Niveau Microsoft Spanisch Design Thinking..."
+   - Du MUSST semantisch trennen: Nur echte Sprachennamen (Deutsch, Englisch, Spanisch, Französisch, Italienisch, etc.) gehören in \`languages\`.
+   - "Microsoft", "Hasso-Plattner-Institut", "TÜV", "Azure", "Design Thinking" etc. sind NIEMALS Sprachen → gehören in \`certifications\`.
+   - PFLICHT: Extrahiere ALLE im Text erkennbaren Sprachen (typisch: 2-4 Sprachen pro deutsch-sprachiges CV, inkl. Muttersprache Deutsch + Englisch).
 
 **ZUSÄTZLICHE HINWEISE ZUR DATENSTRUKTUR:**
 - \`dateRangeText\`: z.B. "01/2020 - 12/2022" oder "2018 - Heute"
@@ -129,7 +167,7 @@ Das JSON muss exakt diesem Schema entsprechen:
     { "id": "lang-1", "language": "...", "proficiency": "...", "level": 4 }
   ],
   "certifications": [
-    { "id": "cert-1", "name": "...", "issuer": "...", "dateText": "...", "credentialUrl": "..." }
+    { "id": "cert-1", "name": "...", "issuer": "...", "dateText": "...", "credentialUrl": "...", "description": "..." }
   ]
 }
 
@@ -179,11 +217,24 @@ ${sanitized}
       };
     }
 
-    // Post-processing: sort experience by end-date descending (newest first)
-    // This is a safety net in case Claude returns entries in wrong order
+    // Post-processing: sort + deterministic noise filters + role sanitization
+    const CERT_NOISE = new Set(['zertifikate', 'certificates', 'certifications', 'zertifizierungen', 'weiterbildung', 'weitere kompetenzen']);
     const sorted = {
       ...validated,
-      experience: sortExperienceByDate(validated.experience ?? []),
+      experience: sortExperienceByDate(
+        (validated.experience ?? []).map((e: any) => ({
+          ...e,
+          role: stripRoleDateMarkers(e.role),
+        }))
+      ),
+      languages: (validated.languages ?? []).filter((l: any) => {
+        const lang = (l.language || '').trim().toLowerCase();
+        return lang.length > 0 && KNOWN_LANGUAGES.has(lang);
+      }),
+      certifications: (validated.certifications ?? []).filter((c: any) => {
+        const name = (c.name || '').trim().toLowerCase();
+        return name.length > 0 && !CERT_NOISE.has(name);
+      }),
     };
 
     return sorted as CvStructuredData;
@@ -260,3 +311,109 @@ function sortExperienceByDate(
 
   return [...entries].sort((a, b) => parseEndDate(b.dateRangeText) - parseEndDate(a.dateRangeText));
 }
+
+/**
+ * Strips date markers (Heute/Present/09.2025/seit 2023) from the role field.
+ *
+ * Root cause: OCR often outputs 2-column layouts where dates are visually adjacent
+ * to the role title on a separate line. Claude then concatenates them into role
+ * (e.g. "AI Business Development Manager\nHeute"). Dates belong in `dateRangeText`,
+ * NOT in `role`. This post-processor enforces that invariant deterministically.
+ *
+ * Pattern coverage (word-boundary safe, won't touch "Today's Solutions" etc.):
+ *   - Trailing standalone markers: "…Manager\nHeute", "…Engineer Present"
+ *   - Trailing date ranges: "…Manager 09.2025 - Heute"
+ *   - Newline-separated fragments: "…Manager\n09.2025\nHeute"
+ *   - German "seit 2023", Spanish "desde 2023"
+ */
+function stripRoleDateMarkers(role: string | null | undefined): string | null | undefined {
+  if (!role) return role;
+  let cleaned = role
+    // Strip trailing "Heute/Present/Actualidad" preceded by newline or whitespace (word-boundary)
+    .replace(/[\s\n\r]+(Heute|Present|Actualidad|Currently|Aktuell|laufend)\b\s*$/gi, '')
+    // Strip trailing date range: "09.2025 - Heute", "01/2020 – 12/2022"
+    .replace(/[\s\n\r]+\d{1,2}[./-]\d{2,4}(\s*[-–—]\s*(Heute|Present|Actualidad|Currently|Aktuell|\d{1,2}[./-]\d{2,4}|\d{4}))?\s*$/gi, '')
+    // Strip trailing year-only range: "2020 - 2022", "2023 - Heute"
+    .replace(/[\s\n\r]+\d{4}(\s*[-–—]\s*(Heute|Present|Actualidad|Currently|Aktuell|\d{4}))?\s*$/gi, '')
+    // Strip trailing "seit 2023" / "ab 2023" / "desde 2023"
+    .replace(/[\s\n\r]+(seit|ab|desde|since)\s+\d{4}\s*$/gi, '')
+    // Collapse any remaining internal newlines + whitespace
+    .replace(/[\n\r]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned.length > 0 ? cleaned : role;
+}
+
+/**
+ * Whitelist of known languages in de/en/es (app's supported locales).
+ *
+ * Why a whitelist: OCR from 2-column layouts (SPRACHEN adjacent to ZERTIFIKATE)
+ * routinely leaks cert column values ("Microsoft", "Azure", "TÜV") and section
+ * headers ("Niveau", "Zertifikate") into the languages array. A strict whitelist
+ * is the only deterministic defense against this — blacklists are whack-a-mole.
+ *
+ * Users with rare languages not on this list can add them via the optimizer UI
+ * after upload. Covered: 60+ major world languages in all 3 app languages.
+ */
+const KNOWN_LANGUAGES = new Set<string>([
+  // Core European (de/en/es forms)
+  'deutsch', 'german', 'alemán', 'alemana', 'aleman',
+  'englisch', 'english', 'inglés', 'ingles', 'inglesa',
+  'spanisch', 'spanish', 'español', 'espanol', 'española', 'castellano',
+  'französisch', 'french', 'francés', 'frances', 'francesa',
+  'italienisch', 'italian', 'italiano', 'italiana',
+  'portugiesisch', 'portuguese', 'portugués', 'portugues', 'portuguesa',
+  'niederländisch', 'dutch', 'nederlands', 'holandés', 'holandes', 'holandesa',
+  'schwedisch', 'swedish', 'sueco', 'sueca',
+  'norwegisch', 'norwegian', 'noruego', 'noruega',
+  'dänisch', 'danish', 'danés', 'danes', 'danesa',
+  'finnisch', 'finnish', 'finés', 'fines', 'finesa', 'finlandés',
+  'isländisch', 'icelandic', 'islandés',
+  'polnisch', 'polish', 'polaco', 'polaca',
+  'tschechisch', 'czech', 'checo', 'checa',
+  'slowakisch', 'slovak', 'eslovaco', 'eslovaca',
+  'slowenisch', 'slovenian', 'esloveno', 'eslovena',
+  'ungarisch', 'hungarian', 'húngaro', 'hungaro', 'húngara',
+  'rumänisch', 'romanian', 'rumano', 'rumana',
+  'bulgarisch', 'bulgarian', 'búlgaro', 'bulgaro', 'búlgara',
+  'kroatisch', 'croatian', 'croata',
+  'serbisch', 'serbian', 'serbio', 'serbia',
+  'bosnisch', 'bosnian', 'bosnio', 'bosnia',
+  'mazedonisch', 'macedonian', 'macedonio',
+  'albanisch', 'albanian', 'albanés', 'albanes',
+  'griechisch', 'greek', 'griego', 'griega',
+  'russisch', 'russian', 'ruso', 'rusa',
+  'ukrainisch', 'ukrainian', 'ucraniano', 'ucraniana',
+  'weißrussisch', 'belarusian', 'bielorruso',
+  'litauisch', 'lithuanian', 'lituano',
+  'lettisch', 'latvian', 'letón', 'leton',
+  'estnisch', 'estonian', 'estonio',
+  'türkisch', 'turkish', 'turco', 'turca', 'türkçe', 'turkce',
+  // Non-European major
+  'chinesisch', 'chinese', 'chino', 'china', 'mandarin', 'mandarín', 'kantonesisch', 'cantonese',
+  'japanisch', 'japanese', 'japonés', 'japones', 'japonesa',
+  'koreanisch', 'korean', 'coreano', 'coreana',
+  'vietnamesisch', 'vietnamese', 'vietnamita',
+  'thai', 'thailändisch', 'tailandés', 'tailandesa',
+  'indonesisch', 'indonesian', 'indonesio', 'indonesia',
+  'malaysisch', 'malay', 'malayo', 'malaya',
+  'filipino', 'tagalog',
+  'hindi', 'urdu', 'bengalisch', 'bengali', 'punjabi', 'tamil', 'telugu',
+  'arabisch', 'arabic', 'árabe', 'arabe',
+  'hebräisch', 'hebrew', 'hebreo', 'hebrea',
+  'persisch', 'persian', 'farsi', 'persa',
+  'suaheli', 'swahili',
+  // Regional / minority
+  'katalanisch', 'catalan', 'catalán', 'catala', 'català',
+  'baskisch', 'basque', 'vasco', 'euskara',
+  'galizisch', 'galician', 'gallego',
+  'walisisch', 'welsh', 'galés',
+  'irisch', 'irish', 'irlandés', 'gaeilge',
+  'schottisch', 'scottish', 'gaelic', 'gaelisch',
+  'luxemburgisch', 'luxembourgish', 'luxemburgués',
+  'schweizerdeutsch', 'swiss german',
+  'latein', 'latin', 'latín',
+  'esperanto',
+  // Sign languages
+  'gebärdensprache', 'sign language', 'lengua de signos', 'dgs', 'asl', 'bsl',
+]);

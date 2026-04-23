@@ -325,7 +325,7 @@ export const analyzeCVMatch = inngest.createFunction(
                     // Check if the profile already references this document
                     const { data: profile } = await supabaseAdmin
                         .from('user_profiles')
-                        .select('cv_original_file_path')
+                        .select('cv_original_file_path, full_name')
                         .eq('id', userId)
                         .single();
 
@@ -357,6 +357,15 @@ export const analyzeCVMatch = inngest.createFunction(
 
                     const { parseCvTextToJson } = await import('@/lib/services/cv-parser');
                     const structuredCv = await parseCvTextToJson(extractedText);
+
+                    // Tier 1 name override: user_profiles.full_name is the confirmed name
+                    // (set by upload/route.ts integrity guard on every CV upload).
+                    // Prevents stale OCR-header names from leaking into re-parsed CVs.
+                    if (profile?.full_name) {
+                        if (!structuredCv.personalInfo) structuredCv.personalInfo = {} as any;
+                        structuredCv.personalInfo.name = profile.full_name;
+                        console.log(`[cv-match-pipeline] 🔧 Name override from full_name → "${profile.full_name}"`);
+                    }
 
                     const { error: updateErr } = await supabaseAdmin
                         .from('user_profiles')

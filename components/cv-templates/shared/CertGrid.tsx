@@ -47,15 +47,16 @@ interface CertEntry {
     issuer?: string;
     dateText?: string;
     credentialUrl?: string;
+    description?: string;
 }
 
 function CertItem({ cert }: { cert: CertEntry }) {
+    const meta = [cert.issuer, cert.dateText].filter(Boolean).join(' · ');
     return (
         <View style={s.item}>
             <Text style={s.name}>{truncate(cert.name || '', 80)}</Text>
-            <Text style={s.detail}>
-                {[cert.issuer, cert.dateText].filter(Boolean).join(' · ')}
-            </Text>
+            {meta ? <Text style={s.detail}>{meta}</Text> : null}
+            {cert.description ? <Text style={s.detail}>{cert.description}</Text> : null}
             {cert.credentialUrl && (
                 <Link src={cert.credentialUrl} style={s.link}>
                     Verify →

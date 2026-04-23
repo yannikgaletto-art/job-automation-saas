@@ -152,6 +152,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
     const [showCvDialog, setShowCvDialog] = useState(false);
 
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
+    const notifiedRef = useRef(false);
 
     // Cleanup polling on unmount
     useEffect(() => {
@@ -253,7 +254,10 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                         clearTimeout(step5Timer);
                         setMatchData(pollData.cached);
                         setState('complete');
-                        notify(t('notify_match_done'));
+                        if (!notifiedRef.current) {
+                            notifiedRef.current = true;
+                            notify(t('notify_match_done'));
+                        }
                         onMatchComplete?.(pollData.cached);
                     } else if (pollData.cvMatchStatus === 'error') {
                         // Pipeline permanently failed (onFailure wrote error to DB)

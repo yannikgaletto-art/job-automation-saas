@@ -127,6 +127,10 @@ const FIRST_WORD_STOPLIST = new Set([
     'Por', 'POR', 'Con', 'CON', 'Para', 'PARA',
     // Business/CV section words that are followed by a city/noun
     'New', 'NEW', 'San', 'SAN', 'Los', 'LOS', 'Las', 'LAS',
+    // German institutional prefixes — never a person's first name
+    // Prevents "Deutsche Rentenversicherung", "Deutsche Bank", etc. from matching as names
+    'Deutsche', 'DEUTSCHE', 'Deutschen', 'DEUTSCHEN',
+    'Bundesagentur', 'BUNDESAGENTUR', 'Bundesministerium', 'BUNDESMINISTERIUM',
 ]);
 
 /**

@@ -162,69 +162,72 @@ export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' 
                 )}
 
                 {/* ===== EXPERIENCE ===== */}
+                {/* Orphan-safe: title bound to first entry via wrap={false} \u2014 title never stands alone at page bottom */}
                 {data.experience.length > 0 && (
-                    <View style={s.sectionContainer} minPresenceAhead={60}>
-                        <Text style={s.sectionTitle}>{labels.experience}</Text>
-                        {data.experience.map((exp) => (
-                            <View key={exp.id} style={s.expBlock} wrap={false}>
-                                <View style={s.expTopRow}>
-                                    <Text style={s.expRole}>{exp.role || ''}</Text>
-                                    <Text style={s.expDate}>{normalizeDateRangeText(exp.dateRangeText, labels.present)}</Text>
-                                </View>
-                                {exp.company && (
-                                    <Text style={s.expCompany}>
-                                        {exp.company}{exp.location ? ` \u2022 ${exp.location}` : ''}
-                                    </Text>
-                                )}
-                                {exp.description?.slice(0, maxBullets).map((b) => (
-                                    <View key={b.id} style={s.bulletRow}>
-                                        <Text style={s.bulletDot}>{'\u2022'}</Text>
-                                        <RenderBullet text={b.text} />
+                    <View style={s.sectionContainer}>
+                        {data.experience.map((exp, idx) => (
+                            <View key={exp.id} wrap={false}>
+                                {idx === 0 && <Text style={s.sectionTitle}>{labels.experience}</Text>}
+                                <View style={s.expBlock}>
+                                    <View style={s.expTopRow}>
+                                        <Text style={s.expRole}>{exp.role || ''}</Text>
+                                        <Text style={s.expDate}>{normalizeDateRangeText(exp.dateRangeText, labels.present)}</Text>
                                     </View>
-                                ))}
+                                    {exp.company && (
+                                        <Text style={s.expCompany}>
+                                            {exp.company}{exp.location ? ` \u2022 ${exp.location}` : ''}
+                                        </Text>
+                                    )}
+                                    {exp.description?.slice(0, maxBullets).map((b) => (
+                                        <View key={b.id} style={s.bulletRow}>
+                                            <Text style={s.bulletDot}>{'\u2022'}</Text>
+                                            <RenderBullet text={b.text} />
+                                        </View>
+                                    ))}
+                                </View>
                             </View>
                         ))}
                     </View>
                 )}
 
                 {/* ===== EDUCATION ===== */}
+                {/* Orphan-safe: title bound to first entry via wrap={false} — fixes "AUSBILDUNG alone on page 1" bug */}
                 {data.education.length > 0 && (
-                    <View style={s.sectionContainer} minPresenceAhead={80}>
-                        <Text style={s.sectionTitle}>{labels.education}</Text>
-                        {data.education.map((edu) => {
-                            // Split description into sub-items (split on '. ' or ', ')
+                    <View style={s.sectionContainer}>
+                        {data.education.map((edu, idx) => {
                             const rawDesc = edu.description || '';
                             const subItems = rawDesc
                                 .split(/\. (?=[A-ZÄÖÜ0-9])/g)
                                 .map(s => s.replace(/\.$/, '').trim())
                                 .filter(s => s.length > 2);
                             return (
-                                <View key={edu.id} style={s.eduBlock} wrap={false}>
-                                    <View style={s.eduTopRow}>
-                                        <Text style={s.eduDegree}>{edu.degree || ''}</Text>
-                                        <Text style={s.eduDate}>{normalizeDateRangeText(edu.dateRangeText, labels.present)}</Text>
-                                    </View>
-                                    {edu.institution && <Text style={s.eduInstitution}>{edu.institution}</Text>}
-                                    {/* Grade as bold label */}
-                                    {edu.grade && (
-                                        <View style={s.eduSubRow}>
-                                            <Text style={s.eduSubLabel}>{labels.grade}: </Text>
-                                            <Text style={s.eduSubText}>{edu.grade}</Text>
+                                <View key={edu.id} wrap={false}>
+                                    {idx === 0 && <Text style={s.sectionTitle}>{labels.education}</Text>}
+                                    <View style={s.eduBlock}>
+                                        <View style={s.eduTopRow}>
+                                            <Text style={s.eduDegree}>{edu.degree || ''}</Text>
+                                            <Text style={s.eduDate}>{normalizeDateRangeText(edu.dateRangeText, labels.present)}</Text>
                                         </View>
-                                    )}
-                                    {/* Description sub-items as dash list */}
-                                    {subItems.map((item, i) => (
-                                        <Text key={i} style={s.eduSubItem}>– {item}</Text>
-                                    ))}
+                                        {edu.institution && <Text style={s.eduInstitution}>{edu.institution}</Text>}
+                                        {edu.grade && (
+                                            <View style={s.eduSubRow}>
+                                                <Text style={s.eduSubLabel}>{labels.grade}: </Text>
+                                                <Text style={s.eduSubText}>{edu.grade}</Text>
+                                            </View>
+                                        )}
+                                        {subItems.map((item, i) => (
+                                            <Text key={i} style={s.eduSubItem}>– {item}</Text>
+                                        ))}
+                                    </View>
                                 </View>
                             );
                         })}
                     </View>
                 )}
 
-                {/* ===== SKILLS (full-width, internal multi-col grid) ===== */}
+                {/* ===== SKILLS \u2014 wrap={false}: compact section, title + grid stay together ===== */}
                 {hasSkills && (
-                    <View style={s.sectionContainer} minPresenceAhead={40}>
+                    <View style={s.sectionContainer} wrap={false}>
                         <Text style={s.sectionTitle}>{labels.skills}</Text>
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                             {data.skills.map((g) => (
@@ -237,9 +240,9 @@ export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' 
                     </View>
                 )}
 
-                {/* ===== LANGUAGES (full-width, internal 2-col grid) ===== */}
+                {/* ===== LANGUAGES \u2014 wrap={false}: compact section, title + grid stay together ===== */}
                 {hasLanguages && (
-                    <View style={s.sectionContainer} minPresenceAhead={40}>
+                    <View style={s.sectionContainer} wrap={false}>
                         <Text style={s.sectionTitle}>{labels.languages}</Text>
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                             {data.languages.map((l) => (
@@ -254,9 +257,9 @@ export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' 
                     </View>
                 )}
 
-                {/* ===== CERTIFICATES (full-width, CertGrid 2-col, HARD CAP: 6) ===== */}
+                {/* ===== CERTIFICATES \u2014 wrap={false}: CertGrid kept with title (HARD CAP: 6) ===== */}
                 {cappedCerts.length > 0 && (
-                    <View style={s.sectionContainer} minPresenceAhead={40}>
+                    <View style={s.sectionContainer} wrap={false}>
                         <Text style={s.sectionTitle}>{labels.certificates}</Text>
                         <CertGrid certs={cappedCerts} maxColumns={2} />
                     </View>

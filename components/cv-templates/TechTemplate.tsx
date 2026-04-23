@@ -221,11 +221,13 @@ export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredDat
                             </View>
                         )}
 
+                        {/* Experience — orphan-safe: title bound to first entry via wrap={false} */}
                         {data.experience.length > 0 && (
                             <View>
-                                <Text style={s.sectionTitle}>{labels.experience}</Text>
-                                {data.experience.map(exp => (
-                                    <View key={exp.id} style={s.expBlock} wrap={false}>
+                                {data.experience.map((exp, idx) => (
+                                    <View key={exp.id} wrap={false}>
+                                        {idx === 0 && <Text style={s.sectionTitle}>{labels.experience}</Text>}
+                                        <View style={s.expBlock}>
                                         <View style={s.expHeader}>
                                             <Text style={s.expRole}>{exp.role || ''}</Text>
                                             <Text style={s.expDateTag}>{normalizeDateRangeText(exp.dateRangeText, labels.present)}</Text>
@@ -238,6 +240,7 @@ export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredDat
                                                 <RenderBullet text={bullet.text} />
                                             </View>
                                         ))}
+                                        </View>
                                     </View>
                                 ))}
                             </View>
@@ -259,15 +262,17 @@ export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredDat
                             </View>
                         )}
 
-                        {/* Education */}
+                        {/* Education — orphan-safe: title bound to first entry via wrap={false} */}
                         {data.education.length > 0 && (
                             <View style={{ marginBottom: 20 }}>
-                                <Text style={s.sectionTitle}>{labels.education}</Text>
-                                {data.education.map(edu => (
-                                    <View key={edu.id} style={s.sideBlock} wrap={false}>
-                                        <Text style={s.sideLabel}>{edu.degree || ''}</Text>
-                                        <Text style={s.sideText}>{edu.institution || ''}</Text>
-                                        <Text style={[s.sideText, { color: ACCENT, marginTop: 2 }]}>{normalizeDateRangeText(edu.dateRangeText, labels.present)}</Text>
+                                {data.education.map((edu, idx) => (
+                                    <View key={edu.id} wrap={false}>
+                                        {idx === 0 && <Text style={s.sectionTitle}>{labels.education}</Text>}
+                                        <View style={s.sideBlock}>
+                                            <Text style={s.sideLabel}>{edu.degree || ''}</Text>
+                                            <Text style={s.sideText}>{edu.institution || ''}</Text>
+                                            <Text style={[s.sideText, { color: ACCENT, marginTop: 2 }]}>{normalizeDateRangeText(edu.dateRangeText, labels.present)}</Text>
+                                        </View>
                                     </View>
                                 ))}
                             </View>
@@ -275,21 +280,23 @@ export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredDat
 
                         {/* Certifications — V2: CertGrid */}
                         {data.certifications && data.certifications.length > 0 && (
-                            <View style={{ marginBottom: 20 }} wrap={false} minPresenceAhead={40}>
+                            <View style={{ marginBottom: 20 }} wrap={false}>
                                 <Text style={s.sectionTitle}>{labels.certificates}</Text>
                                 <CertGrid certs={data.certifications} maxColumns={1} />
                             </View>
                         )}
 
-                        {/* Languages — V2: with ProficiencyDots */}
+                        {/* Languages — orphan-safe: title bound to first row via wrap={false} */}
                         {data.languages.length > 0 && (
                             <View>
-                                <Text style={s.sectionTitle}>{labels.languages}</Text>
-                                {data.languages.map(lang => (
-                                    <View key={lang.id} style={s.langRow} wrap={false}>
-                                        <View style={s.langLeft}>
-                                            <Text style={[s.sideLabel, { marginBottom: 0, marginRight: 6 }]}>{lang.language || ''}</Text>
-                                            {lang.proficiency ? <Text style={s.sideText}>– {lang.proficiency}</Text> : null}
+                                {data.languages.map((lang, idx) => (
+                                    <View key={lang.id} wrap={false}>
+                                        {idx === 0 && <Text style={s.sectionTitle}>{labels.languages}</Text>}
+                                        <View style={s.langRow}>
+                                            <View style={s.langLeft}>
+                                                <Text style={[s.sideLabel, { marginBottom: 0, marginRight: 6 }]}>{lang.language || ''}</Text>
+                                                {lang.proficiency ? <Text style={s.sideText}>– {lang.proficiency}</Text> : null}
+                                            </View>
                                         </View>
                                     </View>
                                 ))}
