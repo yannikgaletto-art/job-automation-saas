@@ -41,17 +41,18 @@ Model-IDs (niemals ändern ohne Freigabe):
 
 ```
 [10 min Pflicht]
-1. AGENT_ONBOARDING.md         ← du bist hier
-2. CLAUDE.md                    ← Developer Operating Manual (§RECENT FIXES zeigt Code-Stand)
-3. directives/FEATURE_COMPAT_MATRIX.md  ← Forbidden Files + Feature-Silos (Abschnitt 0)
+1. AGENT_ONBOARDING.md          ← du bist hier
+2. ARCHITECTURE.md (Root, V5.2+) ← Complete System Design (Tech Stack, Data Flow, Routes, DB)
+3. CLAUDE.md                     ← Developer Operating Manual (§RECENT FIXES zeigt Code-Stand)
+4. directives/FEATURE_COMPAT_MATRIX.md  ← Forbidden Files + Feature-Silos (Abschnitt 0)
 
 [Kontextspezifisch — nur für dein Feature]
-4a. Cover Letter → directives/QUALITY_CV_COVER_LETTER.md + lib/services/cover-letter-prompt-builder.ts
-4b. CV Pipeline → directives/cv_generation.md + Übergang/CV_PIPELINE_LEARNINGS.md
-4c. Security → docs/SICHERHEITSARCHITEKTUR.md (14 Contracts)
-4d. Design → docs/DESIGN_SYSTEM.md (Notion-Linear Hybrid, #FAFAF9, Inter)
-4e. Motion → docs/MOTION_PRINCIPLES.md (PFLICHT bei Framer Motion)
-4f. i18n → directives/i18n_protocol.md (de/en/es gleichzeitig, kein hardcoded Text)
+5a. Cover Letter → directives/QUALITY_CV_COVER_LETTER.md + lib/services/cover-letter-prompt-builder.ts
+5b. CV Pipeline → directives/cv_generation.md + Übergang/CV_PIPELINE_LEARNINGS.md
+5c. Security → docs/SICHERHEITSARCHITEKTUR.md (14 Contracts)
+5d. Design → docs/DESIGN_SYSTEM.md (Notion-Linear Hybrid, #FAFAF9, Inter)
+5e. Motion → docs/MOTION_PRINCIPLES.md (PFLICHT bei Framer Motion)
+5f. i18n → directives/i18n_protocol.md (de/en/es gleichzeitig, kein hardcoded Text)
 
 [Historisch — NICHT als Vorlage nutzen]
 - directives/AGENT_*.md  ← Phase-1-MVP-Docs aus Feb 2026, überholt
@@ -59,7 +60,7 @@ Model-IDs (niemals ändern ohne Freigabe):
 - directives/PHASE_2_EXECUTION_PLAN.md  ← historisch
 ```
 
-**Die ehrliche Wahrheit:** Die Doku driftete vom Code ab. Bei Widersprüchen gilt: **Code > CLAUDE.md > directives/ > docs/**. Lies den Code selbst, wenn die Directive alt wirkt.
+**Die ehrliche Wahrheit:** Die Doku kann vom Code abdriften. Bei Widersprüchen gilt: **Code > ARCHITECTURE.md > CLAUDE.md > directives/ > docs/**. Lies den Code selbst, wenn die Directive alt wirkt.
 
 ---
 

@@ -51,6 +51,10 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via explizite
    - Liest sich in ~10 Minuten, orientiert über Architektur + Regeln + Toolchain
    - Referenziert die relevanten Directives + Docs per Link
 
+1a. **`ARCHITECTURE.md`** (Project-Root, V5.2+) — System Architecture & Data Flow
+   - Complete system design: Tech Stack, Data Flow, API Routes, DB Schema
+   - Read the relevant section for your feature
+
 2. **`docs/DESIGN_SYSTEM.md`** — UI/UX Standards
    - Follow Notion-like aesthetic (`bg-[#FAFAF9]`, clean forms)
    - Maintain consistency with existing components
