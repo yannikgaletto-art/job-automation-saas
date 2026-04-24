@@ -326,7 +326,7 @@ function sortExperienceByDate(
  *   - Newline-separated fragments: "…Manager\n09.2025\nHeute"
  *   - German "seit 2023", Spanish "desde 2023"
  */
-function stripRoleDateMarkers(role: string | null | undefined): string | null | undefined {
+export function stripRoleDateMarkers(role: string | null | undefined): string | null | undefined {
   if (!role) return role;
   let cleaned = role
     // Strip trailing "Heute/Present/Actualidad" preceded by newline or whitespace (word-boundary)
@@ -355,7 +355,7 @@ function stripRoleDateMarkers(role: string | null | undefined): string | null | 
  * Users with rare languages not on this list can add them via the optimizer UI
  * after upload. Covered: 60+ major world languages in all 3 app languages.
  */
-const KNOWN_LANGUAGES = new Set<string>([
+export const KNOWN_LANGUAGES = new Set<string>([
   // Core European (de/en/es forms)
   'deutsch', 'german', 'alemán', 'alemana', 'aleman',
   'englisch', 'english', 'inglés', 'ingles', 'inglesa',

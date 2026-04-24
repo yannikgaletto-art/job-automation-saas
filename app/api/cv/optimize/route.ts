@@ -8,6 +8,7 @@ import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import { logger } from '@/lib/logging';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { translateCvIfNeeded } from '@/lib/services/cv-translator';
+import { sanitizeCv } from '@/lib/services/cv-data-sanitizer';
 import { pruneForOptimizer } from '@/lib/utils/cv-payload-pruner';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
@@ -166,11 +167,11 @@ export async function POST(req: NextRequest) {
         const log = logger.forRequest(undefined, user.id, '/api/cv/optimize');
 
         const body = await req.json();
-        const { cv_structured_data, cv_match_result, template_id, job_id, station_metrics, cv_opt_settings, locale: rawLocale } = body;
+        const { cv_structured_data: rawCvData, cv_match_result, template_id, job_id, station_metrics, cv_opt_settings, locale: rawLocale } = body;
         const locale: SupportedLocale = (['de', 'en', 'es'].includes(rawLocale) ? rawLocale : 'de') as SupportedLocale;
         const lang = getLanguageName(locale);
 
-        if (!cv_structured_data || !cv_match_result || !job_id) {
+        if (!rawCvData || !cv_match_result || !job_id) {
             return NextResponse.json({ error: 'error_missing_params' }, { status: 400 });
         }
 
@@ -185,6 +186,17 @@ export async function POST(req: NextRequest) {
 
         // §3: User-scoped — always use session user.id, never trust body
         const user_id = user.id;
+
+        // ── Read-time sanitation: cleans OCR/extraction artefacts that may
+        // have been persisted to user_profiles.cv_structured_data by a pre-fix
+        // upload. Uses user_profiles.full_name as a trusted override for
+        // personalInfo.name. Idempotent — safe on already-clean data.
+        const { data: profileRow } = await supabaseAdmin
+            .from('user_profiles')
+            .select('full_name')
+            .eq('id', user_id)
+            .single();
+        const cv_structured_data = sanitizeCv(rawCvData, { trustedName: profileRow?.full_name });
 
         // ── Pass 1: Translate CV to target language if needed ───────────
         // cv-parser stores content verbatim (e.g. German bullets from a German CV).
