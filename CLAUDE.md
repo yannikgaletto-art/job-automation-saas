@@ -46,13 +46,16 @@ Warum das wichtig ist:
 Jedes neue Feature braucht eine Impact Map BEVOR Code geschrieben wird.
 Impact Map Yannik vorlegen und auf "Go" warten.
 
-## 🔒 DOCUMENTATION SYNC PFLICHT (ab 2026-03-09)
+## 🔒 DOCUMENTATION SYNC PFLICHT (ab 2026-03-09, präzisiert 2026-04-24)
 Jede Änderung an der Datenbank oder den API-Routen erfordert zwingend Doku-Updates:
-- **Neue SQL-Migration in `supabase/migrations/`** → `database/schema.sql` UND `ARCHITECTURE.md` Tabellenliste aktualisieren
-- **Neue API-Route in `app/api/`** → `ARCHITECTURE.md` Route-Struktur aktualisieren
+- **Neue SQL-Migration in `supabase/migrations/`** → `database/schema.sql` aktualisieren (Referenz-Snapshot)
+- **Neue API-Route in `app/api/`** → im CLAUDE.md §RECENT FIXES kurz erwähnen, damit Onboarding-Agenten es sehen
 - **Neue DB-Tabelle mit `user_id`** → `docs/SICHERHEITSARCHITEKTUR.md` §3 (SESSION CONTRACT) aktualisieren
+- **Entfernung eines API-Endpoints** → `app/_archive/` (nicht löschen), Changelog-Eintrag in CLAUDE.md
 
 Kein PR/Commit ohne diese Updates. Diese Regel existiert, weil die Doku in den letzten Wochen vom Code abgedriftet ist und Agenten dann veraltete Informationen nutzen.
+
+**Anmerkung:** Das alte `docs/ARCHITECTURE.md` existiert nicht mehr. Code ist Source of Truth — `lib/services/`, `app/api/`, `supabase/migrations/` direkt lesen. `docs/MASTER_PLAN.md` hält High-Level-Roadmap.
 
 ## ⚠️ i18n PROTOCOL (ab 2026-03-17)
 → directives/i18n_protocol.md
@@ -305,9 +308,10 @@ Chrome Extension (Plasmo)
    - Warte auf "Go" — kein Code ohne Freigabe
 
 1. **Read the docs:**
-   - `/ARCHITECTURE.md` - Complete system design (V5.0)
+   - `AGENT_ONBOARDING.md` (Root) — Orientierung für neue Agenten, Must-Read
    - `/database/schema.sql` - Database structure (⚠️ Referenz-Snapshot — autoritäre Quelle sind `supabase/migrations/`)
    - **`directives/FEATURE_COMPAT_MATRIX.md`** - Cross-Feature-Ownership (PFLICHT)
+   - `docs/SICHERHEITSARCHITEKTUR.md` — Contracts (Onboarding, Documents, Session, Quote, PII)
 
 2. **Check existing code:**
    - Don't rewrite what exists
@@ -611,4 +615,4 @@ npm run build
 
 **Status:** ACTIVE
 **Next Review:** When adding major features
-**Questions?** Check `/docs/ARCHITECTURE.md` first
+**Questions?** Check `AGENT_ONBOARDING.md` (Root) for orientation, then code directly.

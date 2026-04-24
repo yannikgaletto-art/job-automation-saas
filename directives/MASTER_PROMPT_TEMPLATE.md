@@ -47,9 +47,9 @@ supabase/migrations/*                           ← DB-SCHEMA (nur via explizite
 
 **Before starting ANY work, you MUST read AND cross-reference these documents:**
 
-1. **`docs/ARCHITECTURE.md`** — System Architecture & Data Flow
-   - Study the relevant section for this phase
-   - Understand how this feature fits into the overall pipeline
+1. **`AGENT_ONBOARDING.md`** (Project-Root) — Einstiegspunkt für neue Agenten
+   - Liest sich in ~10 Minuten, orientiert über Architektur + Regeln + Toolchain
+   - Referenziert die relevanten Directives + Docs per Link
 
 2. **`docs/DESIGN_SYSTEM.md`** — UI/UX Standards
    - Follow Notion-like aesthetic (`bg-[#FAFAF9]`, clean forms)

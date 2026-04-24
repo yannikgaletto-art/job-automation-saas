@@ -1,6 +1,24 @@
 # AGENT 5: COVER LETTER GENERATION DIRECTIVE
 
-**Version:** 1.0 (MVP)  
+> ## ⚠️ STATUS: HISTORISCH — PHASE-1-MVP (Feb 2026)
+>
+> **Dieses Dokument beschreibt den Ursprungs-MVP von Februar 2026.**
+> Der aktuelle Stand (Phase 5.3, 2026-04-24) ist deutlich weiter:
+> - Multi-Iteration Judge-Loop ist PRODUKTIV (nicht mehr Phase 2)
+> - Writing Style Analyzer + Custom-Style-Modus mit Pathly-DNA-Toggle
+> - 12+ Regex-Patterns in anti-fluff-blacklist.ts
+> - 9 §-Blöcke im Prompt (§KEIN-ZITAT, §FIRMEN-ANSPRACHE, §AUTOR-ICH-PERSPEKTIVE, §REFERENZBRIEF-KALIBRIERUNG, §UNTERNEHMENS-URTEILE, §ABSOLUT VERBOTENE SATZSTRUKTUREN, §PRE-COMMIT-SCAN, §SATZLÄNGE, §ABSOLUT BINDENDE ANREDE-FORM)
+> - Multi-Agent-Pipeline ist ARCHIVIERT (lib/services/_archive/)
+> - Golden-Samples + jobId-deterministische Rotation
+>
+> **Für den aktuellen Stand → `CLAUDE.md` (§RECENT FIXES) + `directives/QUALITY_CV_COVER_LETTER.md` + `memory/MEMORY.md`.**
+> **Für Prompt-Architektur → `lib/services/cover-letter-prompt-builder.ts` direkt lesen.**
+>
+> Dieses Dokument bleibt nur als Historie erhalten. NICHT als Vorlage für neue Arbeit nutzen.
+
+---
+
+**Version:** 1.0 (MVP — historisch)  
 **Last Updated:** 2026-02-13  
 **Agent:** Cover Letter Generation (Writer Agent)  
 **Implementation:** `lib/services/cover-letter-generator.ts`  

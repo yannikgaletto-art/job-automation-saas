@@ -174,7 +174,7 @@ Stripe Monetization V1 ist live (2026-04-01). Aber: Sind alle AI-Calls wirklich 
 - [ ] Audit aller API Routes mit AI-Calls:
   - [ ] `/api/cover-letter/generate` ✅ (vermutlich vorhanden)
   - [ ] `/api/cover-letter/critique` — verifizieren
-  - [ ] `/api/cover-letter/kill-fluff` — verifizieren  
+  - [x] ~~`/api/cover-letter/kill-fluff`~~ — **archiviert 2026-04-24** (0 Caller, → `app/_archive/kill-fluff-route.ts`)  
   - [ ] `/api/cover-letter/quotes` — verifizieren (Tier-3!)
   - [ ] `/api/cv/match` — verifizieren
   - [ ] `/api/coaching/session` — verifizieren
