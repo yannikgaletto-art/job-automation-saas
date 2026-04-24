@@ -14,7 +14,6 @@ export interface StyleAnalysis {
     // ─── Structural Pattern Fields (Anti-Generic) ─────────────────────────────
     max_commas_per_sentence: number;       // Avg comma count per sentence (e.g. 1)
     uses_em_dash: boolean;                  // Does the author use – or — as punctuation?
-    rhetorical_contrast_pattern: boolean;   // Does the author use "nicht X, sondern Y" / "not X, but Y"?
 }
 
 /**
@@ -44,7 +43,7 @@ export async function analyzeWritingStyle(
             max_tokens: 1000,
             temperature: 0,
             system: `You are a writing style analyzer. Extract style patterns from cover letters.
-Return ONLY valid JSON with these 9 keys:
+Return ONLY valid JSON with these 8 keys:
 - tone: "professional" | "enthusiastic" | "technical" | "conversational" | "storytelling" | "philosophical"
 - sentence_length: "short" | "medium" | "long" (avg 10-15 / 16-25 / 26+ words)
 - conjunctions: array of top 5 conjunctions/transition words used (German examples: Daher, Deshalb, Zudem, Gleichzeitig, Außerdem)
@@ -52,15 +51,14 @@ Return ONLY valid JSON with these 9 keys:
 - rhetorical_devices: array of rhetorical devices found (from: "quote", "anecdote", "rhetorical_question", "metaphor", "enumeration", "contrast", "personal_story", "data_reference")
 - forbidden_constructs: array of writing patterns the author deliberately avoids (e.g., "passive_voice", "exclamation_marks", "generic_openings", "buzzword_lists"). If you cannot determine this, return an empty array.
 - max_commas_per_sentence: integer — count the commas in each sentence, then return the AVERAGE rounded to the nearest integer (e.g. 1). If most sentences have 0 or 1 commas, return 1.
-- uses_em_dash: boolean — does the author use em-dashes (– or —) as punctuation? true if at least one is found, false otherwise.
-- rhetorical_contrast_pattern: boolean — does the author use the rhetorical structure "nicht [nur] X, sondern [auch] Y" (German) or "not [only] X, but [also] Y" (English)? true if at least one instance is found, false otherwise.`,
+- uses_em_dash: boolean — does the author use em-dashes (– or —) as punctuation? true if at least one is found, false otherwise.`,
             messages: [{
                 role: 'user',
                 content: `Analyze the writing style of this cover letter thoroughly:
 
 ${textToAnalyze}
 
-Return JSON with: tone, sentence_length, conjunctions, greeting, rhetorical_devices, forbidden_constructs, max_commas_per_sentence, uses_em_dash, rhetorical_contrast_pattern`
+Return JSON with: tone, sentence_length, conjunctions, greeting, rhetorical_devices, forbidden_constructs, max_commas_per_sentence, uses_em_dash`
             }]
         });
 
@@ -85,10 +83,9 @@ Return JSON with: tone, sentence_length, conjunctions, greeting, rhetorical_devi
                         forbidden_constructs: Array.isArray(analysis.forbidden_constructs) ? analysis.forbidden_constructs : [],
                         max_commas_per_sentence: typeof analysis.max_commas_per_sentence === 'number' ? analysis.max_commas_per_sentence : 2,
                         uses_em_dash: analysis.uses_em_dash ?? false,
-                        rhetorical_contrast_pattern: analysis.rhetorical_contrast_pattern ?? false,
                     };
 
-                    console.log(`📊 Style analysis: ${result.tone}, ${result.sentence_length} sentences, ${result.rhetorical_devices.length} devices, ${result.forbidden_constructs.length} forbidden, commas/sentence: ${result.max_commas_per_sentence}, em-dash: ${result.uses_em_dash}, contrast: ${result.rhetorical_contrast_pattern}`);
+                    console.log(`📊 Style analysis: ${result.tone}, ${result.sentence_length} sentences, ${result.rhetorical_devices.length} devices, ${result.forbidden_constructs.length} forbidden, commas/sentence: ${result.max_commas_per_sentence}, em-dash: ${result.uses_em_dash}`);
                     return result;
                 }
             }
@@ -115,6 +112,5 @@ export function getDefaultStyleAnalysis(): StyleAnalysis {
         forbidden_constructs: [],
         max_commas_per_sentence: 2,
         uses_em_dash: false,
-        rhetorical_contrast_pattern: false,
     };
 }

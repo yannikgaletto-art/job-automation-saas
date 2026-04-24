@@ -51,6 +51,14 @@ interface CompanyResearchData {
 // ─── Exported Types (re-export for generator) ─────────────────────────────────
 export type { UserProfileData, JobData, CompanyResearchData };
 
+// ─── Deterministische Varianten-Rotation (LLM-First-Item-Bias-Workaround) ───
+// Ohne Rotation wählt Claude zwangsläufig Variante A. Per jobId-Hash wird genau
+// EINE Variante injiziert, die anderen werden explizit verboten.
+function pickVariant<T>(jobId: string, bucket: T[], offset = 0): T {
+    const hash = [...jobId].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return bucket[(hash + offset) % bucket.length];
+}
+
 // ─── Main Builder ─────────────────────────────────────────────────────────────
 export function buildSystemPrompt(
     profile: UserProfileData,
@@ -59,15 +67,26 @@ export function buildSystemPrompt(
     style: StyleAnalysis | null,
     ctx: CoverLetterSetupContext | undefined,
     feedback: string[],
-    lastWordCount: number
+    lastWordCount: number,
+    jobId: string = ''
 ): string {
-    const isEnglish = ctx?.tone.targetLanguage === 'en';
-    const isSpanish = ctx?.tone?.targetLanguage === 'es';
-    const lang = isEnglish ? 'English' : isSpanish ? 'Español' : 'Deutsch';
-    // Locale helper: returns localized string. ES falls back to EN if no Spanish variant provided.
-    const t = (de: string, en: string, es?: string) => isEnglish ? en : isSpanish ? (es || en) : de;
+    // Cover-Letter-Output kennt nur zwei Sprachen: DE (Default) und EN.
+    // ES als Target-Language wird auf EN gemappt — die UI kann weiterhin auf Spanisch
+    // sein, aber der generierte Brief ist nie auf Spanisch.
+    const isEnglish = ctx?.tone.targetLanguage === 'en' || ctx?.tone?.targetLanguage === 'es';
+    const lang = isEnglish ? 'English' : 'Deutsch';
+    const t = (de: string, en: string) => isEnglish ? en : de;
     const companyName = job?.company_name || ctx?.companyName || t('das Unternehmen', 'the company');
     const jobTitle = job?.job_title || t('die ausgeschriebene Stelle', 'the advertised position');
+    // Phase 5 (2026-04-24): Pathly-DNA gating for custom-style users.
+    // - Preset modes: DNA always active (useDNA = true).
+    // - Custom-style + toggle off (default): pure user style (useDNA = false).
+    // - Custom-style + toggle on: user style + Pathly signature layer (useDNA = true).
+    const isCustomStyle = ctx?.tone?.toneSource === 'custom-style';
+    const useDNA = !isCustomStyle || ctx?.tone?.usePathlyDNA === true;
+    const rotationSeed = jobId || companyName || 'fallback';
+    const openingVariant = useDNA ? pickVariant(rotationSeed, ['A', 'B', 'C', 'D'] as const) : null;
+    const closingVariant = useDNA ? pickVariant(rotationSeed, ['A', 'B', 'C'] as const, 7) : null;
 
     // ─── B1.6: Ansprechperson-Binding (Cascading Fallback) ────────────────────
     const isDuForm = ctx?.tone.formality === 'du';
@@ -160,7 +179,9 @@ ${JSON.stringify(cvDataForPrompt, null, 2)}`
 ${JSON.stringify(cvDataForPrompt, null, 2)}`;
 
     // ─── Early declarations needed by toneInstructions template literals ────────
-    const hasQuote = !!ctx?.selectedQuote;
+    // Defense-in-Depth: hasQuote is TRUE only if quote field is a non-empty, non-whitespace string.
+    // Prevents phantom quotes from deserialized-but-empty objects or stale persist state.
+    const hasQuote = !!ctx?.selectedQuote?.quote?.trim();
 
     // ─── Tone Instructions (B1.5: Jeder Stil verändert GESAMTE Prompt-Struktur) ─
     const toneInstructions: Record<string, string> = {
@@ -231,10 +252,33 @@ BEISPIEL INTRO (mit Zitat, Sie-Form):
 "Ihre Ausschreibung nennt 'strategische Empfehlungen entwickeln und dabei unterschiedliche Perspektiven integrieren'. Nach meiner Erfahrung gelingt das nur, wenn man versteht, warum jede Perspektive so denkt wie sie denkt. Simon Sinek hat das auf einen Satz gebracht: [ZITAT]. Mit anderen Worten: Wer nur fragt was eine Organisation tut, versteht ihre Entscheidungen nicht. In jedem Projekt, das ich begleitet habe — von der KI-Strategieberatung bei Fraunhofer FOKUS bis zur B2B-Transformation bei Ingrano Solutions — war der Einstieg immer derselbe: erst das Warum verstehen, dann die Loesung entwickeln."
 --- ENDE FEW-SHOT ---`,
     };
-    const activeTone = toneInstructions[ctx?.tone.preset ?? 'formal'];
+    // Phase 5.1 (2026-04-24): Bei Custom-Style MUTED das preset-basierte Tone-Template.
+    // Der Referenz-Brief bestimmt Ton + Struktur — nicht eine generische Preset-Dramaturgie.
+    // Phase 5.2 (2026-04-24): Kalibrierungs-Checkliste — zwingt Claude zu einem vor-Schreib-Check.
+    const activeTone = isCustomStyle
+        ? `STIL: DEIN EIGENER SCHREIBSTIL (aus hochgeladenem Referenzbrief — HÖCHSTE PRIORITÄT)
+
+§REFERENZBRIEF-KALIBRIERUNG (PFLICHT vor jedem Satz):
+Dein einziger Stil-Maßstab ist der Referenzbrief (siehe CUSTOM-STYLE-Block mit tone/sentence_length/conjunctions/greeting). Die Preset-Auswahl "${ctx?.tone?.preset ?? 'storytelling'}" wirkt hier NICHT als Dramaturgie-Vorgabe — der Referenzbrief allein bestimmt Aufbau und Rhythmus.
+
+KALIBRIERUNGS-CHECKLISTE (vor Beginn prüfen):
+1. Nutzt der Referenzbrief Zitate? ${hasQuote ? 'Falls nein im Referenzbrief und User hat Zitat gewählt: Zitat einbinden wie vom User gewollt.' : 'Falls nein: KEINE Zitate erfinden.'}
+2. Wie viele Absätze hat der Referenzbrief typischerweise? Halte GENAU diese Zahl ein.
+3. Welche Grußformel nutzt der Referenzbrief? ("Mit freundlichen Grüßen" / "Viele Grüße" / "Liebe Grüße"). Übernimm sie EXAKT.
+4. Satz-Rhythmus: Kurz-lang-kurz? Oder durchgängig mittellang? Wie im Referenzbrief.
+5. Narratives Storytelling (Mini-Geschichten) ODER lineare Faktenlogik? Der Referenzbrief entscheidet.
+
+VERBOTEN (überschreibt Preset-Suggestions):
+- Generische Storytelling-Mini-Geschichten mit Situation/Handlung/Ergebnis-Schema, wenn der Referenzbrief linear-sachlich ist.
+- Pathos, rhetorische Würzung als Pflicht, wenn der Referenzbrief nüchtern ist.
+- "war/wurde mir sofort klar", "sofort erkannte ich" — vorgetäuschte Sofort-Einsichten.
+- Anthropomorphe Firma-Zuschreibung wie "[Firma] hat mich gelehrt" oder "Fraunhofer zeigte mir, dass" — Firmen lehren nicht. Schreibe "Bei [Firma] habe ich gelernt".
+
+SCHLUSS: Wird durch Sektion 5 gesteuert.`
+        : toneInstructions[ctx?.tone.preset ?? 'formal'];
 
     // ─── Style Sample (Anti-Competition: Preset hat Vorrang über Style-Sample) ──
-    const isCustomStyle = ctx?.tone?.toneSource === 'custom-style';
+    // isCustomStyle already declared at top of function (Phase 5 DNA-gating prerequisite).
     const hasPreset = !!ctx?.tone?.preset;
 
     // Custom Style: analyzed cover letter is the FULL tone source (not rhythm-only)
@@ -262,7 +306,6 @@ Der Output soll klingen, als hätte der Bewerber selbst geschrieben.
 Nutze die extrahierten Konjunktionen statt generischer Übergänge.
 Kalibriere deinen Output auf dieses Muster — übernimm den Stil, nicht den Inhalt.
 
-${!style.rhetorical_contrast_pattern ? t('VERBOTEN: Die Struktur "nicht [nur] X, sondern [auch] Y" — der User nutzt sie nie.', 'FORBIDDEN: The structure "not [only] X, but [also] Y" — the user never uses it.') : ''}
 ${!style.uses_em_dash ? t('VERBOTEN: Gedankenstriche (– oder —) als Satzzeichen.', 'FORBIDDEN: Em-dashes (– or —) as punctuation.') : ''}
 ${t(`SATZBAU: Max. ${style.max_commas_per_sentence ?? 1} Komma(s) pro Satz — exakt wie im Stil des Users.`, `SENTENCE STRUCTURE: Max. ${style.max_commas_per_sentence ?? 1} comma(s) per sentence — exactly like the user's style.`)}`
             // Partial style: use what we have (rhythm data) but note limited calibration
@@ -296,52 +339,40 @@ Nutze die extrahierten Konjunktionen statt generischer Übergänge.`
         : '';
 
     // ─── Stations Section (B2.3: Stations-Selektor mit PFLICHT/VERBOT) ──────────
+    // Opener-Regeln einmal gerendert (statt pro Station wiederholt).
     let stationsSection: string;
     if (ctx?.cvStations?.length) {
         const stationNames = ctx.cvStations.map(s => `${s.role} @ ${s.company}`).join(', ');
+        const openerRules = `§STATIONS-OPENER — GILT FÜR JEDEN STATIONS-ABSATZ:
+Leite JEDEN Stations-Absatz mit EINEM einleitenden Gedanken ein, der erklärt WARUM diese Erfahrung für die Stelle relevant ist. Orientiere dich am Ton der STIL-BEISPIELE (Sektion STIL).
+ERLAUBT (Inspiration, keine Schablone): JD-Konzept aufgreifen · zentrale Erkenntnis voranstellen · kurzes JD-Fragment (2-5 Wörter, in Anführungszeichen) als Brücke.
+HALLUZINATIONS-SCHUTZ: JD-Fragmente max. 5 Wörter, NUR Arbeitsthemen. Unsicher? Paraphrasiere OHNE Anführungszeichen.
+VERBOTEN: Template-Sätze ("Genau daran habe ich...", "Zudem habe ich mich in X wiedergefunden", "von der Expertise des Teams zu lernen") · Meta-Formulierungen ("Weil ${isDuForm ? 'ihr jemanden sucht' : 'Sie jemanden suchen'}") · "Bei [Firma] habe ich..." ohne WARUM · denselben Einleitungstyp in zwei aufeinanderfolgenden Absätzen.
+PFLICHT-FRAGMENT: In GENAU EINEM Stations-Opener ein wörtliches Fragment (2-5 Wörter) aus KERNAUFGABEN in Anführungszeichen. Steht es dort EXAKT so? Sonst paraphrasieren OHNE Anführungszeichen.
+FALLBACK (kein userContext / matchedRequirement): Starte mit dem konkreten Station-Ergebnis und erkläre Relevanz für ${companyName}.
+INHALTLICHE KOHÄRENZ: Opener MUSS zur tatsächlichen Stationsarbeit passen.`;
+
         stationsSection = `[REGEL: HAUPTTEIL - CV-STATIONEN]
 PFLICHT: Verwende AUSSCHLIESSLICH diese ${ctx.cvStations.length} Stationen: ${stationNames}
 VERBOT: Erwähne KEINE anderen Stationen aus dem CV — nur die oben genannten sind erlaubt!
 
-- Schreibe keinen Fließtext-Lebenslauf! Widme jeder ausgewählten CV-Station einen EIGENEN, kurzen Absatz (max. 3 Sätze).
-- Nenne den Kontext kurz, aber fokussiere dich zu 70% auf den erlernten WERT (Was hat der Kandidat gelernt? Warum ist das für den neuen Arbeitgeber relevant?).
-- REDUZIERE BUZZWORDS DRASTISCH. Pro Absatz maximal 2 zentrale Fachbegriffe. Wenn eine CV-Station viele Technologien enthält, erwähne NUR diejenige, die absolut essenziell für die ausgeschriebene Stelle ist. Lass alles andere weg.
-- ROTER FADEN (optional): Wenn die Stellenanzeige ein prägnantes Schlüsselwort enthält (z.B. "Generalist", "Teamaufbau"), darfst du es im Intro UND im ersten Stations-Absatz organisch aufgreifen — nicht wörtlich kopieren, sondern als verbindendes Motiv nutzen.
+- Kein Fließtext-Lebenslauf! Jede Station → eigener kurzer Absatz (max. 3 Sätze).
+- 70% Fokus auf erlernten WERT (Was gelernt? Warum für neuen AG relevant?), 30% Kontext.
+- REDUZIERE BUZZWORDS DRASTISCH. Max. 2 zentrale Fachbegriffe pro Absatz. Nenne NUR die Technologie, die essenziell zur Stelle passt.
+- ROTER FADEN (optional): Prägnantes JD-Schlüsselwort (z.B. "Generalist", "Teamaufbau") darf im Intro UND im ersten Stations-Absatz organisch aufgegriffen werden — nicht wörtlich kopieren.
+
+${openerRules}
 
 ` + ctx.cvStations.map(s => {
             const hasUserContext = s.userContext && s.userContext.trim().length > 5;
             return `Station ${s.stationIndex}: ${s.role} @ ${s.company} (${s.period})${hasUserContext ? `
-  → 🎯 BEWERBER-KONTEXT (HÖCHSTE PRIORITÄT — nutze als primären Erzählanker):
-    "${s.userContext!.trim()}"
-    REGEL: Baue den Absatz um DIESEN Kontext herum. Der Bewerber hat dir gesagt, was an dieser Station relevant ist. Nutze die Bullets unten nur als Stütze, nicht als Hauptinhalt.` : ''}
+  → 🎯 BEWERBER-KONTEXT (PRIMÄRER ERZÄHLANKER — baue den Absatz hierum; Bullets nur als Stütze):
+    "${s.userContext!.trim()}"` : ''}
   → Beweis für Job-Anforderung: "${s.matchedRequirement}"
   → Schlüssel-Achievement: "${s.keyBullet}"
-  → Alle Stärken dieser Station (nutze als inhaltliche Basis):
+  → Stärken (inhaltliche Basis):
 ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
-  → Zeige im Text: ${s.intent}
-
-  → ROTER FADEN (PFLICHT für JEDEN Stations-Absatz):
-    Beginne JEDEN Stations-Absatz mit einer Verknüpfung, die dem Recruiter erklärt WARUM diese Erfahrung relevant ist.
-
-    §STATIONS-OPENER — QUALITAETSPRINZIP (statt starrem Varianten-Pool):
-
-    Leite JEDEN Stations-Absatz mit EINEM einleitenden Gedanken ein, der erklaert WARUM diese Erfahrung fuer die Stelle relevant ist.
-    Formuliere organisch und individuell — orientiere dich am Ton der FEW-SHOT BEISPIELE oben (Sektion 2 — STIL).
-
-    ERLAUBTE TECHNIKEN (als Inspiration, nicht als Schablone):
-    - Ein Konzept oder eine Idee aus der Stellenanzeige aufgreifen und mit der eigenen Erfahrung verbinden
-    - Eine zentrale Erkenntnis an den Anfang stellen, die dann durch die Station belegt wird
-    - Ein kurzes JD-Fragment (2-5 Woerter) in Anfuehrungszeichen als Bruecke nutzen
-    HALLUZINATIONS-SCHUTZ: JD-Fragmente max. 5 Woerter, NUR Arbeitsthemen. Unsicher? Paraphrasiere OHNE Anfuehrungszeichen.
-
-    VERBOTEN: Template-Saetze wie \"Genau daran habe ich bei [Firma] gearbeitet\" oder \"Zudem habe ich mich in X wiedergefunden\" oder \"von der Expertise des Teams zu lernen\".
-    VERBOTEN: \"Weil ${isDuForm ? 'ihr jemanden sucht' : 'Sie jemanden suchen'}\" / \"Da ${isDuForm ? 'ihr' : 'Sie'} jemanden ${isDuForm ? 'sucht' : 'suchen'}, der...\" — Meta-Formulierung.
-    VERBOTEN: Stations-Absatz mit \"Bei [Firma] habe ich...\" starten OHNE Bezug zum WARUM.
-    VERBOTEN: Denselben Einleitungstyp fuer zwei aufeinanderfolgende Absaetze verwenden.
-
-    PFLICHT-FRAGMENT: Integriere in GENAU EINEM Stations-Opener ein woertliches Fragment (2-5 Woerter) aus den Kernaufgaben (Sektion STELLEN-ANFORDERUNGEN) in Anfuehrungszeichen. Pruefe vorher: Steht das Fragment EXAKT so in den Kernaufgaben? Wenn nein: paraphrasiere OHNE Anfuehrungszeichen.
-    FALLBACK (wenn kein userContext und keine matchedRequirement vorhanden): Beginne mit dem konkreten Ergebnis der Station und erklaere, warum es fuer ${companyName} relevant ist.
-    INHALTLICHE KOHAERENZ: Opener MUSS zur tatsaechlichen Stationsarbeit passen.`;
+  → Zeige im Text: ${s.intent}`;
         }).join('\n');
     } else {
         stationsSection = 'Nutze die relevantesten Erfahrungen aus dem CV und beweise damit deinen Wert für das Unternehmen.';
@@ -367,41 +398,36 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
 
     // ─── Zitat-Block (wiederverwendbar für Intro oder Body) ────────────────────
     const quoteIntroBlock = hasQuote ? `[REGEL: EINLEITUNG — JD → ZITAT → BRÜCKE]
-Zitat (WORTWÖRTLICH übernehmen, NICHT übersetzen — Sprache beibehalten wie angegeben):
+Zitat (WORTWÖRTLICH übernehmen, NICHT übersetzen):
 "${ctx!.selectedQuote!.quote}"
 (Autor: ${ctx!.selectedQuote!.author})
 
 AUFBAU (max. 80 Wörter ohne Zitat):
-1. EINLEITUNGSSATZ (1 Satz): Bezug auf Stellenanzeige oder Kernaufgabe, endet mit bescheidener Überleitung zum Zitat.
-   ✅ "Als ich eure Stelle als [Jobtitel] las, erinnerte ich mich an ein Zitat:"
-   ✅ "Beim Lesen eurer Ausschreibung fiel mir ein Gedanke ein, den ich mit euch teilen möchte:"
-   ✅ "Da ich auf eurer Website las, dass [konkreter Fakt], musste ich an ein Zitat denken:"
-   ❌ NIEMALS: "wie treffend", "wie präzise", "wie passend ein Gedanke" — das ist Selbstlob.
-   PFLICHT: Formuliere BESCHEIDEN aus ICH-Perspektive. Nicht bewerten, nur teilen.
+${openingVariant ? `1. EINLEITUNGSSATZ — PFLICHT-VARIANTE: ${openingVariant} (andere Varianten sind für diesen Brief VERBOTEN):
+${openingVariant === 'A' ? `   (A) KLASSISCH — Ausschreibungs-Bezug: "Beim Lesen eurer Ausschreibung fiel mir ein Gedanke ein, den ich teilen möchte:" — 1 Satz, dann direkt Zitat.` : ''}${openingVariant === 'B' ? `   (B) JD-FRAGMENT — Öffne MIT einem wörtlichen Fragment aus der Stellenanzeige (2-5 Wörter, in Anführungszeichen), dann 1 Satz Brücke zum Zitat:
+       Beispiel: "'Unternehmerische Verantwortung'; dieses Spannungsverhältnis hat mich angesprochen, und erinnerte mich an:" (Struktur, nicht Wortlaut kopieren).` : ''}${openingVariant === 'C' ? `   (C) STATISTIK — Öffne mit einem konkreten Datenpunkt aus JD/Firmenkontext (Zahl + Kontext), dann 1 Satz zum Zitat:
+       §HALLUZINATIONS-SCHUTZ (HART): Die Zahl + Quelle MÜSSEN EXPLIZIT in der Stellenanzeige oder der Unternehmensanalyse (KERNAUFGABEN / company_research) stehen. KEINE erfundenen Studien ("laut einer Studie des BSI", "laut einer Gartner-Studie", "laut Forbes"). Wenn KEINE verifizierbare Zahl verfügbar: Diese Variante ist NICHT geeignet — öffne stattdessen mit einem namentlichen Fakt aus der Unternehmensanalyse ("Auf eurer Website habe ich gelesen, dass [Fakt]").
+       Beispiel-Struktur (nur wenn Zahl aus JD/Analyse verfügbar): "Laut [Quelle aus JD] [Zahl]. Diese Zahl führte mich zu einem Zitat von [Autor]:"` : ''}${openingVariant === 'D' ? `   (D) META-HOOK — Öffne mit einer ehrlichen, NEUTRALEN Meta-Beobachtung zum Bewerbungsprozess, dann 1 Satz zum Zitat:
+       §VERBOTEN in D: Komparative Selbstaufwertung ("besser als [anderer]", "trägt meine Perspektive besser als jede Selbstbeschreibung", "anders als viele andere"). Niemals andere Bewerber herabsetzen oder sich über sie stellen.
+       Beispiel-Struktur: "Ich vermute, ihr erhaltet viele Bewerbungen, die sich ähneln. Deshalb möchte ich mit einem Zitat beginnen, das meine Perspektive auf [Berufsthema] skizziert:" (Struktur, nicht Wortlaut kopieren). Nur bei ${isDuForm ? 'Du-Form + kreativer Firma' : 'moderner, offener Firma'} einsetzen.` : ''}
+   PFLICHT: ICH-Perspektive, bescheiden, nicht bewertend. ❌ "wie treffend/präzise/passend" (Selbstlob). ❌ Komparativ-Wertungen über eigene Perspektive.`
+: `1. EINLEITUNGSSATZ (1-2 Sätze): Schreibe eine natürliche Hinführung zum Zitat, die zum Stil deines Referenz-Anschreibens passt. ICH-Perspektive, bescheiden, nicht bewertend. ❌ Selbstlob ("wie treffend/präzise"). ❌ Komparativ-Wertungen über die eigene Perspektive. ❌ Erfundene Statistiken.`}
 
-2. ZITAT: Eigene Zeile, in Anführungszeichen. Darunter Signatur-Zeile:
+2. ZITAT: Eigene Zeile in Anführungszeichen. Signatur-Zeile PFLICHT:
    "– ${ctx!.selectedQuote!.author}"
-   Die Signatur-Zeile ist PFLICHT. Autor NICHT zusätzlich im Fließtext nennen.
+   Autor NICHT zusätzlich im Fließtext nennen.
 
-3. BRÜCKE (1-2 Sätze): Verbinde den KONKRETEN GEDANKEN des Zitats mit der Stelle — IMMER in ICH-Perspektive.
-   ✅ "Für mich bedeutet [Zitat-Kerngedanke], dass [persönliche Reflexion]. Deshalb möchte ich mich als [Jobtitel] bei ${isDuForm ? 'euch' : 'Ihnen'} kurz vorstellen."
-   ✅ "[Zitat-Kerngedanke] begleitet mich durch viele Stationen. Deshalb möchte ich mich kurz vorstellen."
-   ❌ NIEMALS: "Genau das ist [Thema]" / "Das ist die Definition von" — das ist allwissend und anmaßend.
-   ❌ NIEMALS: Objekte oder Konzepte definieren. Immer persönlich: "Für mich bedeutet...", "Dieser Gedanke begleitet mich..."
+3. BRÜCKE (1-2 Sätze): Verbinde den KONKRETEN GEDANKEN des Zitats mit der Stelle — IMMER ICH-Perspektive.
+   ✅ "Für mich bedeutet [Zitat-Kerngedanke], dass [persönliche Reflexion]. Genau diese Verbindung sehe ich in ${isDuForm ? 'eurer' : 'Ihrer'} Arbeit bei ${companyName}. Daher möchte ich mich kurz vorstellen."
+   ❌ VERBOTEN: "Genau diese Verbindung suche ich bei ${companyName}" — fordernd, ICH-zentriert. Besser: "sehe ich in eurer Arbeit" (Firma-zentriert).
+   ❌ "Genau das ist [Thema]" / "Das ist die Definition von" — allwissend.
    TEST: Passt der Brückensatz nur zu DIESEM Zitat? Wenn er zu jedem Zitat passt → neu schreiben.
-   STRUKTUR: Brücke + Bewerbungssatz gehören zum Einleitungsblock (kein eigener Absatz).
 ${enablePingPong ? `
-[PING-PONG — Antithese + Synthese nach Brücke (max. 2 Sätze)]
+[PING-PONG — Antithese + Synthese nach Brücke (max. 2 Sätze, MAX 100 Wörter inkl. Zitat, kein eigener Absatz)]
 ANTITHESE (1 Satz): Wie du den Gedanken FRÜHER anders gesehen hast (abstrakt, keine Firmennamen).
-✅ "${t('Früher dachte ich, dass schnelle Produktentwicklung vor allem Geschwindigkeit bedeutet.', 'I used to think that fast product development mainly meant speed.')}"
-SYNTHESE (1 Satz): Verbinde mit konkretem ${companyName}-Bezug.
-✅ "${t(`Da ich gelesen habe, dass ${companyName} [konkreter Firmenbezug], möchte ich mich kurz vorstellen.`, `Having read that ${companyName} [specific company reference], I would like to briefly introduce myself.`)}"
-MAX 100 Wörter inkl. Zitat. Zählt NICHT als eigener Absatz.` : ''}
+SYNTHESE (1 Satz): Verbinde mit konkretem ${companyName}-Bezug.` : ''}
 
-[COMPANY-BEZUG]
-Nutze Fakten aus der Unternehmensanalyse (ICH-Perspektive):
-✅ "Da ich auf eurer Website gelesen habe, dass [konkreter Fakt aus der Analyse]..."
-✅ "Als ich euer Projekt [aus Analyse] sah..."` : '';
+[COMPANY-BEZUG] Nutze Firmen-Fakten in ICH-Perspektive ("Da ich auf eurer Website gelesen habe, dass...").` : '';
 
     const quoteBodyBlock = hasQuote ? `[REGEL: ZITAT IM HAUPTTEIL — STATION-1-EINLEITUNG]:
 Das folgende Zitat MUSS WORTWORTLICH im Text stehen. Lass es NICHT weg!
@@ -609,7 +635,9 @@ ${wordCountFeedback ? `\n${wordCountFeedback}` : ''}`
         : '';
 
     // ─── Golden Sample Section (Primacy — goes FIRST in prompt) ──────────────
-    const goldenSampleSection = (!isCustomStyle && (preset === 'storytelling' || preset === 'formal'))
+    // Phase 5: gated by useDNA instead of !isCustomStyle. When custom-style + DNA toggle ON,
+    // Yannik's reference letter IS loaded as an additional signature layer.
+    const goldenSampleSection = (useDNA && (preset === 'storytelling' || preset === 'formal'))
         ? buildGoldenSampleSection(preset as 'storytelling' | 'formal', isEnglish)
         : '';
 
@@ -646,10 +674,11 @@ OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
 - Absätze getrennt durch eine Leerzeile. MAXIMAL 5 Absätze (inkl. Schluss). Gruß im letzten Absatz integrieren.
 - Beginne direkt mit der Anrede: ${contactPersonGreeting}${ctx?.tone.contactPerson ? ` — ZWINGEND: Nutze EXAKT diese Anrede. NIEMALS auf generische Alternativen wie "Dear Hiring Manager", "Sehr geehrte Damen und Herren" etc. ausweichen. Der Name des Ansprechpartners ist gesetzt.` : ''}
 - Anrede-Form: ${isDuForm ? 'DU-FORM (du/dein/euch/dir). Wende diese Du-Form STRIKT auf das GESAMTE Anschreiben an. Kein "Sie" oder "Ihnen" — NIEMALS.' : 'SIE-FORM (Sie/Ihr/Ihnen). Wende diese Sie-Form STRIKT auf das GESAMTE Anschreiben an.'}
-- ${t('ABSOLUTE SATZLÄNGE: Max. 25 Wörter pro Satz. Kein einziger Satz darf 25 Wörter überschreiten. Wenn ein Gedanke zu lang wird: Punkt setzen und neuen Satz beginnen.', 'ABSOLUTE SENTENCE LENGTH: Max. 25 words per sentence. Not a single sentence may exceed 25 words. If a thought gets too long: use a period and start a new sentence.', 'LONGITUD ABSOLUTA: Máx. 25 palabras por oración. Ninguna oración puede exceder 25 palabras.')}
+- ${t('ABSOLUTE SATZLÄNGE: Max. 25 Wörter pro Satz. Kein einziger Satz darf 25 Wörter überschreiten. Wenn ein Gedanke zu lang wird: Punkt setzen und neuen Satz beginnen.', 'ABSOLUTE SENTENCE LENGTH: Max. 25 words per sentence. Not a single sentence may exceed 25 words. If a thought gets too long: use a period and start a new sentence.')}
 - ${t('Max. 2 Kommas pro Satz. Mehr Kommas = Satz aufteilen.', 'Max. 2 commas per sentence. More commas = split the sentence.')}
-- ${t('KEIN Gedankenstrich (– oder —) im Fließtext. EINZIGE AUSNAHME: Die Zitat-Signatur-Zeile (z.B. "– Autor"). Überall sonst: Nutze Semikolon (;) oder Punkt statt Gedankenstrich.', 'NO em-dash (– or —) in body text. ONLY EXCEPTION: The quote attribution line ("– Author"). Everywhere else: Use semicolons (;) or periods instead.', 'PROHIBIDO el guión largo (– o —) en el texto. ÚNICA EXCEPCIÓN: La línea de atribución de cita. Usa punto y coma (;) o punto.')}
-- ${t('TONALITÄT: Eloquenz + Bescheidenheit. Sei zuversichtlich aber nicht abgehoben. Zeige Lernbereitschaft statt Allwissenheit. GUT: "Ich gehe zuversichtlich ran", "Ich freue mich, von Ihrer Expertise zu lernen". VERBOTEN: "Ich bringe eine solide Grundlage", "Meine Erfahrung befähigt mich", "Genau das ist", "Die Kombination aus", "Diese Kombination aus".', 'TONE: Eloquence + Humility. Be confident yet grounded. Show eagerness to learn, not omniscience. GOOD: "I approach this with confidence", "I look forward to learning from your expertise". FORBIDDEN: "I bring a solid foundation", "My experience qualifies me", "That is exactly what".', 'TONO: Elocuencia + Humildad. Sé seguro pero sin arrogancia. PROHIBIDO: "Exactamente eso es".')}
+- ${t('KEIN Gedankenstrich (– oder —) im Fließtext. EINZIGE AUSNAHME: Die Zitat-Signatur-Zeile (z.B. "– Autor"). Überall sonst: Nutze Semikolon (;) oder Punkt statt Gedankenstrich.', 'NO em-dash (– or —) in body text. ONLY EXCEPTION: The quote attribution line ("– Author"). Everywhere else: Use semicolons (;) or periods instead.')}
+- ${t('SEMIKOLON-REGEL (PFLICHT ≥2×, aber grammatikalisch korrekt): Semikolon verbindet NUR gleichrangige HAUPTSÄTZE. NIEMALS vor Konjunktionen wie "bevor", "weil", "dass", "obwohl", "damit", "wenn" — dort gehört ein Komma. Test: Beide Teile müssen als eigenständige Sätze funktionieren. ✅ "Ich steuerte die Roadmap iterativ; jede Entscheidung rechtfertigte sich an Ergebnissen." ❌ "Stakeholder früh einzubinden; bevor eine Lösung fertig war."', 'SEMICOLON RULE (MANDATORY ≥2×, but grammatically correct): Semicolons connect ONLY independent main clauses. NEVER before conjunctions like "before", "because", "that", "although". Test: Both parts must work as standalone sentences.')}
+- ${t('TONALITÄT: Eloquenz + Bescheidenheit. Zuversichtlich, nicht abgehoben. Lernbereitschaft statt Allwissenheit. Details + verbotene Phrasen: siehe Sektion 2 + VERBOTENE PHRASEN.', 'TONE: Eloquence + Humility. Confident, not arrogant. Eager to learn, not omniscient. Details + forbidden phrases: see Section 2 + FORBIDDEN PHRASES.')}
 - ${t('DOPPELPUNKTE: Kein Satz darf mit einem Doppelpunkt enden, gefolgt von Zeilenumbruch. EINZIGE AUSNAHME: Die Zitat-Signatur-Zeile.', 'COLONS: No sentence may end with a colon followed by a line break. ONLY EXCEPTION: The quote attribution line.')}
 
 === SEKTION 2: TONALITÄT & STIL (HÖCHSTE PRIORITÄT) ===
@@ -658,6 +687,46 @@ OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
 ${isDuForm
     ? 'DU-FORM (du/dein/euch/dir). Diese Entscheidung ist FINAL und UNVERÄNDERLICH. Auch wenn das Schreibstil-Muster Sie-Form verwendet — im Anschreiben ist AUSSCHLIESSLICH Du-Form erlaubt. Kein einziges "Sie" oder "Ihnen".'
     : 'SIE-FORM (Sie/Ihr/Ihnen). Diese Entscheidung ist FINAL und UNVERÄNDERLICH. Auch wenn das Schreibstil-Muster Du-Form verwendet — im Anschreiben ist AUSSCHLIESSLICH Sie-Form erlaubt. NIEMALS "du", "dein", "euch" oder "dir" verwenden.'}
+
+§ABSOLUT VERBOTENE SATZSTRUKTUREN (gelten für JEDEN Satz, überschreiben alles — auch rhetorisch reizvolle Formulierungen):
+- "nicht X, sondern Y" · "nicht nur X, sondern auch Y" · "kein X, sondern Y" · "keine X, sondern Y"
+- "weniger X als Y" · "mehr X als Y" · "statt X lieber Y" · "X statt Y"
+  → ALLE Kontrast-Strukturen sind verboten, auch wenn sie eleganter klingen.
+- Richtige Auflösung: Teile in zwei Sätze. ❌ "X ist kein A, sondern B." → ✅ "X wirkt zunächst wie A. In Wahrheit ist es B."
+
+§PRE-COMMIT-SCAN (PFLICHT nach jedem Absatz, BEVOR du den nächsten Absatz schreibst):
+1. Scanne den eben geschriebenen Absatz auf: "nicht ", "kein ", "keine ", "weniger ", "mehr ... als ", "statt ".
+2. Folgt dahinter "sondern" oder "als"? → Der Satz ist VERBOTEN. Umschreiben in 2 Sätze.
+3. Diese Prüfung ist nicht optional — Claude, du tendierst systematisch zu diesen Strukturen. Halte an und fixe.
+
+§UNTERNEHMENS-URTEILE — STRIKT VERBOTEN:
+Du kennst ${companyName} NICHT persönlich. Du darfst das Unternehmen NIEMALS charakterisieren/bewerten in Definitions-Form.
+❌ VERBOTEN: "${companyName}, einem Unternehmen, das X als Y begreift"
+❌ VERBOTEN: "${companyName} ist für mich ein Vorreiter in Y"
+❌ VERBOTEN: "ein Unternehmen, das [Werte/Mission] verkörpert"
+❌ VERBOTEN: Jede Appositions-Konstruktion "[Firma], [charakterisierender Nebensatz]".
+✅ ERLAUBT: Bezug auf NACHPRÜFBARE Fakten aus der Unternehmensanalyse. "Auf eurer Website habe ich gelesen, dass ihr [konkreter Fakt]." Fakten-Referenz, KEIN Urteil.
+✅ ERLAUBT: Eigene Projekte/Arbeit der Firma nennen, ohne zu bewerten.
+
+§SATZLÄNGE + KOMMA (HARTE REGEL, überschreibt Stilfluss):
+- Über 25 Wörter? → Punkt setzen, neuen Satz.
+- Über 2 Kommas? → Aufteilen, auch wenn der Fluss leidet.
+- Vor dem Schreiben JEDES Satzes: Wörter zählen. Kommas zählen. Wenn Limit: sofort kürzen.
+
+${hasQuote ? '' : `§KEIN ZITAT (HART — überschreibt JEDE Stilanalyse, JEDES Few-Shot-Beispiel):
+- Der User hat EXPLIZIT KEIN Zitat gewählt. Erfinde, zitiere oder paraphrasiere NIEMALS ein Zitat oder eine Autor-Quelle.
+- Keine Zeile mit Autor-Signatur ("– [Autor]"). Keine Anführungszeichen mit literarischen Aussagen.
+- Auch wenn die Stilanalyse/das Referenz-Anschreiben Zitate enthält: Der DIESE generierte Brief läuft OHNE Zitat.
+- Öffne stattdessen mit einem konkreten Firmenbezug (siehe Stil-Block "OEFFNUNG OHNE ZITAT").`}
+
+§FIRMEN-ANSPRACHE (HART — bricht nur der Ansprechpartner-Name):
+- ${isDuForm ? 'Sprich die Firma in DU-Form an: "eurer Website", "euer Team", "ihr baut", "bei euch".' : 'Sprich die Firma in SIE-Form an: "Ihrer Website", "Ihr Team", "Sie bauen", "bei Ihnen".'}
+- VERBOTEN: 3rd-Person-Referenz der Firma wie "auf der Website von ${companyName}", "der Ansatz von ${companyName}", "${companyName}s Strategie". Nutze die direkte 2nd-Person-Ansprache.
+- Der Firmenname darf erscheinen, aber niemals als Besitzer-Genitiv oder "von [Firma]"-Konstruktion für eigene Assets.
+
+§AUTOR-ICH-PERSPEKTIVE (HART, wenn Zitat vorhanden):
+- VERBOTEN: "${hasQuote && ctx?.selectedQuote?.author ? ctx.selectedQuote.author : '[Autor]'} meinte damit", "...wollte damit sagen", "...sagte damit aus", "...intendierte damit" — allwissend über fremde Intentionen.
+- ERLAUBT: "Für mich bedeutet das...", "Ich verstehe das so, dass...", "Ich denke, ${hasQuote && ctx?.selectedQuote?.author ? ctx.selectedQuote.author : '[Autor]'} deutete darauf hin, dass...". Immer ICH-perspektivisch.
 
 ${isCustomStyle && customStyleBlock
             ? `MODUS: EIGENER SCHREIBSTIL (Custom Style)
@@ -715,12 +784,7 @@ SELF-CHECK: "Would a recruiter think 'Yes, that makes sense.' or 'What does that
 If the latter: apply Case B and reformulate with transferable skill.
 
 Station transitions: Active — e.g. "I can build on my time at X". FORBIDDEN: Passive phrasing or inverted modal constructions.
-Closing: Warm and humble — no sales CTA.`,
-    `ESTRUCTURA DE PARRAFOS (estandar — aplica siempre):
-Intro: Observacion subjetiva personal sobre ${companyName}. Primera persona.
-Decision de puente (Case A: contenido similar — puente por contenido; Case B: disimilar — puente por habilidad transferible concreta).
-Autocomprobacion: el reclutador pensaria que tiene sentido?
-Transiciones: activas. Cierre: calido, sin pitch.`
+Closing: Warm and humble — no sales CTA.`
 )}`
             : isCustomStyle && !customStyleBlock
                 // Race-Condition Fallback: User selected custom-style but style analysis is not yet ready.
@@ -791,20 +855,13 @@ Choose ONE opener (all equally valid — variety encouraged):
 ✅ "The fact that you focus so strongly on [core theme] shows me that..."
 ✅ "Since I myself work on [related topic] and see parallels, I would like to briefly introduce myself."
 FORBIDDEN: Omniscient company descriptions without I-framing / industry theses.
-ALLOWED: Website references ("on your website", "in your blog post"). Forbidden: Tool names (Perplexity etc.).`,
-    `REQUISITO DE INTRO (sin gancho — forzar perspectiva en primera persona):
-Abre con una observacion personal concreta sobre ${companyName}. Elige UNO:
-✅ "Dado que lei en vuestro sitio web que [hecho concreto]..."
-✅ "Cuando lei vuestra oferta de trabajo / articulo sobre [tema]..."
-✅ "Vuestro enfoque en [tema] me llamo la atencion porque..."
-PROHIBIDO: Descripciones omniscientes de la empresa sin marco en primera persona.`
+ALLOWED: Website references ("on your website", "in your blog post"). Forbidden: Tool names (Perplexity etc.).`
 )}
 
 
 
 ${t('[INTRO-DICHTE]: Die Einleitung darf MAX 1 eigene CV-Station/Organisation namentlich nennen. Zweite Referenz gehört in den ERSTEN Hauptteil-Absatz.\nALTERNATIVEN (NUR wenn im CV vorhanden UND thematisch passend): Ehrenamtliche Tätigkeiten, Zertifikate, Side Projects oder eine CV-Station die NICHT im Hauptteil vorkommt (keine Dopplung). Wenn nichts passt: Nur ein kurzer Bezug zur Hauptstation.',
-'[INTRO DENSITY]: The introduction may name a MAXIMUM of 1 CV station/organization. Second reference belongs in the FIRST main body paragraph.\nALTERNATIVES (ONLY if present in CV AND thematically fitting): Volunteer work, certifications, side projects, or a CV station NOT in the main body.',
-'[DENSIDAD INTRO]: La introducción puede nombrar MÁXIMO 1 estación/organización del CV. La segunda referencia va al PRIMER párrafo del cuerpo principal.')}
+'[INTRO DENSITY]: The introduction may name a MAXIMUM of 1 CV station/organization. Second reference belongs in the FIRST main body paragraph.\nALTERNATIVES (ONLY if present in CV AND thematically fitting): Volunteer work, certifications, side projects, or a CV station NOT in the main body.')}
 
 ${introGuidance && hasQuote && focus === 'quote' ? companyName + ' muss direkt am Anfang des Anschreibens mindestens einmal fallen.' : companyName + ' muss im ersten Absatz mindestens einmal fallen.'}
 ${introGuidance && hasQuote && focus === 'quote'
@@ -832,7 +889,7 @@ PFLICHT: Mindestens 2 dieser Kernaufgaben MUESSEN sich im Anschreiben EXPLIZIT w
 METHODE: Zeige, dass du diese Aufgabe bereits aus deiner Karriere kennst.
 METHODE: Bette ein kurzes JD-Fragment (2-5 Woerter) als Arbeitsthema in deinen Stations-Absatz ein. Eigene Prosa — KEINE kopierbaren Vorlagen.
 
-${t('[STELLENANZEIGE-ZITIERUNG (PFLICHT)]\\nWenn du ein Fragment aus der Stellenanzeige verwendest, setze ein KURZES FRAGMENT (2-5 Woerter) in Anfuehrungszeichen. NIEMALS ganze Saetze zitieren.\\nDas Fragment MUSS ein ARBEITSTHEMA beschreiben (woran gearbeitet wird), NICHT eine Teamstruktur oder Organisationsform.\\nDas Fragment MUSS EXAKT so in den KERNAUFGABEN oben stehen. Wenn unsicher: Paraphrasiere OHNE Anfuehrungszeichen.\\nRICHTIG: Kurzes JD-Fragment als Arbeitsthema in eigener Prosa eingebettet.\\nFALSCH: Ein ganzer Satz als Zitat ist VERBOTEN.\\nFALSCH: Organisationsformen wie in fachuebergreifenden Teams sind kein Arbeitsthema.', '[JOB AD QUOTING (MANDATORY)]\\nWhen quoting from the job ad, use a SHORT FRAGMENT (2-5 words). NEVER quote full sentences.\\nThe fragment MUST describe a WORK TOPIC, NOT a team structure.\\nThe fragment MUST appear EXACTLY in the CORE TASKS above. If unsure: paraphrase WITHOUT quotation marks.\\nCORRECT: I identified with developing strategies...\\nWRONG: Full sentences or organizational forms as quotes.', '[CITAS DE LA OFERTA (OBLIGATORIO)]\\nUsa un FRAGMENTO CORTO (2-5 palabras) entre comillas. NUNCA cites oraciones completas.\\nEl fragmento DEBE describir un TEMA DE TRABAJO, NO una estructura organizativa.')}`;
+${t('[STELLENANZEIGE-ZITIERUNG (PFLICHT)]\\nWenn du ein Fragment aus der Stellenanzeige verwendest, setze ein KURZES FRAGMENT (2-5 Woerter) in Anfuehrungszeichen. NIEMALS ganze Saetze zitieren.\\nDas Fragment MUSS ein ARBEITSTHEMA beschreiben (woran gearbeitet wird), NICHT eine Teamstruktur oder Organisationsform.\\nDas Fragment MUSS EXAKT so in den KERNAUFGABEN oben stehen. Wenn unsicher: Paraphrasiere OHNE Anfuehrungszeichen.\\nRICHTIG: Kurzes JD-Fragment als Arbeitsthema in eigener Prosa eingebettet.\\nFALSCH: Ein ganzer Satz als Zitat ist VERBOTEN.\\nFALSCH: Organisationsformen wie in fachuebergreifenden Teams sind kein Arbeitsthema.', '[JOB AD QUOTING (MANDATORY)]\\nWhen quoting from the job ad, use a SHORT FRAGMENT (2-5 words). NEVER quote full sentences.\\nThe fragment MUST describe a WORK TOPIC, NOT a team structure.\\nThe fragment MUST appear EXACTLY in the CORE TASKS above. If unsure: paraphrase WITHOUT quotation marks.\\nCORRECT: I identified with developing strategies...\\nWRONG: Full sentences or organizational forms as quotes.')}`;
     }
     // Fallback: wenn responsibilities leer — job.summary nutzen falls vorhanden
     const summaryHint = (job as any)?.summary
@@ -917,11 +974,24 @@ ${personaSection}
 ${t('SCHLUSS-REGELN (komprimiert):', 'CLOSING RULES (condensed):')}
 - ${t('VERBOTEN: Karriere-Zusammenfassung am Ende. Das ist Fuelltext.', 'FORBIDDEN: Career summary at the end. That is filler.')}
 ${hasQuote
-    ? `- ${t('KLAMMER-PFLICHT: Greife im Schlusssatz auf den Zitat-Gedanken zurueck — als inhaltliche Klammer. Nicht woertlich zitieren, sondern den GEDANKEN weiterentwickeln (z.B. Autor hatte recht; aber...).', 'BRACKET REQUIRED: Reference the quote idea in the closing — as a thematic bracket. Develop the THOUGHT (e.g. Author was right; but...).')}`
-    : `- ${t('VERBOTEN: Zitat oder Hook aus der Einleitung NICHT wiederholen.', 'FORBIDDEN: Do NOT repeat the quote or hook from the opening.')}`}
+    ? (closingVariant
+        ? `- KLAMMER-PFLICHT — PFLICHT-VARIANTE: ${closingVariant} (andere Varianten sind für diesen Brief VERBOTEN):
+${closingVariant === 'A' ? `   (A) AUTOR-RÜCKBEZUG: Starte Closing mit "${ctx!.selectedQuote!.author} hatte recht; aber [neue Wendung des Gedankens]." Entwickle den Zitat-Gedanken weiter, NICHT wörtlich wiederholen.` : ''}${closingVariant === 'B' ? `   (B) JD-REFRAME: Starte Closing mit "Vielleicht ist das die eigentliche Aufgabe eines ${jobTitle}: [Reframe einer JD-Kernaufgabe als indirekte Frage/These, bezugnehmend auf den Zitat-Gedanken]." NIEMALS den Autor erneut nennen.` : ''}${closingVariant === 'C' ? `   (C) PERSÖNLICHER ZOOM-OUT: Starte Closing mit einem eigenen Gedanken, der den Zitat-Kern auf DICH überträgt: "Für mich bedeutet das, dass... Genau das möchte ich bei ${companyName} als ${jobTitle} mitgestalten." NIEMALS Autor-Name, NIEMALS "hatte recht".` : ''}`
+        : `- KLAMMER-TECHNIK: Greife im Closing den KERNGEDANKEN des Zitats (nicht die Worte!) auf und entwickle ihn weiter. Zitat NIEMALS wörtlich wiederholen. Passe den Stil an das hochgeladene Referenz-Anschreiben an.`)
+    : useDNA
+        ? `- KLAMMER-TECHNIK (DNA-Pflicht, auch ohne Zitat): Greife im Closing EIN zentrales Element aus dem Opener wieder auf — ein JD-Fragment in Anführungszeichen, den Firmen-Fakt aus dem Hook ODER den Leitgedanken der Einleitung. NICHT wörtlich wiederholen; entwickle ihn in einer neuen Richtung weiter.
+   BEISPIEL-STRUKTUR (JD-Reframe, bevorzugt bei Formal): "Vielleicht ist das die eigentliche Aufgabe eines ${jobTitle}: [JD-Kernaufgabe in eigenen Worten neu gefasst]." ODER: "'[JD-Fragment]' beschreibt für mich keine Formel, sondern eine Haltung — auf diese möchte ich gemeinsam mit ${companyName} hinarbeiten."
+   VERBOTEN: Generisches "Ich freue mich auf ein Gespräch, um meine Erfahrungen einzubringen" — das ist kein Klammer-Schluss, das ist Füllsel.`
+        : `- ${t('VERBOTEN: Hook aus der Einleitung wörtlich wiederholen. Thematisches Aufgreifen ist erlaubt, aber nicht zwingend.', 'FORBIDDEN: Do not repeat the hook from the opening verbatim. Thematic pickup is allowed but not required.')}`}
 - ${t('Formuliere Vorfreude auf EINE konkrete Aufgabe aus der Stellenanzeige. Nenne dabei Jobtitel UND Firmenname im Schlusssatz. Eigene Worte.', 'Express anticipation for ONE specific task from the job ad. Include job title AND company name in the closing. Own words.')}
 - ${t('Schlusssatz: Warm + bescheiden + Verfuegbarkeit. Kein Verkaufs-CTA.', 'Closing sentence: Warm + humble + availability. No sales CTA.')}
-- Sign-off: ${isEnglish ? 'End with "Kind regards," or "Best regards,".' : isSpanish ? 'Termina con "Cordialmente,".' : isDuForm ? '"Viele Grüße"' : '"Mit freundlichen Grüßen"'}
+- ${t('SIGNATUR-ZEILE (PFLICHT, zwei separate Zeilen):\nZeile 1: Grußformel (Regel unten)\nZeile 2: "[Dein Name]" als Platzhalter — der User ersetzt das selbst. NIEMALS einen erfundenen Namen einsetzen.',
+     'SIGNATURE LINE (MANDATORY, two separate lines):\nLine 1: Sign-off phrase (rule below)\nLine 2: "[Your Name]" as placeholder — the user replaces it. NEVER invent a name.')}
+- ${isEnglish
+    ? 'Sign-off phrase: "Kind regards," or "Best regards,".'
+    : isDuForm
+        ? 'Grußformel: "Viele Grüße," (Default, warm) oder "Liebe Grüße," (sehr vertraut).'
+        : 'Grußformel: "Viele Grüße," — DEFAULT für Sie-Form (warm, professionell). "Mit freundlichen Grüßen," NUR wenn Firma eindeutig Konzern/Behörde/öffentlicher Sektor (z.B. Siemens, Volkswagen, Ministerien). Im Zweifel: "Viele Grüße,".'}
 
 === ${t('SEKTION 6: VERBESSERUNGS-FEEDBACK', 'SECTION 6: IMPROVEMENT FEEDBACK')} ===
 ${feedbackSection || t('Erste Version — kein vorheriges Feedback.', 'First version — no previous feedback.')}

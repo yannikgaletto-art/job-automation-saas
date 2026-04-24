@@ -119,6 +119,8 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 | **CL Pipeline Hardening (2026-04-09)** | **K1: PII personalInfo stripped from CV JSON before prompt. K2: Inngest polish writes metadata ONLY (no content overwrite — Lost Edit Prevention). K3: Multi-Agent Pipeline deprecated (Haiku→Sonnet regression). Blacklist consolidated: 4 lists → 1 SSOT (~74 patterns). Fluff feedback injected into sync-loop. kill-fluff degraded to scan-only (cost=$0). Em-dash utility extracted.** |
 | **CL Structural Hardening & Quotes (2026-04-09)** | **Quote-Bridge reformiert ("wurde mir klar" → "Dieser Gedanke begleitete mich"). JD-Zitat Logik repariert (Max 5 Wörter Fragment, Thema statt Organisationsform). Fragment-Validator Check + False-Positive Exclusion für Attributions. Kritischer Prompt Unicode-Escape Bug (escaped `\u201e`) gefixt. Anti-Fluff System 100% test-gesichert.** |
 | **CV Data Integrity Hardening (2026-04-17)** | **Root Cause analysiert: `proposal.translated` wurde korrupt in DB gespeichert (PII null, 6→2 Stationen). Fix 1 (`route.ts`): Integrity Guard — nach AI-Optimierung werden PII-Felder (email, phone, location, linkedin, website) und Strukturfelder (languages, certifications, experience/education-Count) aus `cv_structured_data` wiederhergestellt, BEVOR das Proposal in die DB geschrieben wird. Fix 2 (`cv-translator.ts`): PII + Structure Restore nach AI-Translation — company, dateRangeText, institution, grade werden idempotent aus dem Original-CV zurückkopiert. Fix 3 (`OptimizerWizard.tsx`): Layout-Fix sendet immer `cvData` (immutable Original), niemals display-gefiltertes `editablePdfData`. Fix 4 (`cv-merger.ts`): Entity-Level-Remove Parität mit Backend. Fix 5 (`cv-payload-pruner.ts`): Dead Code Fix — Feldname `certificates` → `certifications` (war immer false-y, Cap-at-8 war toter Code).** |
+| **CL Phase 5 Hardening (2026-04-24)** | **Regex-Post-Gen-Validator um 9 Patterns erweitert: Kontrast "nicht X, sondern Y", Komparativ-Selbstlob, halluzinierte Studien, 3rd-Person-Firma, ICH-zentrierte Brücke, Unternehmens-Apposition, "[Autor] meinte damit", anthropomorphe Firma ("X hat mich gelehrt"), "war mir sofort klar". Pathly-DNA-Toggle für Custom-Style (default OFF). Prompt-Härtung: §KEIN-ZITAT wenn `!hasQuote`, §FIRMEN-ANSPRACHE (2nd-Person-Pflicht), §AUTOR-ICH-PERSPEKTIVE, §REFERENZBRIEF-KALIBRIERUNG-Checkliste. activeTone bei Custom-Style gemutet. hasQuote via `.quote?.trim()` gehärtet. Upload-Limit-Fix: generierte Drafts (`origin='generated'`) zählen nicht mehr. Wizard-Escape: User kann ohne Hook fortfahren bei leerer Perplexity-Analyse. Conflict-Guard: Custom-Style + DNA-OFF verwirft vor-gewähltes Zitat inline. `multi-agent-pipeline` + `kill-fluff` archiviert (0 Caller). `rhetorical_contrast_pattern` Feld aus StyleAnalysis entfernt (war Konflikt-Quelle). Handover-MD für Wizard-Step-0-Refactor (`memory/project_phase_b_wizard_refactor.md`).** |
+| **CL Phase 5.3 Sync-Loop Fix (2026-04-24)** | **Kritischer Architektur-Bug behoben: scanForFluff lief NACH dem Break-Check, wurde bei Judge-PASS umgangen. Folge: "kein X, sondern Y" rutschte durch obwohl Regex korrekt. Fix (`cover-letter-generator.ts:374-383`): scanForFluff ist jetzt Break-Blocker (`judgePassed && !iterFluff.found`). Blacklist um 3 weitere Patterns erweitert: Chat-Floskel "auf ihrem Weg in die digitale Zukunft", Allwissens-Definition "ist bei [Firma] X" / "bei [Firma] heißt/bedeutet X". Klammer-Technik ist jetzt DNA-Pflicht auch OHNE Zitat — JD-Fragment oder Hook wird im Closing aufgegriffen (JD-Reframe-Pattern aus Volkswagen-Referenz). Base: 60 Tests grün.** |
 
 
 ---
@@ -145,13 +147,13 @@ Claude Haiku 4.5 (Anthropic US)
 ```
 parse_html, extract_job_fields                              → Claude Haiku 4.5 (structured, deutsch)
 detect_ats_system, classify_job_board, summarize             → GPT-4o-mini (cheap)
-write_cover_letter, personalize_intro, optimize_cv      → Claude Sonnet 4.5 (premium)
+write_cover_letter, personalize_intro, optimize_cv      → Claude Sonnet 4.6 (premium)
 cv_match, cv_parse, analyze_skill_gaps                  → Claude Haiku 4.5 (structured)
 document_extraction (PRIMARY)                           → Azure Document Intelligence (EU)
 ```
 
 **CRITICAL MODEL RULE:** 
-ALLE neuen AI-Calls MÜSSEN zwingend die 4.5er Modelle nutzen (`claude-sonnet-4-5-20250929` oder `claude-haiku-4-5-20251001`). Die Verwendung von alten Modellen wie `claude-3-5-...` oder `claude-3-haiku-20240307` ist **STRENG VERBOTEN**.
+ALLE neuen AI-Calls MÜSSEN zwingend die aktuellen Modelle nutzen: `claude-sonnet-4-6` (Premium-Tasks) oder `claude-haiku-4-5-20251001` (Judge/Analysis). Die Verwendung alter Modelle wie `claude-3-5-...`, `claude-3-haiku-20240307` oder `claude-sonnet-4-5-*` ist **STRENG VERBOTEN**.
 
 ### AI Content Generation (Writing Rules)
 Wenn Prompts für Textgenerierungen (wie Cover Letter, CV-Bulletpoints oder Critiques) erstellt werden, MÜSSEN folgende Constraints standardmäßig integriert sein:

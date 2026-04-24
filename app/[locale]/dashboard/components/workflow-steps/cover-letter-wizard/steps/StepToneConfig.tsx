@@ -26,7 +26,10 @@ function formatDate(dateStr: string, locale: string) {
 export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const t = useTranslations('cover_letter');
     const locale = useLocale();
-    const { setTone, setOptInModule, isStepComplete, tone, optInModules } = useCoverLetterSetupStore();
+    const { setTone, setOptInModule, isStepComplete, tone, optInModules, selectedQuote, setQuote } = useCoverLetterSetupStore();
+
+    // Phase 5.2: Inline warning when Custom-Style + DNA-OFF discards a pre-selected quote.
+    const [quoteDiscardedWarning, setQuoteDiscardedWarning] = useState(false);
 
     const toneOptions = useMemo(() => toneOptionIds.map(id => {
         const key = id.replace(/-/g, '_') as 'tone_storytelling' | 'tone_formal';
@@ -51,6 +54,10 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const [pendingDocId, setPendingDocId] = useState<string | undefined>(undefined);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+    // Phase 5 (2026-04-24): Pathly-DNA opt-in for custom-style mode.
+    // Default OFF — user chose "own style" because they want their style, not Yannik's.
+    const [usePathlyDNA, setUsePathlyDNA] = useState<boolean>(tone?.usePathlyDNA ?? false);
 
     const availableDocs = setupData.availableStyleDocs || [];
     const hasUploadedDocs = availableDocs.length > 0;
@@ -95,7 +102,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
         source: 'preset' | 'custom-style',
         preset: TonePreset,
         docId?: string,
-        overrides?: { lang?: TargetLanguage; contact?: string; form?: 'sie' | 'du' }
+        overrides?: { lang?: TargetLanguage; contact?: string; form?: 'sie' | 'du'; dna?: boolean }
     ) => {
         setTone({
             preset,
@@ -106,12 +113,29 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             styleWarningAcknowledged: true,
             contactPerson: overrides?.contact ?? contactPerson,
             formality: overrides?.form ?? formality,
+            usePathlyDNA: overrides?.dna ?? usePathlyDNA,
         });
+    };
+
+    const handlePathlyDNAToggle = () => {
+        const next = !usePathlyDNA;
+        setUsePathlyDNA(next);
+        // Phase 5.2: When DNA flips ON, quote support is restored → clear the discard warning.
+        if (next) setQuoteDiscardedWarning(false);
+        syncTone(toneSource, selectedPreset, selectedDocId, { dna: next });
     };
 
     // ─── Tone Source Toggle Handler ─────────────────────────────────
     const handleToneSourceChange = (source: 'preset' | 'custom-style') => {
         setToneSource(source);
+
+        // Phase 5.2: Conflict-Guard — when switching to custom-style with DNA-OFF (default),
+        // a quote selected in Step 1 conflicts with "pure user style without quotes".
+        // Discard the quote and notify the user inline.
+        if (source === 'custom-style' && !usePathlyDNA && selectedQuote) {
+            setQuote(null);
+            setQuoteDiscardedWarning(true);
+        }
 
         if (source === 'custom-style') {
             // Fix: Ghost-Preset — reset hidden preset to data-driven
@@ -128,6 +152,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             }
         } else {
             setSelectedDocId(undefined);
+            setQuoteDiscardedWarning(false); // Clear warning when switching back to preset
             syncTone('preset', selectedPreset, undefined);
         }
     };
@@ -329,6 +354,43 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                                 </div>
                             )}
                         </div>
+
+                        {/* ─── Quote Discarded Warning (Phase 5.2) ─────────── */}
+                        {quoteDiscardedWarning && (
+                            <div className="mt-2 flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                <p className="text-[10px] text-amber-800 leading-relaxed">
+                                    {t('custom_style_quote_discarded')}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* ─── Pathly-DNA Toggle (Phase 5 — 2026-04-24) ─────── */}
+                        {/* Only relevant in custom-style mode: lets user opt into Yannik's
+                            signature layer on top of their own style. */}
+                        <button
+                            onClick={handlePathlyDNAToggle}
+                            className="mt-2 w-full flex items-start gap-2 p-3 rounded-lg border border-[#E7E7E5] bg-white hover:bg-[#FAFAF9] transition-colors text-left"
+                        >
+                            <div
+                                className={`mt-0.5 w-9 h-5 rounded-full transition-colors shrink-0 relative ${usePathlyDNA ? 'bg-[#002e7a]' : 'bg-[#D6D6D3]'
+                                    }`}
+                            >
+                                <motion.div
+                                    className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm"
+                                    animate={{ left: usePathlyDNA ? 18 : 2 }}
+                                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                                />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-[#37352F]">
+                                    {t('pathly_dna_label')}
+                                </p>
+                                <p className="text-[10px] text-[#73726E] mt-0.5 leading-relaxed">
+                                    {t('pathly_dna_hint')}
+                                </p>
+                            </div>
+                        </button>
                     </motion.div>
                 )}
 

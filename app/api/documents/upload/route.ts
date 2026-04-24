@@ -67,6 +67,9 @@ export async function POST(req: NextRequest) {
 
         // ─── Document Limit Guard (max 3 per type) ───────────────────
         // Double-Assurance: Frontend disables button at 3, backend rejects at 3.
+        // Bugfix 2026-04-24: Exclude generated drafts (`origin='generated'`) — they
+        // are auto-saved by the generator and must NOT count against the upload quota.
+        // Consistent with cover-letter-generator.ts:144 which also filters `origin!='generated'`.
         const singleTypeField = (formData.get('type') as string) || null;
 
         // Only applies to Settings mode: single `file` upload with explicit `type`
@@ -76,10 +79,11 @@ export async function POST(req: NextRequest) {
                 .from('documents')
                 .select('id', { count: 'exact', head: true })
                 .eq('user_id', userId)
-                .eq('document_type', explicitType);
+                .eq('document_type', explicitType)
+                .neq('origin', 'generated');
 
             if (!countErr && (count ?? 0) >= 3) {
-                console.log(`[${requestId}] route=documents/upload BLOCKED — ${explicitType} limit reached (${count}/3)`);
+                console.log(`[${requestId}] route=documents/upload BLOCKED — ${explicitType} limit reached (${count}/3, excluding generated drafts)`);
                 return NextResponse.json(
                     { error: `Limit erreicht: Du kannst maximal 3 ${explicitType === 'cv' ? 'Lebensläufe' : 'Anschreiben'} hochladen. Lösche zuerst ein bestehendes Dokument.`, code: 'DOCUMENT_LIMIT_REACHED', requestId },
                     { status: 429 }

@@ -48,6 +48,13 @@ export interface ToneConfig {
     styleWarningAcknowledged: boolean;   // User hat Anti-GPT-Callout gelesen
     contactPerson?: string;              // Optionaler Ansprechpartner für die Anrede
     formality: 'sie' | 'du';            // Sie-Form (klassisch) oder Du-Form (Startups/Tech)
+    /**
+     * Phase 5 (2026-04-24): When `toneSource='custom-style'`, mix Pathly signature
+     * patterns (opening rotation, golden sample, bracket technique) on top of the
+     * user's own style. Default `false` — purely user-style unless explicitly enabled.
+     * Ignored when `toneSource='preset'` (preset always carries DNA).
+     */
+    usePathlyDNA?: boolean;
 }
 
 // ─── Quote Selection (Phase B, optional) ──────────────────────────
@@ -90,7 +97,9 @@ export interface HiringManagerCritique {
 export interface CoverLetterSetupContext {
     jobId: string;
     companyName: string;
-    selectedHook: SelectedHook;
+    /** Optional. Users can skip hook selection when no company intel is available
+     *  (e.g. Perplexity returned nothing, or they want to proceed without it). */
+    selectedHook?: SelectedHook;
     selectedQuote?: SelectedQuote;     // Optional quote from Phase B
     cvStations: SelectedCVStation[];   // Min 1, Max 3
     tone: ToneConfig;

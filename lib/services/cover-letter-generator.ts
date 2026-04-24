@@ -16,6 +16,7 @@ import type { StyleAnalysis } from './writing-style-analyzer';
 import { scanForFluff } from './anti-fluff-blacklist';
 import { buildSystemPrompt, type UserProfileData, type JobData, type CompanyResearchData } from './cover-letter-prompt-builder';
 import { judgeCoverLetter, type JudgeResult } from './cover-letter-judge';
+import { auditPrompt } from './prompt-audit';
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 // WHY: Uses Helicone-aware singleton from model-router (not a raw client).
@@ -254,7 +255,7 @@ REGELN:
         // 1F: Minimum quality gate for targeted fixes (validator + fluff scan, no Judge call)
         const companyName = setupContext?.companyName || 'das Unternehmen';
         const fixValidation = validateCoverLetter(fixedText, companyName);
-        const fixFluff = scanForFluff(fixedText);
+        const fixFluff = scanForFluff(fixedText, companyName);
         const fixJudgePassed = fixValidation.isValid && !fixFluff.found;
         const fixFailReasons: string[] = [
             ...fixValidation.errors,
@@ -307,8 +308,15 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
             styleAnalysis ?? null,
             setupContext,
             feedback,
-            lastWordCount
+            lastWordCount,
+            jobId
         );
+
+        auditPrompt(prompt, setupContext, {
+            jobId,
+            iteration: iteration + 1,
+            feedbackAttached: feedback,
+        });
 
         // API Key guard — mock if missing
         if (!process.env.ANTHROPIC_API_KEY) {
@@ -363,9 +371,14 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
             timestamp: new Date().toISOString()
         });
 
-        if (validationResult.isValid && judgePassed) {
+        // Phase 5.3 (2026-04-24): scanForFluff MUSS vor dem Break laufen. Sonst rutschen
+        // Fluff-Bugs durch den Judge-PASS-Pfad (der die Kontrast-Struktur "kein X, sondern Y"
+        // nicht als Hard-Fail sieht). Fluff = Break-Blocker, nicht nur Feedback-Injection.
+        const iterFluff = scanForFluff(generatedText, companyName);
+
+        if (validationResult.isValid && judgePassed && !iterFluff.found) {
             coverLetter = generatedText;
-            console.log(`✅ Quality target reached (Judge: PASS)`);
+            console.log(`✅ Quality target reached (Judge: PASS, Fluff: CLEAN)`);
             break;
         }
 
@@ -385,13 +398,12 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
 
         // R1: Fluff-Feedback injected into iteration loop (moved from async Inngest)
         // Runs BEFORE the next generation so Claude can correct in-place.
-        const iterFluff = scanForFluff(generatedText);
         if (iterFluff.found) {
             for (const m of iterFluff.matches) {
                 const msg = m.feedback ?? `Entferne die Phrase "${m.pattern}" — ${m.reason}`;
                 feedback.push(`FLUFF: ${msg}`);
             }
-            console.warn(`⚠️ [Anti-Fluff] ${iterFluff.matches.length} pattern(s) found in iteration ${iteration + 1} — injecting feedback`);
+            console.warn(`⚠️ [Anti-Fluff] ${iterFluff.matches.length} pattern(s) found in iteration ${iteration + 1} — injecting feedback (blocks break)`);
         }
 
         // §Fix Defect #2 (position-corrected): Author check AFTER feedback reset so hint survives into next iteration
@@ -407,16 +419,30 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
             console.warn('⚠️ Max iterations reached. Picking best valid version.');
             const validAttempts = iterationLog.filter(log => log.validation.isValid);
             if (validAttempts.length > 0) {
-                // Prefer passed attempts, otherwise take the last valid one
+                // Phase 5.3.1 (2026-04-24): Prefer fluff-free attempts over fluff-tainted ones.
+                // Without this, the 3-iteration cap allows "kein X, sondern Y" contrast leaks
+                // to survive when Claude stubbornly produces them in every iteration.
+                // Priority order: (1) fluff-free + passed, (2) fluff-free + valid, (3) passed, (4) valid.
                 const passedAttempts = validAttempts.filter(log => log.judgePassed);
-                const best = passedAttempts.length > 0
-                    ? passedAttempts[passedAttempts.length - 1]
-                    : validAttempts[validAttempts.length - 1];
+                const fluffFreePassed = passedAttempts.filter(log => !scanForFluff(log.letterVersion, companyName).found);
+                const fluffFreeValid = validAttempts.filter(log => !scanForFluff(log.letterVersion, companyName).found);
+
+                const best = fluffFreePassed.length > 0
+                    ? fluffFreePassed[fluffFreePassed.length - 1]
+                    : fluffFreeValid.length > 0
+                        ? fluffFreeValid[fluffFreeValid.length - 1]
+                        : passedAttempts.length > 0
+                            ? passedAttempts[passedAttempts.length - 1]
+                            : validAttempts[validAttempts.length - 1];
                 coverLetter = best.letterVersion;
                 judgePassed = best.judgePassed;
                 judgeFailReasons = best.judgeFailReasons;
                 validation = best.validation;
-                console.log(`✅ Best-of-N: Iteration ${best.iteration} (Judge: ${judgePassed ? 'PASS' : 'FAIL'})`);
+                const tier = fluffFreePassed.includes(best) ? 'fluff-free+passed'
+                    : fluffFreeValid.includes(best) ? 'fluff-free+valid'
+                    : passedAttempts.includes(best) ? 'passed-with-fluff'
+                    : 'valid-with-fluff';
+                console.log(`✅ Best-of-N: Iteration ${best.iteration} — tier=${tier} (Judge: ${judgePassed ? 'PASS' : 'FAIL'})`);
             } else {
                 console.error(`❌ No valid cover letter after ${MAX_ITERATIONS} iterations — returning last attempt.`);
                 coverLetter = generatedText;
@@ -425,7 +451,7 @@ async function generateCoverLetter(params: CoverLetterGenerationParams): Promise
     }
 
     // ─── Post-Generation Fluff Scan (final audit, fluff was also checked in-loop) ──
-    const fluffScan = scanForFluff(coverLetter);
+    const fluffScan = scanForFluff(coverLetter, companyName);
     const fluffWarning = fluffScan.found;
     if (fluffWarning) {
         console.warn(`⚠️ [Anti-Fluff] ${fluffScan.matches.length} patterns survived ${MAX_ITERATIONS} iterations`);

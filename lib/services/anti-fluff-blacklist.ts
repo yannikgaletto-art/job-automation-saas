@@ -18,11 +18,19 @@
 
 export interface BlacklistPattern {
     pattern: string;
+    /** If set, matches via regex instead of substring. `pattern` stays as human-readable label. */
+    regex?: RegExp;
+    /** For patterns that need the companyName at scan time (Unternehmens-Apposition). */
+    regexBuilder?: (companyName: string) => RegExp;
     reason: string;
     category: 'cliche' | 'ai_marker' | 'passive' | 'structure' | 'source_leak';
     /** Optional feedback string for hard-stop phrases that survive the LLM Judge.
      *  Used by cover-letter-validator.ts to inject explicit re-generation guidance. */
     feedback?: string;
+}
+
+function escapeRegex(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -551,6 +559,120 @@ export const BLACKLIST_PATTERNS: BlacklistPattern[] = [
         reason: 'KI-Schablone — Template-Formulierung für Zitat-Brücken.',
         category: 'ai_marker',
     },
+
+    // ─── REGEX PATTERNS (Phase 5 — 2026-04-24) ────────────────────────────────
+    // Catches variable-fill anti-patterns that substring matching misses.
+    // These are universal rules (per User-Entscheidung 2026-04-24), not style-dependent.
+    {
+        pattern: '[REGEX] nicht/kein X, sondern Y — Kontrast-Konstruktion',
+        regex: /\b(nicht|kein|keine|keinen|keinem|keiner)\b[^.!?;]{1,80}\bsondern\b/i,
+        reason: 'Kontrast-Konstruktion — rhetorisch aufgeblasen, Pathly-Anti-Pattern (Phase 4.7 universell verboten)',
+        category: 'ai_marker',
+        feedback: 'Formuliere den Satz positiv und direkt um — beschreibe was du meinst, ohne "nicht X, sondern Y"-Struktur. Beispiel: "X war eine Bedingung" statt "keine Tugend, sondern eine Bedingung".',
+    },
+    {
+        pattern: '[REGEX] besser/anders als jede/viele andere — Komparativ-Selbstlob',
+        // Allow intervening words: "besser TRÄGT als jede Selbstbeschreibung"
+        regex: /\b(besser|anders|stärker)\b[^.!?;,]{0,25}\bals\s+(jede|alle|viele|andere|die\s+(meisten|anderen|üblichen))\b/i,
+        reason: 'Komparativ-Selbstlob — setzt sich über andere Bewerber. Klingt arrogant (Bug A: Variante D Meta-Hook)',
+        category: 'ai_marker',
+        feedback: 'Entferne den Vergleich mit anderen Bewerbern oder Selbstbeschreibungen. Beschreibe direkt deine Perspektive ohne Abgrenzung nach außen.',
+    },
+    {
+        pattern: '[REGEX] laut einer Studie des/von [INSTITUTION] — halluzinierte Quelle',
+        regex: /\blaut\s+(einer?|dem|der|den)\s+(Studie|Umfrage|Analyse|Report|Bericht|Untersuchung|Erhebung)\s+(des|der|von|vom|beim)\s+[A-ZÄÖÜ]/i,
+        reason: 'Autoritäts-Quelle — muss EXPLIZIT in JD/Unternehmensanalyse stehen, sonst halluziniert (Bug E)',
+        category: 'ai_marker',
+        feedback: 'Prüfe, ob diese Zahl/Quelle WIRKLICH in der Stellenanzeige oder der Unternehmensanalyse steht. Falls nein: Ersetze durch einen konkreten Fakt aus der Unternehmensanalyse ("Auf eurer Website habe ich gelesen, dass...").',
+    },
+    {
+        pattern: '[REGEX] suche ich bei [Firma] — ich-zentrierte Brücke',
+        regex: /\b(suche|finde|erwarte|erhoffe)\s+ich\s+(bei|in)\s+(eurer|Ihrer|euer|Ihr|der|dem|den)?\s*[A-ZÄÖÜ]/,
+        reason: 'ICH-zentrierte Brücke — fordernd statt firma-zentriert (Bug D). Yanniks Idealform: "sehe ich in eurer Arbeit bei [Firma]"',
+        category: 'ai_marker',
+        feedback: 'Formuliere firma-zentriert statt ich-zentriert. Beispiel: "Genau diese Verbindung sehe ich in eurer Arbeit bei [Firma]" statt "Genau diese Verbindung suche ich bei [Firma]".',
+    },
+    // Phase 5.3 (2026-04-24) — Atruvia DNA-ON Findings (Klammer fehlt + Chat-Floskeln)
+    {
+        pattern: '[REGEX] Chat-Floskel "auf ihrem Weg" / "in die digitale Zukunft"',
+        regex: /\b(auf (ihrem|Ihrem|eurem|Eurem) Weg (in die|zur)|in die digitale Zukunft|auf diesem Weg zu begleiten)\b/,
+        reason: 'Generische KI-Floskel in Schluss-Sätzen. Liest sich wie Marketing-Broschüre, nicht wie ein konkretes Anschreiben.',
+        category: 'ai_marker',
+        feedback: 'Ersetze durch einen konkreten Bezug zur Aufgabe oder einer Unternehmensherausforderung. Nicht generisch "auf dem Weg begleiten" — sondern: welches spezifische Problem möchtest du lösen?',
+    },
+    {
+        pattern: '[REGEX] "[Thema] ist bei [Firma] X, sondern Y" — Allwissens-Definition über Unternehmen',
+        regexBuilder: (companyName) => {
+            const coreName = companyName.replace(/\s+(AG|GmbH|SE|GbR|Inc|Ltd|Co|Corp|KG|e\.V\.|OHG)\.?\s*$/i, '').trim();
+            if (coreName.length < 2) return /(?!)/;
+            // Catches "X ist bei [Firma] Y" or "Bei [Firma] ist/heißt/bedeutet X Y" — candidate defines the company.
+            return new RegExp(
+                `\\b(ist bei\\s+${escapeRegex(coreName)}|bei\\s+${escapeRegex(coreName)}[^.!?;]{0,20}\\s+(ist|heißt|bedeutet|meint|steht für))\\b`,
+                'i'
+            );
+        },
+        reason: 'Bewerber definiert das Unternehmen von außen ("ist bei X kein Y sondern Z"). Allwissens-Pose, verstößt gegen Bescheidenheit (QUALITY_CV_COVER_LETTER §N).',
+        category: 'ai_marker',
+        feedback: 'Formuliere aus ICH-Perspektive mit Quelle: "Auf eurer Website habe ich gelesen, dass ihr [Fakt]..." oder "In der Ausschreibung verstehe ich, dass [Thema] ein zentraler Punkt ist." Nicht: "[Thema] ist bei [Firma] X".',
+    },
+    // Phase 5.2 (2026-04-24) — Atruvia QA Findings
+    {
+        pattern: '[REGEX] "war/wurde mir sofort/schnell/direkt klar" — vorgetäuschte Sofort-Einsicht',
+        regex: /\b(war|wurde) mir (sofort|schnell|direkt|umgehend|gleich|unmittelbar) klar\b/i,
+        reason: 'Vorgetäuschte Sofort-Einsicht. Klingt künstlich und selbstinszeniert. Der Bewerber sollte konkret beschreiben, was ihn anspricht, statt eine Gewissheits-Phrase zu verwenden.',
+        category: 'ai_marker',
+        feedback: 'Ersetze durch konkrete Beobachtung: "Das erinnerte mich an..." oder "Darin erkenne ich die Aufgabe, ...". Keine Gewissheits-Behauptungen am Satzanfang.',
+    },
+    {
+        pattern: '[REGEX] "[Firma] hat mich gelehrt" — anthropomorphe Firma-Zuschreibung',
+        regexBuilder: (companyName) => {
+            // Catches "[AnyFirma] hat mich gelehrt/lehrte mich/zeigte mir"
+            // companyName param unused for this pattern (fires for ANY capitalized entity)
+            void companyName;
+            return /\b[A-ZÄÖÜ][a-zäöüß]+(\s+[A-ZÄÖÜ][a-zäöüß]+)?\s+(hat mich gelehrt|lehrte mich|zeigte mir,\s+dass|brachte mir bei)\b/;
+        },
+        reason: 'Anthropomorphe Zuschreibung: Firmen/Institutionen "lehren" nicht. Der Bewerber lernt DURCH die Erfahrung dort, nicht VON der Firma.',
+        category: 'ai_marker',
+        feedback: 'Formuliere ICH-perspektivisch: "Bei [Firma] habe ich gelernt, dass..." oder "Aus meiner Zeit bei [Firma] nehme ich mit, dass...".',
+    },
+    {
+        pattern: '[REGEX] "[Autor] meinte damit..." — Allwissend über Autor-Intention',
+        regex: /\b[A-ZÄÖÜ][a-zäöüß]+\s+meinte\s+damit\b/,
+        reason: 'Allwissende Aussage über die Intention eines Autors. Der Bewerber kann nicht wissen, was ein Philosoph/Denker "gemeint" hat — nur was er selbst darin sieht.',
+        category: 'ai_marker',
+        feedback: 'Ersetze durch ICH-Perspektive: "Für mich bedeutet das..." oder "Ich verstehe das so, dass..." oder "Ich denke, [Autor] deutete darauf hin, dass...".',
+    },
+    {
+        pattern: '[REGEX] auf der Website von [Firma] — 3rd-Person statt 2nd-Person',
+        regexBuilder: (companyName) => {
+            const coreName = companyName.replace(/\s+(AG|GmbH|SE|GbR|Inc|Ltd|Co|Corp|KG|e\.V\.|OHG)\.?\s*$/i, '').trim();
+            if (coreName.length < 2) return /(?!)/;
+            return new RegExp(
+                `\\b(Website|Homepage|Seite|Portal|LinkedIn|Profil|Blog|Presseseite)\\s+(von|der|des)\\s+${escapeRegex(coreName)}\\b`,
+                'i'
+            );
+        },
+        reason: '3rd-Person-Firmenreferenz statt direkter 2nd-Person-Ansprache. Bricht die ICH-zu-IHR-Beziehung des Anschreibens.',
+        category: 'ai_marker',
+        feedback: 'Ersetze durch 2nd-Person: "auf eurer Website" (Du-Form) oder "auf Ihrer Website" (Sie-Form) statt "auf der Website von [Firma]".',
+    },
+    {
+        pattern: '[REGEX] [Firma], einem Unternehmen, das... — Definitions-Apposition',
+        regexBuilder: (companyName) => {
+            // Strip legal suffixes to catch "HiSolutions" even if DB stores "HiSolutions AG"
+            const coreName = companyName.replace(/\s+(AG|GmbH|SE|GbR|Inc|Ltd|Co|Corp|KG|e\.V\.|OHG)\.?\s*$/i, '').trim();
+            if (coreName.length < 2) return /(?!)/; // never-match fallback
+            // Allow optional legal suffix + up to 30 non-terminal chars (e.g. verb "geführt"),
+            // then [,;] then apposition "einem/einer Unternehmen/Firma/..."
+            return new RegExp(
+                `\\b${escapeRegex(coreName)}(\\s+(AG|GmbH|SE|GbR|Inc|Ltd|Co|Corp|KG|e\\.V\\.|OHG))?\\b[^.!?]{0,30}?[,;]\\s+(einem?|einer)\\s+(Unternehmen|Firma|Agentur|Gesellschaft|Organisation|Konzern|Beratung|Anbieter|Dienstleister|Marke|Start[-\\s]?up|Team)\\b`,
+                'i'
+            );
+        },
+        reason: 'Unternehmens-Apposition im Definitions-Format — ChatGPT-Pattern (Bug C). Bewerber definiert keine Unternehmen.',
+        category: 'ai_marker',
+        feedback: 'Entferne die Apposition "[Firma], einem Unternehmen, das...". Formuliere aus ICH-Perspektive mit Quelle: "Auf eurer Website habe ich gelesen, dass...".',
+    },
 ];
 
 export interface FluffScanResult {
@@ -565,14 +687,28 @@ export interface FluffScanResult {
 
 /**
  * Scan generated text for blacklisted patterns.
- * Returns { found: true, matches: [...] } if any patterns are detected.
+ * Supports substring (legacy), static regex, and dynamic regex (company-specific).
+ * @param companyName — required for regexBuilder patterns (Unternehmens-Apposition)
  */
-export function scanForFluff(text: string): FluffScanResult {
+export function scanForFluff(text: string, companyName?: string): FluffScanResult {
     const lowerText = text.toLowerCase();
     const matches: FluffScanResult['matches'] = [];
 
-    for (const { pattern, reason, category, feedback } of BLACKLIST_PATTERNS) {
-        if (lowerText.includes(pattern.toLowerCase())) {
+    for (const entry of BLACKLIST_PATTERNS) {
+        const { pattern, regex, regexBuilder, reason, category, feedback } = entry;
+        let hit = false;
+
+        if (regexBuilder) {
+            if (companyName) {
+                hit = regexBuilder(companyName).test(text);
+            }
+        } else if (regex) {
+            hit = regex.test(text);
+        } else {
+            hit = lowerText.includes(pattern.toLowerCase());
+        }
+
+        if (hit) {
             matches.push({ pattern, reason, category, feedback });
         }
     }

@@ -35,7 +35,7 @@ const MOCK_JOB = {
 
 const MOCK_COMPANY = { company_values: ['Innovation', 'Nachhaltigkeit'], tech_stack: ['SAP'], current_challenges: ['Digitale Transformation'], roadmap_signals: ['KI-Beratung'], recent_news: [{ title: 'Cassini expandiert', date: '2026-03' }] };
 
-const MOCK_STYLE = { tone: 'professional' as const, sentence_length: 'medium' as const, conjunctions: ['Daher', 'Zudem'], greeting: 'Hallo Jens,', rhetorical_devices: [] as string[], forbidden_constructs: [] as string[], uses_em_dash: false, rhetorical_contrast_pattern: false, max_commas_per_sentence: 2 };
+const MOCK_STYLE = { tone: 'professional' as const, sentence_length: 'medium' as const, conjunctions: ['Daher', 'Zudem'], greeting: 'Hallo Jens,', rhetorical_devices: [] as string[], forbidden_constructs: [] as string[], uses_em_dash: false, max_commas_per_sentence: 2 };
 
 const QUOTE_A: SelectedQuote = { quote: 'Ohne Daten bist du nur eine weitere Person mit einer Meinung.', author: 'W. Edwards Deming', source: 'Attributed', matchedValue: 'Innovation', relevanceScore: 0.9 };
 const QUOTE_B: SelectedQuote = { quote: 'The only way to do great work is to love what you do.', author: 'Steve Jobs', source: 'Stanford 2005', matchedValue: 'Innovation', relevanceScore: 0.8 };

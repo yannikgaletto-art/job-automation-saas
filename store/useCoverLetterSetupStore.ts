@@ -24,7 +24,7 @@ interface SetupStore {
     // Actions
     setStep: (step: 1 | 2 | 3) => void;
     initForJob: (jobId: string) => void;
-    setHook: (hook: SelectedHook) => void;
+    setHook: (hook: SelectedHook | null) => void;
     setQuote: (quote: SelectedQuote | null) => void;
     setFetchedQuotes: (quotes: SelectedQuote[]) => void;
     toggleStation: (station: Omit<SelectedCVStation, 'stationIndex'>) => void;
@@ -75,7 +75,7 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
 
             setHook: (hook) => {
                 set({ selectedHook: hook });
-                console.log(`✅ [WizardSetup] Hook selected: ${hook.label}`);
+                console.log(`✅ [WizardSetup] Hook ${hook ? 'selected: ' + hook.label : 'cleared'}`);
             },
 
             setQuote: (quote) => {
@@ -149,7 +149,10 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
 
             isStepComplete: (step) => {
                 const s = get();
-                if (step === 1) return !!s.selectedHook;
+                // Phase 5.2: Step 1 is complete as soon as analysis phase is passed
+                // (hook is optional — user may skip if no company intel was returned).
+                // The jobId presence indicates initForJob has been called and the wizard is active.
+                if (step === 1) return !!s.jobId;
                 if (step === 2) return s.cvStations.length >= 1;
                 if (step === 3) {
                     if (!s.tone?.preset) return false;
@@ -163,14 +166,16 @@ export const useCoverLetterSetupStore = create<SetupStore>()(
 
             buildContext: (): CoverLetterSetupContext | null => {
                 const s = get();
-                if (!s.jobId || !s.selectedHook || s.cvStations.length === 0 || !s.tone) {
+                // Hook is OPTIONAL (Phase 5.2): users can proceed without company intel
+                // when Perplexity analysis returns no results or the user skips explicitly.
+                if (!s.jobId || s.cvStations.length === 0 || !s.tone) {
                     console.warn('⚠️ [WizardSetup] Cannot build context — incomplete state');
                     return null;
                 }
                 return {
                     jobId: s.jobId,
                     companyName: '', // Generator uses jobData.company_name
-                    selectedHook: s.selectedHook,
+                    selectedHook: s.selectedHook ?? undefined,
                     selectedQuote: s.selectedQuote ?? undefined,
                     cvStations: s.cvStations,
                     tone: s.tone,

@@ -214,7 +214,18 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
         onNext();
     };
 
+    // Phase 5.2: Escape hatch — when Perplexity returns no hooks, or the user just
+    // wants to skip company intel, they can proceed without a selected hook.
+    const handleSkipHook = () => {
+        setHook(null);
+        setQuote(null);
+        onNext();
+    };
+
     const canProceed = !!selectedHook && (selectedHook.type !== 'manual' || selectedHook.content.trim().length > 10);
+    // Skip is offered once the user passed the analysis stage (phase=results) and either
+    // no hooks were returned or the user explicitly wants to continue without one.
+    const canSkipHook = (phase === 'results' || phase === 'quoteResults');
 
     // ─── Phase A: IDLE ─────────────────────────────────────────────
     if (phase === 'idle') {
@@ -766,7 +777,18 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
 
             {/* Simple Weiter button when hook not yet selected */}
             {(phase === 'results' || phase === 'quoteResults') && !canProceed && (
-                <div className="flex justify-end pt-2">
+                <div className="flex justify-between items-center pt-2">
+                    {/* Phase 5.2: Escape hatch — skip hook selection */}
+                    {canSkipHook ? (
+                        <button
+                            type="button"
+                            onClick={handleSkipHook}
+                            className="text-xs text-[#73726E] hover:text-[#37352F] underline underline-offset-2"
+                            title={t('btn_skip_hook_hint')}
+                        >
+                            {t('btn_skip_hook')}
+                        </button>
+                    ) : <span />}
                     <button
                         disabled
                         className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-[#E7E7E5] text-[#A8A29E] cursor-not-allowed"

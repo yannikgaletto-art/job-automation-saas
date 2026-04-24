@@ -237,9 +237,9 @@ export function CoverLetterResultView({ initialResult, userId, jobId, companyNam
                 }
             `}</style>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column: Editor & Actions */}
-                <div className="lg:col-span-2 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-stretch">
+                {/* Left Column: Editor & Actions — same max-h as right column for visual parity */}
+                <div className="lg:col-span-2 space-y-4 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:pr-1">
                     <LetterEditor
                         letter={currentLetter}
                         onLetterChange={setCurrentLetter}

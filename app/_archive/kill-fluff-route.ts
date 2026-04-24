@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         // Security: Verify jobId belongs to this user
         const { data: job, error: jobError } = await supabase
             .from('job_queue')
-            .select('id')
+            .select('id, company_name')
             .eq('id', jobId)
             .eq('user_id', user.id)
             .single();
@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Scan-Only: Identify fluff via centralized BLACKLIST_PATTERNS
-        const localScan = scanForFluff(coverLetterText);
+        // companyName enables Unternehmens-Apposition regex (Phase 5)
+        const localScan = scanForFluff(coverLetterText, job.company_name ?? undefined);
         const removedPhrases: string[] = localScan.matches.map(m => m.pattern);
 
         return NextResponse.json({
