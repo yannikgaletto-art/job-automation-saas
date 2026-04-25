@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Launch Waitlist Card — Settings page
+ * Launch Waitlist Card — Profil page
  *
  * Lets users pre-register for the Pathly launch.
  * Clicking the CTA expands a pricing accordion showing the plans.
@@ -21,7 +21,7 @@ const PLANS: { id: PlanOption; priceLabel: string; period: string }[] = [
 ];
 
 export function LaunchWaitlistCard() {
-    const t = useTranslations('settings.launch_waitlist');
+    const t = useTranslations('profil.launch_waitlist');
     const locale = useLocale();
 
     const [expanded, setExpanded] = useState(false);

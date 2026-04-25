@@ -3,7 +3,7 @@
 /**
  * DocumentsRequiredDialog — Shared popup for features that require CV/cover letter.
  * Shows when a user tries to use a feature that needs documents they haven't uploaded yet.
- * Navigates to Settings with a `returnTo` parameter so user is redirected back after upload.
+ * Navigates to Profil with a `returnTo` parameter so user is redirected back after upload.
  *
  * i18n: Uses useTranslations('documents_required').
  */
@@ -46,9 +46,8 @@ export function DocumentsRequiredDialog({
 
     const handleNavigateToSettings = () => {
         onClose();
-        // QA Integration: returnTo parameter so Settings can redirect back after upload
         const returnTo = encodeURIComponent(pathname);
-        router.push(`/${locale}/dashboard/settings?returnTo=${returnTo}`);
+        router.push(`/${locale}/dashboard/profil?returnTo=${returnTo}`);
     };
 
     return (

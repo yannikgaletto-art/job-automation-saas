@@ -67,6 +67,7 @@
       "volunteering": "Voluntariado (Beta)",
       "data_security": "Seguridad de datos",
       "feedback_voice": "Feedback",
+      "profile": "Perfil",
       "settings": "Ajustes",
       "admin": "Admin"
     },
@@ -600,6 +601,33 @@
       "error_network": "Error de red. Por favor, inténtalo de nuevo."
     }
   },
+  "profil": {
+    "page": {
+      "title": "Perfil",
+      "subtitle": "Tus documentos personales e información profesional."
+    },
+    "documents": {
+      "title": "Mis documentos",
+      "description": "Tu CV y cartas de presentación para CV matching, optimización y creación de solicitudes."
+    },
+    "launch_waitlist": {
+      "title": "Lista de espera del lanzamiento",
+      "description": "Asegura tu lugar para el lanzamiento de Pathly.",
+      "cta_title": "Unirme a la lista de espera",
+      "cta_desc": "Elige tu plan y sé el primero en saber cuándo empezamos.",
+      "plan_starter": "Starter",
+      "plan_starter_desc": "30 créditos, 10 sesiones de coaching, 30 búsquedas",
+      "plan_durchstarter": "Durchstarter",
+      "plan_durchstarter_desc": "75 créditos, 25 sesiones de coaching, 75 búsquedas",
+      "plan_quarterly": "Paquete trimestral",
+      "plan_quarterly_desc": "3 meses de Durchstarter a precio reducido",
+      "submit": "Reservar mi lugar",
+      "disclaimer": "Sin compromiso — te avisaremos cuando comience el lanzamiento.",
+      "success_title": "¡Estás en la lista de espera!",
+      "success_desc": "Te avisaremos cuando tu plan esté disponible.",
+      "error": "Algo salió mal. Por favor, inténtalo de nuevo."
+    }
+  },
   "settings": {
     "page": {
       "title": "Tu perfil profesional",
@@ -620,23 +648,6 @@
       "en": "English",
       "es": "Español",
       "saved": "Idioma guardado"
-    },
-    "launch_waitlist": {
-      "title": "Lista de espera del lanzamiento",
-      "description": "Asegura tu lugar para el lanzamiento de Pathly.",
-      "cta_title": "Unirme a la lista de espera",
-      "cta_desc": "Elige tu plan y sé el primero en saber cuándo empezamos.",
-      "plan_starter": "Starter",
-      "plan_starter_desc": "30 créditos, 10 sesiones de coaching, 30 búsquedas",
-      "plan_durchstarter": "Durchstarter",
-      "plan_durchstarter_desc": "75 créditos, 25 sesiones de coaching, 75 búsquedas",
-      "plan_quarterly": "Paquete trimestral",
-      "plan_quarterly_desc": "3 meses de Durchstarter a precio reducido",
-      "submit": "Reservar mi lugar",
-      "disclaimer": "Sin compromiso — te avisaremos cuando comience el lanzamiento.",
-      "success_title": "¡Estás en la lista de espera!",
-      "success_desc": "Te avisaremos cuando tu plan esté disponible.",
-      "error": "Algo salió mal. Por favor, inténtalo de nuevo."
     },
     "tours": {
       "section_title": "Tours guiados",
@@ -1105,6 +1116,7 @@
     "cmd_search": "Abrir Búsqueda de empleo",
     "cmd_queue": "Abrir Cola de empleos",
     "cmd_analytics": "Abrir Analítica",
+    "cmd_profile": "Perfil",
     "cmd_settings": "Abrir Configuración",
     "cmd_security": "Abrir Seguridad de datos"
   },
@@ -1559,7 +1571,25 @@
     "cl_hint_bullet_2": "La que suena más auténtica — no la más pulida",
     "cl_hint_bullet_3": "Preferiblemente una escrita para un puesto que realmente querías",
     "cl_hint_continue": "Subir carta de presentación",
-    "cl_hint_dismiss": "Lo he leído"
+    "cl_hint_dismiss": "Lo he leído",
+    "cv_section_title": "CV",
+    "cl_section_title": "Cartas de presentación",
+    "upload_button": "Subir ({current}/{max})",
+    "uploaded_at": "Subido",
+    "no_cv_uploaded": "Todavía no hay CV subido",
+    "cv_max_reached": "Elimina primero un CV existente",
+    "cl_max_reached": "Elimina primero una carta existente",
+    "category_button": "Categoría",
+    "category_create_title": "Crear categoría",
+    "category_assign_title": "Asignar categoría",
+    "category_none": "Ninguna",
+    "category_placeholder": "p. ej. Account Executive, Business Development...",
+    "download_title": "Descargar",
+    "delete_title": "Eliminar",
+    "cl_empty_hint": "Sube cartas de presentación exitosas para que Pathly aprenda tu estilo de escritura.",
+    "cv_uploaded_toast": "CV subido",
+    "cl_uploaded_toast": "Carta de presentación subida",
+    "category_delete_title": "Eliminar categoría"
   },
   "tour": {
     "step1_title": "Tus objetivos del día",

@@ -1,13 +1,11 @@
-import { ActiveCVCard } from "./active-cv-card"
 import { LanguageToggleCard } from "./language-toggle-card"
 import { CheckinSettingsCard } from "./checkin-settings-card"
 import { TourResetCard } from "./tour-reset-card"
 import { CreditUsageCard } from "./credit-usage-card"
 import { ReferralCard } from "./referral-card"
-import { LaunchWaitlistCard } from "./launch-waitlist-card"
 import { SettingsTabs } from "./settings-tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Globe, GraduationCap, Zap, Gift, Rocket } from "lucide-react"
+import { Globe, GraduationCap, Zap, Gift } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { getTranslations } from "next-intl/server"
@@ -69,22 +67,6 @@ export default async function SettingsPage() {
                 </Card>
                 )}
 
-                {/* Launch Waitlist — above Language */}
-                <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">
-                    <CardHeader className="pb-4">
-                        <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
-                            <Rocket className="h-5 w-5 text-[#012e7a]" />
-                            {t('launch_waitlist.title')}
-                        </CardTitle>
-                        <CardDescription className="text-[#73726E]">
-                            {t('launch_waitlist.description')}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <LaunchWaitlistCard />
-                    </CardContent>
-                </Card>
-
                 <Card className="bg-white border-[#E7E7E5] shadow-sm mb-6">
                     <CardHeader className="pb-4">
                         <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
@@ -121,21 +103,6 @@ export default async function SettingsPage() {
                     </CardContent>
                 </Card>
 
-                {/* Document Management Section */}
-                <Card className="bg-white border-[#E7E7E5] shadow-sm">
-                    <CardHeader>
-                        <CardTitle className="text-xl text-[#37352F] flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-[#012e7a]" />
-                            {t('documents.title')}
-                        </CardTitle>
-                        <CardDescription className="text-[#73726E]">
-                            {t('documents.description')}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ActiveCVCard />
-                    </CardContent>
-                </Card>
             </SettingsTabs>
         </div>
     )

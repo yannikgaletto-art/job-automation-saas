@@ -20,7 +20,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/motion/button";
 import { useNotification } from "@/hooks/use-notification";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 type DocumentEntry = {
     id: string;
@@ -37,8 +37,9 @@ const COLLAPSED_KEY = 'pathly_cl_collapsed';
 const cvHintKey = (uid: string) => `pathly_cv_hint_dismissed_${uid}`;
 const clHintKey = (uid: string) => `pathly_cl_hint_dismissed_${uid}`;
 
-function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString("de-DE", {
+function formatDate(dateStr: string, locale: string) {
+    const tag = locale === 'de' ? 'de-DE' : locale === 'es' ? 'es-ES' : 'en-US';
+    return new Date(dateStr).toLocaleDateString(tag, {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -72,6 +73,7 @@ export function ActiveCVCard() {
     const [isLoading, setIsLoading] = useState(true);
     const notify = useNotification();
     const t = useTranslations('upload');
+    const locale = useLocale();
     const [uploading, setUploading] = useState<string | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadStatus, setUploadStatus] = useState<string>('');
@@ -279,7 +281,7 @@ export function ActiveCVCard() {
                 xhr.send(fd);
             });
 
-            notify(type === 'cv' ? 'Lebenslauf hochgeladen' : 'Anschreiben hochgeladen');
+            notify(type === 'cv' ? t('cv_uploaded_toast') : t('cl_uploaded_toast'));
             await loadDocs();
 
             // QA Integration: If user came from a feature via DocumentsRequiredDialog,
@@ -407,7 +409,7 @@ export function ActiveCVCard() {
             <FileText className={`w-4 h-4 shrink-0 ${highlight ? 'text-[#012e7a]' : 'text-[#73726E]'}`} />
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[#37352F] truncate">{doc.name}</p>
-                <p className="text-xs text-[#73726E]">Hochgeladen: {formatDate(doc.createdAt)}</p>
+                <p className="text-xs text-[#73726E]">{t('uploaded_at')}: {formatDate(doc.createdAt, locale)}</p>
             </div>
             {/* Category selector for cover letters */}
             {doc.type === 'cover_letter' && categoryNames.length > 0 && (
@@ -415,19 +417,19 @@ export function ActiveCVCard() {
                     value={getCategoryForDoc(doc.id) ?? '__none__'}
                     onChange={(e) => assignCategory(doc.id, e.target.value)}
                     className="text-xs border border-[#E7E7E5] rounded px-1.5 py-1 text-[#73726E] bg-white focus:outline-none focus:ring-1 focus:ring-[#012e7a]/30 max-w-[120px]"
-                    title="Kategorie zuweisen"
+                    title={t('category_assign_title')}
                 >
-                    <option value="__none__">Ohne</option>
+                    <option value="__none__">{t('category_none')}</option>
                     {categoryNames.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                     ))}
                 </select>
             )}
             <div className="flex items-center gap-1">
-                <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1" title="Herunterladen">
+                <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1" title={t('download_title')}>
                     <Download className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1" title="Löschen">
+                <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1" title={t('delete_title')}>
                     <Trash2 className="w-4 h-4" />
                 </button>
             </div>
@@ -470,17 +472,17 @@ export function ActiveCVCard() {
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-[#37352F] flex items-center gap-2">
                         <FileText className="w-4 h-4 text-[#012e7a]" />
-                        Lebenslauf (CV)
+                        {t('cv_section_title')}
                     </h3>
                     <Button
                         variant="secondary"
                         className="text-xs h-8"
                         onClick={handleCvUploadClick}
                         disabled={!!uploading || cvDocs.length >= 3}
-                        title={cvDocs.length >= 3 ? 'Bitte lösche erst einen bestehenden Lebenslauf' : undefined}
+                        title={cvDocs.length >= 3 ? t('cv_max_reached') : undefined}
                     >
                         <Upload className="w-3 h-3 mr-1.5" />
-                        {uploading === 'cv' ? `${uploadProgress}%` : `Hochladen (${cvDocs.length}/3)`}
+                        {uploading === 'cv' ? `${uploadProgress}%` : t('upload_button', { current: cvDocs.length, max: 3 })}
                     </Button>
                 </div>
 
@@ -492,7 +494,7 @@ export function ActiveCVCard() {
                         onClick={handleCvUploadClick}
                     >
                         <Plus className="w-5 h-5 text-[#A8A29E] mx-auto mb-1" />
-                        <p className="text-sm text-[#73726E]">Noch kein CV hochgeladen</p>
+                        <p className="text-sm text-[#73726E]">{t('no_cv_uploaded')}</p>
                     </div>
                 ) : (
                     <ul className="space-y-2">
@@ -509,7 +511,7 @@ export function ActiveCVCard() {
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-[#37352F] flex items-center gap-2">
                         <FileText className="w-4 h-4 text-[#012e7a]" />
-                        Anschreiben (Cover Letters)
+                        {t('cl_section_title')}
                     </h3>
                     <div className="flex items-center gap-2">
                         {/* Add Category Button */}
@@ -517,10 +519,10 @@ export function ActiveCVCard() {
                             <button
                                 onClick={() => setShowAddCategory(!showAddCategory)}
                                 className="flex items-center gap-1 text-xs text-[#73726E] hover:text-[#012e7a] transition-colors px-2 py-1 rounded border border-[#E7E7E5] hover:border-[#012e7a]/30"
-                                title="Kategorie erstellen"
+                                title={t('category_create_title')}
                             >
                                 <Tag className="w-3 h-3" />
-                                Kategorie
+                                {t('category_button')}
                             </button>
                         )}
                         <Button
@@ -528,10 +530,10 @@ export function ActiveCVCard() {
                             className="text-xs h-8"
                             onClick={handleClUploadClick}
                             disabled={!!uploading || clDocs.length >= 3}
-                            title={clDocs.length >= 3 ? 'Bitte lösche erst ein bestehendes Anschreiben' : undefined}
+                            title={clDocs.length >= 3 ? t('cl_max_reached') : undefined}
                         >
                             <Upload className="w-3 h-3 mr-1.5" />
-                            {uploading === 'cover_letter' ? `${uploadProgress}%` : `Hochladen (${clDocs.length}/3)`}
+                            {uploading === 'cover_letter' ? `${uploadProgress}%` : t('upload_button', { current: clDocs.length, max: 3 })}
                         </Button>
                     </div>
                 </div>
@@ -542,7 +544,7 @@ export function ActiveCVCard() {
                         <Tag className="w-3.5 h-3.5 text-[#73726E] shrink-0" />
                         <input
                             type="text"
-                            placeholder="z.B. Account Executive, Business Development..."
+                            placeholder={t('category_placeholder')}
                             value={newCategoryName}
                             onChange={(e) => setNewCategoryName(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') addCategory(); }}
@@ -573,7 +575,7 @@ export function ActiveCVCard() {
                         onClick={() => clRef.current?.click()}
                     >
                         <Plus className="w-5 h-5 text-[#A8A29E] mx-auto mb-1" />
-                        <p className="text-sm text-[#73726E]">Lade erfolgreiche Anschreiben hoch, damit Pathly deinen Schreibstil lernt.</p>
+                        <p className="text-sm text-[#73726E]">{t('cl_empty_hint')}</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -597,7 +599,7 @@ export function ActiveCVCard() {
                                             <button
                                                 onClick={() => deleteCategory(catName)}
                                                 className="text-[#A8A29E] hover:text-red-500 transition-colors p-0.5"
-                                                title="Kategorie löschen"
+                                                title={t('category_delete_title')}
                                             >
                                                 <X className="w-3 h-3" />
                                             </button>
@@ -627,7 +629,7 @@ export function ActiveCVCard() {
                                         <button
                                             onClick={() => deleteCategory(catName)}
                                             className="text-[#A8A29E] hover:text-red-500 transition-colors p-0.5"
-                                            title="Kategorie löschen"
+                                            title={t('category_delete_title')}
                                         >
                                             <X className="w-3 h-3" />
                                         </button>

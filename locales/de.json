@@ -67,6 +67,7 @@
       "volunteering": "Ehrenamt (Beta)",
       "data_security": "Datensicherheit",
       "feedback_voice": "Feedback",
+      "profile": "Profil",
       "settings": "Einstellungen",
       "admin": "Admin"
     },
@@ -601,6 +602,33 @@
       "error_network": "Netzwerkfehler. Bitte versuche es erneut."
     }
   },
+  "profil": {
+    "page": {
+      "title": "Profil",
+      "subtitle": "Deine persönlichen Dokumente und beruflichen Informationen."
+    },
+    "documents": {
+      "title": "Meine Dokumente",
+      "description": "Dein Lebenslauf und Anschreiben für CV-Match, Optimierung und Bewerbungserstellung."
+    },
+    "launch_waitlist": {
+      "title": "Launch-Warteliste",
+      "description": "Sichere dir jetzt deinen Platz für den Pathly Launch.",
+      "cta_title": "Auf die Launch-Warteliste setzen",
+      "cta_desc": "Wähle deinen Wunschplan und erfahre als Erster, wenn es losgeht.",
+      "plan_starter": "Starter",
+      "plan_starter_desc": "30 Credits, 10 Coaching-Sessions, 30 Jobsuchen",
+      "plan_durchstarter": "Durchstarter",
+      "plan_durchstarter_desc": "75 Credits, 25 Coaching-Sessions, 75 Jobsuchen",
+      "plan_quarterly": "Quartalspaket",
+      "plan_quarterly_desc": "3 Monate Durchstarter zum Vorteilspreis",
+      "submit": "Platz sichern",
+      "disclaimer": "Unverbindlich — du wirst benachrichtigt, sobald der Launch startet.",
+      "success_title": "Du bist auf der Warteliste!",
+      "success_desc": "Wir benachrichtigen dich, sobald dein Plan verfügbar ist.",
+      "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+    }
+  },
   "settings": {
     "page": {
       "title": "Dein Karriere-Profil",
@@ -621,23 +649,6 @@
       "en": "English",
       "es": "Español",
       "saved": "Sprache gespeichert"
-    },
-    "launch_waitlist": {
-      "title": "Launch-Warteliste",
-      "description": "Sichere dir jetzt deinen Platz für den Pathly Launch.",
-      "cta_title": "Auf die Launch-Warteliste setzen",
-      "cta_desc": "Wähle deinen Wunschplan und erfahre als Erster, wenn es losgeht.",
-      "plan_starter": "Starter",
-      "plan_starter_desc": "30 Credits, 10 Coaching-Sessions, 30 Jobsuchen",
-      "plan_durchstarter": "Durchstarter",
-      "plan_durchstarter_desc": "75 Credits, 25 Coaching-Sessions, 75 Jobsuchen",
-      "plan_quarterly": "Quartalspaket",
-      "plan_quarterly_desc": "3 Monate Durchstarter zum Vorteilspreis",
-      "submit": "Platz sichern",
-      "disclaimer": "Unverbindlich — du wirst benachrichtigt, sobald der Launch startet.",
-      "success_title": "Du bist auf der Warteliste!",
-      "success_desc": "Wir benachrichtigen dich, sobald dein Plan verfügbar ist.",
-      "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
     },
     "tours": {
       "section_title": "Geführte Touren",
@@ -1107,6 +1118,7 @@
     "cmd_search": "Jobsuche öffnen",
     "cmd_queue": "Job Queue öffnen",
     "cmd_analytics": "Analytik öffnen",
+    "cmd_profile": "Profil",
     "cmd_settings": "Einstellungen öffnen",
     "cmd_security": "Datensicherheit öffnen"
   },
@@ -1576,7 +1588,25 @@
     "cl_hint_bullet_2": "Das, das am authentischsten klingt — nicht das perfekteste",
     "cl_hint_bullet_3": "Am besten eines, das zu einer Stelle gepasst hat, die du möchtest",
     "cl_hint_continue": "Anschreiben hochladen",
-    "cl_hint_dismiss": "Habe ich gelesen"
+    "cl_hint_dismiss": "Habe ich gelesen",
+    "cv_section_title": "Lebenslauf (CV)",
+    "cl_section_title": "Anschreiben (Cover Letters)",
+    "upload_button": "Hochladen ({current}/{max})",
+    "uploaded_at": "Hochgeladen",
+    "no_cv_uploaded": "Noch kein CV hochgeladen",
+    "cv_max_reached": "Bitte lösche erst einen bestehenden Lebenslauf",
+    "cl_max_reached": "Bitte lösche erst ein bestehendes Anschreiben",
+    "category_button": "Kategorie",
+    "category_create_title": "Kategorie erstellen",
+    "category_assign_title": "Kategorie zuweisen",
+    "category_none": "Ohne",
+    "category_placeholder": "z.B. Account Executive, Business Development...",
+    "download_title": "Herunterladen",
+    "delete_title": "Löschen",
+    "cl_empty_hint": "Lade erfolgreiche Anschreiben hoch, damit Pathly deinen Schreibstil lernt.",
+    "cv_uploaded_toast": "Lebenslauf hochgeladen",
+    "cl_uploaded_toast": "Anschreiben hochgeladen",
+    "category_delete_title": "Kategorie löschen"
   },
   "tour": {
     "step1_title": "Deine Tagesziele",

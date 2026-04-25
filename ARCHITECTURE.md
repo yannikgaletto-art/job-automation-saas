@@ -56,8 +56,9 @@ Last Updated: 2026-04-18
 - `/dashboard/extension` (Chrome Extension Infos)
 - `/dashboard/job-queue` (Verwaltung von Jobs & Bewerbungen — Workflow-Steps)
 - `/dashboard/job-search` (Suche nach neuen Jobs via SerpAPI Pipeline)
+- `/dashboard/profil` (Persönliche Dokumente — CV & Cover Letter Upload, Verwaltung)
 - `/dashboard/security` (Sicherheitseinstellungen, Datenexport)
-- `/dashboard/settings` (Benutzereinstellungen, CV-Upload, Profil)
+- `/dashboard/settings` (Benutzereinstellungen — Konto, Sprache, Touren, Credits, Privacy)
 - `/dashboard/volunteering` (Ehrenamt-Angebote, Bookmarks, Category Voting)
 
 ### Legal Routes (`/legal`)
@@ -241,7 +242,7 @@ proposal = { translated: safeTranslated, optimized, changes } → DB
 ### Kern-Tabellen:
 - `auth.users` (Supabase Auth)
 - `user_profiles` (PII-Verschlüsselung, CV Structured Data, Preferences, Mood Check-in: `checkin_skip_streak`, `show_checkin`)
-- `user_settings` (Onboarding Status, Active CV, LinkedIn/Target Role)
+- `user_settings` (Onboarding Status, Active CV, Avatar, Sprache)
 - `consent_history` (DSGVO Art. 7 Zustimmungen)
 - `documents` (CVs & Anschreiben, PII als JSONB)
 - `auto_search_configs` (Konfiguration für automatisierte Jobsuche)

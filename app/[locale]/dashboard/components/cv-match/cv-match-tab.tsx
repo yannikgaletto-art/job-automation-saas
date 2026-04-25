@@ -342,7 +342,7 @@ export function CVMatchTab({ jobId, cachedMatch, onMatchStart, onMatchComplete, 
                     </p>
                     <Button
                         variant="primary"
-                        onClick={() => router.push(`/${locale}/dashboard/settings`)}
+                        onClick={() => router.push(`/${locale}/dashboard/profil`)}
                     >
                         {t('no_cv_cta')}
                     </Button>

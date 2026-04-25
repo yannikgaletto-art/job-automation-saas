@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Sidebar, NavSection, NavItem } from '@/components/motion/sidebar';
-import { Home, Search, Inbox, BarChart3, Users, Heart, Shield, Settings, MessageSquare, Mic } from 'lucide-react';
+import { Home, Search, Inbox, BarChart3, Users, Heart, Shield, Settings, MessageSquare, Mic, User } from 'lucide-react';
 import { PomodoroMiniWidget } from './components/pomodoro-mini-widget';
 import { usePathname } from '@/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -247,6 +247,7 @@ function DashboardLayoutInner({
 
                     <NavSection title={t('nav_section.tools')}>
                         <NavItem icon={Mic} label={t('nav.feedback_voice')} href={`/${locale}/dashboard/feedback`} />
+                        <NavItem icon={User} label={t('nav.profile')} href={`/${locale}/dashboard/profil`} />
                         <NavItem icon={Settings} label={t('nav.settings')} href={`/${locale}/dashboard/settings`} />
                         <AdminNavItem />
                     </NavSection>
