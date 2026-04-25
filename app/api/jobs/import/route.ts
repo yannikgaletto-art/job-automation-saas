@@ -10,6 +10,7 @@ import { getUserLocale, getLanguageName, type SupportedLocale } from '@/lib/i18n
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash'
 import { complete } from '@/lib/ai/model-router'
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer'
+import { filterAtsKeywords } from '@/lib/services/ats-keyword-filter'
 
 // ================================================================
 // CORS Headers — required for Browser Extension (chrome-extension:// origin)
@@ -267,7 +268,7 @@ IMPORTANT for benefits:
 - Extract ONLY the 6 most standout benefits, max 3 words each.
 - Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
-Schema: {"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8"],"qualifications":["max 8"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["MAXIMUM 15 ATS keywords. ONLY: tools, frameworks, platforms, certifications, domain terms. EXCLUDE: generic verbs, language names, soft skills, adjectives."]}`,
+Schema: {"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8"],"qualifications":["max 8"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["MAXIMUM 15 ATS keywords. ONLY: tools, frameworks, platforms, certifications, domain terms. EXCLUDE: generic verbs, language names, soft skills, adjectives. LANGUAGE: translate language-dependent terms ALWAYS into ${languageName} (e.g. 'Project Management' → 'Projektmanagement' for de, GDPR → DSGVO for de). Eigennamen stay original (Salesforce, SAP, Python, Scrum, OKR, PMP, ISO 9001/27001/26262, PCI DSS). This rule applies even if the job posting is in a different language."]}`,
                     prompt: sanitizeForAI(description).sanitized,
                     temperature: 0,
                     maxTokens: 2000,
@@ -291,19 +292,29 @@ Schema: {"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8
 
                 // Write extracted fields + sync flag
                 if (extracted.summary || extracted.buzzwords) {
-                    // Normalize buzzwords
+                    // Normalize buzzwords + ATS-Filter (parity with /api/jobs/ingest STEP 3.5)
                     let buzzwords: string[] | null = null
                     if (Array.isArray(extracted.buzzwords) && extracted.buzzwords.length > 0) {
                         const seen = new Set<string>()
-                        buzzwords = []
+                        const normalized: string[] = []
                         for (const kw of extracted.buzzwords as string[]) {
                             const key = kw.trim().toLowerCase()
                             if (key.length >= 2 && !seen.has(key)) {
                                 seen.add(key)
-                                buzzwords.push(kw.trim())
+                                normalized.push(kw.trim())
                             }
                         }
-                        buzzwords.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+                        normalized.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+
+                        // ATS-Filter: strip garbage + rewrite German compounds.
+                        const atsFilter = filterAtsKeywords(normalized)
+                        buzzwords = atsFilter.kept.length > 0 ? atsFilter.kept : null
+                        if (atsFilter.removed.length > 0) {
+                            console.log(`[${requestId}] route=jobs/import step=ats_filter kept=${atsFilter.kept.length} removed=${atsFilter.removed.length}: ${atsFilter.removed.slice(0, 5).join(', ')}`)
+                        }
+                        if (atsFilter.rewritten && atsFilter.rewritten.length > 0) {
+                            console.log(`[${requestId}] route=jobs/import step=ats_filter rewrote=${atsFilter.rewritten.slice(0, 3).map(r => `${r.from}→${r.to}`).join(', ')}`)
+                        }
                     }
 
                     await supabaseAdmin

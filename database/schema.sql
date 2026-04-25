@@ -281,6 +281,8 @@ CREATE TABLE IF NOT EXISTS job_queue (
   sustainability_section_raw TEXT,
   leadership_signals_raw TEXT,
   tech_stack_mentioned TEXT[],
+  -- DEPRECATED 2026-04-25: writes removed from process route, all readers use `buzzwords`.
+  -- Drop column scheduled for V2.1 migration.
   ats_keywords TEXT[],
   application_deadline TEXT,
 

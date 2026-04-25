@@ -19,6 +19,8 @@ import {
     type SerpApiJob,
     type UserValues,
 } from '@/lib/services/job-search-pipeline';
+import { filterAtsKeywords } from '@/lib/services/ats-keyword-filter';
+import { getUserLocale } from '@/lib/i18n/get-user-locale';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = createAdminClient(
@@ -111,27 +113,43 @@ export async function POST(request: NextRequest) {
         }
 
         // ─── §12.5 Step 2: Claude Haiku Harvester ────────────────────
-        // SerpAPI = Ground Truth, Jina = Enrichment
+        // SerpAPI = Ground Truth, Jina = Enrichment.
+        // userLocale steers ATS-keyword language for CV-Match consistency.
         const primaryDescription = serpApiFullDesc || serpApiJob.description;
+        const userLocale = await getUserLocale(user.id);
         const harvested = await harvestJobData(
             jinaMarkdown || '',
             primaryDescription,
+            userLocale,
         );
 
-        // ─── §12.3 Verification Guard: Company Mismatch ─────────────
-        // Simple substring check (no Levenshtein — "Reduce Complexity")
+        // Stop-list filter: drop garbage ATS keywords (Bürozeit, Teamfähigkeit, etc.)
+        // BEFORE persistence — downstream consumers (CV-Match, CV-Optimizer, UI)
+        // all read from the cleaned set.
+        const atsFilter = filterAtsKeywords(harvested?.ats_keywords);
+        if (atsFilter.removed.length > 0) {
+            console.log(`✅ [Process] ATS-Filter: kept ${atsFilter.kept.length}, removed ${atsFilter.removed.length}: ${atsFilter.removed.slice(0, 5).join(', ')}${atsFilter.removed.length > 5 ? '...' : ''}`);
+        }
+        if (atsFilter.rewritten && atsFilter.rewritten.length > 0) {
+            console.log(`✅ [Process] ATS-Filter: rewrote ${atsFilter.rewritten.length} compounds: ${atsFilter.rewritten.slice(0, 3).map(r => `${r.from}→${r.to}`).join(', ')}`);
+        }
+        const cleanedAtsKeywords = atsFilter.kept;
+
+        // ─── §12.3 Verification Guard: Company Mismatch (soft-warn) ──
+        // Substring check stays simple. Mismatch is now a NON-BLOCKING warning
+        // — Holdings/Konzern-Strukturen (z.B. L. Possehl ↔ Hänsel Processing)
+        // sollen den Job nicht hart ablehnen. User entscheidet im Steckbrief.
+        let mismatchWarning: { expected: string; actual: string } | null = null;
         if (harvested?.company_name) {
             const expected = serpApiJob.company_name.toLowerCase().trim();
             const actual = harvested.company_name.toLowerCase().trim();
-            // Neither contains the other → completely different company
             const isMatch = expected.includes(actual) || actual.includes(expected);
             if (!isMatch) {
-                console.warn(`⚠️ [Process] Company mismatch: expected "${serpApiJob.company_name}", got "${harvested.company_name}"`);
-                return NextResponse.json({
-                    success: false,
-                    reason: 'mismatch',
-                    message: `Der Link führt zu einer Stelle bei "${harvested.company_name}" statt bei "${serpApiJob.company_name}". Der Job wurde nicht hinzugefügt.`,
-                });
+                console.warn(`⚠️ [Process] Company mismatch (non-blocking): expected "${serpApiJob.company_name}", got "${harvested.company_name}"`);
+                mismatchWarning = {
+                    expected: serpApiJob.company_name,
+                    actual: harvested.company_name,
+                };
             }
         }
 
@@ -205,14 +223,16 @@ export async function POST(request: NextRequest) {
             requirements: harvested?.hard_requirements || null,
             responsibilities: harvested?.tasks || null,
             benefits: harvested?.benefits_and_perks || [],
-            buzzwords: harvested?.ats_keywords || null,
+            buzzwords: cleanedAtsKeywords.length > 0 ? cleanedAtsKeywords : null,
             about_company_raw: harvested?.about_company_raw || null,
             mission_statement_raw: harvested?.mission_statement_raw || null,
             diversity_section_raw: harvested?.diversity_section_raw || null,
             sustainability_section_raw: harvested?.sustainability_section_raw || null,
             leadership_signals_raw: harvested?.leadership_signals_raw || null,
             tech_stack_mentioned: harvested?.tech_stack_mentioned || null,
-            ats_keywords: harvested?.ats_keywords || null,
+            // ats_keywords column DEPRECATED 2026-04-25 — all readers use `buzzwords`.
+            // Removed from INSERT to eliminate dual-source-of-truth drift.
+            // Migration to drop column: scheduled for V2.1.
             application_deadline: harvested?.application_deadline || null,
             // Judge fields
             match_score_overall: judgeResult?.match_score_overall || null,
@@ -245,6 +265,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
+            mismatch_warning: mismatchWarning,
             job: {
                 ...insertedJob,
                 // §12.5 Preview data — sent to SteckbriefPreviewModal
@@ -252,7 +273,7 @@ export async function POST(request: NextRequest) {
                 hard_requirements: harvested?.hard_requirements || [],
                 soft_requirements: harvested?.soft_requirements || [],
                 benefits: harvested?.benefits_and_perks || [],
-                ats_keywords: harvested?.ats_keywords || [],
+                ats_keywords: cleanedAtsKeywords,
                 score_breakdown: judgeResult?.score_breakdown || null,
                 judge_reasoning: judgeResult?.judge_reasoning || null,
                 red_flags: judgeResult?.red_flags || [],
@@ -260,6 +281,7 @@ export async function POST(request: NextRequest) {
                 knockout_reason: judgeResult?.knockout_reason || null,
                 work_model: harvested?.work_model || 'unknown',
                 location: harvested?.location || serpApiJob.location || null,
+                mismatch_warning: mismatchWarning,
             },
             pipeline: {
                 serpapi_full: !!serpApiFullDesc,

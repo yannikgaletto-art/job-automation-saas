@@ -185,23 +185,15 @@ function SummaryBlock({ summary }: { summary: string }) {
 }
 
 /** ATS Keywords — simple pill grid, no circle badge */
+// Filtering moved to pipeline (lib/services/ats-keyword-filter.ts) 2026-04-25:
+// stop-list now applied BEFORE persistence so all consumers (CV-Match, CV-Optimizer)
+// share the same cleaned set. UI just renders.
 function ATSKeywords({ buzzwords }: { buzzwords: string[] }) {
-    const LOW_SIGNAL = [
-        // DE
-        'und', 'oder', 'bzw', 'etc', 'diverse', 'sonstige', 'allgemein', 'gut', 'gute',
-        // EN
-        'and', 'or', 'various', 'general', 'good', 'other', 'misc', 'etc.',
-        // ES
-        'y', 'o', 'varios', 'general', 'bueno', 'otros',
-    ];
-    const filtered = buzzwords
-        .filter(bw => !LOW_SIGNAL.includes(bw.toLowerCase()));
-
-    if (filtered.length === 0) return null;
+    if (buzzwords.length === 0) return null;
 
     return (
         <div className="flex flex-wrap gap-2 mt-2">
-            {filtered.map((kw, i) => (
+            {buzzwords.map((kw, i) => (
                 <span
                     key={i}
                     className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"

@@ -414,9 +414,21 @@ async function scrapeWithJina(url: string): Promise<string | null> {
 
 // ─── Step 3a: Claude Haiku Harvester ─────────────────────────────
 
+/**
+ * Map user locale → language name for ATS-keyword extraction.
+ * Default 'de' to keep backward compatibility with callers that don't pass locale yet.
+ */
+type HarvesterLocale = 'de' | 'en' | 'es';
+const LOCALE_NAME: Record<HarvesterLocale, string> = {
+    de: 'Deutsch',
+    en: 'English',
+    es: 'Español',
+};
+
 export async function harvestJobData(
     markdown: string,
     fallbackDescription: string,
+    userLocale: HarvesterLocale = 'de',
 ): Promise<HarvestedData | null> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -464,11 +476,97 @@ Halte dich STRIKT an das JSON-Schema.
 Erfinde NICHTS. Wenn ein Feld im Text nicht vorkommt: null zurückgeben.
 
 WICHTIG für Listen (hard_requirements, soft_requirements, tasks, benefits_and_perks):
-- Schreibe verdichtete, vollständige Sätze — ca. 20% kürzer als das Original.
+- Schreibe verdichtete, vollständige Sätze; ca. 20% kürzer als das Original.
 - Erhalte die Kernaussage jedes Punktes. Kein Abkürzen auf bloße Stichworte.
 - KEIN Copy-Paste des Originals, sondern eine informierte Verdichtung.
 - Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
-- Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."`;
+- Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
+
+DEFINITION ats_keywords (PFLICHTLEKTÜRE):
+Ein ATS-Keyword ist ein konkreter, eindeutig kategorisierbarer Such-Term, den ein
+Bewerbungsmanagement-System (Greenhouse, Workday, Lever, Personio, Softgarden)
+in seinem Skill-/Tag-Index führen würde, um Bewerbungen automatisiert zu screenen.
+
+ZULÄSSIGE KATEGORIEN (nur diese 6):
+1. Tools/Software: "Salesforce", "Python", "SAP S/4HANA", "TypeScript", "Adobe Photoshop",
+   "DATEV", "Lexware", "Personio", "Softgarden", "HRworks", "Power BI", "Tableau"
+2. Methoden/Frameworks: "Scrum", "OKR", "Six Sigma", "ITIL", "Agile", "Kanban", "Lean",
+   "Prince2", "Design Thinking", "GDPR", "ISO 9001", "ISO 27001"
+3. Hard Skills: "SQL", "Machine Learning", "API-Design", "Buchhaltung", "Controlling",
+   "Stakeholder Management", "Change Management", "P&L Management", "Budget Ownership",
+   "Cross-Functional Collaboration", "Risk Management", "Process Improvement",
+   "Bilanzbuchhaltung", "Anlagenbuchhaltung", "Finanzbuchhaltung", "Kostenrechnung",
+   "Gehaltsabrechnung", "Lohnsteuer", "Sozialversicherung",
+   "Prokura", "Handlungsbevollmächtigt", "Tarifvertrag" (DACH-spezifisch)
+4. Zertifizierungen: "PMP", "AWS Solutions Architect", "Scrum Master", "CISSP",
+   "Bilanzbuchhalter IHK", "Industriemeister IHK", "Fachinformatiker IHK",
+   "Geprüfter Controller IHK", "Prince2 Practitioner", "ITIL 4 Foundation"
+5. Domain-Begriffe: "B2B SaaS", "FinTech", "PropTech", "EdTech", "HealthTech",
+   "Supply Chain", "M&A", "Private Equity", "ESG Strategy", "Net Zero"
+6. Berufsbezeichnungen: "Account Executive", "Senior Backend Engineer", "Bilanzbuchhalter"
+
+VALIDE SOFT-SKILL-PHRASEN (echte ATS-Filter-Terme — nicht mit Floskeln verwechseln):
+Diese DÜRFEN aufgenommen werden, weil ATS sie als spezifische Kompetenz indexieren:
+- "Stakeholder Management", "Cross-Functional Collaboration", "Change Management"
+- "P&L Management", "Budget Ownership", "Strategic Thinking", "Executive Communication"
+- "Board-Level Communication", "Decision-Making", "Mentoring", "Coaching"
+- "Conflict Resolution", "Negotiation", "Client Relations", "Relationship Building"
+
+VERBOTEN als ats_keywords (NIEMALS aufnehmen — auch wenn sie häufig vorkommen):
+- Generische Soft Skills: "Teamfähigkeit", "Eigenverantwortung", "Kommunikationsstärke",
+  "Belastbarkeit", "Flexibilität", "Eigeninitiative", "Selbstständigkeit",
+  "Hands-on-Mentalität", "Detailverliebt", "Ergebnisorientiert"
+- Benefits/Arbeitsbedingungen: "Bürozeit", "Homeoffice", "Bonus", "Urlaubstage",
+  "flexible Arbeitszeit", "Jobticket", "Firmenwagen", "Betriebliche Altersvorsorge",
+  "Vollzeit", "Teilzeit", "Unbefristet"
+- Allgemeine Adjektive: "dynamisch", "innovativ", "modern", "agil" (als Adjektiv),
+  "engagiert", "motiviert", "zukunftsorientiert", "namhaft", "renommiert"
+- Phrasen/Floskeln: "Du bringst mit", "Wir bieten", "Wir suchen",
+  "Werde Teil unseres Teams", "Das erwartet dich", "Ab sofort", "Über uns"
+- Überholte Tech-Terme: "MS Office Suite" (nutze stattdessen "Excel"/"Word"),
+  "Social Media" (nutze "LinkedIn Ads"/"Instagram Marketing"),
+  "Web 2.0", "EDV-Kenntnisse", "Internet-Kenntnisse", "PC-Kenntnisse"
+- Personennamen, geographische Allgemeinplätze ohne Job-Bezug
+
+DACH-KOMPOSITUM-REGEL (KRITISCH für deutsche Stellenanzeigen):
+Deutsche ATS-Systeme (Personio, Softgarden, SAP SuccessFactors) indexieren
+KEINE deutschen Komposita. Komposita IMMER zerlegen auf den Kernbegriff:
+- "Projektleitungserfahrung" → "Projektleitung"
+- "Führungskompetenz" → "Führung"
+- "Vertriebserfahrung" → "Vertrieb"
+- "Buchhaltungskenntnisse" → "Buchhaltung"
+- "Marketingerfahrung" → "Marketing"
+- "Programmierkenntnisse" → "Programmierung"
+- "Personalverantwortung" → "Personalführung"
+
+Suffixe die zu entfernen sind: "-erfahrung", "-kompetenz", "-kenntnisse",
+"-fähigkeit" (wenn an Skill drangehängt, nicht bei "Teamfähigkeit").
+
+FORMAT-REGELN für ats_keywords:
+- Max. 3 Wörter pro Keyword.
+- Original-Schreibweise behalten (nicht lowercased).
+- Keine Duplikate.
+- Wenn unsicher ob Keyword unter eine der 6 Kategorien fällt: WEGLASSEN.
+- Lieber 5 starke ATS-Keywords als 20 schwache.
+
+SPRACH-REGEL für ats_keywords (KRITISCH für CV-Match-Konsistenz):
+ZIELSPRACHE: ${LOCALE_NAME[userLocale]}
+- Übersetze sprachabhängige Begriffe IMMER in die Zielsprache:
+  → "Stakeholder Management" (en) ↔ "Stakeholder-Management" (de) ↔ "Gestión de Stakeholders" (es)
+  → "Project Management" (en) ↔ "Projektmanagement" (de) ↔ "Gestión de Proyectos" (es)
+  → "Accounting" (en) ↔ "Buchhaltung" (de) ↔ "Contabilidad" (es)
+  → "Change Management" (en) ↔ "Change-Management" (de) ↔ "Gestión del Cambio" (es)
+- EIGENNAMEN bleiben IMMER in Original-Schreibweise (NIEMALS übersetzen):
+  → Tools/Brands: "Salesforce", "SAP", "Python", "TypeScript", "DATEV", "Personio"
+  → Frameworks/Methoden: "Scrum", "Kanban", "OKR", "Six Sigma", "ITIL", "Agile"
+  → Zertifizierungen: "PMP", "AWS Solutions Architect", "Bilanzbuchhalter IHK"
+  → Standards: "ISO 9001", "ISO 27001", "ISO 26262", "PCI DSS"
+- AUSNAHME: Sprach-Versionen desselben Standards übersetzen wie normale Begriffe:
+  → "GDPR" (en) ↔ "DSGVO" (de) ↔ "RGPD" (es)  — NICHT als Eigenname behandeln
+- Wenn der Job-Text in einer anderen Sprache als ${LOCALE_NAME[userLocale]} ist:
+  → Übersetze die sprachabhängigen Begriffe trotzdem in ${LOCALE_NAME[userLocale]}
+  → Eigennamen bleiben Original
+  → Diese Regel gilt unabhängig von der Sprache der Stellenanzeige.`;
 
     const userPrompt = `Extrahiere aus diesem Stellenanzeigen-Text:
 
@@ -497,7 +595,13 @@ JSON-Schema:
   "ats_keywords": ["string"],
   "salary_range": "string | null",
   "application_deadline": "string | null"
-}`;
+}
+
+ats_keywords-CHECKLIST (vor Output prüfen):
+✓ Würde ein Recruiter dieses Wort als Filter im Greenhouse-Suchfeld eingeben?
+✓ Fällt es eindeutig unter eine der 6 zulässigen Kategorien?
+✓ Max. 3 Wörter, kein Adjektiv-Floskel, kein Benefit, keine Soft-Skill-Phrase?
+Wenn EINE Antwort "nein" → Keyword WEGLASSEN.`;
 
     try {
         console.log('✅ [Pipeline] Claude Haiku harvesting...');

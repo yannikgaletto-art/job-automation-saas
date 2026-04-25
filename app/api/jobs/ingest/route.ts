@@ -10,6 +10,7 @@ import { inngest } from '@/lib/inngest/client';
 import { complete } from '@/lib/ai/model-router';
 import { getUserLocale, getLanguageName } from '@/lib/i18n/get-user-locale';
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
+import { filterAtsKeywords } from '@/lib/services/ats-keyword-filter';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = createAdminClient(
@@ -174,17 +175,23 @@ export async function POST(request: NextRequest) {
         } | null = null;
 
         try {
-            // Single-row lookup via unique index (user_id, description_hash)
+            // Single-row lookup via unique index (user_id, description_hash, locale).
+            // Locale is part of the key — the same job in different locales caches separately
+            // because ATS keywords are language-aware (CV-Match consistency).
             const { data: cached, error: cacheErr } = await supabaseAdmin
                 .from('job_extraction_cache')
                 .select('buzzwords, requirements, responsibilities, benefits, summary, seniority, location')
                 .eq('user_id', userId)
                 .eq('description_hash', descriptionHash)
+                .eq('locale', locale)
                 .maybeSingle();
 
             if (!cacheErr && cached && Array.isArray(cached.buzzwords) && cached.buzzwords.length > 0) {
+                // ATS-Filter applied to legacy cache entries — old caches may contain
+                // pre-hardening garbage (Bürozeit, Teamfähigkeit, etc.).
+                const cacheFilter = filterAtsKeywords(cached.buzzwords as string[]);
                 cachedExtraction = {
-                    buzzwords: cached.buzzwords,
+                    buzzwords: cacheFilter.kept,
                     summary: cached.summary || null,
                     qualifications: Array.isArray(cached.requirements) ? cached.requirements : [],
                     responsibilities: Array.isArray(cached.responsibilities) ? cached.responsibilities : [],
@@ -192,7 +199,10 @@ export async function POST(request: NextRequest) {
                     seniority: cached.seniority || 'unknown',
                     location: cached.location || null,
                 };
-                console.log(`[${requestId}] route=jobs/ingest step=extraction_cache HIT — reusing ${cached.buzzwords.length} buzzwords (hash: ${descriptionHash.slice(0, 8)}…)`);
+                console.log(`[${requestId}] route=jobs/ingest step=extraction_cache HIT — reusing ${cacheFilter.kept.length}/${cached.buzzwords.length} buzzwords after filter (hash: ${descriptionHash.slice(0, 8)}…)`);
+                if (cacheFilter.removed.length > 0) {
+                    console.log(`[${requestId}] route=jobs/ingest step=cache_filter removed=${cacheFilter.removed.length}: ${cacheFilter.removed.slice(0, 5).join(', ')}`);
+                }
             }
         } catch (cacheErr: any) {
             // Non-blocking — cache failure falls through to LLM extraction
@@ -229,7 +239,21 @@ export async function POST(request: NextRequest) {
                     buzzwords: `string[] — ATS keywords: MAXIMUM 15. ONLY include: software tools, frameworks, platforms, technical standards, certifications, and specific domain/methodology terms that an ATS robot would scan for.
   ✅ INCLUDE: Python, Salesforce, SAP, Jira, ISO 26262, SCRUM, OKR, MEDDPICC, Machine Learning, M&A, Kartellrecht, IFRS, Power BI, ROI, ARR
   ❌ EXCLUDE: generic verbs ("Implementierung", "Schulungen", "Analyse"), language names ("Deutsch", "Englisch", "Fließend"), company/product names that are the job focus ("Odoo"-role = not a keyword), adjectives ("Agile"), soft skills ("Kommunikation"), job titles ("Business Consultant")
-  Quality over quantity. 8–12 high-signal keywords is better than 20 weak ones.`
+  Quality over quantity. 8–12 high-signal keywords is better than 20 weak ones.
+
+  LANGUAGE RULE (CRITICAL for CV-Match consistency):
+  TARGET LANGUAGE: ${languageName}
+  Translate language-dependent terms ALWAYS into the target language:
+    "Project Management" (en) ↔ "Projektmanagement" (de) ↔ "Gestión de Proyectos" (es)
+    "Stakeholder Management" (en) ↔ "Stakeholder-Management" (de)
+    "Accounting" (en) ↔ "Buchhaltung" (de) ↔ "Contabilidad" (es)
+  EIGENNAMEN stay in original (never translate):
+    Tools/Brands (Salesforce, SAP, Python, DATEV), frameworks (Scrum, OKR, ITIL),
+    certifications (PMP, AWS Solutions Architect, Bilanzbuchhalter IHK),
+    standards (ISO 9001, ISO 27001, ISO 26262, PCI DSS).
+  EXCEPTION — language variants of the same regulation translate normally:
+    GDPR (en) ↔ DSGVO (de) ↔ RGPD (es).
+  This rule applies even if the job posting is in a different language than ${languageName}.`
                 };
 
                 const response = await complete({
@@ -297,10 +321,20 @@ Schema: ${JSON.stringify(extractionSchema)}`,
         // ================================================================
         // STEP 3.5: Normalize buzzwords + requirements (determinism guarantee)
         // Sort + dedup ensures identical descriptions produce identical keyword lists.
+        // Then ATS-Filter strips garbage (Bürozeit, Teamfähigkeit, ...) and rewrites
+        // German compounds (Projektleitungserfahrung → Projektleitung).
         // ================================================================
         if (Array.isArray(extractedData.buzzwords) && extractedData.buzzwords.length > 0) {
-            extractedData.buzzwords = normalizeSortDedup(extractedData.buzzwords);
-            console.log(`[${requestId}] route=jobs/ingest step=normalize_buzzwords count=${extractedData.buzzwords.length}`);
+            const normalized = normalizeSortDedup(extractedData.buzzwords);
+            const atsFilter = filterAtsKeywords(normalized);
+            extractedData.buzzwords = atsFilter.kept;
+            console.log(`[${requestId}] route=jobs/ingest step=normalize_buzzwords count=${atsFilter.kept.length} (filtered ${atsFilter.removed.length}/${normalized.length})`);
+            if (atsFilter.removed.length > 0) {
+                console.log(`[${requestId}] route=jobs/ingest step=ats_filter removed=${atsFilter.removed.slice(0, 5).join(', ')}${atsFilter.removed.length > 5 ? '...' : ''}`);
+            }
+            if (atsFilter.rewritten && atsFilter.rewritten.length > 0) {
+                console.log(`[${requestId}] route=jobs/ingest step=ats_filter rewrote=${atsFilter.rewritten.slice(0, 3).map(r => `${r.from}→${r.to}`).join(', ')}`);
+            }
         }
         if (Array.isArray(extractedData.qualifications) && extractedData.qualifications.length > 0) {
             extractedData.qualifications = normalizeSortDedup(extractedData.qualifications);
@@ -417,6 +451,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
                         .upsert({
                             user_id: userId,
                             description_hash: descriptionHash,
+                            locale,
                             buzzwords: extractedData.buzzwords || [],
                             requirements: extractedData.qualifications || [],
                             responsibilities: extractedData.responsibilities || [],
@@ -426,9 +461,9 @@ Schema: ${JSON.stringify(extractionSchema)}`,
                             location: extractedData.location || null,
                             updated_at: new Date().toISOString(),
                         }, {
-                            onConflict: 'user_id,description_hash',
+                            onConflict: 'user_id,description_hash,locale',
                         });
-                    console.log(`[${requestId}] route=jobs/ingest step=extraction_cache_write hash=${descriptionHash.slice(0, 8)}… buzzwords=${extractedData.buzzwords.length}`);
+                    console.log(`[${requestId}] route=jobs/ingest step=extraction_cache_write hash=${descriptionHash.slice(0, 8)}… locale=${locale} buzzwords=${extractedData.buzzwords.length}`);
                 } catch (cacheWriteErr: any) {
                     // Non-blocking — extraction already saved to job_queue row
                     console.warn(`[${requestId}] route=jobs/ingest step=extraction_cache_write error (non-blocking): ${cacheWriteErr?.message}`);

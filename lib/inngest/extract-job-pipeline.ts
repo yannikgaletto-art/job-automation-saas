@@ -14,6 +14,7 @@ import { complete } from '@/lib/ai/model-router';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
 import { deepScrapeJob } from '@/lib/services/job-search-pipeline';
+import { filterAtsKeywords } from '@/lib/services/ats-keyword-filter';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -195,7 +196,7 @@ IMPORTANT for benefits:
 - Extract ONLY the 6 most standout benefits, max 3 words each.
 - Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
-{"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8 responsibilities"],"qualifications":["max 8 qualifications"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["MAXIMUM 15 ATS keywords. ONLY: software tools, frameworks, platforms, technical standards, certifications, specific domain/methodology terms. INCLUDE: Python, SAP, Jira, ISO 26262, SCRUM, OKR, MEDDPICC, M&A, IFRS, Power BI, ROI. EXCLUDE: generic verbs (Implementierung, Schulungen), language names (Deutsch, Englisch, Fluent), company names that are the job subject, adjectives (Agile), soft skills, job titles. Quality over quantity — 8-12 strong keywords beats 20 weak ones."]}`,
+{"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8 responsibilities"],"qualifications":["max 8 qualifications"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["MAXIMUM 15 ATS keywords. ONLY: software tools, frameworks, platforms, technical standards, certifications, specific domain/methodology terms. INCLUDE: Python, SAP, Jira, ISO 26262, SCRUM, OKR, MEDDPICC, M&A, IFRS, Power BI, ROI. EXCLUDE: generic verbs (Implementierung, Schulungen), language names (Deutsch, Englisch, Fluent), company names that are the job subject, adjectives (Agile), soft skills, job titles. Quality over quantity — 8-12 strong keywords beats 20 weak ones. LANGUAGE: translate language-dependent terms ALWAYS into ${languageName} (e.g. 'Project Management' → 'Projektmanagement' for de, GDPR → DSGVO for de). Eigennamen stay original (Salesforce, SAP, Python, Scrum, OKR, PMP, ISO 9001/27001/26262, PCI DSS). This rule applies even if the job posting is in a different language."]}`,
                 prompt: sanitizeForAI(job.description).sanitized,
                 temperature: 0,
                 maxTokens: 2000,
@@ -221,7 +222,7 @@ IMPORTANT for benefits:
                 const existingBuzzwords = Array.isArray(currentJob?.buzzwords) && currentJob.buzzwords.length > 0;
                 let newBuzzwords = Array.isArray((extracted as any).buzzwords) ? (extracted as any).buzzwords as string[] : null;
 
-                // Normalize buzzwords: sort + dedup (mirrors ingest/route.ts STEP 3.5)
+                // Normalize buzzwords: sort + dedup + ATS-Filter (mirrors ingest/route.ts STEP 3.5)
                 if (newBuzzwords && newBuzzwords.length > 0) {
                     const seen = new Set<string>();
                     const normalized: string[] = [];
@@ -232,7 +233,17 @@ IMPORTANT for benefits:
                             normalized.push(kw.trim());
                         }
                     }
-                    newBuzzwords = normalized.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+                    const sorted = normalized.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+                    // ATS-Filter — strip garbage + rewrite German compounds.
+                    const atsFilter = filterAtsKeywords(sorted);
+                    newBuzzwords = atsFilter.kept;
+                    if (atsFilter.removed.length > 0) {
+                        console.log(`[Extract] Job ${jobId} ats_filter kept=${atsFilter.kept.length} removed=${atsFilter.removed.length}: ${atsFilter.removed.slice(0, 5).join(', ')}`);
+                    }
+                    if (atsFilter.rewritten && atsFilter.rewritten.length > 0) {
+                        console.log(`[Extract] Job ${jobId} ats_filter rewrote=${atsFilter.rewritten.slice(0, 3).map(r => `${r.from}→${r.to}`).join(', ')}`);
+                    }
                 }
 
                 // Buzzword-Schutz: Only write if DB has no buzzwords yet.
