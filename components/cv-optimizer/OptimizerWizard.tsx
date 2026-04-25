@@ -514,7 +514,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                 <p className="text-slate-400 text-xs max-w-sm mb-6 leading-relaxed bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
                     {t('no_cv_scan_hint')}
                 </p>
-                <Link href={`/${locale}/dashboard/settings`}>
+                <Link href={`/${locale}/dashboard/profil`}>
                     <button className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#012e7a] hover:bg-[#01246b] text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
                         {t('no_cv_link')}
                         <ArrowRight className="w-4 h-4" />

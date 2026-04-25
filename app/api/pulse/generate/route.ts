@@ -148,7 +148,7 @@ export async function GET() {
                 priority: 'high',
                 category: 'setup',
                 job_queue_id: null,
-                deep_link: '/dashboard/settings',
+                deep_link: '/dashboard/profil',
                 icon: 'file-up',
             });
         }

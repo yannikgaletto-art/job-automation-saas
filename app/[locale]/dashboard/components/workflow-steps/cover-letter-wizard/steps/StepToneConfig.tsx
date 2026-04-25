@@ -6,6 +6,7 @@ import type { SetupDataResponse, TonePreset, TargetLanguage } from '@/types/cove
 import { Info, ChevronLeft, Sparkles, Zap, Shield, FileText, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations, useLocale } from 'next-intl';
+import { DocumentsRequiredDialog } from '@/components/shared/documents-required-dialog';
 
 interface Props {
     setupData: SetupDataResponse;
@@ -51,6 +52,7 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
     const [pendingDocId, setPendingDocId] = useState<string | undefined>(undefined);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+    const [showCoverLetterRequired, setShowCoverLetterRequired] = useState(false);
 
     const availableDocs = setupData.availableStyleDocs || [];
     const hasUploadedDocs = availableDocs.length > 0;
@@ -239,9 +241,8 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
             <div className="flex items-center gap-6">
                 {/* Eigener Stil */}
                 <button
-                    onClick={() => handleToneSourceChange('custom-style')}
-                    disabled={!hasUploadedDocs}
-                    className={`flex items-center gap-2 transition-all ${!hasUploadedDocs ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                    onClick={() => hasUploadedDocs ? handleToneSourceChange('custom-style') : setShowCoverLetterRequired(true)}
+                    className={`flex items-center gap-2 cursor-pointer transition-all ${!hasUploadedDocs ? 'opacity-50 hover:opacity-70' : ''
                         }`}
                     title={!hasUploadedDocs ? t('doc_upload_hint') : undefined}
                 >
@@ -616,6 +617,12 @@ export function StepToneConfig({ setupData, onBack, onGenerate }: Props) {
                     {t('btn_generate')}
                 </button>
             </div>
+
+            <DocumentsRequiredDialog
+                open={showCoverLetterRequired}
+                onClose={() => setShowCoverLetterRequired(false)}
+                type="cover_letter"
+            />
         </div>
     );
 }

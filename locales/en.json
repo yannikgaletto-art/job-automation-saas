@@ -67,6 +67,7 @@
       "volunteering": "Volunteering (Beta)",
       "data_security": "Data Security",
       "feedback_voice": "Feedback",
+      "profile": "Profile",
       "settings": "Settings",
       "admin": "Admin"
     },
@@ -601,6 +602,33 @@
       "error_network": "Network error. Please try again."
     }
   },
+  "profil": {
+    "page": {
+      "title": "Profile",
+      "subtitle": "Your personal documents and professional information."
+    },
+    "documents": {
+      "title": "My Documents",
+      "description": "Your CV and cover letters for CV matching, optimization and application creation."
+    },
+    "launch_waitlist": {
+      "title": "Launch Waitlist",
+      "description": "Secure your spot for the Pathly launch.",
+      "cta_title": "Join the launch waitlist",
+      "cta_desc": "Choose your plan and be the first to know when we go live.",
+      "plan_starter": "Starter",
+      "plan_starter_desc": "30 credits, 10 coaching sessions, 30 job searches",
+      "plan_durchstarter": "Durchstarter",
+      "plan_durchstarter_desc": "75 credits, 25 coaching sessions, 75 job searches",
+      "plan_quarterly": "Quarterly Package",
+      "plan_quarterly_desc": "3 months Durchstarter at a discounted rate",
+      "submit": "Reserve my spot",
+      "disclaimer": "Non-binding — you'll be notified as soon as the launch begins.",
+      "success_title": "You're on the waitlist!",
+      "success_desc": "We'll notify you as soon as your plan becomes available.",
+      "error": "Something went wrong. Please try again."
+    }
+  },
   "settings": {
     "page": {
       "title": "Your Career Profile",
@@ -621,23 +649,6 @@
       "en": "English",
       "es": "Español",
       "saved": "Language saved"
-    },
-    "launch_waitlist": {
-      "title": "Launch Waitlist",
-      "description": "Secure your spot for the Pathly launch.",
-      "cta_title": "Join the launch waitlist",
-      "cta_desc": "Choose your plan and be the first to know when we go live.",
-      "plan_starter": "Starter",
-      "plan_starter_desc": "30 credits, 10 coaching sessions, 30 job searches",
-      "plan_durchstarter": "Durchstarter",
-      "plan_durchstarter_desc": "75 credits, 25 coaching sessions, 75 job searches",
-      "plan_quarterly": "Quarterly Package",
-      "plan_quarterly_desc": "3 months Durchstarter at a discounted rate",
-      "submit": "Reserve my spot",
-      "disclaimer": "Non-binding — you'll be notified as soon as the launch begins.",
-      "success_title": "You're on the waitlist!",
-      "success_desc": "We'll notify you as soon as your plan becomes available.",
-      "error": "Something went wrong. Please try again."
     },
     "tours": {
       "section_title": "Guided Tours",
@@ -1107,6 +1118,7 @@
     "cmd_search": "Open Job Search",
     "cmd_queue": "Open Job Queue",
     "cmd_analytics": "Open Analytics",
+    "cmd_profile": "Profile",
     "cmd_settings": "Open Settings",
     "cmd_security": "Open Data Security"
   },
@@ -1571,7 +1583,25 @@
     "cl_hint_bullet_2": "The one that sounds most authentic — not the most polished",
     "cl_hint_bullet_3": "Ideally one written for a role you genuinely wanted",
     "cl_hint_continue": "Upload cover letter",
-    "cl_hint_dismiss": "I've read this"
+    "cl_hint_dismiss": "I've read this",
+    "cv_section_title": "CV",
+    "cl_section_title": "Cover Letters",
+    "upload_button": "Upload ({current}/{max})",
+    "uploaded_at": "Uploaded",
+    "no_cv_uploaded": "No CV uploaded yet",
+    "cv_max_reached": "Please delete an existing CV first",
+    "cl_max_reached": "Please delete an existing cover letter first",
+    "category_button": "Category",
+    "category_create_title": "Create category",
+    "category_assign_title": "Assign category",
+    "category_none": "None",
+    "category_placeholder": "e.g. Account Executive, Business Development...",
+    "download_title": "Download",
+    "delete_title": "Delete",
+    "cl_empty_hint": "Upload successful cover letters so Pathly can learn your writing style.",
+    "cv_uploaded_toast": "CV uploaded",
+    "cl_uploaded_toast": "Cover letter uploaded",
+    "category_delete_title": "Delete category"
   },
   "tour": {
     "step1_title": "Your Daily Goals",

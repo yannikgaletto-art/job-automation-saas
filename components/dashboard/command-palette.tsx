@@ -11,7 +11,7 @@ import { Command } from 'cmdk';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Search, Inbox, BarChart3, Plus, Target, Settings, Shield } from 'lucide-react';
+import { Home, Search, Inbox, BarChart3, Plus, Target, Settings, Shield, User } from 'lucide-react';
 
 export function CommandPalette() {
     const router = useRouter();
@@ -23,6 +23,7 @@ export function CommandPalette() {
         { id: 'search', icon: Search, label: t('cmd_search'), shortcut: 'S', href: '/dashboard/job-search' },
         { id: 'queue', icon: Inbox, label: t('cmd_queue'), shortcut: 'Q', href: '/dashboard/job-queue' },
         { id: 'analytics', icon: BarChart3, label: t('cmd_analytics'), shortcut: 'A', href: '/dashboard/analytics' },
+        { id: 'profile', icon: User, label: t('cmd_profile'), shortcut: 'P', href: '/dashboard/profil' },
         { id: 'settings', icon: Settings, label: t('cmd_settings'), shortcut: ',', href: '/dashboard/settings' },
         { id: 'security', icon: Shield, label: t('cmd_security'), shortcut: '', href: '/dashboard/security' },
     ], [t]);
