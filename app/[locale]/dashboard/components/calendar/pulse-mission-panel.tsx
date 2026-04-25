@@ -10,8 +10,10 @@
  */
 
 import { useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useTranslations, useLocale } from 'next-intl';
 import { useDraggable } from '@dnd-kit/core';
+import { localizedHref } from '@/lib/utils/locale-href';
 import { CSS } from '@dnd-kit/utilities';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -98,6 +100,8 @@ function MissionCard({ suggestion }: { suggestion: PulseSuggestion }) {
     const { dismissSuggestion, acceptSuggestion } = useCalendarStore();
     const [isAccepting, setIsAccepting] = useState(false);
     const t = useTranslations('dashboard.calendar');
+    const router = useRouter();
+    const locale = useLocale();
 
     // Make this card draggable — ID prefixed with "pulse-" so orchestrator can detect it
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -114,6 +118,12 @@ function MissionCard({ suggestion }: { suggestion: PulseSuggestion }) {
 
     const IconComponent = ICON_MAP[suggestion.icon] || Target;
     const priority = PRIORITY_CONFIG[suggestion.priority];
+
+    const handleCardClick = useCallback(() => {
+        if (isDragging) return;
+        if (!suggestion.deep_link) return;
+        router.push(localizedHref(suggestion.deep_link, locale));
+    }, [isDragging, suggestion.deep_link, locale, router]);
 
     const handleAccept = useCallback(async () => {
         if (isAccepting) return;
@@ -151,7 +161,7 @@ function MissionCard({ suggestion }: { suggestion: PulseSuggestion }) {
                 ${priority.border}
             `}
         >
-            {/* Drag Handle */}
+            {/* Drag Handle (left) — visual cue */}
             <span
                 {...listeners}
                 {...attributes}
@@ -160,16 +170,12 @@ function MissionCard({ suggestion }: { suggestion: PulseSuggestion }) {
                 <GripVertical className="w-4 h-4" />
             </span>
 
-            {/* Icon */}
-            <div className={`
-                flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center
-                ${priority.bg}
-            `}>
-                <IconComponent className="w-4 h-4 text-[#37352F]" />
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 min-w-0">
+            {/* Body — draggable from title area, NOT clickable (prevents accidental nav) */}
+            <div
+                {...listeners}
+                {...attributes}
+                className="flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none"
+            >
                 <p className="text-sm font-medium text-[#37352F] truncate">
                     {suggestion.title}
                 </p>
@@ -185,10 +191,23 @@ function MissionCard({ suggestion }: { suggestion: PulseSuggestion }) {
                 </div>
             </div>
 
-            {/* Actions */}
+            {/* Actions — Nav-Icon (right) + Accept + Dismiss */}
             <div className="flex items-center gap-1 flex-shrink-0">
+                {suggestion.deep_link && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
+                        className={`
+                            w-7 h-7 rounded-md flex items-center justify-center
+                            ${priority.bg} hover:brightness-95
+                            transition-all
+                        `}
+                        title={t('open_details')}
+                    >
+                        <IconComponent className="w-3.5 h-3.5 text-[#37352F]" />
+                    </button>
+                )}
                 <button
-                    onClick={handleAccept}
+                    onClick={(e) => { e.stopPropagation(); handleAccept(); }}
                     disabled={isAccepting}
                     className="
                         w-7 h-7 rounded-md flex items-center justify-center
@@ -200,7 +219,7 @@ function MissionCard({ suggestion }: { suggestion: PulseSuggestion }) {
                     <Check className="w-3.5 h-3.5" />
                 </button>
                 <button
-                    onClick={handleDismiss}
+                    onClick={(e) => { e.stopPropagation(); handleDismiss(); }}
                     className="
                         w-7 h-7 rounded-md flex items-center justify-center
                         bg-gray-50 hover:bg-gray-100 text-gray-400

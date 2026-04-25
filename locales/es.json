@@ -106,6 +106,7 @@
       "priority_low": "Baja",
       "accept_mission": "Aceptar misión",
       "dismiss_mission": "Rechazar misión",
+      "open_details": "Abrir detalles",
       "focus_modal": {
         "title": "Listo para el trabajo profundo?",
         "scheduled_time": "Hora planificada",

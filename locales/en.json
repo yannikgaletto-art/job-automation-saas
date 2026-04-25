@@ -106,6 +106,7 @@
       "priority_low": "Low",
       "accept_mission": "Accept mission",
       "dismiss_mission": "Dismiss mission",
+      "open_details": "Open details",
       "focus_modal": {
         "title": "Ready for Deep Work?",
         "scheduled_time": "Scheduled",
