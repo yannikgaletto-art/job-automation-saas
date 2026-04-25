@@ -313,7 +313,7 @@ export function PulseMissionPanel() {
                                     {t('no_job_recommendations')}
                                 </p>
                             ) : (
-                                <AnimatePresence mode="popLayout">
+                                <AnimatePresence>
                                     {visibleSuggestions.map((suggestion) => (
                                         <MissionCard
                                             key={suggestion.id}

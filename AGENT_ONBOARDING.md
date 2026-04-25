@@ -140,6 +140,26 @@ Das Verbindungsglied ist der **MASTER_PROMPT_TEMPLATE.md** — eine wiederverwen
 - **Nie** `git config --global --edit`.
 - Commit-Message: `<type>(<scope>): <kurz>\n\n<bullet-body>\n\nCo-Authored-By: Claude ...`.
 
+### 6.6 Fachbegriffe beim Stellen von Fragen aufbereiten
+
+Yannik lernt aktiv mit. **Jedes Mal, wenn du ihm eine Frage stellst, die Fachbegriffe oder Fremdwörter enthält, verwendest du dieses Format:**
+
+```
+❓ FRAGE (technisch)
+<Frage in normaler Fachsprache>
+
+💬 FRAGE (vereinfacht)
+<Dieselbe Frage in einfachen Worten — ohne Jargon, so als würdest du es einem
+ engagierten Nicht-Entwickler erklären>
+
+📚 BEGRIFFE
+• <Begriff 1>: <1-2 Sätze was das ist + warum es in diesem Kontext wichtig ist>
+• <Begriff 2>: <1-2 Sätze …>
+  …(nur Begriffe die in der Frage vorkommen und nicht offensichtlich sind)
+```
+
+**Ziel:** Yannik soll nach 10-20 Gesprächen die wiederkehrenden Begriffe (z.B. RLS, Hydration, Server Component, Migration, Namespace) auswendig kennen — nicht weil er nachgeschlagen hat, sondern weil sie jedes Mal kurz kontextualisiert wurden.
+
 ---
 
 ## 7 · Commands Cheatsheet

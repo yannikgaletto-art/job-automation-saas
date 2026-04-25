@@ -24,10 +24,18 @@ interface PomodoroCardProps {
 
 // ── Pomodoro Done Banner (top-right, portal) ──────────────────────────────────
 function PomodoroDoneBanner({ onDismiss }: { onDismiss: () => void }) {
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     useEffect(() => {
         const t = setTimeout(onDismiss, 6000);
         return () => clearTimeout(t);
     }, [onDismiss]);
+
+    if (!isMounted) return null;
 
     return createPortal(
         <motion.div

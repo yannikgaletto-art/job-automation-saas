@@ -65,3 +65,6 @@ Job_Search_Pre.mp4
 tmp/test-*.ts
 scripts/cfo-*.ts
 scripts/migrate_*.ts
+
+# Claude Code memory (enthält interne Projektnotizen + persönliche Infos)
+.claude/memory/
