@@ -64,10 +64,13 @@ function needsTranslation(cv: CvStructuredData, targetLang: string): boolean {
         return germanMarkers.test(sampleText) || spanishMarkers.test(sampleText);
     }
 
-    // If target is German, check if content is in English
+    // If target is German, check if content is in English.
+    // Require ≥2 matches to avoid false positives from single English company names
+    // (e.g. "The Boston Consulting Group" contributes "the" = 1 match → no false trigger).
     if (targetLang === 'German') {
-        const englishMarkers = /\b(the|and|for|with|from|through|including|achieving|enabling|built|developed|designed|managed|implemented|delivered|led)\b/;
-        return englishMarkers.test(sampleText);
+        const englishMarkers = /\b(the|and|for|with|from|through|including|achieving|enabling|built|developed|designed|managed|implemented|delivered|led)\b/g;
+        const matchCount = (sampleText.match(englishMarkers) ?? []).length;
+        return matchCount >= 2;
     }
 
     // If target is Spanish, check for English/German

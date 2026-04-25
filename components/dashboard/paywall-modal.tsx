@@ -24,7 +24,7 @@ import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Mic, Search, Gift, ArrowUpCircle, CreditCard } from 'lucide-react';
+import { Loader2, Mic, Search, Gift, ArrowUpCircle, CreditCard, ExternalLink } from 'lucide-react';
 import type { PaywallReason } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
 
 type ModalPhase = 'pricing' | 'granting' | 'surprise';
@@ -185,9 +185,25 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
                                 <Dialog.Title className="text-center text-lg font-semibold text-foreground mb-1">
                                     {title}
                                 </Dialog.Title>
-                                <Dialog.Description className="text-center text-sm text-muted-foreground mb-6">
+                                <Dialog.Description className="text-center text-sm text-muted-foreground mb-2">
                                     {subtitle}
                                 </Dialog.Description>
+                                {reason === 'search' && (
+                                    <p className="text-center text-sm text-muted-foreground mb-6">
+                                        {t.rich('search_limit_waitlist', {
+                                            link: (chunks) => (
+                                                <a
+                                                    href={`/${locale}/dashboard/profil`}
+                                                    onClick={() => handleOpenChange(false)}
+                                                    className="underline underline-offset-2 text-[#012e7a] hover:text-[#023a97] transition-colors inline-flex items-center gap-0.5"
+                                                >
+                                                    {chunks}
+                                                    <ExternalLink className="w-3 h-3 inline" />
+                                                </a>
+                                            ),
+                                        })}
+                                    </p>
+                                )}
 
                                 {/* Error banner */}
                                 {errorMsg && (
@@ -250,7 +266,11 @@ export function PaywallModal({ open, onOpenChange, reason, remaining = 0 }: Payw
                                     )}
                                 </div>
 
-                                <Dialog.Close className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground py-2 transition-colors">
+                                <Dialog.Close className={`mt-4 w-full py-3 rounded-xl text-sm font-semibold transition-colors ${
+                                    reason === 'search'
+                                        ? 'bg-[#012e7a] hover:bg-[#023a97] text-white'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                }`}>
                                     {t('dismiss')}
                                 </Dialog.Close>
                             </motion.div>

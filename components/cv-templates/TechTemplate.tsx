@@ -234,7 +234,7 @@ export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredDat
                                         </View>
                                         <Text style={s.expCompany}>{exp.company || ''} {exp.location ? `// ${exp.location}` : ''}</Text>
 
-                                        {exp.description?.map(bullet => (
+                                        {exp.description?.slice(0, 4).map(bullet => (
                                             <View key={bullet.id} style={s.bulletRow}>
                                                 <Text style={s.bulletDot}>{'\u203A'}</Text>
                                                 <RenderBullet text={bullet.text} />

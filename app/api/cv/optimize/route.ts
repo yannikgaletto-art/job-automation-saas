@@ -199,14 +199,10 @@ export async function POST(req: NextRequest) {
         const cv_structured_data = sanitizeCv(rawCvData, { trustedName: profileRow?.full_name });
 
         // ── Pass 1: Translate CV to target language if needed ───────────
-        // cv-parser stores content verbatim (e.g. German bullets from a German CV).
-        // Translation is ONLY needed for non-German locales — the cv-parser prompt
-        // is in German and preserves original text, so locale='de' CVs are always
-        // already in the correct language. Skipping for 'de' prevents false-positive
-        // triggers from company names (e.g. 'The Boston Consulting Group').
-        const { cv: translatedCv, wasTranslated } = locale !== 'de'
-            ? await translateCvIfNeeded(cv_structured_data, lang)
-            : { cv: cv_structured_data, wasTranslated: false };
+        // Always run detection; needsTranslation() is a no-op if content already
+        // matches the target language. Previously skipped for locale='de', which
+        // silently broke users who uploaded English CVs with a German UI locale.
+        const { cv: translatedCv, wasTranslated } = await translateCvIfNeeded(cv_structured_data, lang);
         if (wasTranslated) {
             log.info('CV pre-translated to target language', { locale, lang });
         }
@@ -300,13 +296,13 @@ AUTHENTIC KEYWORD WEAVING:
 - Counter-example: keyword "Emergency Planning" + CV has nothing → do NOT insert.
 
 SECTION DISTRIBUTION (MANDATORY):
-- Your changes MUST cover at least 2 different sections. Do NOT spend all 12 changes on experience alone.
+- Your changes MUST cover at least 2 different sections. Do NOT spend all 18 changes on experience alone.
 - Reserve at least 2 changes for Skills (reorder, add missing keywords) or Summary.
-- Prioritize: 7–8 experience changes, 2–3 skills changes, 1–2 summary changes.
+- Prioritize: 11–12 experience changes, 4–5 skills changes, 1–2 summary changes.
 
 SELF-JUDGE VALIDATION (run this before returning):
 Before returning your output, mentally verify:
-1. Count total changes. If >12, keep only the 12 most impactful.
+1. Count total changes. If >18, keep only the 18 most impactful.
 2. Verify at least 2 sections are covered (experience + skills/summary). If not, add 1–2 skills/summary changes.
 3. Count total bullet points across all experience entries. If >15, cut the weakest.
 4. Count total skill items. If >24, remove least relevant.
@@ -350,6 +346,10 @@ ${keywordBlock}
 
 **OUTPUT LANGUAGE: ${lang}. Write ALL "after" and "reason" text fields in ${lang}.**
 
+**STYLE RULES (apply to every "after" value):**
+- NEVER use em-dashes (— or –). Use a colon (:) or semicolon (;) instead.
+- Max 30 words per bullet. Split longer ideas into two sentences.
+
 **OUTPUT FORMAT (STRICT JSON):**
 Return ONLY JSON. No markdown framing (\`\`\`json), no comments.
 Must conform to the following Zod schema:
@@ -379,7 +379,7 @@ Must conform to the following Zod schema:
                     taskType: 'optimize_cv',
                     prompt,
                     temperature: 0,
-                    maxTokens: 8000, // Increased: 5000 caused truncation on large CVs with 12 changes
+                    maxTokens: 10000, // 18-change cap headroom; observed ~3500 tok for 15 changes
                 }),
                 job_id
             );
@@ -469,11 +469,13 @@ Must conform to the following Zod schema:
             // personalInfo — flat object, no arrays
             if (section === 'personalInfo' && field) {
                 const realBefore = (translatedCv.personalInfo as any)?.[field];
-                if (realBefore != null) {
+                // Empty-string guard: an empty before with a non-empty after looks
+                // like a hallucinated "added new content" diff in the UI.
+                if (realBefore != null && String(realBefore).trim().length > 0) {
                     change.before = String(realBefore);
                     verifiedChanges.push(change);
                 } else {
-                    lookupFailures.push({ changeId: change.id, reason: 'personalInfo field not found', path: `personalInfo.${field}` });
+                    lookupFailures.push({ changeId: change.id, reason: 'personalInfo field empty or missing', path: `personalInfo.${field}` });
                 }
                 continue;
             }
@@ -506,13 +508,18 @@ Must conform to the following Zod schema:
             // Field-level lookup
             if (field) {
                 const realValue = entity[field];
-                if (realValue != null) {
-                    change.before = Array.isArray(realValue)
-                        ? realValue.map((x: any) => typeof x === 'string' ? x : x.text).join(', ')
+                // Empty-value guard: empty string / empty array would render as a
+                // "from nothing" diff which looks hallucinated to the user.
+                const beforeText = realValue == null
+                    ? ''
+                    : Array.isArray(realValue)
+                        ? realValue.map((x: any) => typeof x === 'string' ? x : x.text).filter(Boolean).join(', ')
                         : String(realValue);
+                if (beforeText.trim().length > 0) {
+                    change.before = beforeText;
                     verifiedChanges.push(change);
                 } else {
-                    lookupFailures.push({ changeId: change.id, reason: 'field not found on entity', path: `${section}.${entityId}.${field}` });
+                    lookupFailures.push({ changeId: change.id, reason: 'field empty or missing', path: `${section}.${entityId}.${field}` });
                 }
             } else {
                 lookupFailures.push({ changeId: change.id, reason: 'no field or bulletId specified', path: `${section}.${entityId}` });
@@ -521,7 +528,13 @@ Must conform to the following Zod schema:
 
         // Replace with verified-only changes
         const droppedCount = rawJson.changes.length - verifiedChanges.length;
-        rawJson.changes = verifiedChanges;
+        // Em-dash post-processing: strip any — or – that escaped the prompt rule
+        rawJson.changes = verifiedChanges.map((c: any) => ({
+            ...c,
+            after: typeof c.after === 'string'
+                ? c.after.replace(/\s*[–—]\s*/g, '; ')
+                : c.after,
+        }));
 
         if (lookupFailures.length > 0) {
             log.warn('Before-text sanitizer: changes dropped due to path mismatch', {
@@ -533,9 +546,11 @@ Must conform to the following Zod schema:
             });
         }
 
-        // Backend-cap: limit to 12 most relevant changes
-        // Prompt already asks for max 12, but enforce as safety net
-        const MAX_CHANGES = 12;
+        // Backend-cap: limit to 18 most relevant changes
+        // Prompt asks for max 18; cap enforced here as safety net.
+        // 18 allows comprehensive CVs (6+ stations) to be fully optimized
+        // without exceeding 2-page PDF layout constraints.
+        const MAX_CHANGES = 18;
         if (rawJson.changes.length > MAX_CHANGES) {
             log.info(`Capping changes from ${rawJson.changes.length} to ${MAX_CHANGES}`);
             // Priority: modify > add > remove (keeps the most impactful)

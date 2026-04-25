@@ -11,9 +11,16 @@ import {
 } from 'lucide-react';
 import type { SerpApiJob } from '@/lib/services/job-search-pipeline';
 import { useJobQueueCount } from '@/store/use-job-queue-count';
+import { AddJobDialog } from '@/components/dashboard/add-job-dialog';
 import JobSwipeView from '@/components/job-search/JobSwipeView';
 import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
 import { useDashboardTour, type TourStep } from '../hooks/useDashboardTour';
+import { useCreditExhausted } from '../hooks/credit-exhausted-context';
+
+interface QuotaInfo {
+    jobSearchesUsed: number;
+    jobSearchesTotal: number;
+}
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -64,7 +71,26 @@ function getScoreBar(score: number): { color: string; label: string | null } {
 export default function JobSearchPage() {
     const t = useTranslations('dashboard.job_search');
     const tTour = useTranslations('tour');
+    const { showPaywall } = useCreditExhausted();
     const [starredUrls, setStarredUrls] = useState<Set<string>>(new Set());
+    const [quota, setQuota] = useState<QuotaInfo | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetch('/api/credits')
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+                if (cancelled || !d?.credits) return;
+                setQuota({
+                    jobSearchesUsed: d.credits.jobSearchesUsed ?? 0,
+                    jobSearchesTotal: d.credits.jobSearchesTotal ?? 0,
+                });
+            })
+            .catch(() => { /* fail open: button stays enabled */ });
+        return () => { cancelled = true; };
+    }, []);
+
+    const noQuota = !!quota && quota.jobSearchesUsed >= quota.jobSearchesTotal;
 
     useEffect(() => {
         const saved = localStorage.getItem('pathly_starred_jobs');
@@ -98,6 +124,10 @@ export default function JobSearchPage() {
                 }),
             });
             const data = await res.json();
+            if (res.status === 402 || data?.error === 'JOB_SEARCH_QUOTA_EXHAUSTED') {
+                showPaywall('search', { remaining: data?.remaining ?? 0 });
+                return;
+            }
             if (!res.ok) throw new Error(data.error);
 
             setSavedSearches(prev => prev.map(s => {
@@ -115,16 +145,18 @@ export default function JobSearchPage() {
         } catch (err: any) {
             setError(err?.message || t('refresh_failed'));
         }
-    }, [starredUrls]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [starredUrls, showPaywall, t]);
 
     // Search state
     const [query, setQuery] = useState('');
-    const [location, setLocation] = useState('Berlin');
+    const [location, setLocation] = useState('Deutschland');
     const [isSearching, setIsSearching] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searchMode, setSearchMode] = useState<'keyword' | 'mission'>('keyword');
     const [showManualModal, setShowManualModal] = useState(false);
+    const increment = useJobQueueCount(s => s.increment);
 
     // Filter state
     const [selectedExperience, setSelectedExperience] = useState<string[]>([]);
@@ -263,6 +295,11 @@ export default function JobSearchPage() {
 
             const data = await res.json();
 
+            if (res.status === 402 || data?.error === 'JOB_SEARCH_QUOTA_EXHAUSTED') {
+                showPaywall('search', { remaining: data?.remaining ?? 0 });
+                return;
+            }
+
             if (!res.ok) throw new Error(data.error || t('search_failed'));
 
             // Insert new search at top of list
@@ -291,7 +328,7 @@ export default function JobSearchPage() {
         } finally {
             setIsSearching(false);
         }
-    }, [query, location, selectedExperience, selectedOrgType, selectedWerte, searchMode]);
+    }, [query, location, selectedExperience, selectedOrgType, selectedWerte, searchMode, showPaywall, t]);
 
     // ─── Delete Search ──────────────────────────────────────────────
 
@@ -391,7 +428,7 @@ export default function JobSearchPage() {
                 </div>
 
                 {/* Manual Job Popup Modal */}
-                <ManualJobForm isOpen={showManualModal} onClose={() => setShowManualModal(false)} />
+                <AddJobDialog isOpen={showManualModal} onClose={() => setShowManualModal(false)} onJobAdded={() => increment()} />
 
                 {/* Search UI (always visible now) */}
                 <div className="flex gap-2">
@@ -431,10 +468,11 @@ export default function JobSearchPage() {
                     </a>
                     {/* Suchen button */}
                     <motion.button
-                        whileHover={{ scale: 1.02, y: -1 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleSearch}
+                        whileHover={noQuota ? undefined : { scale: 1.02, y: -1 }}
+                        whileTap={noQuota ? undefined : { scale: 0.98 }}
+                        onClick={() => noQuota ? showPaywall('search', { remaining: 0 }) : handleSearch()}
                         disabled={isSearching || !query.trim()}
+                        title={noQuota ? t('quota_exhausted_tooltip') : undefined}
                         className="px-6 py-2.5 bg-[#002e7a] text-white text-sm font-medium rounded-lg hover:bg-[#001d4f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                     >
                         {isSearching ? (
@@ -1005,290 +1043,7 @@ function JobRow({ job, starredUrls, toggleStar, onDelete, onJobAdded }: { job: E
     );
 }
 
-// ─── Manual Job Entry Form (Popup Modal) ─────────────────────────
-
-function ManualJobForm({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const [jobTitle, setJobTitle] = useState('');
-    const [company, setCompany] = useState('');
-    const [websiteUrl, setWebsiteUrl] = useState('');
-    const [jobDescription, setJobDescription] = useState('');
-    const [submitting, setSubmitting] = useState(false);
-    const [submitted, setSubmitted] = useState(false);
-    const [showQueueFull, setShowQueueFull] = useState(false);
-    const [showPulse, setShowPulse] = useState(false);
-    const [formError, setFormError] = useState<string | null>(null);
-    const t = useTranslations('dashboard.job_search');
-    const locale = useLocale();
-    const increment = useJobQueueCount(s => s.increment);
-
-    const charCount = jobDescription.length;
-    const MAX_CHARS = 7000;
-    const MIN_CHARS = 400;
-
-    const canSubmit = jobTitle.trim().length >= 2
-        && company.trim().length >= 2
-        && websiteUrl.trim().length > 0
-        && charCount >= MIN_CHARS
-        && charCount <= MAX_CHARS;
-
-    const handleSubmit = async () => {
-        if (!canSubmit || submitting) return;
-        setFormError(null);
-        setSubmitting(true);
-
-        try {
-            const res = await fetch('/api/jobs/ingest', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jobTitle: jobTitle.trim(),
-                    company: company.trim(),
-                    companyWebsite: websiteUrl.trim(),
-                    jobDescription: jobDescription.trim(),
-                    source_url: websiteUrl.trim(),
-                    source: 'manual_entry',
-                }),
-            });
-
-            if (res.status === 429) {
-                setShowQueueFull(true);
-                return;
-            }
-
-            if (res.ok) {
-                const data = await res.json();
-                if (!data.duplicate) {
-                    setShowPulse(true);
-                    increment();
-                    setTimeout(() => {
-                        setSubmitted(true);
-                        setShowPulse(false);
-                    }, 1200);
-                } else {
-                    setSubmitted(true);
-                }
-            } else {
-                const data = await res.json().catch(() => ({}));
-                setFormError(data.error || t('manual_error_generic'));
-            }
-        } catch {
-            setFormError(t('manual_error_network'));
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleReset = () => {
-        setJobTitle('');
-        setCompany('');
-        setWebsiteUrl('');
-        setJobDescription('');
-        setSubmitted(false);
-        setFormError(null);
-    };
-
-    const handleClose = () => {
-        handleReset();
-        onClose();
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                >
-                    <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        className="relative w-[min(600px,calc(100vw-2rem))] max-h-[85vh] overflow-y-auto rounded-xl shadow-lg bg-white p-6"
-                    >
-                        <button onClick={handleClose} className="absolute top-4 right-4 text-[#73726E] hover:text-[#37352F] transition-colors">
-                            <X className="w-5 h-5" />
-                        </button>
-
-                        {submitted ? (
-                            /* ── Success Screen ── */
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="flex flex-col items-center justify-center py-8 text-center"
-                            >
-                                <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
-                                    <CheckCircle2 className="w-7 h-7 text-green-500" />
-                                </div>
-                                <h3 className="text-base font-bold text-[#37352F] mb-1">
-                                    {t('manual_success_title')}
-                                </h3>
-                                <p className="text-sm text-[#73726E] mb-5">
-                                    <strong>{jobTitle}</strong>{' '}{t('manual_success_link')}{' '}<strong>{company}</strong>{' '}{t('manual_success_verb')}
-                                </p>
-                                <div className="flex gap-3">
-                                    <a
-                                        href="/dashboard/job-queue"
-                                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#002e7a] text-white text-sm font-medium hover:bg-[#001f5c] transition-colors"
-                                    >
-                                        <ArrowRight className="w-4 h-4" />
-                                        {t('manual_to_queue')}
-                                    </a>
-                                    <button
-                                        onClick={handleReset}
-                                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#E7E7E5] text-sm text-[#73726E] font-medium hover:bg-[#F7F7F5] transition-colors"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        {t('manual_add_more')}
-                                    </button>
-                                </div>
-                            </motion.div>
-                        ) : (
-                            /* ── Form ── */
-                            <>
-                                <div className="mb-5">
-                                    <h2 className="text-lg font-semibold text-[#37352F]">{t('manual_title')}</h2>
-                                    <p className="text-sm text-[#73726E] mt-1">{t('manual_subtitle')}</p>
-                                    <p className="text-xs text-[#A8A29E] mt-1">{t('manual_tip')}</p>
-                                </div>
-
-                                {showQueueFull && <QueueFullModal onClose={() => setShowQueueFull(false)} />}
-
-                                <div className="space-y-4">
-                                    {/* Row 1: Unternehmen + Jobtitel */}
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-xs font-medium text-[#73726E] mb-1.5 block">{t('manual_company_label')} <span className="text-red-500">*</span></label>
-                                            <input
-                                                type="text"
-                                                placeholder={t('manual_company_placeholder')}
-                                                value={company}
-                                                onChange={e => setCompany(e.target.value)}
-                                                className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-medium text-[#73726E] mb-1.5 block">{t('manual_jobtitle_label')} <span className="text-red-500">*</span></label>
-                                            <input
-                                                type="text"
-                                                placeholder={t('manual_jobtitle_placeholder')}
-                                                value={jobTitle}
-                                                onChange={e => setJobTitle(e.target.value)}
-                                                className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Row 2: Website URL */}
-                                    <div>
-                                        <div className="flex items-center gap-1.5 mb-1.5">
-                                            <Globe className="w-3.5 h-3.5 text-[#73726E]" />
-                                            <label className="text-xs font-medium text-[#73726E]">{t('manual_website_label')} <span className="text-red-500">*</span></label>
-                                        </div>
-                                        <input
-                                            type="url"
-                                            placeholder={t('manual_website_placeholder')}
-                                            value={websiteUrl}
-                                            onChange={e => setWebsiteUrl(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all"
-                                        />
-                                        <p className="text-xs text-[#a1a1aa] mt-1">{t('manual_website_hint')}</p>
-                                    </div>
-
-                                    {/* Row 3: Job Description */}
-                                    <div>
-                                        <div className="flex justify-between items-center mb-1.5">
-                                            <label className="text-xs font-medium text-[#73726E]">{t('manual_desc_label')} <span className="text-red-500">*</span></label>
-                                            <span className={`text-xs ${charCount < MIN_CHARS ? 'text-[#a1a1aa]' : charCount > MAX_CHARS ? 'text-red-500' : 'text-green-600'}`}>
-                                                {charCount.toLocaleString(locale)} / {MAX_CHARS.toLocaleString(locale)} {t('manual_chars_label')}
-                                            </span>
-                                        </div>
-                                        <textarea
-                                            placeholder={t('manual_desc_placeholder')}
-                                            value={jobDescription}
-                                            onChange={e => setJobDescription(e.target.value)}
-                                            maxLength={MAX_CHARS}
-                                            rows={7}
-                                            className="w-full px-4 py-2.5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] text-sm text-[#37352F] placeholder:text-[#A8A29E] focus:outline-none focus:border-[#002e7a] focus:ring-1 focus:ring-[#002e7a]/20 transition-all resize-y min-h-[120px]"
-                                        />
-                                    </div>
-
-                                    {/* Error */}
-                                    {formError && (
-                                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
-                                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                            {formError}
-                                        </div>
-                                    )}
-
-                                    {/* Footer Buttons */}
-                                    <div className="flex justify-end gap-3 pt-2">
-                                        <button
-                                            onClick={handleClose}
-                                            className="px-4 py-2 rounded-lg border border-[#E7E7E5] text-sm text-[#73726E] font-medium hover:bg-[#F7F7F5] transition-colors"
-                                        >
-                                            {t('manual_cancel')}
-                                        </button>
-                                        <div className="relative">
-                                            <motion.button
-                                                whileHover={canSubmit && !showPulse ? { scale: 1.01, y: -1 } : undefined}
-                                                whileTap={canSubmit && !showPulse ? { scale: 0.98 } : undefined}
-                                                onClick={handleSubmit}
-                                                disabled={!canSubmit || submitting || showPulse}
-                                                animate={{ backgroundColor: showPulse ? '#16a34a' : '#002e7a' }}
-                                                transition={{ duration: 0.3 }}
-                                                className="px-6 py-2 text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 relative overflow-hidden"
-                                            >
-                                                {submitting && !showPulse && (
-                                                    <motion.div
-                                                        className="absolute inset-0 bg-[#0050d4]"
-                                                        initial={{ x: '-100%' }}
-                                                        animate={{ x: '0%' }}
-                                                        transition={{ duration: 3, ease: 'easeInOut' }}
-                                                    />
-                                                )}
-                                                <AnimatePresence mode="wait">
-                                                    {showPulse ? (
-                                                        <motion.span
-                                                            key="check"
-                                                            initial={{ scale: 0, rotate: -90 }}
-                                                            animate={{ scale: 1, rotate: 0 }}
-                                                            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                                                            className="relative z-10 flex items-center gap-2"
-                                                        >
-                                                            <CheckCircle2 className="w-4 h-4" />
-                                                            {t('manual_submitted')}
-                                                        </motion.span>
-                                                    ) : submitting ? (
-                                                        <motion.span key="loading" className="relative z-10 flex items-center gap-2">
-                                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                                            Wird analysiert...
-                                                        </motion.span>
-                                                    ) : (
-                                                        <motion.span key="default" className="relative z-10">
-                                                            Zur Queue hinzufügen
-                                                        </motion.span>
-                                                    )}
-                                                </AnimatePresence>
-                                            </motion.button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
-    );
-}
-
 // ─── Queue Full Modal ────────────────────────────────────────────
-
 function QueueFullModal({ onClose }: { onClose: () => void }) {
     const t = useTranslations('dashboard.job_search');
     return (
@@ -1401,8 +1156,9 @@ function AddToQueueButton({ job, onJobAdded }: { job: EnrichedJob; onJobAdded: (
             if (res.ok) {
                 const data = await res.json();
 
-                // §12.3 Verification Guard: handle expired/mismatch
-                if (data.success === false && (data.reason === 'expired' || data.reason === 'mismatch')) {
+                // §12.3 Verification Guard: only "expired" still hard-blocks.
+                // "mismatch" is now a soft-warning carried into SteckbriefPreviewModal.
+                if (data.success === false && data.reason === 'expired') {
                     setVerificationWarning(data.message || 'Diese Stelle konnte nicht verifiziert werden.');
                     return;
                 }
@@ -1411,7 +1167,7 @@ function AddToQueueButton({ job, onJobAdded }: { job: EnrichedJob; onJobAdded: (
                     setAdded(true);
                     onJobAdded(job.apply_link);
                 } else {
-                    // §12.5: Show preview modal instead of direct add
+                    // §12.5: Show preview modal — `mismatch_warning` (if any) is on data.job
                     setPreviewData(data.job);
                 }
             } else {
@@ -1567,6 +1323,7 @@ interface SteckbriefPreviewData {
     source_url?: string;
     apply_link?: string;
     location: string | null;
+    mismatch_warning?: { expected: string; actual: string } | null;
 }
 
 function SteckbriefPreviewModal({
@@ -1686,6 +1443,16 @@ function SteckbriefPreviewModal({
 
                     {/* Content */}
                     <div className="p-6 space-y-4">
+                        {/* §12.3 Soft-Warn: Company-Mismatch (Holding/Konzern-Heuristik) */}
+                        {data.mismatch_warning && (
+                            <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div className="text-xs text-amber-900 leading-relaxed">
+                                    <p className="font-medium mb-0.5">{t('mismatch_warning_title')}</p>
+                                    <p>{t('mismatch_warning_body', { expected: data.mismatch_warning.expected, actual: data.mismatch_warning.actual })}</p>
+                                </div>
+                            </div>
+                        )}
                         {/* §QA: Empty data hint — guide user to add manually */}
                         {isEmpty && (
                             <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">

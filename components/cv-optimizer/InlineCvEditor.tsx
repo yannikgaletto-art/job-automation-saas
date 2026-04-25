@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { CvStructuredData } from '@/types/cv'
 import { Plus, Trash2, X } from 'lucide-react'
 
@@ -11,6 +12,8 @@ interface InlineCvEditorProps {
 }
 
 export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps) {
+    const t = useTranslations('cv_optimizer')
+
     // -- Personal Info --
     const updatePersonal = (field: keyof CvStructuredData['personalInfo'], value: string) => {
         const updated = structuredClone(data)
@@ -80,7 +83,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
         <div className="h-full overflow-y-auto space-y-6 pr-2">
             {/* Header */}
             <div className="flex items-center justify-between sticky top-0 bg-white pb-3 border-b border-slate-200 z-10">
-                <h3 className="text-sm font-semibold text-slate-900">Lebenslauf bearbeiten</h3>
+                <h3 className="text-sm font-semibold text-slate-900">{t('inline_editor_title')}</h3>
                 <button
                     onClick={onClose}
                     className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
@@ -92,7 +95,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
             {/* Personal Info */}
             <section>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
-                    Persönliche Daten
+                    {t('inline_editor_personal')}
                 </p>
                 {(['name', 'email', 'phone', 'location', 'linkedin'] as const).map((field) => (
                     <div key={field} className="mb-2">
@@ -109,7 +112,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
                 ))}
                 {/* Summary */}
                 <div className="mb-2">
-                    <label className="text-[10px] text-slate-400">Summary</label>
+                    <label className="text-[10px] text-slate-400">{t('inline_editor_summary')}</label>
                     <textarea
                         rows={3}
                         value={data.personalInfo.summary ?? ''}
@@ -124,7 +127,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
             {/* Experience */}
             <section>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
-                    Erfahrung
+                    {t('inline_editor_experience')}
                 </p>
                 {data.experience?.map((exp, eIdx) => (
                     <div key={exp.id} className="mb-5 pl-3 border-l-2 border-slate-100">
@@ -154,7 +157,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
                             className="mt-1 flex items-center gap-1 text-[10px] text-blue-600
                                        hover:text-blue-800 transition"
                         >
-                            <Plus size={11} /> Bullet hinzufuegen
+                            <Plus size={11} /> {t('inline_editor_add_bullet')}
                         </button>
                     </div>
                 ))}
@@ -164,7 +167,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
             {data.education?.length > 0 && (
                 <section>
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
-                        Bildung
+                        {t('inline_editor_education')}
                     </p>
                     {data.education.map((edu) => (
                         <div key={edu.id} className="mb-3 pl-3 border-l-2 border-slate-100">
@@ -179,7 +182,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
             {data.skills?.length > 0 && (
                 <section>
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
-                        Skills
+                        {t('inline_editor_skills')}
                     </p>
                     {data.skills.map((skillGroup, sIdx) => (
                         <div key={skillGroup.id} className="mb-4 pl-3 border-l-2 border-slate-100">
@@ -190,7 +193,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
                                 </p>
                                 <button
                                     onClick={() => removeSkillGroup(sIdx)}
-                                    title="Kategorie löschen"
+                                    title={t('inline_editor_delete_group')}
                                     className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition flex-shrink-0"
                                 >
                                     <Trash2 size={11} />
@@ -210,7 +213,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
                                         />
                                         <button
                                             onClick={() => removeSkillItem(sIdx, iIdx)}
-                                            title="Skill löschen"
+                                            title={t('inline_editor_delete_skill')}
                                             className="p-0.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition flex-shrink-0"
                                         >
                                             <X size={10} />
@@ -227,7 +230,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
             {data.certifications && data.certifications.length > 0 && (
                 <section>
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
-                        Zertifikate
+                        {t('inline_editor_certifications')}
                     </p>
                     {data.certifications.map((cert, cIdx) => (
                         <div key={cert.id} className="mb-3 pl-3 border-l-2 border-slate-100">
@@ -237,7 +240,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
                                         type="text"
                                         value={cert.name ?? ''}
                                         onChange={(e) => updateCert(cIdx, 'name', e.target.value)}
-                                        placeholder="Zertifikat-Name"
+                                        placeholder={t('inline_editor_cert_name_placeholder')}
                                         className="w-full px-2 py-1 text-[10px] rounded border border-slate-200
                                                    focus:outline-none focus:border-blue-500 text-slate-800 bg-white font-medium"
                                     />
@@ -245,7 +248,7 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
                                         type="text"
                                         value={cert.issuer ?? ''}
                                         onChange={(e) => updateCert(cIdx, 'issuer', e.target.value)}
-                                        placeholder="Aussteller"
+                                        placeholder={t('inline_editor_cert_issuer_placeholder')}
                                         className="w-full px-2 py-1 text-[10px] rounded border border-slate-200
                                                    focus:outline-none focus:border-blue-500 text-slate-500 bg-white"
                                     />
@@ -253,14 +256,14 @@ export function InlineCvEditor({ data, onChange, onClose }: InlineCvEditorProps)
                                         type="text"
                                         value={cert.dateText ?? ''}
                                         onChange={(e) => updateCert(cIdx, 'dateText', e.target.value)}
-                                        placeholder="Datum (z.B. 2022)"
+                                        placeholder={t('inline_editor_cert_date_placeholder')}
                                         className="w-full px-2 py-1 text-[10px] rounded border border-slate-200
                                                    focus:outline-none focus:border-blue-500 text-slate-500 bg-white"
                                     />
                                 </div>
                                 <button
                                     onClick={() => removeCert(cIdx)}
-                                    title="Zertifikat löschen"
+                                    title={t('inline_editor_delete_cert')}
                                     className="mt-1 p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition flex-shrink-0"
                                 >
                                     <Trash2 size={12} />

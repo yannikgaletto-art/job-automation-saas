@@ -359,6 +359,11 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
             if (error instanceof DOMException && error.name === 'AbortError') {
                 console.error('[CV Optimize] Client timeout after 110s');
                 setOptimizerError(t('error_timeout'));
+            } else if (error instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(error.message)) {
+                // Browser-level fetch failure: server unreachable, dev server died, or network drop.
+                // Distinct from server-returned errors which arrive as parsed JSON via res.ok=false.
+                console.error('[CV Optimize] Network failure:', error.message);
+                setOptimizerError(t('error_network'));
             } else {
                 const msg = error instanceof Error ? error.message : t('error_unknown');
                 console.error('[CV Optimize] Error:', msg);
@@ -390,6 +395,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                 sessionStorage.setItem('pathly_cv_preview_first_visit', '1');
             }
         } else {
+            setOptimizerError(t('error_db_failed'));
         }
     };
 

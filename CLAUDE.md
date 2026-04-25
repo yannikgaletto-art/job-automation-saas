@@ -91,6 +91,8 @@ Liste aller Features, die für V2.0 depriorisiert wurden.
 ## 🚀 RECENT FIXES
 | Feature | Fix / Implementation |
 |---------|----------------------|
+| **Such-Limit Popup (2026-04-25)** | **Pathly-Design: "Später" dark-navy for search reason, waitlist deeplink (de/en/es `billing.search_limit_waitlist`), text size `text-sm`. Job Search "Add Job" → unified `AddJobDialog` (deleted inline ManualJobForm).** |
+| **CV Optimizer Phase 2 (2026-04-25)** | **Bug #B: `locale !== 'de'` bypass removed (L1); German `needsTranslation` raised to ≥2 matches (L2 false-positive fix). Bug #C: MAX_CHANGES 12→18, maxTokens 8000→10000, TechTemplate bullet cap `slice(0,4)`. Em-Dash: prompt rule + `change.after` post-processor. InlineCvEditor i18n (14 keys de/en/es, typo fix). Silent-save error: `setOptimizerError(t('error_db_failed'))`. New `error_network` (de/en/es) for `TypeError: Failed to fetch` cases (server unreachable / dev server died) — distinct from server-returned errors.** |
 | PDF Download | New API route `/api/documents/download` |
 | Company Research | URL validation in research route |
 | CV Match | Null guards (Array.isArray) + safeResult normalization in pipeline |

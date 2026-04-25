@@ -53,6 +53,38 @@ const INSTITUTIONAL_NAME_PREFIXES: readonly string[] = [
     'lebenslauf',
 ];
 
+/**
+ * Removes obvious OCR-doubling artefacts where Azure Document Intelligence
+ * (or pdf-parse fallback) interleaved a section header with bullet text,
+ * producing patterns like "Kommunikation und Kommunikation: Konzeption …".
+ *
+ * Two conservative patterns:
+ *   P1 — Header doubling at start: `Word + connector + same Word + separator`
+ *        e.g. "Kommunikation und Kommunikation: Konzeption …" → "Konzeption …"
+ *   P2 — Direct adjacent repeat (≥5 chars, case-insensitive)
+ *        e.g. "developed developed pipelines" → "developed pipelines"
+ *
+ * Conservative thresholds (≥5 chars + word boundaries) avoid false positives
+ * on legitimate phrases like "Hand in Hand" (intervening word) or short
+ * repeats like "is is" (typo, but unlikely in CV bullets).
+ *
+ * Idempotent and non-destructive: if the result would be empty, returns the
+ * original input unchanged.
+ */
+function dedupePhraseRepeats(text: string | null | undefined): string | null | undefined {
+    if (!text || typeof text !== 'string') return text;
+    let out = text;
+    // P1: leading "Word und Word:" / "Word and Word -" header doubling
+    out = out.replace(
+        /^([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß\-]{3,})\s+(?:und|and|&|-)\s+\1\s*[:\-]?\s*/i,
+        ''
+    );
+    // P2: directly adjacent identical words, ≥5 letters (case-insensitive)
+    out = out.replace(/\b([A-Za-zÄÖÜäöüß\-]{5,})\s+\1\b/gi, '$1');
+    const trimmed = out.trim();
+    return trimmed.length > 0 ? trimmed : text;
+}
+
 /** Strips a single leading institutional prefix (case-insensitive, word-boundary safe). */
 function stripInstitutionalPrefix(input: string): string {
     const collapsed = input.trim().replace(/\s+/g, ' ');
@@ -138,6 +170,21 @@ export function sanitizeCv(
         experience: (cv.experience || []).map(e => ({
             ...e,
             role: stripRoleDateMarkers(e.role) ?? undefined,
+            summary: typeof e.summary === 'string'
+                ? (dedupePhraseRepeats(e.summary) ?? e.summary)
+                : e.summary,
+            description: Array.isArray(e.description)
+                ? e.description.map((b: any) =>
+                    typeof b?.text === 'string'
+                        ? { ...b, text: dedupePhraseRepeats(b.text) ?? b.text }
+                        : b)
+                : e.description,
+        })),
+        education: (cv.education || []).map(ed => ({
+            ...ed,
+            description: typeof ed.description === 'string'
+                ? (dedupePhraseRepeats(ed.description) ?? ed.description)
+                : ed.description,
         })),
         languages: (cv.languages || []).filter(l => {
             const lang = (l.language || '').trim().toLowerCase();
