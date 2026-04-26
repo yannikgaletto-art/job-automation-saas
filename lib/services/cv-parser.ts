@@ -235,6 +235,30 @@ ${sanitized}
 
     // Post-processing: sort + deterministic noise filters + role sanitization
     const CERT_NOISE = new Set(['zertifikate', 'certificates', 'certifications', 'zertifizierungen', 'weiterbildung', 'weitere kompetenzen']);
+
+    // Languages: filter LLM output by whitelist; if that drops everything,
+    // fall back to deterministic recovery from the raw OCR text.
+    const filteredLanguages = (validated.languages ?? []).filter((l: any) => {
+      const lang = (l.language || '').trim().toLowerCase();
+      return lang.length > 0 && KNOWN_LANGUAGES.has(lang);
+    });
+    const languages = filteredLanguages.length > 0
+      ? filteredLanguages
+      : recoverMissingLanguages(text);
+
+    // Certifications: clean section-header prefixes from `name`, then drop
+    // entries whose name is JUST a section header, then sanitize issuer.
+    const cleanedCerts = cleanCertificationNames(
+      (validated.certifications ?? []) as Array<{ name?: string | null;[k: string]: any }>
+    );
+    const certsAfterNoise = cleanedCerts.filter((c: any) => {
+      const name = (c.name || '').trim().toLowerCase();
+      return name.length > 0 && !CERT_NOISE.has(name);
+    });
+    const certifications = sanitizeCertIssuer(
+      certsAfterNoise as Array<{ issuer?: string | null;[k: string]: any }>
+    );
+
     const sorted = {
       ...validated,
       // The LLM occasionally drops `company` even when the OCR text shows
@@ -255,14 +279,13 @@ ${sanitized}
         (validated.education ?? []) as Array<{ degree?: string | null; institution?: string | null; [k: string]: any }>,
         text
       ),
-      languages: (validated.languages ?? []).filter((l: any) => {
-        const lang = (l.language || '').trim().toLowerCase();
-        return lang.length > 0 && KNOWN_LANGUAGES.has(lang);
-      }),
-      certifications: (validated.certifications ?? []).filter((c: any) => {
-        const name = (c.name || '').trim().toLowerCase();
-        return name.length > 0 && !CERT_NOISE.has(name);
-      }),
+      // Skills: strip literal `\n` artefacts from category — observed pattern
+      // "IT-Kenntnisse\n\nProgrammierkenntnisse" after Phase-3.1 re-upload.
+      skills: cleanSkillCategories(
+        (validated.skills ?? []) as Array<{ category?: string | null;[k: string]: any }>
+      ),
+      languages,
+      certifications,
     };
 
     return sorted as CvStructuredData;
@@ -543,6 +566,194 @@ export function recoverMissingEducationInstitution<T extends { degree?: string |
     if (tail.length === 0 || tail.length > 120) return entry;
     if (!UNI_HINTS.test(tail) && !/[A-Z]{2,}/.test(tail)) return entry; // BSP, MIT etc are all-caps acronyms
     return { ...entry, institution: tail };
+  });
+}
+
+/**
+ * Recovers `languages[]` when the LLM emitted an empty array even though a
+ * Languages section is clearly present in the OCR text. Observed pattern in
+ * Phase-3.1 re-upload run: 4 sauber strukturierte Einträge (Deutsch, Englisch,
+ * Französisch, Spanisch) ALLE übersprungen.
+ *
+ * Strategy:
+ *   1. Locate a Languages section header (de/en/es) in the raw text.
+ *   2. Walk subsequent lines until a likely next-section header or EOF.
+ *   3. For each line, parse "<Language> [I|||—|-|:] <Proficiency>" or
+ *      "<Language> (<Proficiency>)" or just "<Language>".
+ *   4. Filter by KNOWN_LANGUAGES whitelist (same defense-in-depth as before).
+ *   5. Generate stable ids ("lang-recovered-1", ...).
+ *
+ * Idempotent only at the input level: returning [] when no section is found
+ * means the caller can fall back to the LLM result. Caller must decide whether
+ * to invoke this recovery (typically: only if the filtered LLM list is empty).
+ * Exported for testing.
+ */
+export function recoverMissingLanguages(rawText: string): Array<{
+  id: string;
+  language: string;
+  proficiency: string | null;
+}> {
+  // Allow leading markdown markers (#, ##, ###) and optional trailing colon —
+  // the OCR text often comes through with markdown-style section headers.
+  const SECTION_HEADERS = /^#{0,3}\s*(sprachen|languages|idiomas|sprachkenntnisse|language skills)\s*:?\s*$/i;
+  const STOP_HEADERS = /^#{0,3}\s*(zertifikate|zertifizierungen|certifications|certificates|berufserfahrung|experience|bildung|ausbildung|education|skills|kenntnisse|interessen|hobbys|hobbies|projekte|projects|references|referenzen|weiterbildungen?|publikationen|publications)\s*:?\s*$/i;
+  const lines = rawText.split('\n');
+
+  // 1. Find the Languages section start.
+  let startIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (SECTION_HEADERS.test(lines[i].trim())) {
+      startIdx = i + 1;
+      break;
+    }
+  }
+  if (startIdx === -1) return [];
+
+  const recovered: Array<{ id: string; language: string; proficiency: string | null }> = [];
+  // 2. Walk lines until next section, EOF, or 20-line defensive cap.
+  for (let i = startIdx; i < Math.min(lines.length, startIdx + 20); i++) {
+    const line = lines[i].trim();
+    if (line.length === 0) continue;
+    if (STOP_HEADERS.test(line)) break;
+
+    // 3. Parse separator patterns. Order matters: try the most specific first.
+    let language = '';
+    let proficiency: string | null = null;
+
+    // Pattern A: "Deutsch (C2)" or "English (Native)" — parens-style.
+    const parensMatch = line.match(/^([A-Za-zÀ-ÿ]+)\s*\(([^)]+)\)\s*$/);
+    if (parensMatch) {
+      language = parensMatch[1].trim();
+      proficiency = parensMatch[2].trim();
+    } else {
+      // Pattern B: pipe / dash / em-dash separator (require space both sides —
+      // capital "I" is Azure DI's typographic-pipe replacement).
+      let parts = line.split(/\s+[I|—–\-]\s+/);
+      // Pattern C: colon separator (allow no leading whitespace, e.g. "Deutsch: Muttersprache").
+      if (parts.length < 2) {
+        parts = line.split(/\s*:\s+/);
+      }
+      if (parts.length >= 2) {
+        language = parts[0].trim();
+        proficiency = parts.slice(1).join(' ').trim() || null;
+      } else {
+        // Pattern D: bare language name on its own line.
+        language = line;
+      }
+    }
+
+    // 4. Whitelist filter — reject anything that isn't a known language.
+    const lower = language.toLowerCase();
+    if (!KNOWN_LANGUAGES.has(lower)) continue;
+    // Dedup: if we already recovered this language, skip.
+    if (recovered.some((r) => r.language.toLowerCase() === lower)) continue;
+
+    recovered.push({
+      id: `lang-recovered-${recovered.length + 1}`,
+      language,
+      proficiency,
+    });
+  }
+
+  return recovered;
+}
+
+/**
+ * Cleans Skills categories that contain literal `\n` characters from the LLM
+ * concatenating a section header with the actual category. Observed pattern:
+ *   { category: "IT-Kenntnisse\n\nProgrammierkenntnisse", items: ["Python", ...] }
+ *
+ * Strategy: split category on `\n`, take the first non-empty line. The
+ * subsequent lines (if any) are typically section noise that the user can
+ * recover via the optimizer UI; preserving them in items[] would corrupt the
+ * downstream filter chain.
+ *
+ * Idempotent: a category without `\n` is returned untouched.
+ * Exported for testing.
+ */
+export function cleanSkillCategories<T extends { category?: string | null;[k: string]: any }>(
+  skills: T[]
+): T[] {
+  return skills.map((skill) => {
+    const category = (skill.category || '').toString();
+    if (!category.includes('\n')) return skill;
+    const firstNonEmpty = category
+      .split('\n')
+      .map((l) => l.trim())
+      .find((l) => l.length > 0);
+    return { ...skill, category: firstNonEmpty ?? null };
+  });
+}
+
+/**
+ * Section-header tokens that occasionally leak into `certifications[].name`
+ * when the LLM concatenates a header line with the first cert. Lowercased.
+ */
+const CERT_SECTION_HEADERS = new Set<string>([
+  'zertifikate', 'zertifizierungen', 'zertifizierung',
+  'certificates', 'certifications', 'certification',
+  'certificados', 'certificaciones',
+  'weiterbildungen', 'weiterbildung', 'fortbildungen',
+  'kurse', 'courses', 'cursos',
+]);
+
+/**
+ * Strips a leading section-header line from `cert.name` when the LLM produced
+ * something like "Zertifikate\nManagementberatung". Conservative: only strips
+ * when the first line matches the known CERT_SECTION_HEADERS set.
+ *
+ * Idempotent: a name without `\n` or without a header prefix is untouched.
+ * Exported for testing.
+ */
+export function cleanCertificationNames<T extends { name?: string | null;[k: string]: any }>(
+  certs: T[]
+): T[] {
+  return certs.map((cert) => {
+    const name = (cert.name || '').toString();
+    if (!name.includes('\n')) return cert;
+    const lines = name.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+    if (lines.length === 0) return cert;
+    if (CERT_SECTION_HEADERS.has(lines[0].toLowerCase())) {
+      const rest = lines.slice(1).join(' ').trim();
+      if (rest.length > 0) return { ...cert, name: rest };
+    }
+    // Even if the first line is not a section header, collapse the multi-line
+    // name to its first non-empty line — `\n` in a cert name is always wrong.
+    return { ...cert, name: lines[0] };
+  });
+}
+
+/**
+ * Status-words that occasionally appear as `cert.issuer` when the LLM
+ * misclassifies an annotation. Observed: "TEDx Coaching" cert had
+ * issuer="Ehrenamtliche Tätigkeit" — a status, not an organization. Lowercased.
+ */
+const ISSUER_NOISE = new Set<string>([
+  'ehrenamtliche tätigkeit', 'ehrenamtliche tatigkeit',
+  'ehrenamt', 'ehrenamtlich',
+  'freiwilligenarbeit', 'freiwillig',
+  'werkstudent', 'praktikum', 'praktikant',
+  'volontariat', 'trainee',
+  'hobby', 'hobbys', 'hobbies', 'interesse', 'interessen',
+  'voluntary work', 'volunteer work', 'volunteer', 'volunteering',
+  'internship', 'intern',
+  'voluntariado',
+]);
+
+/**
+ * Drops `cert.issuer` when its value is a status-word rather than a real
+ * organization name. Idempotent. Exported for testing.
+ */
+export function sanitizeCertIssuer<T extends { issuer?: string | null;[k: string]: any }>(
+  certs: T[]
+): T[] {
+  return certs.map((cert) => {
+    const issuer = (cert.issuer || '').toString().trim().toLowerCase();
+    if (issuer.length === 0) return cert;
+    if (ISSUER_NOISE.has(issuer)) {
+      return { ...cert, issuer: null };
+    }
+    return cert;
   });
 }
 
