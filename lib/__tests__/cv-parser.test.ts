@@ -6,6 +6,7 @@ import {
     cleanSkillCategories,
     cleanCertificationNames,
     sanitizeCertIssuer,
+    validateDescriptionsAgainstRawText,
 } from '../services/cv-parser';
 import { complete } from '@/lib/ai/model-router';
 
@@ -471,5 +472,116 @@ describe('sanitizeCertIssuer — Phase 4 Welle A (2026-04-26)', () => {
         const certs = [{ id: 'cert-1', name: 'A', issuer: null }];
         const out = sanitizeCertIssuer(certs);
         expect(out[0].issuer).toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// validateDescriptionsAgainstRawText — Welle A.5 hallucination validator
+// ---------------------------------------------------------------------------
+
+describe('validateDescriptionsAgainstRawText', () => {
+
+    // Yannik's actual TEDx regression: cert had description="Coaching von TEDx-Redner:innen;
+    // Übersetzung von Inhalten in überzeugende Narrationen" but the PDF only shows
+    // "TEDx-Coach / seit 2022" — zero description text present.
+    test('drops fully-fabricated TEDx description (no 5-word match in rawText)', () => {
+        const rawText = 'TEDx-Coach\nseit 2022\n\nDesign Thinking Coach\nZertifizierter Design Thinking Coach';
+        const certs = [{
+            id: 'cert-1',
+            name: 'TEDx-Coach',
+            description: 'Coaching von TEDx-Redner:innen; Übersetzung von Inhalten in überzeugende Narrationen',
+        }];
+        const out = validateDescriptionsAgainstRawText(certs, rawText);
+        expect(out[0].description).toBeNull();
+    });
+
+    // A cert whose description text IS present in the OCR raw text should be kept.
+    test('keeps description when 5-word window matches rawText', () => {
+        const rawText = 'Design Thinking Coach\nZertifizierter Design Thinking Coach\nIDEO method, Datenanalyse für unternehmerische Entscheidungen und Change-Management-Prozesse';
+        const certs = [{
+            id: 'cert-2',
+            name: 'Design Thinking Coach',
+            description: 'Datenanalyse für unternehmerische Entscheidungen und Change-Management-Prozesse',
+        }];
+        const out = validateDescriptionsAgainstRawText(certs, rawText);
+        expect(out[0].description).toBe('Datenanalyse für unternehmerische Entscheidungen und Change-Management-Prozesse');
+    });
+
+    // Education entry with a grounded description should survive.
+    test('keeps education description grounded in rawText', () => {
+        const rawText = 'Europäische Medienwissenschaften (B.A.)\nUniversität Potsdam\nSchwerpunkte: Medienproduktion und digitale Transformation';
+        const edu = [{
+            id: 'edu-1',
+            degree: 'Europäische Medienwissenschaften (B.A.)',
+            institution: 'Universität Potsdam',
+            description: 'Schwerpunkte: Medienproduktion und digitale Transformation',
+        }];
+        const out = validateDescriptionsAgainstRawText(edu, rawText);
+        expect(out[0].description).toBe('Schwerpunkte: Medienproduktion und digitale Transformation');
+    });
+
+    // Education entry with a fabricated description should be dropped.
+    test('drops fabricated education description', () => {
+        const rawText = 'Europäische Medienwissenschaften (B.A.)\nUniversität Potsdam';
+        const edu = [{
+            id: 'edu-1',
+            degree: 'Europäische Medienwissenschaften (B.A.)',
+            institution: 'Universität Potsdam',
+            description: 'Kritisches Denken und methodische Analyse komplexer Medienphänomene',
+        }];
+        const out = validateDescriptionsAgainstRawText(edu, rawText);
+        expect(out[0].description).toBeNull();
+    });
+
+    // No description → untouched.
+    test('leaves null description untouched', () => {
+        const certs = [{ id: 'cert-1', name: 'A', description: null }];
+        const out = validateDescriptionsAgainstRawText(certs, 'some raw text here for context');
+        expect(out[0].description).toBeNull();
+    });
+
+    // Empty description string → untouched.
+    test('leaves empty description string untouched', () => {
+        const certs = [{ id: 'cert-1', name: 'A', description: '' }];
+        const out = validateDescriptionsAgainstRawText(certs, 'some raw text here for context');
+        expect(out[0].description).toBe('');
+    });
+
+    // rawText too short (<50 chars) → keep all descriptions regardless.
+    test('keeps all when rawText too short to validate against', () => {
+        const certs = [{ id: 'cert-1', name: 'A', description: 'völlig erfunden und nicht im Text vorhanden' }];
+        const out = validateDescriptionsAgainstRawText(certs, 'kurz');
+        expect(out[0].description).toBe('völlig erfunden und nicht im Text vorhanden');
+    });
+
+    // Empty array → returns empty array.
+    test('handles empty array', () => {
+        expect(validateDescriptionsAgainstRawText([], 'some raw text')).toEqual([]);
+    });
+
+    // Short description (3 words) — uses 3-word window, keeps when matching.
+    test('keeps short 3-word description when matching rawText', () => {
+        const rawText = 'TEDx Coaching Zertifikat erhalten 2021';
+        const certs = [{ id: 'cert-1', name: 'TEDx', description: 'TEDx Coaching Zertifikat' }];
+        const out = validateDescriptionsAgainstRawText(certs, rawText);
+        expect(out[0].description).toBe('TEDx Coaching Zertifikat');
+    });
+
+    // Other fields (name, id, issuer) on the item are preserved when description is dropped.
+    test('preserves other item fields when dropping description', () => {
+        const rawText = 'TEDx-Coach\nseit 2022\nEhrenamtliche Tätigkeit\nweitere Aktivitäten und Interessen';
+        const certs = [{
+            id: 'cert-1',
+            name: 'TEDx-Coach',
+            issuer: 'TED Conferences',
+            dateText: 'seit 2022',
+            description: 'Halluzinierter Text über internationale Redner und inspirierende Geschichten',
+        }];
+        const out = validateDescriptionsAgainstRawText(certs, rawText);
+        expect(out[0].description).toBeNull();
+        expect(out[0].id).toBe('cert-1');
+        expect(out[0].name).toBe('TEDx-Coach');
+        expect(out[0].issuer).toBe('TED Conferences');
+        expect(out[0].dateText).toBe('seit 2022');
     });
 });

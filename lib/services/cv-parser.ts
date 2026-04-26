@@ -255,8 +255,11 @@ ${sanitized}
       const name = (c.name || '').trim().toLowerCase();
       return name.length > 0 && !CERT_NOISE.has(name);
     });
-    const certifications = sanitizeCertIssuer(
-      certsAfterNoise as Array<{ issuer?: string | null;[k: string]: any }>
+    const certifications = validateDescriptionsAgainstRawText(
+      sanitizeCertIssuer(
+        certsAfterNoise as Array<{ issuer?: string | null;[k: string]: any }>
+      ),
+      text
     );
 
     const sorted = {
@@ -275,8 +278,12 @@ ${sanitized}
         text
       ),
       // Same drop pattern for education.institution when "Studiengang (X.Y.) Universität ..." sits on one line.
-      education: recoverMissingEducationInstitution(
-        (validated.education ?? []) as Array<{ degree?: string | null; institution?: string | null; [k: string]: any }>,
+      // validateDescriptionsAgainstRawText drops fully-fabricated descriptions.
+      education: validateDescriptionsAgainstRawText(
+        recoverMissingEducationInstitution(
+          (validated.education ?? []) as Array<{ degree?: string | null; institution?: string | null; [k: string]: any }>,
+          text
+        ) as Array<{ description?: string | null; [k: string]: any }>,
         text
       ),
       // Skills: strip literal `\n` artefacts from category — observed pattern
@@ -754,6 +761,44 @@ export function sanitizeCertIssuer<T extends { issuer?: string | null;[k: string
       return { ...cert, issuer: null };
     }
     return cert;
+  });
+}
+
+/**
+ * Drops `item.description` when no 5-consecutive-word window from the
+ * description appears in rawText. This catches fully-fabricated descriptions
+ * emitted by the LLM for certs/education entries that have no description text
+ * in the original PDF (e.g. "TEDx-Coach / seit 2022" → LLM invents two
+ * sentences about coaching methodology).
+ *
+ * Rationale for 5-word threshold: too short and legitimate paraphrasing trips
+ * it; 5+ words is specific enough to be a real trace in the source text.
+ *
+ * Edge cases:
+ *   - description shorter than 5 words → use 3-word window (catches short
+ *     but real extracts like "Zertifizierter Design Thinking Coach")
+ *   - rawText shorter than 50 chars → no context to validate, keep all
+ *   - empty description → untouched
+ *
+ * Applied to cert.description and education[].description only. Experience
+ * bullets are handled separately by the optimizer. Exported for testing.
+ */
+export function validateDescriptionsAgainstRawText<
+  T extends { description?: string | null; [k: string]: any }
+>(items: T[], rawText: string): T[] {
+  if (rawText.length < 50) return items;
+  const lowerRaw = rawText.toLowerCase();
+  return items.map((item) => {
+    const desc = (item.description || '').trim();
+    if (desc.length === 0) return item;
+    const words = desc.toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+    const windowSize = words.length >= 5 ? 5 : words.length >= 3 ? 3 : 0;
+    if (windowSize === 0) return item; // too short to validate
+    for (let i = 0; i <= words.length - windowSize; i++) {
+      const window = words.slice(i, i + windowSize).join(' ');
+      if (lowerRaw.includes(window)) return item;
+    }
+    return { ...item, description: null };
   });
 }
 
