@@ -184,7 +184,7 @@ export const extractJob = inngest.createFunction(
             // If sync flag is missing (manual entry, failed sync, or old job), run extraction
             console.log(`🔄 [Extract] Job ${jobId} running full extraction (syncFlag=${hasSyncFlag}, hasSummary=${hasSummary})`);
             const response = await complete({
-                taskType: 'parse_html',
+                taskType: 'extract_job_fields',
                 systemPrompt: `Extract the following JSON structure from the job description. Return ONLY JSON, no markdown, no explanations. All text fields (summary, responsibilities, qualifications, benefits) MUST be written in ${languageName}.
 
 IMPORTANT for lists (responsibilities, qualifications):

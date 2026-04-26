@@ -5,13 +5,19 @@
  *
  * Provider hierarchy:
  *   - Claude Sonnet 4.5: Creative writing (Cover Letter, CV Optimizer)
- *   - Claude Haiku 4.5: Semantic analysis (CV Match, Language Judge, Coaching)
- *   - Mistral Small 4: Classification & extraction (Parse HTML, Detect ATS, etc.)
+ *   - Claude Haiku 4.5: Semantic analysis + ATS-keyword extraction (CV Match, Job Schema, Coaching)
+ *   - Mistral Small 4: Lightweight classification (Detect ATS, Classify Job Board, Summarize)
  *
  * COST OPTIMIZATION HISTORY:
  *   2026-03-30: GPT_4O_MINI removed (dead code)
  *   2026-03-30: Language Judge downgraded Sonnet → Haiku
  *   2026-03-30 Phase 2: Mistral Small 4 added for Stufe 1 tasks (~5× cheaper than Haiku)
+ *   2026-04-26: extract_job_fields PROMOTED Mistral → Haiku — Mistral-Small consistently
+ *               under-recalled key skills (Supply Chain Management, Engineering) and
+ *               over-emitted hallucinated terms (DSGVO/ISO/PCI DSS without JD basis,
+ *               medical conditions, job titles). Haiku 4.5 holds the harvester prompt
+ *               reliably and reduces the need for downstream code-filter hardening.
+ *               Cost impact: ~5× per job-import (~0.5¢ → ~2.5¢, negligible at scale).
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -52,14 +58,13 @@ export const MODELS = {
 // ============================================================================
 
 export type TaskType =
-    // Mistral Small tier (cheapest — pure classification/extraction)
-    | 'parse_html'
-    | 'extract_job_fields'
-    | 'detect_ats_system'
-    | 'classify_job_board'
-    | 'summarize_job_description'
-    | 'classify_station_relevance'
-    // Haiku tier (semantic understanding, structured analysis)
+    // Mistral Small tier (cheapest — lightweight classification only)
+    | 'parse_html'                  // legacy HTML→JSON for simple Title/Company/Location
+    | 'detect_ats_system'           // string-pattern classification
+    | 'classify_job_board'          // platform classification
+    | 'summarize_job_description'   // 2-3 sentence summary
+    | 'classify_station_relevance'  // CV-station relevance scoring
+    // Haiku tier (semantic understanding + ATS keyword extraction)
     | 'briefing_generate'
     | 'cv_match'
     | 'cv_parse'
@@ -68,6 +73,7 @@ export type TaskType =
     | 'kill_fluff'
     | 'analyze_skill_gaps'
     | 'synthesize_certificates'
+    | 'extract_job_fields'          // promoted 2026-04-26 — needs reliable HARD-RULE adherence
     // Premium tier (Claude Sonnet — creative writing only)
     | 'write_cover_letter'
     | 'personalize_intro'
@@ -80,15 +86,16 @@ export type TaskType =
 
 export function selectModel(taskType: TaskType) {
     const routingMap: Record<TaskType, keyof typeof MODELS> = {
-        // Mistral Small 4: Classification & extraction (Stufe 1 — 2026-03-30 Phase 2)
-        // Pure data extraction, no creative writing, no complex JSON schemas
-        parse_html: 'MISTRAL_SMALL',
-        extract_job_fields: 'MISTRAL_SMALL',
+        // Mistral Small 4: lightweight classification only (Stufe 1 — 2026-03-30)
+        // Simple string-level tasks where instruction-adherence is not critical.
+        parse_html: 'MISTRAL_SMALL',                   // legacy lib/scrapers/parser.ts
         detect_ats_system: 'MISTRAL_SMALL',
         classify_job_board: 'MISTRAL_SMALL',
         summarize_job_description: 'MISTRAL_SMALL',
         classify_station_relevance: 'MISTRAL_SMALL',
-        // Claude Haiku: Semantic analysis (needs deep understanding + reliable JSON)
+        // Claude Haiku: Semantic analysis + ATS keyword extraction (2026-04-26)
+        // Needs deep understanding, reliable JSON, and HARD-RULE adherence.
+        extract_job_fields: 'CLAUDE_HAIKU',
         briefing_generate: 'CLAUDE_HAIKU',
         language_judge: 'CLAUDE_HAIKU',
         kill_fluff: 'CLAUDE_HAIKU',

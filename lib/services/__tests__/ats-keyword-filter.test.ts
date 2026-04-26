@@ -7,29 +7,23 @@ describe('ats-keyword-filter', () => {
             expect(ATS_STOP_LIST.has('bürozeit')).toBe(true);
         });
 
-        it('is non-trivial (>= 230 entries after PDF Sektion 9 + medical/format/job-title extension)', () => {
-            expect(ATS_STOP_LIST.size).toBeGreaterThanOrEqual(230);
+        it('is non-trivial (>= 130 entries after Haiku migration simplified the list)', () => {
+            expect(ATS_STOP_LIST.size).toBeGreaterThanOrEqual(130);
         });
 
-        it('blocks job-title acronyms (SDR / BDR / KAM / VP / C-suite)', () => {
+        it('blocks high-frequency job-title acronyms (SDR / BDR / C-suite)', () => {
             expect(ATS_STOP_LIST.has('sdr')).toBe(true);
             expect(ATS_STOP_LIST.has('bdr')).toBe(true);
-            expect(ATS_STOP_LIST.has('kam')).toBe(true);
             expect(ATS_STOP_LIST.has('ceo')).toBe(true);
-            expect(ATS_STOP_LIST.has('cfo')).toBe(true);
             expect(ATS_STOP_LIST.has('cto')).toBe(true);
-            expect(ATS_STOP_LIST.has('cmo')).toBe(true);
-            expect(ATS_STOP_LIST.has('vp')).toBe(true);
         });
 
-        it('blocks full job-titles (Manager/Representative/Executive variants)', () => {
+        it('blocks high-frequency full job-titles', () => {
             expect(ATS_STOP_LIST.has('sales development representative')).toBe(true);
-            expect(ATS_STOP_LIST.has('business development manager')).toBe(true);
             expect(ATS_STOP_LIST.has('account manager')).toBe(true);
             expect(ATS_STOP_LIST.has('project manager')).toBe(true);
             expect(ATS_STOP_LIST.has('product manager')).toBe(true);
             expect(ATS_STOP_LIST.has('vertriebsleiter')).toBe(true);
-            expect(ATS_STOP_LIST.has('geschäftsführer')).toBe(true);
         });
 
         it('PRESERVES skill-noun-form when title-form is blocked (Project Management vs Project Manager)', () => {
@@ -41,7 +35,7 @@ describe('ats-keyword-filter', () => {
             // PDF Sektion 5 certifications must NOT be blocked
             expect(ATS_STOP_LIST.has('pmp')).toBe(false);
             expect(ATS_STOP_LIST.has('cissp')).toBe(false);
-            expect(ATS_STOP_LIST.has('csm')).toBe(false); // Certified Scrum Master ambiguous — kept out of stop-list
+            expect(ATS_STOP_LIST.has('csm')).toBe(false); // Certified Scrum Master ambiguous — kept out
         });
 
         it('blocks vague solo terms without skill content (ICP / Enrichment / Playbooks)', () => {
@@ -51,29 +45,12 @@ describe('ats-keyword-filter', () => {
             expect(ATS_STOP_LIST.has('pipeline-aufbau')).toBe(true);
         });
 
-        it('blocks Hybridarbeit (German benefit compound) but PRESERVES Hybrid Working as it would be paired', () => {
+        it('blocks Hybridarbeit benefit compounds', () => {
             expect(ATS_STOP_LIST.has('hybridarbeit')).toBe(true);
             expect(ATS_STOP_LIST.has('hybrides arbeiten')).toBe(true);
         });
 
-        it('blocks medical conditions / disease names (Tinnitus / Vorhofflimmern / AFib)', () => {
-            expect(ATS_STOP_LIST.has('tinnitus')).toBe(true);
-            expect(ATS_STOP_LIST.has('vorhofflimmern')).toBe(true);
-            expect(ATS_STOP_LIST.has('afib')).toBe(true);
-            expect(ATS_STOP_LIST.has('herzinsuffizienz')).toBe(true);
-            expect(ATS_STOP_LIST.has('cardiovascular')).toBe(true);
-        });
-
-        it('blocks delivery-format terms (Webinare / Workshops / Konferenzen)', () => {
-            expect(ATS_STOP_LIST.has('webinare')).toBe(true);
-            expect(ATS_STOP_LIST.has('webinar')).toBe(true);
-            expect(ATS_STOP_LIST.has('workshops')).toBe(true);
-            expect(ATS_STOP_LIST.has('seminare')).toBe(true);
-            expect(ATS_STOP_LIST.has('konferenzen')).toBe(true);
-        });
-
         it('still allows legitimate healthcare ATS keywords (PDF Sektion 4 ## Healthcare)', () => {
-            // These must NOT be stopped — they are PDF-listed valid healthcare ATS terms
             expect(ATS_STOP_LIST.has('patient care')).toBe(false);
             expect(ATS_STOP_LIST.has('clinical documentation')).toBe(false);
             expect(ATS_STOP_LIST.has('hipaa compliance')).toBe(false);

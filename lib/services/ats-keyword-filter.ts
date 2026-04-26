@@ -128,99 +128,33 @@ const STOP_LIST_FILLER_PHRASES = [
     'y', 'o', 'varios', 'general', 'bueno', 'otros',
 ];
 
-// Source: empirical evidence (2026-04-26 Sonova Tinnitus + J&J MedTech imports)
-// Medical conditions, diagnoses and disease-area names lack skill content. The PDF
-// (Sektion 4 ## Healthcare) lists VALID healthcare keywords (Patient Care, EHR,
-// HIPAA Compliance, Clinical Documentation, ICD-10, Telehealth) — disease names
-// are deliberately absent. These belong in the Steckbrief description, not the
-// ATS-keyword list.
-const STOP_LIST_MEDICAL_CONDITIONS = [
-    // German conditions
-    'tinnitus', 'vorhofflimmern', 'herzinsuffizienz', 'bluthochdruck',
-    'diabetes', 'asthma', 'krebs', 'schlaganfall', 'demenz',
-    'alzheimer', 'parkinson', 'depression', 'depressionen', 'migräne',
-    'arteriosklerose', 'multiple sklerose',
-    'osteoporose', 'rheuma', 'arthrose', 'arthritis',
-    'epilepsie', 'autismus', 'adhs', 'copd', 'morbus crohn',
-    // Cardiology abbreviations (only multi-char/multi-word — single 2-letter
-    // codes like "VT" or "EP" are conflict-prone and stay out of the list).
-    'afib', 'a-fib', 'a fib', 'vfib', 'v-fib', 'vt ablation',
-    'ep-therapien', 'ep-therapie',
-    'kardiovaskulär', 'kardiovaskular', 'cardiovascular',
-    // Generic disease-area framing without skill content
-    'klinische standards', 'klinische outcomes',
-    // English conditions
-    'hypertension', 'stroke', 'cancer', 'dementia', 'diabetes mellitus',
-    'heart failure', 'atrial fibrillation', 'ventricular fibrillation',
-    'congestive heart failure', 'chf',
-    'mental health', 'epilepsy', 'autism',
-];
-
-// Source: empirical evidence (2026-04-26 Airwallex SDR import — user-flagged)
-// Job titles are not ATS-keywords. The PDF lists "Skills" / "Tools" / "Methods" /
-// "Certifications" / "Domain-Begriffe" — never job titles. The candidate's role
-// title is stored separately in job_queue.title, not in buzzwords.
+// Minimal job-title defense (kept after Mistral → Haiku migration 2026-04-26).
+// The harvester prompt instructs Haiku 4.5 to skip job titles, and Haiku largely
+// follows it. This short list is empirical insurance for the highest-frequency
+// title-leakage patterns that Mistral introduced and that may occasionally still
+// slip through. Singular skill-noun forms ("Project Management", "Account
+// Management", "Sales Development") deliberately stay OUT of the list.
 //
-// IMPORTANT: We deliberately exclude title-acronyms that ARE certifications
-// (PMP, CISSP, CISA, CEH, PHR, SHRM-CP) — those belong in PDF Sektion 5.
-// CSM is ambiguous (Customer Success Manager vs. Certified Scrum Master) — kept
-// out of the stop-list to avoid false-positive on the certification meaning.
-//
-// Singular vs. plural distinction matters: "Project Manager" (title) blocked,
-// "Project Management" (skill, PDF Sektion 1) NOT blocked.
+// EXCLUDED on purpose: PMP, CISSP, CSM (PDF Sektion 5 certifications).
+// CSM is ambiguous (title vs. cert) — keep certification meaning intact.
 const STOP_LIST_JOB_TITLES = [
-    // English title acronyms (job roles, not certifications)
+    // High-frequency title acronyms
     'sdr', 'bdr', 'kam',
-    'ceo', 'cfo', 'cto', 'cmo', 'coo', 'cro', 'cio', 'cpo', 'chro',
-    'vp', 'svp', 'evp',
-    // English full job titles
+    'ceo', 'cfo', 'cto', 'cmo', 'coo',
+    // High-frequency full titles
     'sales development representative',
     'business development representative',
-    'sales development manager',
-    'business development manager',
-    'account executive', 'account manager', 'key account manager',
-    'sales manager', 'sales director',
-    'customer success manager', 'customer success representative',
-    'customer success specialist',
-    'marketing manager', 'marketing director',
-    'product manager', 'product owner',
-    'project manager',
-    'engineering manager', 'engineering lead',
-    'team lead', 'tech lead',
-    'head of sales', 'head of marketing', 'head of product',
-    'head of engineering', 'head of growth',
-    'vice president', 'senior vice president',
-    'managing director',
-    // German full job titles
-    'vertriebsleiter', 'vertriebsleiterin',
-    'vertriebsmitarbeiter', 'vertriebsmitarbeiterin',
-    'außendienstmitarbeiter', 'außendienstmitarbeiterin',
-    'innendienstmitarbeiter', 'innendienstmitarbeiterin',
-    'kundenbetreuer', 'kundenbetreuerin',
-    'projektleiter', 'projektleiterin',
-    'teamleiter', 'teamleiterin',
-    'abteilungsleiter', 'abteilungsleiterin',
-    'geschäftsführer', 'geschäftsführerin',
-    'bereichsleiter', 'bereichsleiterin',
-    'gruppenleiter', 'gruppenleiterin',
-    'business consultant', 'business analyst',
+    'account manager', 'account executive',
+    'project manager', 'product manager',
+    'vertriebsleiter', 'projektleiter', 'geschäftsführer',
 ];
 
-// Source: empirical evidence (2026-04-26 Sonova) + PDF inference
-// Delivery formats — webinars, workshops, seminars are HOW knowledge is delivered,
-// not WHAT skills the candidate has. The PDF doesn't mark these as ATS-keywords
-// in any of Sektionen 1-7.
-const STOP_LIST_FORMATS = [
-    // German formats
-    'webinare', 'webinar', 'workshops', 'workshop',
-    'seminare', 'seminar', 'konferenzen', 'konferenz',
-    'tagungen', 'tagung', 'roundtables', 'roundtable',
-    'veranstaltungen', 'veranstaltung', 'events', 'event',
-    'meetings', 'meeting', 'calls', 'sessions', 'session',
-    'trainings', 'training', // already in benefits list, defensive duplicate
-    // English formats (additional)
-    'webinars', 'seminars', 'conferences', 'conference',
-];
+// NOTE 2026-04-26: STOP_LIST_MEDICAL_CONDITIONS (40 entries) and
+// STOP_LIST_FORMATS (20 entries) were removed when extract_job_fields
+// was promoted Mistral → Haiku 4.5. Haiku reliably follows the harvester
+// prompt's domain/theme and format exclusions, so the empirical lists no
+// longer earn their cost in code complexity. Restore from git history
+// (commit e5df79e) if a future audit reveals systematic leakage.
 
 // Source: docs/ATS_Keywords.docs.pdf — Sektion 9 "Überholte / zu generische Tech-Terme"
 // These terms are too generic for modern ATS; PDF prescribes specific replacements
@@ -245,8 +179,6 @@ export const ATS_STOP_LIST: ReadonlySet<string> = new Set([
     ...STOP_LIST_GENERIC_ADJECTIVES,
     ...STOP_LIST_FILLER_PHRASES,
     ...STOP_LIST_OUTDATED_TECH,
-    ...STOP_LIST_MEDICAL_CONDITIONS,
-    ...STOP_LIST_FORMATS,
     ...STOP_LIST_JOB_TITLES,
 ].map(s => s.toLowerCase().trim()));
 

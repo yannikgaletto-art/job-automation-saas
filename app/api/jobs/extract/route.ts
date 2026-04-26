@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
             const { complete } = await import('@/lib/ai/model-router');
 
             const response = await complete({
-                taskType: 'parse_html',
+                taskType: 'extract_job_fields',
                 systemPrompt: `Extrahiere aus der Stellenbeschreibung diese JSON-Struktur. NUR JSON zurückgeben, kein Markdown, keine Erklärungen.
 
 WICHTIG für Listen (responsibilities, qualifications, benefits):
