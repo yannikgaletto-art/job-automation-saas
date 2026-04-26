@@ -7,6 +7,10 @@ import {
     cleanCertificationNames,
     sanitizeCertIssuer,
     validateDescriptionsAgainstRawText,
+    cleanLanguageProficiency,
+    splitMergedSkillGroups,
+    dropProjectLikeCerts,
+    truncateCertDescriptionAtNewline,
 } from '../services/cv-parser';
 import { complete } from '@/lib/ai/model-router';
 
@@ -583,5 +587,338 @@ describe('validateDescriptionsAgainstRawText', () => {
         expect(out[0].name).toBe('TEDx-Coach');
         expect(out[0].issuer).toBe('TED Conferences');
         expect(out[0].dateText).toBe('seit 2022');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// cleanLanguageProficiency — Welle A.6 separator-artifact stripper
+// ---------------------------------------------------------------------------
+
+describe('cleanLanguageProficiency', () => {
+
+    // Yannik's actual regression — Azure DI's "I" pipe replacement leaks into proficiency.
+    test('strips "I " prefix from proficiency (Yannik regression)', () => {
+        const langs = [
+            { id: 'lang-1', language: 'Deutsch', proficiency: 'I Muttersprache' },
+            { id: 'lang-2', language: 'Englisch', proficiency: 'I C1 Niveau' },
+        ];
+        const out = cleanLanguageProficiency(langs);
+        expect(out[0].proficiency).toBe('Muttersprache');
+        expect(out[1].proficiency).toBe('C1 Niveau');
+    });
+
+    test('strips pipe "| ", em/en-dash, plain dash, colon prefixes', () => {
+        const langs = [
+            { id: 'lang-1', language: 'A', proficiency: '| Native' },
+            { id: 'lang-2', language: 'B', proficiency: '— C1' },
+            { id: 'lang-3', language: 'C', proficiency: '– B2' },
+            { id: 'lang-4', language: 'D', proficiency: '- A2' },
+            { id: 'lang-5', language: 'E', proficiency: ': Fluent' },
+        ];
+        const out = cleanLanguageProficiency(langs);
+        expect(out[0].proficiency).toBe('Native');
+        expect(out[1].proficiency).toBe('C1');
+        expect(out[2].proficiency).toBe('B2');
+        expect(out[3].proficiency).toBe('A2');
+        expect(out[4].proficiency).toBe('Fluent');
+    });
+
+    test('keeps clean proficiency value untouched (idempotent)', () => {
+        const langs = [
+            { id: 'lang-1', language: 'Deutsch', proficiency: 'Muttersprache' },
+            { id: 'lang-2', language: 'Englisch', proficiency: 'C1' },
+        ];
+        const out = cleanLanguageProficiency(langs);
+        expect(out[0].proficiency).toBe('Muttersprache');
+        expect(out[1].proficiency).toBe('C1');
+    });
+
+    test('does not strip "I" inside language names like "Italian"', () => {
+        // Italian starts with "I" but no following space — must not be stripped.
+        const langs = [{ id: 'lang-1', language: 'English', proficiency: 'Italian B2' }];
+        const out = cleanLanguageProficiency(langs);
+        expect(out[0].proficiency).toBe('Italian B2');
+    });
+
+    test('handles null and empty proficiency', () => {
+        const langs = [
+            { id: 'lang-1', language: 'A', proficiency: null },
+            { id: 'lang-2', language: 'B', proficiency: '' },
+        ];
+        const out = cleanLanguageProficiency(langs);
+        expect(out[0].proficiency).toBeNull();
+        expect(out[1].proficiency).toBe('');
+    });
+
+    test('sets proficiency to null when only the separator is present', () => {
+        const langs = [{ id: 'lang-1', language: 'A', proficiency: 'I ' }];
+        const out = cleanLanguageProficiency(langs);
+        expect(out[0].proficiency).toBeNull();
+    });
+
+    test('preserves other fields when stripping prefix', () => {
+        const langs = [{ id: 'lang-1', language: 'Deutsch', proficiency: 'I Muttersprache' }];
+        const out = cleanLanguageProficiency(langs);
+        expect(out[0].id).toBe('lang-1');
+        expect(out[0].language).toBe('Deutsch');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// splitMergedSkillGroups — Welle A.7 sub-section header recovery
+// ---------------------------------------------------------------------------
+
+describe('splitMergedSkillGroups', () => {
+
+    // Yannik's actual regression: Adobe + Microsoft headers stuck inside items[].
+    test('splits IT-Kenntnisse / Adobe / Microsoft from Yannik raw output', () => {
+        const skills = [{
+            id: 'skill-1',
+            category: 'IT-Kenntnisse',
+            items: [
+                'Python Grundkenntnisse',
+                'Antigravity',
+                'Make No-Code',
+                'Low-Code Plattformen',
+                'Bubble\nAdobe',
+                'Creative Cloud',
+                'Premiere Pro',
+                'After Effects',
+                'Lightroom\nMicrosoft',
+            ],
+        }];
+        const out = splitMergedSkillGroups(skills);
+        // Three groups: IT-Kenntnisse (with Bubble), Adobe (with Lightroom), Microsoft (empty → dropped)
+        expect(out).toHaveLength(2);
+        expect(out[0].category).toBe('IT-Kenntnisse');
+        expect(out[0].items).toEqual([
+            'Python Grundkenntnisse',
+            'Antigravity',
+            'Make No-Code',
+            'Low-Code Plattformen',
+            'Bubble',
+        ]);
+        expect(out[1].category).toBe('Adobe');
+        expect(out[1].items).toEqual([
+            'Creative Cloud',
+            'Premiere Pro',
+            'After Effects',
+            'Lightroom',
+        ]);
+    });
+
+    // No \n → idempotent passthrough.
+    test('passes clean groups through unchanged', () => {
+        const skills = [
+            { id: 'skill-1', category: 'IT', items: ['Python', 'Java'] },
+            { id: 'skill-2', category: 'Office', items: ['Excel', 'PowerPoint'] },
+        ];
+        const out = splitMergedSkillGroups(skills);
+        expect(out).toHaveLength(2);
+        expect(out[0]).toEqual({ id: 'skill-1', category: 'IT', items: ['Python', 'Java'] });
+        expect(out[1]).toEqual({ id: 'skill-2', category: 'Office', items: ['Excel', 'PowerPoint'] });
+    });
+
+    // Empty array → empty result.
+    test('handles empty input', () => {
+        expect(splitMergedSkillGroups([])).toEqual([]);
+    });
+
+    // Group with no items is dropped (nothing to flush).
+    test('drops empty groups', () => {
+        const skills = [{ id: 'skill-1', category: 'Empty', items: [] }];
+        const out = splitMergedSkillGroups(skills);
+        expect(out).toEqual([]);
+    });
+
+    // Multi-\n in one item: A\nB\nC means A finishes prev group, B becomes empty (dropped), C is new category.
+    test('handles multi-\\n splits with empty-group drop', () => {
+        const skills = [{
+            id: 'skill-1',
+            category: 'First',
+            items: ['Alpha', 'Beta\nMiddle\nLast', 'Omega'],
+        }];
+        const out = splitMergedSkillGroups(skills);
+        // Beta finishes "First". "Middle" group has no items (dropped). "Last" group gets "Omega".
+        expect(out).toHaveLength(2);
+        expect(out[0].category).toBe('First');
+        expect(out[0].items).toEqual(['Alpha', 'Beta']);
+        expect(out[1].category).toBe('Last');
+        expect(out[1].items).toEqual(['Omega']);
+    });
+
+    // Newline at start of item ("\nFoo") — empty pre-split, full text after becomes new category.
+    test('handles leading newline in item', () => {
+        const skills = [{
+            id: 'skill-1',
+            category: 'IT',
+            items: ['Python', '\nNewSection', 'Item1'],
+        }];
+        const out = splitMergedSkillGroups(skills);
+        expect(out).toHaveLength(2);
+        expect(out[0].category).toBe('IT');
+        expect(out[0].items).toEqual(['Python']);
+        expect(out[1].category).toBe('NewSection');
+        expect(out[1].items).toEqual(['Item1']);
+    });
+
+    // Other fields on the group object are preserved.
+    test('preserves non-items fields on each group', () => {
+        const skills = [{ id: 'skill-1', category: 'A', items: ['x\nB', 'y'], _custom: 'meta' }];
+        const out = splitMergedSkillGroups(skills);
+        expect(out).toHaveLength(2);
+        expect((out[0] as any)._custom).toBe('meta');
+        expect((out[1] as any)._custom).toBe('meta');
+    });
+
+    // ID generation: split groups get suffixed IDs (-split-1, -split-2).
+    test('generates unique ids for split groups', () => {
+        const skills = [{ id: 'skill-1', category: 'A', items: ['x\nB', 'y\nC', 'z'] }];
+        const out = splitMergedSkillGroups(skills);
+        expect(out).toHaveLength(3);
+        expect(out[0].id).toBe('skill-1');
+        expect(out[1].id).toBe('skill-1-split-1');
+        expect(out[2].id).toBe('skill-1-split-2');
+    });
+
+    // Whitespace-only fragments still mark boundaries, but trailing empty
+    // groups are dropped — matches the Microsoft-without-items case in
+    // Yannik's CV (header with no following content).
+    test('handles whitespace-only fragments and drops trailing empty groups', () => {
+        const skills = [{ id: 'skill-1', category: 'A', items: ['x\n  \nB'] }];
+        const out = splitMergedSkillGroups(skills);
+        // "x\n  \nB" → x stays in A; "" boundary closes A; "B" starts new group with no items → dropped.
+        expect(out).toHaveLength(1);
+        expect(out[0]).toMatchObject({ category: 'A', items: ['x'] });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// dropProjectLikeCerts — Welle A.8 cert-name validator
+// ---------------------------------------------------------------------------
+
+describe('dropProjectLikeCerts', () => {
+
+    // Yannik's actual regression: a project description bucketed into certs.
+    test('drops "Projekt- ZF Getriebe Brandenburg GmbH HR- Transformation..."', () => {
+        const certs = [
+            { id: 'cert-1', name: 'Design Thinking', issuer: 'HPI' },
+            { id: 'cert-2', name: 'Projekt- ZF Getriebe Brandenburg GmbH HR- Transformation & Organisationsentwicklung', issuer: 'ZF Getriebe Brandenburg GmbH' },
+            { id: 'cert-3', name: 'TEDx-Coach', issuer: null },
+        ];
+        const out = dropProjectLikeCerts(certs);
+        expect(out).toHaveLength(2);
+        expect(out.map(c => c.name)).toEqual(['Design Thinking', 'TEDx-Coach']);
+    });
+
+    test('keeps real short cert names', () => {
+        const certs = [
+            { id: 'a', name: 'PMP' },
+            { id: 'b', name: 'Scrum Master' },
+            { id: 'c', name: 'Design Thinking Coach' },
+            { id: 'd', name: 'Präsenz & Persönlichkeitsprofilierung' },
+            { id: 'e', name: 'ISO 27001' },
+        ];
+        const out = dropProjectLikeCerts(certs);
+        expect(out).toHaveLength(5);
+    });
+
+    test('drops names starting with "Projekt-", "Projekt:", "Projekt "', () => {
+        const certs = [
+            { id: 'a', name: 'Projekt- Test' },
+            { id: 'b', name: 'Projekt: Mein Projekt' },
+            { id: 'c', name: 'Projekt Datenmigration' },
+            { id: 'd', name: 'Projektmanagement' }, // word boundary — should KEEP (real cert)
+        ];
+        const out = dropProjectLikeCerts(certs);
+        expect(out.map(c => c.name)).toEqual(['Projektmanagement']);
+    });
+
+    test('drops long names with company suffix even without Projekt prefix', () => {
+        const certs = [
+            { id: 'a', name: 'HR-Transformation und Beratung Bayer AG Niederlassung München' },
+            { id: 'b', name: 'Strategie Workshop Volkswagen Group Services GmbH Berlin' },
+        ];
+        const out = dropProjectLikeCerts(certs);
+        expect(out).toHaveLength(0);
+    });
+
+    test('drops empty / null names', () => {
+        const certs = [
+            { id: 'a', name: '' },
+            { id: 'b', name: null },
+            { id: 'c', name: 'Real Cert' },
+        ];
+        const out = dropProjectLikeCerts(certs);
+        expect(out).toHaveLength(1);
+        expect(out[0].name).toBe('Real Cert');
+    });
+
+    test('handles empty array', () => {
+        expect(dropProjectLikeCerts([])).toEqual([]);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// truncateCertDescriptionAtNewline — Welle A.8 cert-description sanitizer
+// ---------------------------------------------------------------------------
+
+describe('truncateCertDescriptionAtNewline', () => {
+
+    // Yannik's regression: "kritisches Denken\nDesign Thinking Coach"
+    test('keeps only first paragraph; drops next-cert-name absorbed after \\n', () => {
+        const certs = [{
+            id: 'cert-1',
+            name: 'Managementberatung',
+            description: 'Datenanalyse für unternehmerische Entscheidungen Führung & Management Strategisches und kritisches Denken\nDesign Thinking Coach',
+        }];
+        const out = truncateCertDescriptionAtNewline(certs);
+        expect(out[0].description).toBe('Datenanalyse für unternehmerische Entscheidungen Führung & Management Strategisches und kritisches Denken');
+    });
+
+    // Yannik's TEDx regression: 3-line absorption.
+    test('truncates multi-line absorption to first paragraph', () => {
+        const certs = [{
+            id: 'cert-1',
+            name: 'TEDx-Coach',
+            description: 'Ganzheitliches Coaching von TEDx-Redner:innen Übersetzung von Inhalten in überzeugende Erzählstrukturen Moderation retrospektiver Team-Sessions mit dem TEDx-Team\nUniversität Potsdam\nProjektmanagement',
+        }];
+        const out = truncateCertDescriptionAtNewline(certs);
+        expect(out[0].description).toBe('Ganzheitliches Coaching von TEDx-Redner:innen Übersetzung von Inhalten in überzeugende Erzählstrukturen Moderation retrospektiver Team-Sessions mit dem TEDx-Team');
+    });
+
+    test('keeps clean description (idempotent)', () => {
+        const certs = [{ id: 'a', name: 'Design Thinking', description: 'Anwendung von Design Thinking-Prozessen' }];
+        const out = truncateCertDescriptionAtNewline(certs);
+        expect(out[0].description).toBe('Anwendung von Design Thinking-Prozessen');
+    });
+
+    test('handles null and empty description', () => {
+        const certs = [
+            { id: 'a', description: null },
+            { id: 'b', description: '' },
+        ];
+        const out = truncateCertDescriptionAtNewline(certs);
+        expect(out[0].description).toBeNull();
+        expect(out[1].description).toBe('');
+    });
+
+    test('sets description to null when first line is whitespace only', () => {
+        const certs = [{ id: 'a', description: '   \nReal content' }];
+        const out = truncateCertDescriptionAtNewline(certs);
+        expect(out[0].description).toBeNull();
+    });
+
+    test('preserves other cert fields', () => {
+        const certs = [{ id: 'cert-1', name: 'X', issuer: 'Y', description: 'first\nsecond' }];
+        const out = truncateCertDescriptionAtNewline(certs);
+        expect(out[0].id).toBe('cert-1');
+        expect(out[0].name).toBe('X');
+        expect(out[0].issuer).toBe('Y');
+        expect(out[0].description).toBe('first');
+    });
+
+    test('handles empty array', () => {
+        expect(truncateCertDescriptionAtNewline([])).toEqual([]);
     });
 });

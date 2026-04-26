@@ -242,12 +242,17 @@ ${sanitized}
       const lang = (l.language || '').trim().toLowerCase();
       return lang.length > 0 && KNOWN_LANGUAGES.has(lang);
     });
-    const languages = filteredLanguages.length > 0
-      ? filteredLanguages
-      : recoverMissingLanguages(text);
+    const languages = cleanLanguageProficiency(
+      (filteredLanguages.length > 0
+        ? filteredLanguages
+        : recoverMissingLanguages(text)) as Array<{ proficiency?: string | null;[k: string]: any }>
+    );
 
     // Certifications: clean section-header prefixes from `name`, then drop
-    // entries whose name is JUST a section header, then sanitize issuer.
+    // entries whose name is JUST a section header, then drop project-like
+    // names that the LLM mis-bucketed into certs, then sanitize issuer,
+    // truncate descriptions at newline (next-cert-name absorption guard),
+    // then run hallucination validation.
     const cleanedCerts = cleanCertificationNames(
       (validated.certifications ?? []) as Array<{ name?: string | null;[k: string]: any }>
     );
@@ -255,9 +260,12 @@ ${sanitized}
       const name = (c.name || '').trim().toLowerCase();
       return name.length > 0 && !CERT_NOISE.has(name);
     });
+    const certsAfterProjectDrop = dropProjectLikeCerts(certsAfterNoise);
     const certifications = validateDescriptionsAgainstRawText(
-      sanitizeCertIssuer(
-        certsAfterNoise as Array<{ issuer?: string | null;[k: string]: any }>
+      truncateCertDescriptionAtNewline(
+        sanitizeCertIssuer(
+          certsAfterProjectDrop as Array<{ issuer?: string | null;[k: string]: any }>
+        ) as Array<{ description?: string | null;[k: string]: any }>
       ),
       text
     );
@@ -288,8 +296,12 @@ ${sanitized}
       ),
       // Skills: strip literal `\n` artefacts from category — observed pattern
       // "IT-Kenntnisse\n\nProgrammierkenntnisse" after Phase-3.1 re-upload.
-      skills: cleanSkillCategories(
-        (validated.skills ?? []) as Array<{ category?: string | null;[k: string]: any }>
+      // Then split groups whose items contain `\n` (sub-section headers stuck
+      // inside item strings, e.g. "Bubble\nAdobe" → split into 2 groups).
+      skills: splitMergedSkillGroups(
+        cleanSkillCategories(
+          (validated.skills ?? []) as Array<{ category?: string | null;[k: string]: any }>
+        ) as Array<{ id?: string; category?: string | null; items?: string[];[k: string]: any }>
       ),
       languages,
       certifications,
@@ -761,6 +773,142 @@ export function sanitizeCertIssuer<T extends { issuer?: string | null;[k: string
       return { ...cert, issuer: null };
     }
     return cert;
+  });
+}
+
+/**
+ * Drops cert entries whose `name` is actually a project description rather
+ * than a real certificate name. Observed pattern on Yannik's CV:
+ *   { name: "Projekt- ZF Getriebe Brandenburg GmbH HR- Transformation & Organisationsentwicklung", ... }
+ * — the LLM bucketed a project entry into certifications.
+ *
+ * Reject signals:
+ *   (a) name starts with "Projekt" / "Projekt-" / "Projekt:" — German project prefix
+ *   (b) name has >6 words AND contains a company-suffix token (GmbH/AG/KG/SE/Inc/Ltd/LLC)
+ *   — real cert names are short and never carry company suffixes
+ *
+ * Exported for testing.
+ */
+export function dropProjectLikeCerts<T extends { name?: string | null;[k: string]: any }>(
+  certs: T[]
+): T[] {
+  const COMPANY_SUFFIX = /\b(GmbH|AG|KG|SE|Inc\.?|Ltd\.?|LLC|SA|S\.?A\.?|B\.?V\.?|N\.?V\.?)\b/;
+  return certs.filter((cert) => {
+    const name = (cert.name || '').toString().trim();
+    if (name.length === 0) return false;
+    if (/^Projekt[\s\-:]/i.test(name)) return false;
+    const wordCount = name.split(/\s+/).length;
+    if (wordCount > 6 && COMPANY_SUFFIX.test(name)) return false;
+    return true;
+  });
+}
+
+/**
+ * Truncates `cert.description` at the first newline. The LLM sometimes
+ * absorbs the next certificate's name (or a sub-track header) into the
+ * preceding description. Observed pattern:
+ *   { description: "Datenanalyse für unternehmerische Entscheidungen...\nDesign Thinking Coach" }
+ * — "Design Thinking Coach" is the NEXT cert, not a description continuation.
+ *
+ * Conservative: keep only text up to the first `\n`. Idempotent.
+ * Exported for testing.
+ */
+export function truncateCertDescriptionAtNewline<
+  T extends { description?: string | null;[k: string]: any }
+>(certs: T[]): T[] {
+  return certs.map((cert) => {
+    const desc = (cert.description || '').toString();
+    if (!desc.includes('\n')) return cert;
+    const firstChunk = desc.split('\n')[0].trim();
+    return { ...cert, description: firstChunk.length > 0 ? firstChunk : null };
+  });
+}
+
+/**
+ * Splits a single merged skill group into multiple groups when individual
+ * items contain newlines that should have been section-header breaks.
+ * Observed pattern on Yannik's CV:
+ *   { category: "IT-Kenntnisse", items: ["Python", "Bubble\nAdobe", "Lightroom\nMicrosoft", ...] }
+ * The "\n" inside an item marks where a new sub-section header began in the
+ * source text but the LLM concatenated it onto the preceding item.
+ *
+ * Strategy: scan each item; when one contains `\n`, the substring BEFORE
+ * the `\n` finishes the current group, and the substring AFTER becomes the
+ * category header of a new (initially empty) group. Subsequent items belong
+ * to that new group until the next `\n`. Empty groups (header with no
+ * items, e.g. when two `\n`-splits occur back-to-back) are dropped.
+ *
+ * Idempotent: a group with no `\n` items is returned unchanged.
+ * Exported for testing.
+ */
+export function splitMergedSkillGroups<
+  T extends { id?: string; category?: string | null; items?: string[]; [k: string]: any }
+>(skills: T[]): T[] {
+  const result: T[] = [];
+  for (const group of skills) {
+    const items = group.items ?? [];
+    const baseId = group.id ?? 'skill';
+    let currentCategory = group.category ?? null;
+    let currentItems: string[] = [];
+    let splitIndex = 0;
+
+    const flush = () => {
+      if (currentItems.length === 0) return;
+      result.push({
+        ...group,
+        id: splitIndex === 0 ? baseId : `${baseId}-split-${splitIndex}`,
+        category: currentCategory,
+        items: currentItems,
+      });
+      splitIndex++;
+    };
+
+    for (const item of items) {
+      if (typeof item === 'string' && item.includes('\n')) {
+        // Preserve every fragment (including empty ones) so boundary count is faithful.
+        const parts = item.split('\n').map((p) => p.trim());
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i];
+          if (i === 0) {
+            // First fragment extends the current group (if non-empty).
+            if (part.length > 0) currentItems.push(part);
+          } else {
+            // Each subsequent fragment is a boundary: flush current group,
+            // start a new one with this part as the category header.
+            flush();
+            currentCategory = part.length > 0 ? part : null;
+            currentItems = [];
+          }
+        }
+      } else if (typeof item === 'string') {
+        currentItems.push(item);
+      }
+    }
+    flush();
+  }
+  return result;
+}
+
+/**
+ * Strips a leading separator artifact ("I ", "| ", "— ", "– ", "- ", ": ")
+ * from `proficiency` when the LLM mis-parsed an OCR pipe character as the
+ * first token of the value. Observed on Yannik's CV where Azure DI emits
+ * "Deutsch I Muttersprache" — the LLM sometimes copies the "I" into
+ * proficiency instead of using it as a separator.
+ *
+ * Idempotent: a clean proficiency value is untouched. Exported for testing.
+ */
+export function cleanLanguageProficiency<
+  T extends { proficiency?: string | null; [k: string]: any }
+>(languages: T[]): T[] {
+  return languages.map((lang) => {
+    const prof = (lang.proficiency || '').toString();
+    if (prof.length === 0) return lang;
+    // Strip leading "I ", "| ", em/en-dash, plain dash, or colon followed by whitespace.
+    // Capital "I" only when followed by a space (so "Italian" stays intact).
+    const cleaned = prof.replace(/^([I|—–\-:])\s+/, '').trim();
+    if (cleaned === prof) return lang;
+    return { ...lang, proficiency: cleaned.length > 0 ? cleaned : null };
   });
 }
 
