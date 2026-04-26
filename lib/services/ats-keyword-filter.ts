@@ -80,6 +80,7 @@ const STOP_LIST_BENEFITS = [
 const STOP_LIST_GENERIC_ADJECTIVES = [
     // German — adjectives without skill content
     'dynamisch', 'innovativ', 'innovativ als adjektiv',
+    'innovation', 'innovationen', // generic noun — same skill-content level as 'innovativ'
     'modern', 'agil', // Sektion 9: "Agil (als Adjektiv)" — methode "Agile" bleibt valide
     'engagiert', 'motiviert',
     'erfahren', 'qualifiziert', 'kompetent', 'professionell',
