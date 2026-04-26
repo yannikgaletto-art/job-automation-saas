@@ -7,8 +7,33 @@ describe('ats-keyword-filter', () => {
             expect(ATS_STOP_LIST.has('bürozeit')).toBe(true);
         });
 
-        it('is non-trivial (>= 130 entries after PDF Sektion 9 alignment)', () => {
-            expect(ATS_STOP_LIST.size).toBeGreaterThanOrEqual(130);
+        it('is non-trivial (>= 180 entries after PDF Sektion 9 + medical/format extension)', () => {
+            expect(ATS_STOP_LIST.size).toBeGreaterThanOrEqual(180);
+        });
+
+        it('blocks medical conditions / disease names (Tinnitus / Vorhofflimmern / AFib)', () => {
+            expect(ATS_STOP_LIST.has('tinnitus')).toBe(true);
+            expect(ATS_STOP_LIST.has('vorhofflimmern')).toBe(true);
+            expect(ATS_STOP_LIST.has('afib')).toBe(true);
+            expect(ATS_STOP_LIST.has('herzinsuffizienz')).toBe(true);
+            expect(ATS_STOP_LIST.has('cardiovascular')).toBe(true);
+        });
+
+        it('blocks delivery-format terms (Webinare / Workshops / Konferenzen)', () => {
+            expect(ATS_STOP_LIST.has('webinare')).toBe(true);
+            expect(ATS_STOP_LIST.has('webinar')).toBe(true);
+            expect(ATS_STOP_LIST.has('workshops')).toBe(true);
+            expect(ATS_STOP_LIST.has('seminare')).toBe(true);
+            expect(ATS_STOP_LIST.has('konferenzen')).toBe(true);
+        });
+
+        it('still allows legitimate healthcare ATS keywords (PDF Sektion 4 ## Healthcare)', () => {
+            // These must NOT be stopped — they are PDF-listed valid healthcare ATS terms
+            expect(ATS_STOP_LIST.has('patient care')).toBe(false);
+            expect(ATS_STOP_LIST.has('clinical documentation')).toBe(false);
+            expect(ATS_STOP_LIST.has('hipaa compliance')).toBe(false);
+            expect(ATS_STOP_LIST.has('telehealth')).toBe(false);
+            expect(ATS_STOP_LIST.has('medical affairs')).toBe(false);
         });
 
         it('all entries are lowercased and trimmed', () => {

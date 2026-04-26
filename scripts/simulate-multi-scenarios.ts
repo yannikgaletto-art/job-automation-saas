@@ -74,9 +74,25 @@ Plan and deliver trainings, webinars, clinical discussions. Collaborate with med
 Drive engagement for tinnitus-focused digital health services. Build relationships with
 healthcare professionals. 5+ years of experience in healthcare marketing, medical engagement,
 physician relations, medical affairs or digital health.`,
-        mistralOutput: ['Arztbeziehungen', 'Digitale Gesundheit', 'Klinische Inhalte', 'ROI-Analyse', 'Gesundheitsmarketing', 'Medical Affairs', 'Stakeholder Management', 'App-Adoption', 'Community Engagement', 'DSGVO', 'ISO 27001', 'PCI DSS'],
+        mistralOutput: ['Arztbeziehungen', 'Digitale Gesundheit', 'Klinische Inhalte', 'ROI-Analyse', 'Gesundheitsmarketing', 'Medical Affairs', 'Stakeholder Management', 'App-Adoption', 'Community Engagement', 'Tinnitus', 'Webinare', 'DSGVO', 'ISO 27001', 'PCI DSS'],
         mustSurvive: ['Arztbeziehungen', 'Digitale Gesundheit', 'Klinische Inhalte', 'ROI-Analyse', 'Gesundheitsmarketing', 'Medical Affairs', 'Stakeholder Management', 'App-Adoption', 'Community Engagement'],
-        mustBeRemoved: ['DSGVO', 'ISO 27001', 'PCI DSS'],
+        mustBeRemoved: ['DSGVO', 'ISO 27001', 'PCI DSS', 'Tinnitus', 'Webinare'],
+    },
+    {
+        name: 'Bundesdruckerei Business Development (DE-JD, DE-locale) — Yannik 2026-04-26',
+        jd: `Bundesdruckerei sucht Business Development Manager (m/w/d) Schwerpunkt Datenanalyse
+und Künstliche Intelligenz im Public Sector. Analyse von Kundenbedürfnissen, Markttrends
+sowie des regulatorischen Umfelds für den Einsatz von Datenanalyse und Künstlicher
+Intelligenz im öffentlichen Sektor. Identifizierung von Use Cases und geeigneten
+Verwaltungsprozessen zur Ableitung konkreter Geschäftspotenziale. Erstellung von
+Lösungskonzepten in enger Zusammenarbeit mit unseren Kunden (insbesondere
+Bundesministerien und nachgeordnete Behörden). Hohes Interesse an Digitalpolitik
+sowie gute Kenntnis des öffentlichen Sektors. Fundiertes Wissen über Datenanalyse-
+und KI-Anwendungen und -Technologien. Berufserfahrung in der IT-Beratung, Verwaltung
+oder Geschäftsentwicklung. Aufbau von Kunden- und Stakeholderbeziehungen.`,
+        mistralOutput: ['Bundesministerien', 'Datenanalyse', 'Datenanalyse-Anwendungen', 'Datenanalyse-Methoden', 'Digitalpolitik', 'IT-Beratung', 'KI', 'KI-Anwendungen', 'KI-Methoden', 'Lösungskonzepte', 'Öffentlicher Sektor', 'Regulatorische Rahmenbedingungen', 'Stakeholder-Management', 'Verwaltungsprozesse', 'Innovationen'],
+        mustSurvive: ['Bundesministerien', 'Datenanalyse', 'Digitalpolitik', 'IT-Beratung', 'KI', 'KI-Anwendungen', 'Lösungskonzepte', 'Öffentlicher Sektor', 'Stakeholder-Management', 'Verwaltungsprozesse'],
+        mustBeRemoved: ['Innovationen'], // generic noun, blocked
     },
 ];
 
