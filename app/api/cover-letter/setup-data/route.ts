@@ -211,16 +211,22 @@ export async function GET(req: NextRequest) {
 
         // ─── CV Station Bullets Source (priority order) ────────────────
         // 1. Optimiertes CV (finalCv aus cv_optimization_proposal) — wenn User Änderungen akzeptiert hat
-        // 2. job.metadata.cv_structured_data (direkter Upload / Legacy)
-        // 3. user_profiles.cv_structured_data (Standard-Onboarding)
+        // 2. job.metadata.cv_snapshot (Welle B — CV pinned at CV-Match time)
+        // 3. job.metadata.cv_structured_data (direkter Upload / Legacy)
+        // 4. user_profiles.cv_structured_data (Standard-Onboarding)
         // WHY: Cover Letter Wizard soll dieselben Bullets zeigen wie das generierte PDF.
         let cvData: any[] = [];
 
         const optimizedFinalCv = (job as any).cv_optimization_proposal?.finalCv;
+        const cvSnapshot = (job.metadata as any)?.cv_snapshot;
         if (optimizedFinalCv?.experience?.length > 0) {
             // ✅ Nutze optimiertes CV (Bullets übereinstimmend mit dem generierten PDF)
             cvData = optimizedFinalCv.experience;
             console.log(`🔄 [SetupData] Using optimized finalCv for job ${jobId} (${cvData.length} stations)`);
+        } else if (cvSnapshot?.data?.experience?.length > 0) {
+            // Welle B: pinned snapshot from CV Match
+            cvData = cvSnapshot.data.experience;
+            console.log(`📌 [SetupData] Using job-pinned CV snapshot for job ${jobId} (${cvData.length} stations, pinned ${cvSnapshot.pinned_at})`);
         } else if (job.metadata?.cv_structured_data?.experience?.length > 0) {
             // Fallback: job-level upload
             cvData = job.metadata.cv_structured_data.experience;

@@ -138,6 +138,34 @@ export async function POST(req: NextRequest) {
                 if (cached?.result && typeof cached.result === 'object') {
                     console.log(`✅ [CV Match] Persistent cache HIT — restoring from cv_match_result_cache (hash: ${persistentHash.slice(0, 8)}…)`);
 
+                    // Welle B: build a CV snapshot to pin alongside the restored
+                    // match result so the Optimizer + Cover Letter use the same
+                    // CV the user is currently viewing.
+                    let cachedSnapshot: unknown = undefined;
+                    try {
+                        const { data: profile } = await supabaseAdmin
+                            .from('user_profiles')
+                            .select('cv_structured_data')
+                            .eq('id', user.id)
+                            .single();
+                        if (profile?.cv_structured_data) {
+                            let documentName: string | null = null;
+                            if (cvData.documentId) {
+                                const { data: doc } = await supabaseAdmin
+                                    .from('documents')
+                                    .select('metadata')
+                                    .eq('id', cvData.documentId)
+                                    .eq('user_id', user.id)
+                                    .maybeSingle();
+                                documentName = ((doc?.metadata as Record<string, unknown> | null)?.original_name as string) ?? null;
+                            }
+                            const { buildJobCvSnapshot } = await import('@/lib/services/job-cv-snapshot');
+                            cachedSnapshot = buildJobCvSnapshot(profile.cv_structured_data, cvData.documentId ?? null, documentName);
+                        }
+                    } catch (snapErr: any) {
+                        console.warn(`⚠️ [CV Match] cache-hit snapshot build failed (non-blocking): ${snapErr?.message}`);
+                    }
+
                     // Restore cached result to job_queue.metadata (mirrors Inngest save-results)
                     await supabaseAdmin
                         .from('job_queue')
@@ -152,6 +180,7 @@ export async function POST(req: NextRequest) {
                                 },
                                 cv_match_error: null,
                                 cv_match_status: 'done',
+                                ...(cachedSnapshot ? { cv_snapshot: cachedSnapshot } : {}),
                             },
                             status: 'cv_matched',
                         })
@@ -292,6 +321,47 @@ export async function POST(req: NextRequest) {
                             console.log(`✅ [CV Match] DEV result cached (hash: ${devInputHash.slice(0, 8)}…)`);
                         } catch (cacheWriteErr: any) {
                             console.warn(`⚠️ [CV Match] DEV cache write error (non-blocking): ${cacheWriteErr?.message}`);
+                        }
+
+                        // Welle B: Pin the matched CV snapshot to job_queue.metadata.cv_snapshot
+                        // (mirrors Inngest Step 6 — keeps Optimizer + Cover Letter consistent
+                        // with the CV that was matched, even after later master CV uploads).
+                        try {
+                            const { data: profile } = await supabaseAdmin
+                                .from('user_profiles')
+                                .select('cv_structured_data')
+                                .eq('id', user.id)
+                                .single();
+                            if (profile?.cv_structured_data) {
+                                const docIdToPin = cvDocumentId ?? cvData.documentId ?? null;
+                                let documentName: string | null = null;
+                                if (docIdToPin) {
+                                    const { data: doc } = await supabaseAdmin
+                                        .from('documents')
+                                        .select('metadata')
+                                        .eq('id', docIdToPin)
+                                        .eq('user_id', user.id)
+                                        .maybeSingle();
+                                    documentName = ((doc?.metadata as Record<string, unknown> | null)?.original_name as string) ?? null;
+                                }
+                                const { buildJobCvSnapshot } = await import('@/lib/services/job-cv-snapshot');
+                                const snapshot = buildJobCvSnapshot(profile.cv_structured_data, docIdToPin, documentName);
+                                const { data: freshJobForPin } = await supabaseAdmin
+                                    .from('job_queue')
+                                    .select('metadata')
+                                    .eq('id', jobId)
+                                    .eq('user_id', user.id)
+                                    .single();
+                                const freshMetadataForPin = (freshJobForPin?.metadata as Record<string, unknown>) ?? {};
+                                await supabaseAdmin
+                                    .from('job_queue')
+                                    .update({ metadata: { ...freshMetadataForPin, cv_snapshot: snapshot } })
+                                    .eq('id', jobId)
+                                    .eq('user_id', user.id);
+                                console.log(`✅ [CV Match] DEV CV snapshot pinned to job (doc_id=${docIdToPin ?? 'none'})`);
+                            }
+                        } catch (pinErr: any) {
+                            console.warn(`⚠️ [CV Match] DEV snapshot pin failed (non-blocking): ${pinErr?.message}`);
                         }
 
                         return matchResult;

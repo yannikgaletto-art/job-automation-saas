@@ -108,6 +108,20 @@ export async function generateCoverLetterWithQuality(
 
     if (profileError || !profileData) throw new Error(`Profile not found: ${profileError?.message}`);
 
+    // Welle B: prefer the job-pinned CV snapshot over the master CV. The
+    // snapshot is set at CV-Match time so the cover letter operates on the
+    // SAME CV the user matched against, even if the master CV has changed
+    // since. Falls back to master CV when no snapshot exists.
+    const { resolveJobCv } = await import('@/lib/services/job-cv-snapshot');
+    const resolvedCv = resolveJobCv(
+        (jobData as { metadata?: Record<string, unknown> }).metadata,
+        profileData.cv_structured_data,
+    );
+    if (resolvedCv.source === 'job_snapshot' && resolvedCv.cv) {
+        console.log(`[CoverLetterGen] Using job-pinned CV snapshot (doc=${resolvedCv.documentName ?? resolvedCv.documentId}, pinned_at=${resolvedCv.pinnedAt})`);
+        (profileData as { cv_structured_data: unknown }).cv_structured_data = resolvedCv.cv;
+    }
+
     // ─── Style Analysis: Route based on toneSource ─────────────────────────
     let styleAnalysis: StyleAnalysis | null = null;
     const generationWarnings: string[] = [];

@@ -205,8 +205,19 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                         }
                     }
                     if (userRes) {
-                        if (userRes.cv_structured_data) {
-                            const cvStructured: CvStructuredData = userRes.cv_structured_data;
+                        // Welle B: prefer the job-pinned CV snapshot over the master CV.
+                        // Snapshot is set at CV-Match time; falls back to master CV when no
+                        // snapshot exists (legacy jobs or jobs that have not been matched).
+                        const { resolveJobCv } = await import('@/lib/services/job-cv-snapshot');
+                        const resolved = resolveJobCv<CvStructuredData>(
+                            jobRes?.metadata as Record<string, unknown> | null | undefined,
+                            userRes.cv_structured_data as CvStructuredData | null | undefined,
+                        );
+                        if (resolved.source === 'job_snapshot') {
+                            console.log(`[OptimizerWizard] Using job-pinned CV snapshot (doc=${resolved.documentName ?? resolved.documentId}, pinned_at=${resolved.pinnedAt})`);
+                        }
+                        if (resolved.cv) {
+                            const cvStructured: CvStructuredData = resolved.cv;
                             setCvData(cvStructured);
 
                             // Pre-populate station metrics from CV experience (max 5, most recent first)

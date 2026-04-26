@@ -388,6 +388,67 @@ export const analyzeCVMatch = inngest.createFunction(
             });
         }
 
+        // Step 6: Pin the matched CV snapshot to job_queue.metadata.cv_snapshot
+        // (Welle B — CV-Auswahl Optimizer↔Analyzer-Sync). After Step 5, the
+        // user_profiles row reflects the CV that was matched (either the
+        // explicitly-selected document or the latest upload). Snapshot it here
+        // so the Optimizer and Cover Letter generator operate on the SAME CV
+        // even if the user uploads a new master CV later.
+        await step.run('pin-cv-snapshot', async () => {
+            try {
+                const { data: profile } = await supabaseAdmin
+                    .from('user_profiles')
+                    .select('cv_structured_data')
+                    .eq('id', userId)
+                    .single();
+                if (!profile?.cv_structured_data) {
+                    console.log(`[cv-match-pipeline] ℹ️ No cv_structured_data on profile — skipping snapshot pin`);
+                    return;
+                }
+
+                const docIdToPin = cvDocumentId ?? cvData.documentId ?? null;
+                let documentName: string | null = null;
+                if (docIdToPin) {
+                    const { data: doc } = await supabaseAdmin
+                        .from('documents')
+                        .select('metadata')
+                        .eq('id', docIdToPin)
+                        .eq('user_id', userId)
+                        .maybeSingle();
+                    documentName = ((doc?.metadata as Record<string, unknown> | null)?.original_name as string) ?? null;
+                }
+
+                const { buildJobCvSnapshot } = await import('@/lib/services/job-cv-snapshot');
+                const snapshot = buildJobCvSnapshot(profile.cv_structured_data, docIdToPin, documentName);
+
+                // JSONB merge: read fresh metadata so we don't clobber concurrent writes
+                const { data: freshJob } = await supabaseAdmin
+                    .from('job_queue')
+                    .select('metadata')
+                    .eq('id', jobId)
+                    .eq('user_id', userId)
+                    .single();
+                const freshMetadata = (freshJob?.metadata as Record<string, unknown>) ?? {};
+
+                const { error: pinError } = await supabaseAdmin
+                    .from('job_queue')
+                    .update({
+                        metadata: { ...freshMetadata, cv_snapshot: snapshot },
+                    })
+                    .eq('id', jobId)
+                    .eq('user_id', userId);
+
+                if (pinError) {
+                    console.error(`[cv-match-pipeline] ⚠️ CV snapshot pin failed (non-blocking):`, pinError.message);
+                } else {
+                    console.log(`[cv-match-pipeline] ✅ CV snapshot pinned to job (doc_id=${docIdToPin ?? 'none'})`);
+                }
+            } catch (pinErr) {
+                const errMsg = pinErr instanceof Error ? pinErr.message : String(pinErr);
+                console.error(`[cv-match-pipeline] ⚠️ CV snapshot pin error (non-blocking):`, errMsg);
+            }
+        });
+
         return { success: true, jobId };
     }
 );
