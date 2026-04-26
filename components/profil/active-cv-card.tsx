@@ -242,6 +242,31 @@ export function ActiveCVCard() {
         setUploadProgress(0);
         setUploadStatus(t('status_uploading'));
 
+        // Snapshot the current doc IDs of this type so we can detect a silent
+        // server-side success even if the XHR connection drops mid-response
+        // (Next.js dev/Turbopack occasionally closes long-running connections
+        // after the route has already finished its work). See verifySuccess().
+        const initialIds = new Set(docs.filter(d => d.type === type).map(d => d.id));
+
+        // Poll /api/documents/list for up to 60s — if a new doc of `type`
+        // appears, the upload silently succeeded and we treat it as success.
+        const verifySilentSuccess = async (): Promise<boolean> => {
+            for (let i = 0; i < 30; i++) {
+                await new Promise(r => setTimeout(r, 2000));
+                try {
+                    const res = await fetch('/api/documents/list');
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    if (!data.success) continue;
+                    const found = (data.documents as DocumentEntry[]).some(
+                        d => d.type === type && !initialIds.has(d.id)
+                    );
+                    if (found) return true;
+                } catch { /* keep polling */ }
+            }
+            return false;
+        };
+
         try {
             const fd = new FormData();
             fd.append('file', file);
@@ -276,7 +301,21 @@ export function ActiveCVCard() {
                     }
                 };
 
-                xhr.onerror = () => reject(new Error('Netzwerkfehler beim Upload'));
+                // Connection-drop fallback: the server-side parse takes 15-25s
+                // (Azure DI + Claude). Some dev/proxy stacks drop the response
+                // even though the route completed and DB rows were written.
+                // Poll the docs list before surfacing a misleading error.
+                xhr.onerror = async () => {
+                    setUploadStatus(t('status_analyzing'));
+                    const ok = await verifySilentSuccess();
+                    if (ok) {
+                        setUploadProgress(100);
+                        setUploadStatus(t('status_done'));
+                        resolve();
+                    } else {
+                        reject(new Error('Netzwerkfehler beim Upload'));
+                    }
+                };
                 xhr.open('POST', '/api/documents/upload');
                 xhr.send(fd);
             });
