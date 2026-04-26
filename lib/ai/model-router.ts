@@ -11,7 +11,16 @@
  * COST OPTIMIZATION HISTORY:
  *   2026-03-30: GPT_4O_MINI removed (dead code)
  *   2026-03-30: Language Judge downgraded Sonnet → Haiku
- *   2026-03-30 Phase 2: Mistral Small 4 added for Stufe 1 tasks (~5× cheaper than Haiku)
+ *   2026-03-30 Phase 2: Mistral Small 4 added for Stufe 1 tasks (~5x cheaper than Haiku)
+ *   2026-04-26: extract_job_fields PROMOTED Mistral -> Haiku — Mistral-Small consistently
+ *               under-recalled key skills (Supply Chain Management, Engineering) and
+ *               over-emitted hallucinated terms (DSGVO/ISO/PCI DSS without JD basis,
+ *               medical conditions, job titles). Haiku 4.5 holds the harvester prompt
+ *               reliably and reduces the need for downstream code-filter hardening.
+ *               Cost impact: ~5x per job-import (~0.5c -> ~2.5c, negligible at scale).
+ *   2026-04-26: parse_html TaskType removed — its sole caller (lib/scrapers/parser.ts)
+ *               had 0 production callers and was archived to _archive/scrapers-parser.ts.
+ *               Mistral remains in the stack for 4 lightweight classification tasks.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -52,14 +61,12 @@ export const MODELS = {
 // ============================================================================
 
 export type TaskType =
-    // Mistral Small tier (cheapest — pure classification/extraction)
-    | 'parse_html'
-    | 'extract_job_fields'
-    | 'detect_ats_system'
-    | 'classify_job_board'
-    | 'summarize_job_description'
-    | 'classify_station_relevance'
-    // Haiku tier (semantic understanding, structured analysis)
+    // Mistral Small tier (cheapest — lightweight classification only)
+    | 'detect_ats_system'           // string-pattern classification
+    | 'classify_job_board'          // platform classification
+    | 'summarize_job_description'   // 2-3 sentence summary
+    | 'classify_station_relevance'  // CV-station relevance scoring
+    // Haiku tier (semantic understanding + ATS keyword extraction)
     | 'briefing_generate'
     | 'cv_match'
     | 'cv_parse'
@@ -80,10 +87,8 @@ export type TaskType =
 
 export function selectModel(taskType: TaskType) {
     const routingMap: Record<TaskType, keyof typeof MODELS> = {
-        // Mistral Small 4: Classification & extraction (Stufe 1 — 2026-03-30 Phase 2)
-        // Pure data extraction, no creative writing, no complex JSON schemas
-        parse_html: 'MISTRAL_SMALL',
-        extract_job_fields: 'MISTRAL_SMALL',
+        // Mistral Small 4: lightweight classification only (Stufe 1 — 2026-03-30)
+        // Simple string-level tasks where instruction-adherence is not critical.
         detect_ats_system: 'MISTRAL_SMALL',
         classify_job_board: 'MISTRAL_SMALL',
         summarize_job_description: 'MISTRAL_SMALL',

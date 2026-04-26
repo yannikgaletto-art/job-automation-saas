@@ -28,7 +28,7 @@ Last Updated: 2026-04-18
 | **Queue** | Inngest (Background Jobs) |
 | **Job Search** | SerpAPI |
 | **Deep Scraping** | Firecrawl |
-| **Data Harvester** | Mistral Small 4 (EU-native) |
+| **Data Harvester** | Claude Haiku 4.5 (extract_job_fields, promoted 2026-04-26) |
 | **AI Judge / Analysis** | Anthropic Claude Haiku 4.5 |
 | **AI Generation** | Anthropic Claude Sonnet 4.5 |
 | **Company Research** | Perplexity Sonar Pro |
@@ -159,7 +159,7 @@ Last Updated: 2026-04-18
 
 1. **Suche (SerpAPI):** Sammelt Basisdaten anhand von Keywords, Standort und Werte-Filtern.
 2. **Deep Scrape (Firecrawl):** Markdown-Inhalt der `apply_link`s.
-3. **Data Harvester (GPT-4o-mini):** Extrahiert strukturierten Steckbrief aus Markdown.
+3. **Data Harvester (Claude Haiku 4.5):** Extrahiert strukturierten Steckbrief aus Markdown (war GPT-4o-mini bis 2026-03-30, Mistral Small bis 2026-04-26).
 4. **Scoring Judge (Claude Haiku):** Bewertet Culture Fit und Erfolgschancen.
 
 ---
