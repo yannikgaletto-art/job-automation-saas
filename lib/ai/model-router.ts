@@ -18,6 +18,9 @@
  *               medical conditions, job titles). Haiku 4.5 holds the harvester prompt
  *               reliably and reduces the need for downstream code-filter hardening.
  *               Cost impact: ~5× per job-import (~0.5¢ → ~2.5¢, negligible at scale).
+ *   2026-04-26: parse_html TaskType removed — its sole caller (lib/scrapers/parser.ts)
+ *               had 0 production callers and was archived to _archive/scrapers-parser.ts.
+ *               Mistral remains in the stack for 4 lightweight classification tasks.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -59,7 +62,6 @@ export const MODELS = {
 
 export type TaskType =
     // Mistral Small tier (cheapest — lightweight classification only)
-    | 'parse_html'                  // legacy HTML→JSON for simple Title/Company/Location
     | 'detect_ats_system'           // string-pattern classification
     | 'classify_job_board'          // platform classification
     | 'summarize_job_description'   // 2-3 sentence summary
@@ -88,7 +90,6 @@ export function selectModel(taskType: TaskType) {
     const routingMap: Record<TaskType, keyof typeof MODELS> = {
         // Mistral Small 4: lightweight classification only (Stufe 1 — 2026-03-30)
         // Simple string-level tasks where instruction-adherence is not critical.
-        parse_html: 'MISTRAL_SMALL',                   // legacy lib/scrapers/parser.ts
         detect_ats_system: 'MISTRAL_SMALL',
         classify_job_board: 'MISTRAL_SMALL',
         summarize_job_description: 'MISTRAL_SMALL',

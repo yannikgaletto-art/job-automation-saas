@@ -168,11 +168,11 @@ Claude Haiku 4.5 (Anthropic US)
 
 ### Routing-Logik (lib/ai/model-router.ts)
 ```
-parse_html, extract_job_fields                              → Claude Haiku 4.5 (structured, deutsch)
-detect_ats_system, classify_job_board, summarize             → GPT-4o-mini (cheap)
-write_cover_letter, personalize_intro, optimize_cv      → Claude Sonnet 4.6 (premium)
-cv_match, cv_parse, analyze_skill_gaps                  → Claude Haiku 4.5 (structured)
-document_extraction (PRIMARY)                           → Azure Document Intelligence (EU)
+extract_job_fields, cv_match, cv_parse, analyze_skill_gaps   → Claude Haiku 4.5 (structured)
+detect_ats_system, classify_job_board, summarize_job_description, classify_station_relevance
+                                                              → Mistral Small 4 (EU-native, cheap)
+write_cover_letter, personalize_intro, optimize_cv           → Claude Sonnet 4.6 (premium)
+document_extraction (PRIMARY)                                → Azure Document Intelligence (EU)
 ```
 
 **CRITICAL MODEL RULE:** 

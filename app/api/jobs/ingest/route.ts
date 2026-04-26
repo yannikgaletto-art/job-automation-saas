@@ -1,4 +1,4 @@
-export const maxDuration = 60; // Vercel timeout protection — Jina scrape + Mistral extraction can take 20-30s
+export const maxDuration = 60; // Vercel timeout protection — Jina scrape + Haiku extraction can take 15-25s
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
@@ -20,7 +20,7 @@ const supabaseAdmin = createAdminClient(
 );
 
 // AI extraction handled by Model Router (lib/ai/model-router.ts)
-// extract_job_fields → MISTRAL_SMALL (EU-native, ~5× cheaper than Haiku)
+// extract_job_fields → CLAUDE_HAIKU (promoted 2026-04-26 from Mistral; reliable HARD-RULE adherence)
 
 // Module-level utility — pure function, no closures needed
 function normalizeSortDedup(items: string[]): string[] {
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
 
         // ================================================================
         // STEP 1.9: Description-Level Extraction Cache (Persistent)
-        // Before calling Mistral, check job_extraction_cache for a prior
+        // Before calling Haiku, check job_extraction_cache for a prior
         // extraction of this exact description (by SHA-256 hash).
         // This table survives job deletes — unlike the old job_queue scan.
         // Guarantees: delete + re-add = identical buzzwords + requirements.
@@ -233,10 +233,11 @@ export async function POST(request: NextRequest) {
         try {
             console.log(`[${requestId}] route=jobs/ingest step=ai_parse_requirements`);
 
-            // STEP 2 runs with Mistral (extract_job_fields → MISTRAL_SMALL via model-router).
-            // Guard checks MISTRAL_API_KEY. If missing, we still attempt extraction.
-            // complete() will throw, aiError catch below falls through to empty extraction.
-            // Inngest extract-job-pipeline (STEP 4.5 trigger) will fill the gap in the background.
+            // STEP 2 runs with Claude Haiku (extract_job_fields → CLAUDE_HAIKU via model-router).
+            // Guard is defensive: ANTHROPIC_API_KEY is what's actually needed; the MISTRAL_API_KEY
+            // branch stays for the case someone re-routes extract_job_fields back to Mistral.
+            // If both are missing, complete() throws, aiError catch below falls through to empty
+            // extraction, and the Inngest extract-job-pipeline (STEP 4.5) fills the gap async.
             if (process.env.MISTRAL_API_KEY || process.env.ANTHROPIC_API_KEY) {
                 const extractionSchema = {
                     company: "string — company name",
@@ -430,7 +431,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
 
         // ================================================================
         // STEP 4.5: Trigger strong extraction pipeline (Lazy Extraction)
-        // Non-blocking: Mistral data is already saved as fallback.
+        // Non-blocking: sync Haiku data is already saved as fallback.
         // OPTIMIZATION: Set sync_extracted_at flag BEFORE triggering Inngest
         // so the background job can reliably skip its redundant LLM call.
         // ================================================================
@@ -465,7 +466,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
             // ================================================================
             // STEP 4.6: Persist extraction to job_extraction_cache
             // Ensures buzzwords + requirements survive job deletes.
-            // Only writes on MISS (when Mistral ran). Cache HITs skip this.
+            // Only writes on MISS (when Haiku ran). Cache HITs skip this.
             // Uses upsert: if hash already exists (shouldn't happen on MISS),
             // update the existing row defensively.
             // ================================================================
