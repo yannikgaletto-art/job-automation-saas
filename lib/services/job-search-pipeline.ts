@@ -538,13 +538,21 @@ VERBOTEN als ats_keywords (NIEMALS aufnehmen — auch wenn sie häufig vorkommen
   "Social Media" (nutze "LinkedIn Ads"/"Instagram Marketing"),
   "Web 2.0", "EDV-Kenntnisse", "Internet-Kenntnisse", "PC-Kenntnisse"
 - Personennamen, geographische Allgemeinplätze ohne Job-Bezug
-- DOMAIN/THEME-Begriffe alleinstehend: Krankheitsbilder ("Tinnitus", "COPD", "Diabetes",
-  "Asthma"), medizinische Themenfelder ("Audiologie", "Onkologie") oder Branchen-
-  Schlagworte ("Healthcare", "Logistics") — nur erlauben wenn mit konkretem Tool/
-  Methode gepaart ("SAP Healthcare", "Onkologie-Studien"). Themen gehören in den
-  Steckbrief-Text, nicht in die ATS-Keyword-Liste.
-- FORMAT-Begriffe: "Webinare", "Workshops", "Seminare", "Konferenzen", "Trainings",
-  "Schulungen", "Roundtables" — das sind Liefer-Formate, keine Skills.
+- JOB-TITEL: Akronyme ("SDR", "BDR", "KAM", "CEO", "CFO", "CTO", "CMO", "VP")
+  und Vollnamen ("Sales Development Representative", "Account Manager",
+  "Project Manager", "Vertriebsleiter", "Geschäftsführer"). Skill ist
+  "Project Management" oder "Sales Development", NICHT der Titel der auf
+  Manager/Representative/Executive/Director/Leiter endet.
+- DOMAIN/THEME-Begriffe alleinstehend: Krankheitsbilder ("Tinnitus", "AFib",
+  "Vorhofflimmern", "COPD", "Diabetes"), medizinische Themenfelder
+  ("Audiologie", "Onkologie") oder Branchen-Schlagworte ("Healthcare",
+  "Logistics") — nur erlauben wenn mit konkretem Tool/Methode gepaart
+  ("SAP Healthcare", "Onkologie-Studien").
+- FORMAT-Begriffe: "Webinare", "Workshops", "Seminare", "Konferenzen",
+  "Trainings", "Schulungen", "Roundtables" — Liefer-Formate, keine Skills.
+- VAGE EINZELBEGRIFFE ohne Skill-Inhalt: "ICP", "Enrichment", "Playbooks",
+  "Pipeline-Aufbau" — nur akzeptieren wenn mit Domain gepaart wie
+  "Lead Enrichment" oder "Sales Playbooks".
 
 DACH-KOMPOSITUM-REGEL (KRITISCH für deutsche Stellenanzeigen):
 Deutsche ATS-Systeme (Personio, Softgarden, SAP SuccessFactors) indexieren

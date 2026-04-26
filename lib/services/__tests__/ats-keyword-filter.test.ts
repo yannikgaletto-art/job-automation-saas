@@ -7,8 +7,53 @@ describe('ats-keyword-filter', () => {
             expect(ATS_STOP_LIST.has('bürozeit')).toBe(true);
         });
 
-        it('is non-trivial (>= 180 entries after PDF Sektion 9 + medical/format extension)', () => {
-            expect(ATS_STOP_LIST.size).toBeGreaterThanOrEqual(180);
+        it('is non-trivial (>= 230 entries after PDF Sektion 9 + medical/format/job-title extension)', () => {
+            expect(ATS_STOP_LIST.size).toBeGreaterThanOrEqual(230);
+        });
+
+        it('blocks job-title acronyms (SDR / BDR / KAM / VP / C-suite)', () => {
+            expect(ATS_STOP_LIST.has('sdr')).toBe(true);
+            expect(ATS_STOP_LIST.has('bdr')).toBe(true);
+            expect(ATS_STOP_LIST.has('kam')).toBe(true);
+            expect(ATS_STOP_LIST.has('ceo')).toBe(true);
+            expect(ATS_STOP_LIST.has('cfo')).toBe(true);
+            expect(ATS_STOP_LIST.has('cto')).toBe(true);
+            expect(ATS_STOP_LIST.has('cmo')).toBe(true);
+            expect(ATS_STOP_LIST.has('vp')).toBe(true);
+        });
+
+        it('blocks full job-titles (Manager/Representative/Executive variants)', () => {
+            expect(ATS_STOP_LIST.has('sales development representative')).toBe(true);
+            expect(ATS_STOP_LIST.has('business development manager')).toBe(true);
+            expect(ATS_STOP_LIST.has('account manager')).toBe(true);
+            expect(ATS_STOP_LIST.has('project manager')).toBe(true);
+            expect(ATS_STOP_LIST.has('product manager')).toBe(true);
+            expect(ATS_STOP_LIST.has('vertriebsleiter')).toBe(true);
+            expect(ATS_STOP_LIST.has('geschäftsführer')).toBe(true);
+        });
+
+        it('PRESERVES skill-noun-form when title-form is blocked (Project Management vs Project Manager)', () => {
+            // PDF Sektion 1 lists "Project Management" as universal skill — must NOT be blocked
+            expect(ATS_STOP_LIST.has('project management')).toBe(false);
+            expect(ATS_STOP_LIST.has('account management')).toBe(false);
+            expect(ATS_STOP_LIST.has('sales development')).toBe(false);
+            expect(ATS_STOP_LIST.has('business development')).toBe(false);
+            // PDF Sektion 5 certifications must NOT be blocked
+            expect(ATS_STOP_LIST.has('pmp')).toBe(false);
+            expect(ATS_STOP_LIST.has('cissp')).toBe(false);
+            expect(ATS_STOP_LIST.has('csm')).toBe(false); // Certified Scrum Master ambiguous — kept out of stop-list
+        });
+
+        it('blocks vague solo terms without skill content (ICP / Enrichment / Playbooks)', () => {
+            expect(ATS_STOP_LIST.has('icp')).toBe(true);
+            expect(ATS_STOP_LIST.has('enrichment')).toBe(true);
+            expect(ATS_STOP_LIST.has('playbooks')).toBe(true);
+            expect(ATS_STOP_LIST.has('pipeline-aufbau')).toBe(true);
+        });
+
+        it('blocks Hybridarbeit (German benefit compound) but PRESERVES Hybrid Working as it would be paired', () => {
+            expect(ATS_STOP_LIST.has('hybridarbeit')).toBe(true);
+            expect(ATS_STOP_LIST.has('hybrides arbeiten')).toBe(true);
         });
 
         it('blocks medical conditions / disease names (Tinnitus / Vorhofflimmern / AFib)', () => {
@@ -73,7 +118,7 @@ describe('ats-keyword-filter', () => {
             'B2B SaaS',
             'FinTech',
             'Stakeholder Management',
-            'Account Executive',
+            'Account Management', // skill, NOT 'Account Executive' which is now in JOB_TITLES stop-list
         ];
 
         it.each(validKeywords)('keeps "%s" (valid ATS keyword)', (kw) => {

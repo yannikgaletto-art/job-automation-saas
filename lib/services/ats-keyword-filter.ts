@@ -54,7 +54,8 @@ const STOP_LIST_BENEFITS = [
     'bürozeit', 'kernarbeitszeit', 'gleitzeit', 'flexible arbeitszeit',
     'flexible arbeitszeiten', 'arbeitszeit', 'arbeitszeiten',
     'homeoffice', 'home office', 'home-office', 'mobiles arbeiten',
-    'remote work', 'hybrid work', 'workation', 'sabbatical',
+    'remote work', 'hybrid work', 'hybridarbeit', 'hybrides arbeiten',
+    'workation', 'sabbatical',
     'urlaubstage', '30 urlaubstage', 'urlaub', 'jahresurlaub',
     'unbefristet', 'vollzeit', 'teilzeit',
     // Compensation
@@ -83,6 +84,13 @@ const STOP_LIST_GENERIC_ADJECTIVES = [
     'innovation', 'innovationen', // generic noun — same skill-content level as 'innovativ'
     'modern', 'agil', // Sektion 9: "Agil (als Adjektiv)" — methode "Agile" bleibt valide
     'engagiert', 'motiviert',
+    // Vague single-word skills without context (Airwallex 2026-04-26)
+    // These are valid ONLY when paired with a domain ("Lead Enrichment", "Sales
+    // Playbooks") — solo they lack ATS skill content.
+    'enrichment', 'anreicherung',
+    'icp', 'icps', // ideal customer profile — abbreviation alone has no skill content
+    'playbook', 'playbooks',
+    'pipeline-aufbau', 'pipeline aufbau',
     'erfahren', 'qualifiziert', 'kompetent', 'professionell',
     'zuverlässig', 'kreativ', 'offen', 'freundlich', 'sympathisch',
     'erfolgreich', 'wachsend', 'führend', 'international',
@@ -148,6 +156,56 @@ const STOP_LIST_MEDICAL_CONDITIONS = [
     'mental health', 'epilepsy', 'autism',
 ];
 
+// Source: empirical evidence (2026-04-26 Airwallex SDR import — user-flagged)
+// Job titles are not ATS-keywords. The PDF lists "Skills" / "Tools" / "Methods" /
+// "Certifications" / "Domain-Begriffe" — never job titles. The candidate's role
+// title is stored separately in job_queue.title, not in buzzwords.
+//
+// IMPORTANT: We deliberately exclude title-acronyms that ARE certifications
+// (PMP, CISSP, CISA, CEH, PHR, SHRM-CP) — those belong in PDF Sektion 5.
+// CSM is ambiguous (Customer Success Manager vs. Certified Scrum Master) — kept
+// out of the stop-list to avoid false-positive on the certification meaning.
+//
+// Singular vs. plural distinction matters: "Project Manager" (title) blocked,
+// "Project Management" (skill, PDF Sektion 1) NOT blocked.
+const STOP_LIST_JOB_TITLES = [
+    // English title acronyms (job roles, not certifications)
+    'sdr', 'bdr', 'kam',
+    'ceo', 'cfo', 'cto', 'cmo', 'coo', 'cro', 'cio', 'cpo', 'chro',
+    'vp', 'svp', 'evp',
+    // English full job titles
+    'sales development representative',
+    'business development representative',
+    'sales development manager',
+    'business development manager',
+    'account executive', 'account manager', 'key account manager',
+    'sales manager', 'sales director',
+    'customer success manager', 'customer success representative',
+    'customer success specialist',
+    'marketing manager', 'marketing director',
+    'product manager', 'product owner',
+    'project manager',
+    'engineering manager', 'engineering lead',
+    'team lead', 'tech lead',
+    'head of sales', 'head of marketing', 'head of product',
+    'head of engineering', 'head of growth',
+    'vice president', 'senior vice president',
+    'managing director',
+    // German full job titles
+    'vertriebsleiter', 'vertriebsleiterin',
+    'vertriebsmitarbeiter', 'vertriebsmitarbeiterin',
+    'außendienstmitarbeiter', 'außendienstmitarbeiterin',
+    'innendienstmitarbeiter', 'innendienstmitarbeiterin',
+    'kundenbetreuer', 'kundenbetreuerin',
+    'projektleiter', 'projektleiterin',
+    'teamleiter', 'teamleiterin',
+    'abteilungsleiter', 'abteilungsleiterin',
+    'geschäftsführer', 'geschäftsführerin',
+    'bereichsleiter', 'bereichsleiterin',
+    'gruppenleiter', 'gruppenleiterin',
+    'business consultant', 'business analyst',
+];
+
 // Source: empirical evidence (2026-04-26 Sonova) + PDF inference
 // Delivery formats — webinars, workshops, seminars are HOW knowledge is delivered,
 // not WHAT skills the candidate has. The PDF doesn't mark these as ATS-keywords
@@ -189,6 +247,7 @@ export const ATS_STOP_LIST: ReadonlySet<string> = new Set([
     ...STOP_LIST_OUTDATED_TECH,
     ...STOP_LIST_MEDICAL_CONDITIONS,
     ...STOP_LIST_FORMATS,
+    ...STOP_LIST_JOB_TITLES,
 ].map(s => s.toLowerCase().trim()));
 
 /**

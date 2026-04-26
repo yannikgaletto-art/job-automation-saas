@@ -79,6 +79,21 @@ physician relations, medical affairs or digital health.`,
         mustBeRemoved: ['DSGVO', 'ISO 27001', 'PCI DSS', 'Tinnitus', 'Webinare'],
     },
     {
+        name: 'Airwallex SDR (EN-JD, DE-locale) — Yannik flagged 2026-04-26',
+        jd: `Founding Business Development Manager (SDR) at Airwallex Germany.
+Drive growth engine. Engage prospects, qualify needs, run outreach strategies.
+Work with marketing on bespoke product-led initiatives. Manage early sales funnel.
+Design demand generation and sales process. Hybrid environment, 3 days office Berlin.
+Initiate contact via cold calls, emails, AI-assisted outbound sequences.
+Design plays across customer journey through cold calls, emails, chat, social media.
+CRM system: update activity and contact information. Lead scoring, sequencing co-pilots,
+enrichment, personalization. Outbound strategy with playbooks, ICPs, sequencing, tooling
+in new or early-stage market. SDR experience, 1+ year required. German + English.`,
+        mistralOutput: ['CRM', 'Enrichment', 'Fintech', 'Hybridarbeit', 'ICP', 'KI-gestützte Sequenzierung', 'Lead-Generierung', 'Lead-Scoring', 'Outbound', 'Pipeline-Aufbau', 'Playbooks', 'Sales Development Representative', 'SDR', 'Vertriebsprozess', 'Cold Calling', 'Demand Generation'],
+        mustSurvive: ['CRM', 'Fintech', 'KI-gestützte Sequenzierung', 'Lead-Generierung', 'Lead-Scoring', 'Outbound', 'Vertriebsprozess', 'Cold Calling', 'Demand Generation'],
+        mustBeRemoved: ['Enrichment', 'Hybridarbeit', 'ICP', 'Pipeline-Aufbau', 'Playbooks', 'Sales Development Representative', 'SDR'],
+    },
+    {
         name: 'Bundesdruckerei Business Development (DE-JD, DE-locale) — Yannik 2026-04-26',
         jd: `Bundesdruckerei sucht Business Development Manager (m/w/d) Schwerpunkt Datenanalyse
 und Künstliche Intelligenz im Public Sector. Analyse von Kundenbedürfnissen, Markttrends
