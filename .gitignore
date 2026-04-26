@@ -68,3 +68,6 @@ scripts/migrate_*.ts
 
 # Claude Code memory (enthält interne Projektnotizen + persönliche Infos)
 .claude/memory/
+
+# Lokale CV/CL-Arbeitsmaterialien (Yanniks echte Lebensläufe — nie committen)
+Übergang/

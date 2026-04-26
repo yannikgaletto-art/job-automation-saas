@@ -9,6 +9,7 @@ import { logger } from '@/lib/logging';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { translateCvIfNeeded } from '@/lib/services/cv-translator';
 import { sanitizeCv } from '@/lib/services/cv-data-sanitizer';
+import { sanitizeOptimizerChanges } from '@/lib/services/cv-optimizer-sanitizer';
 import { pruneForOptimizer } from '@/lib/utils/cv-payload-pruner';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
@@ -218,6 +219,13 @@ export async function POST(req: NextRequest) {
             summaryInstruction = `\nSUMMARY INSTRUCTION: Write the summary in MAX 2 sentences.
 No filler text. Strict format: "[Role] with [concrete experience], focused on [value for employer]."
 No adjectives without evidence. No "motivated", "passionate", "dedicated".\n`;
+        } else {
+            // Default: full mode — must produce a 3-sentence summary or the field stays empty.
+            summaryInstruction = `\nSUMMARY INSTRUCTION: Generate a 3-sentence professional summary tailored to the target role.
+Sentence 1: who the candidate is (role + years/depth of experience, grounded in the CV).
+Sentence 2: 1-2 concrete strengths or achievements relevant to the target job (no invented metrics).
+Sentence 3: what value the candidate brings to the employer; no filler words like "motivated", "passionate", "dedicated".
+Always emit a "summary" change in the diff-list, even if the existing summary is missing or empty.\n`;
         }
 
         // Build structured metrics context from station_metrics
@@ -250,6 +258,17 @@ Your task: receive a CV JSON (CV SSoT) and an analysis (CV Match Result), then p
    - FORBIDDEN: Generic superlatives with no evidence: "Proven track record", "Extensive experience", "Deep expertise", "Passionate about", "Visionary leader".
    - FORBIDDEN: Claiming skills, tools, or methodologies not listed in the CV SSoT skills or experience sections.
    - If a gap cannot be filled with real data from the CV SSoT, suggest "TODO: Ask user — do you have experience here?" instead of inventing.
+1b. **IDENTITY-LOCK — NEVER MODIFY THESE FIELDS** (the user's professional identity is FACT, not optimization material):
+   - experience[].role → job titles are sacred. "Innovation Manager" stays "Innovation Manager", never becomes "Sales & Business Development Lead".
+   - experience[].company, experience[].dateRangeText, experience[].location → factual record.
+   - education[].institution, education[].degree, education[].grade, education[].dateRangeText → academic record.
+   - personalInfo.name/email/phone/linkedin/website/location → PII.
+   - languages[].language/proficiency/level → language proficiency is fact.
+   - certifications[].issuer/dateText/credentialUrl → certificate identity.
+   - ANY *.id field → breaks the diff system.
+   You MAY modify ONLY: experience[].description (bullets), experience[].summary, education[].description (the prose under degree),
+   personalInfo.summary/targetRole, skills[].category/items, certifications[].name/description.
+   The backend WILL reject and silently drop changes targeting any forbidden field — wasting your output on them.
 2. Reformulate bullet points so they address the requirements from the CV Match Result more precisely (only if verifiable!).
 3. You may reorder arrays, e.g. in 'skills' (most important first).
 4. Do not change existing IDs without reason. Keep the \`id\` of existing entries. Use \`id\` for stable referencing in your \`changes\` array.
@@ -424,30 +443,37 @@ Must conform to the following Zod schema:
             );
         }
 
-        // Sanitize changes before Zod — handle common AI output quirks
-        rawJson.changes = rawJson.changes
-            .filter((c: any) => {
-                // Drop changes with no section — prevents silent misrouting
-                if (!c.target?.section) {
-                    log.warn('Dropping change with no target.section', { changeId: c.id });
-                    return false;
-                }
-                return true;
-            })
-            .map((c: any, idx: number) => ({
-                id: c.id || `change-${idx + 1}`,
-                target: {
-                    section: c.target.section,
-                    entityId: c.target?.entityId ?? null,
-                    field: c.target?.field ?? null,
-                    bulletId: c.target?.bulletId ?? null,
-                },
-                type: c.type || 'modify',
-                before: Array.isArray(c.before) ? c.before.join(', ') : (c.before ?? undefined),
-                after: Array.isArray(c.after) ? c.after.join(', ') : (c.after ?? undefined),
-                reason: c.reason || 'KI-Optimierung',
-                requirementRef: c.requirementRef ?? null,
-            }));
+        // ── IDENTITY-LOCK + Section-Sanity ─────────────────────────────
+        // Identity fields are FACTS (job title, company, dates, institution, grade, PII).
+        // The AI optimizer must NEVER rewrite them — that would be hallucination, not
+        // optimization. The Translator (Pass 1) handles language conversion of these
+        // separately and is allowed to. The Optimizer (Pass 2) is content-only.
+        // See lib/services/cv-optimizer-sanitizer.ts (FORBIDDEN_FIELDS = single SoT).
+        const triage = sanitizeOptimizerChanges(rawJson.changes as any[]);
+        for (const { change, reason } of triage.dropped) {
+            log.warn('Optimizer change dropped', {
+                reason,
+                changeId: (change as any).id,
+                section: (change as any).target?.section,
+                field: (change as any).target?.field,
+                type: (change as any).type,
+            });
+        }
+
+        rawJson.changes = triage.kept.map((c: any, idx: number) => ({
+            id: c.id || `change-${idx + 1}`,
+            target: {
+                section: c.target.section,
+                entityId: c.target?.entityId ?? null,
+                field: c.target?.field ?? null,
+                bulletId: c.target?.bulletId ?? null,
+            },
+            type: c.type || 'modify',
+            before: Array.isArray(c.before) ? c.before.join(', ') : (c.before ?? undefined),
+            after: Array.isArray(c.after) ? c.after.join(', ') : (c.after ?? undefined),
+            reason: c.reason || 'KI-Optimierung',
+            requirementRef: c.requirementRef ?? null,
+        }));
 
         // ── Before-Text Sanitizer ──────────────────────────────────────
         // Replace AI-generated 'before' values with ground-truth from the CV.

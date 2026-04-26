@@ -380,4 +380,52 @@ describe('ats-keyword-filter', () => {
             ]);
         });
     });
+
+    /**
+     * v1.0.6 parity guard: the Browser Extension import path
+     * (app/api/jobs/import/route.ts) MUST run buzzwords through filterAtsKeywords
+     * before persisting them. Until v1.0.5 the extension popup used a hardcoded
+     * regex that diverged from the server filter. v1.0.6 removes the popup
+     * regex; the server is now the single source of truth. These tests pin the
+     * contract so a regression here would silently restore the old divergence.
+     */
+    describe('Extension import path parity', () => {
+        it('strips Bürozeit-style noise even when extension submits raw Mistral output', () => {
+            // Realistic shape of what the import-route Mistral prompt returns
+            // before filterAtsKeywords runs (mixed valid + noise + filler).
+            const mistralRawBuzzwords = [
+                'Salesforce',
+                'Bürozeit',
+                'Homeoffice',
+                'TypeScript',
+                'Teamfähigkeit',
+                'flexible Arbeitszeit',
+                'Scrum',
+                'Eigenverantwortung',
+            ];
+            const result = filterAtsKeywords(mistralRawBuzzwords);
+            expect(result.kept).toContain('Salesforce');
+            expect(result.kept).toContain('TypeScript');
+            expect(result.kept).toContain('Scrum');
+            expect(result.removed).toEqual(
+                expect.arrayContaining(['Bürozeit', 'Homeoffice', 'Teamfähigkeit', 'Eigenverantwortung']),
+            );
+        });
+
+        it('returns empty kept[] when extension submits a garbage description', () => {
+            // Pure stop-list noise: benefits + soft skills + filler. None should survive.
+            const allNoise = ['Bürozeit', 'Teamfähigkeit', 'dynamisch', 'Wir suchen', 'Homeoffice'];
+            const result = filterAtsKeywords(allNoise);
+            expect(result.kept).toEqual([]);
+            expect(result.removed.length).toBe(allNoise.length);
+        });
+
+        it('preserves DACH-specific tools that the extension scrapes from German JDs', () => {
+            const dachKeywords = ['DATEV', 'SAP S/4HANA', 'Personio', 'Lexware', 'ITIL 4 Foundation'];
+            const result = filterAtsKeywords(dachKeywords);
+            // All five should survive — the filter must not over-strip German tools.
+            expect(result.kept.length).toBe(5);
+            expect(result.removed).toEqual([]);
+        });
+    });
 });

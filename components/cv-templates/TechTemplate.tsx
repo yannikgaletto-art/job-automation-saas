@@ -14,6 +14,14 @@ const DARK = '#0F172A';
 const GRAY = '#475569';
 const LIGHT = '#F1F5F9';
 
+/** Hard caps — defense-in-depth for the AI prompt's "max 3 categories × 8 items" rule.
+ *  Without these, an AI that returns 7 categories overflows the sidebar and breaks
+ *  the 2-page guarantee. Mirrors the Valley template (kept in sync). */
+const MAX_SKILL_CATEGORIES = 3;
+const MAX_SKILL_ITEMS_PER_CATEGORY = 8;
+/** Mirrors Valley's MAX_CERTS=6 to keep both templates rendering the same data. */
+const MAX_CERTS = 6;
+
 const s = StyleSheet.create({
     page: {
         fontFamily: 'Inter',
@@ -253,10 +261,10 @@ export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredDat
                         {data.skills.length > 0 && (
                             <View style={{ marginBottom: 20 }}>
                                 <Text style={s.sectionTitle}>{labels.techStack}</Text>
-                                {data.skills.map(group => (
+                                {data.skills.slice(0, MAX_SKILL_CATEGORIES).map(group => (
                                     <View key={group.id} style={s.sideBlock}>
                                         <Text style={s.sideLabel}>{group.category || 'Core'}</Text>
-                                        <Text style={s.sideText}>{group.items.join(', ')}</Text>
+                                        <Text style={s.sideText}>{group.items.slice(0, MAX_SKILL_ITEMS_PER_CATEGORY).join(', ')}</Text>
                                     </View>
                                 ))}
                             </View>
@@ -278,11 +286,11 @@ export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredDat
                             </View>
                         )}
 
-                        {/* Certifications — V2: CertGrid */}
+                        {/* Certifications — V2: CertGrid (HARD CAP: MAX_CERTS, mirrors Valley) */}
                         {data.certifications && data.certifications.length > 0 && (
                             <View style={{ marginBottom: 20 }} wrap={false}>
                                 <Text style={s.sectionTitle}>{labels.certificates}</Text>
-                                <CertGrid certs={data.certifications} maxColumns={1} />
+                                <CertGrid certs={data.certifications.slice(0, MAX_CERTS)} maxColumns={1} />
                             </View>
                         )}
 

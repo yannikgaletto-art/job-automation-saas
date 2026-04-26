@@ -5,7 +5,7 @@ import { SkillTagGroup } from './shared/SkillTag';
 // ProficiencyDots removed from Valley (2026-03-30 ATS fix) — still used by TechTemplate
 import { CertGrid } from './shared/CertGrid';
 import { RenderMarkdownText } from './shared/RenderMarkdownText';
-import { truncateDescription, normalizeDateRangeText } from '@/lib/utils/cv-template-helpers';
+import { truncateDescription, normalizeDateRangeText, cleanGrade } from '@/lib/utils/cv-template-helpers';
 import { CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 import { LayoutMode } from '@/types/cv-opt-settings';
 
@@ -28,6 +28,12 @@ const MAX_BULLETS_DEFAULT = 3;
 const MAX_BULLETS_COMPACT = 3;
 /** Max certifications — HARD CAP, matches AI prompt rule */
 const MAX_CERTS = 6;
+/** Max skill categories rendered — HARD CAP, matches AI prompt "max 3 categories".
+ *  Defense-in-depth: when AI ignores the prompt and returns 7 categories, the
+ *  template still respects the 2-page guarantee instead of overflowing. */
+const MAX_SKILL_CATEGORIES = 3;
+/** Max skill items per category — HARD CAP, matches AI prompt "max 8 items per category". */
+const MAX_SKILL_ITEMS_PER_CATEGORY = 8;
 
 /**
  * Build styles dynamically based on layoutMode.
@@ -113,6 +119,11 @@ export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' 
     // HARD CAPS — prevent 3-page overflow regardless of AI output
     const maxBullets = layoutMode === 'compact' ? MAX_BULLETS_COMPACT : MAX_BULLETS_DEFAULT;
     const cappedCerts = hasCerts ? data.certifications!.slice(0, MAX_CERTS) : [];
+    // Skills are capped at category-level AND item-level. Without these caps a CV
+    // with 7 categories × 12 items overflows page 2 even though the optimizer prompt
+    // asks for max 3×8. Recompute the column-width heuristic against the capped count.
+    const cappedSkills = data.skills.slice(0, MAX_SKILL_CATEGORIES);
+    const skillColumnWidth = cappedSkills.length >= 3 ? '33.33%' : '50%';
 
 
     return (
@@ -209,12 +220,15 @@ export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' 
                                             <Text style={s.eduDate}>{normalizeDateRangeText(edu.dateRangeText, labels.present)}</Text>
                                         </View>
                                         {edu.institution && <Text style={s.eduInstitution}>{edu.institution}</Text>}
-                                        {edu.grade && (
-                                            <View style={s.eduSubRow}>
-                                                <Text style={s.eduSubLabel}>{labels.grade}: </Text>
-                                                <Text style={s.eduSubText}>{edu.grade}</Text>
-                                            </View>
-                                        )}
+                                        {(() => {
+                                            const cleaned = cleanGrade(edu.grade);
+                                            return cleaned ? (
+                                                <View style={s.eduSubRow}>
+                                                    <Text style={s.eduSubLabel}>{labels.grade}: </Text>
+                                                    <Text style={s.eduSubText}>{cleaned}</Text>
+                                                </View>
+                                            ) : null;
+                                        })()}
                                         {subItems.map((item, i) => (
                                             <Text key={i} style={s.eduSubItem}>– {item}</Text>
                                         ))}
@@ -230,10 +244,10 @@ export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' 
                     <View style={s.sectionContainer} wrap={false}>
                         <Text style={s.sectionTitle}>{labels.skills}</Text>
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                            {data.skills.map((g) => (
-                                <View key={g.id} style={{ width: data.skills.length >= 3 ? '33.33%' : '50%', paddingRight: 10, marginBottom: 6 }}>
+                            {cappedSkills.map((g) => (
+                                <View key={g.id} style={{ width: skillColumnWidth, paddingRight: 10, marginBottom: 6 }}>
                                     {g.category && <Text style={s.skillCategoryLabel}>{g.category}</Text>}
-                                    <SkillTagGroup items={g.items} />
+                                    <SkillTagGroup items={g.items.slice(0, MAX_SKILL_ITEMS_PER_CATEGORY)} />
                                 </View>
                             ))}
                         </View>

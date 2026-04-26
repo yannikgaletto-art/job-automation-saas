@@ -236,21 +236,25 @@ export async function POST(request: NextRequest) {
                     qualifications: `string[] — qualifications (max 8), in ${languageName}`,
                     benefits: `string[] — TOP 6 most important benefits, max 3 words each (e.g. "30 Tage Urlaub", "Remote Work", "Betriebliche Altersvorsorge"). No full sentences. No copy-paste.`,
                     seniority: "'junior' | 'mid' | 'senior' | 'lead' | 'unknown'",
-                    buzzwords: `string[] — ATS keywords: MAXIMUM 15. ONLY include: software tools, frameworks, platforms, technical standards, certifications, and specific domain/methodology terms that an ATS robot would scan for.
-  ✅ INCLUDE: Python, Salesforce, SAP, Jira, ISO 26262, SCRUM, OKR, MEDDPICC, Machine Learning, M&A, Kartellrecht, IFRS, Power BI, ROI, ARR
-  ❌ EXCLUDE: generic verbs ("Implementierung", "Schulungen", "Analyse"), language names ("Deutsch", "Englisch", "Fließend"), company/product names that are the job focus ("Odoo"-role = not a keyword), adjectives ("Agile"), soft skills ("Kommunikation"), job titles ("Business Consultant")
+                    buzzwords: `string[] — ATS keywords: MAXIMUM 15, extracted EXCLUSIVELY from the job description text below.
+
+  HARD RULE (overrides everything else): Each keyword MUST appear verbatim, as a direct translation, or as a clear semantic match in the JD text. If a keyword does NOT appear in the JD, you MUST NOT include it. Never invent keywords from your training data; never carry over keywords from prior tasks. When in doubt, leave it out.
+
+  CATEGORIES (apply ONLY when present in the JD): software tools, frameworks, platforms, technical standards, certifications, and specific domain/methodology terms that an ATS robot would scan for.
+
+  EXCLUDE: generic verbs ("Implementierung", "Schulungen", "Analyse"), language names ("Deutsch", "Englisch", "Fließend"), company/product names that are the job focus ("Odoo"-role = not a keyword), generic adjectives ("Agile", "modern"), soft skills ("Kommunikation"), job titles ("Business Consultant").
+
   Quality over quantity. 8–12 high-signal keywords is better than 20 weak ones.
 
   LANGUAGE RULE (CRITICAL for CV-Match consistency):
   TARGET LANGUAGE: ${languageName}
-  Translate language-dependent terms ALWAYS into the target language:
+  Translate language-dependent terms into the target language when an established translation exists:
     "Project Management" (en) ↔ "Projektmanagement" (de) ↔ "Gestión de Proyectos" (es)
     "Stakeholder Management" (en) ↔ "Stakeholder-Management" (de)
     "Accounting" (en) ↔ "Buchhaltung" (de) ↔ "Contabilidad" (es)
-  EIGENNAMEN stay in original (never translate):
+  Proper nouns and brand-specific tools keep their original form (never translate):
     Tools/Brands (Salesforce, SAP, Python, DATEV), frameworks (Scrum, OKR, ITIL),
-    certifications (PMP, AWS Solutions Architect, Bilanzbuchhalter IHK),
-    standards (ISO 9001, ISO 27001, ISO 26262, PCI DSS).
+    certifications (PMP, AWS Solutions Architect, Bilanzbuchhalter IHK).
   EXCEPTION — language variants of the same regulation translate normally:
     GDPR (en) ↔ DSGVO (de) ↔ RGPD (es).
   This rule applies even if the job posting is in a different language than ${languageName}.`

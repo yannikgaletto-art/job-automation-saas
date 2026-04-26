@@ -29,27 +29,56 @@ import { CvStructuredData } from '@/types/cv';
 
 /**
  * Detects if the CV content is already in the target language.
- * Samples the first 5 experience bullet texts and checks for common
- * German/Spanish indicators. Returns true if translation is needed.
+ * Samples PROPORTIONALLY across all sections (not just experience) to catch
+ * mixed-language CVs (e.g. German experience + English education) that previously
+ * slipped through because the first 8 experience bullets dominated the sample
+ * and starved education/skills detection.
  */
-function needsTranslation(cv: CvStructuredData, targetLang: string): boolean {
-    // Collect sample text across multiple CV sections for reliable detection.
-    // Sampling only experience bullets misses sparse CVs (e.g. fresh graduates).
+export function needsTranslation(cv: CvStructuredData, targetLang: string): boolean {
+    // Per-section caps prevent any one section from dominating the sample.
+    const MAX_EXP_BULLETS_SAMPLED = 3;     // first 3 bullets across first 3 entries
+    const MAX_SKILL_CATEGORIES_SAMPLED = 3;
+
     const samples: string[] = [];
 
-    for (const exp of cv.experience || []) {
-        for (const bullet of exp.description || []) {
-            if (bullet.text) samples.push(bullet.text);
-            if (samples.length >= 8) break;
+    // Experience: round-robin first bullet of each entry, then second bullet, etc.
+    // This guarantees coverage across multiple roles even if one role has many bullets.
+    let bulletsSampled = 0;
+    const experienceEntries = (cv.experience || []).slice(0, 3);
+    for (let bulletIdx = 0; bulletIdx < 3 && bulletsSampled < MAX_EXP_BULLETS_SAMPLED; bulletIdx++) {
+        for (const exp of experienceEntries) {
+            const b = exp.description?.[bulletIdx];
+            if (b?.text) {
+                samples.push(b.text);
+                bulletsSampled++;
+                if (bulletsSampled >= MAX_EXP_BULLETS_SAMPLED) break;
+            }
         }
-        if (samples.length >= 8) break;
     }
-    // Also sample education descriptions and skill categories
+
+    // Personal summary + targetRole — these are user-facing prose, often the giveaway
+    if (cv.personalInfo?.summary) samples.push(cv.personalInfo.summary);
+    if (cv.personalInfo?.targetRole) samples.push(cv.personalInfo.targetRole);
+
+    // Experience role titles — e.g. "Software Engineer" vs "Softwareentwickler"
+    for (const exp of experienceEntries) {
+        if (exp.role) samples.push(exp.role);
+    }
+
+    // Education: ALL descriptions + degrees — never starved by experience now.
+    // This is the field that broke before for users with German exp + English edu.
     for (const edu of cv.education || []) {
         if (typeof edu.description === 'string' && edu.description) samples.push(edu.description);
+        if (edu.degree) samples.push(edu.degree);
     }
-    for (const skill of cv.skills || []) {
+
+    // Skills: first 3 category labels + first 3 items per category sampled.
+    // Items are usually language-neutral (Python, Jira) but categories aren't ("Kenntnisse" vs "Skills").
+    for (const skill of (cv.skills || []).slice(0, MAX_SKILL_CATEGORIES_SAMPLED)) {
         if (skill.category) samples.push(skill.category);
+        for (const item of (skill.items || []).slice(0, 3)) {
+            if (item) samples.push(item);
+        }
     }
 
     // No translatable text found → nothing to do
@@ -119,12 +148,40 @@ export async function translateCvIfNeeded(
     const prompt = `You are a precise CV content translator. Translate the following CV JSON into ${targetLanguage}.
 
 RULES:
-1. Translate ONLY these fields: role, summary, description (bullet texts), degree, category (skills), language names, proficiency text, targetRole, certification names.
-2. DO NOT translate: company names, institution names, dates, dateRangeText, URLs, emails, phone numbers, skill items (e.g. "Python", "Jira"), certification issuers, credential URLs, grades.
-3. DO NOT change any IDs, version numbers, or structural fields.
-4. DO NOT rephrase or improve content — translate faithfully and precisely.
-5. Keep the EXACT same JSON structure. Return the full JSON object.
-6. Professional vocabulary only. Use industry-standard terminology.
+
+1. TRANSLATE THESE FIELDS (exact JSON paths — translate every occurrence):
+   - personalInfo.summary                       (string)
+   - personalInfo.targetRole                    (string)
+   - experience[].role                          (string — e.g. "Innovation Manager" → "Innovation Manager"; English ≈ German for tech roles)
+   - experience[].summary                       (string)
+   - experience[].description[].text            (array of objects — translate each .text)
+   - education[].degree                         (string — e.g. "Bachelor of Arts" ↔ "Bachelor of Arts" if untranslatable, but "Business Innovation & Entrepreneurship (M.Sc.)" stays as proper-noun degree title)
+   - education[].description                    (PLAIN STRING, NOT an array — translate the WHOLE string from start to end, including every sentence and every line break)
+   - skills[].category                          (string — e.g. "Skills" → "Kenntnisse")
+   - languages[].language                       (string — e.g. "English" → "Englisch")
+   - languages[].proficiency                    (string — e.g. "Native" → "Muttersprache")
+   - certifications[].name                      (string — proper-noun cert names usually stay in original)
+   - certifications[].description               (string)
+
+2. DO NOT TRANSLATE (keep VERBATIM, copy from input to output unchanged):
+   - personalInfo.name, .email, .phone, .location, .linkedin, .website
+   - experience[].company, .dateRangeText, .location
+   - education[].institution, .dateRangeText, .grade
+   - skills[].items                             (e.g. "Python", "Jira" — language-neutral tools/products)
+   - languages[].level                          (numeric)
+   - certifications[].issuer, .dateText, .credentialUrl
+   - All .id fields, version
+
+3. STRUCTURAL: Keep the EXACT JSON structure (same keys, same array lengths, same nesting). Do not add or drop fields.
+
+4. FAITHFULNESS: Translate, do not rewrite. No improvements, no shortening, no expansion.
+
+5. PROPER NOUNS: Course titles, school programs, and degree names that are themselves proper nouns
+   (e.g. "Business Innovation & Entrepreneurship (M.Sc.)") MAY stay in their original language if a
+   forced translation would distort the proper-noun meaning. But generic phrases ("Bachelor of Arts in
+   Media Studies") MUST be translated.
+
+6. Professional vocabulary only. Use industry-standard terminology in the target language.
 
 Return ONLY valid JSON. No markdown. No explanation. No code blocks.
 
@@ -193,47 +250,65 @@ ${JSON.stringify(cvForAI, null, 2)}`;
         // as "don't include them". Restore all untranslatable fields from
         // the original CV to guarantee data integrity. This is idempotent:
         // if the AI kept them, the restore is a no-op.
-        const srcPi = cv.personalInfo;
-        if (srcPi && translated.personalInfo) {
-            translated.personalInfo.name     = srcPi.name     ?? translated.personalInfo.name;
-            translated.personalInfo.email    = srcPi.email    ?? translated.personalInfo.email;
-            translated.personalInfo.phone    = srcPi.phone    ?? translated.personalInfo.phone;
-            translated.personalInfo.location = srcPi.location ?? translated.personalInfo.location;
-            translated.personalInfo.linkedin = srcPi.linkedin ?? translated.personalInfo.linkedin;
-            translated.personalInfo.website  = srcPi.website  ?? translated.personalInfo.website;
-        }
-        // Restore experience fields the AI must not change
-        for (let i = 0; i < (translated.experience || []).length; i++) {
-            const orig = cv.experience?.[i];
-            const trans = translated.experience[i];
-            if (orig && trans) {
-                trans.company       = orig.company       ?? trans.company;
-                trans.dateRangeText = orig.dateRangeText  ?? trans.dateRangeText;
-                trans.location      = orig.location       ?? trans.location;
-            }
-        }
-        // Restore education fields the AI must not change
-        for (let i = 0; i < (translated.education || []).length; i++) {
-            const orig = cv.education?.[i];
-            const trans = translated.education[i];
-            if (orig && trans) {
-                trans.institution  = orig.institution  ?? trans.institution;
-                trans.dateRangeText = orig.dateRangeText ?? trans.dateRangeText;
-                trans.grade        = orig.grade         ?? trans.grade;
-            }
-        }
-        // Restore arrays the AI may have dropped entirely
-        if (cv.languages?.length && !translated.languages?.length) {
-            translated.languages = cv.languages;
-        }
-        if (cv.certifications?.length && !translated.certifications?.length) {
-            translated.certifications = cv.certifications;
-        }
+        restoreImmutableFields(cv, translated);
 
         console.log(`[cv-translator] ✅ Translation complete (${response.tokensUsed} tokens, ${response.latencyMs}ms)`);
         return { cv: translated, wasTranslated: true };
     } catch (error: any) {
         console.error('[cv-translator] ❌ Translation failed, using original CV:', error.message);
         return { cv, wasTranslated: false };
+    }
+}
+
+/**
+ * Restores fields the LLM must not change after translation. Mutates `translated` in place.
+ *
+ * Identity fields (name, role, degree, company, institution, dates, contact data) are
+ * proper-noun-like in CV context: "Projektleitung" must not become "Project Lead",
+ * "Innovation Manager" must not become "Innovationsmanager". The translator prompt
+ * says "do not translate these" but LLMs sometimes interpret that as "drop these" or
+ * "translate them anyway"; this function makes data integrity deterministic.
+ *
+ * Idempotent: if the AI kept the original value, the restore is a no-op.
+ * Exported for unit testing.
+ */
+export function restoreImmutableFields(orig: CvStructuredData, translated: CvStructuredData): void {
+    const srcPi = orig.personalInfo;
+    if (srcPi && translated.personalInfo) {
+        translated.personalInfo.name       = srcPi.name       ?? translated.personalInfo.name;
+        translated.personalInfo.email      = srcPi.email      ?? translated.personalInfo.email;
+        translated.personalInfo.phone      = srcPi.phone      ?? translated.personalInfo.phone;
+        translated.personalInfo.location   = srcPi.location   ?? translated.personalInfo.location;
+        translated.personalInfo.linkedin   = srcPi.linkedin   ?? translated.personalInfo.linkedin;
+        translated.personalInfo.website    = srcPi.website    ?? translated.personalInfo.website;
+        // targetRole is the user's job-title self-identification — a proper noun in CV context.
+        translated.personalInfo.targetRole = srcPi.targetRole ?? translated.personalInfo.targetRole;
+    }
+    for (let i = 0; i < (translated.experience || []).length; i++) {
+        const o = orig.experience?.[i];
+        const t = translated.experience[i];
+        if (o && t) {
+            t.role          = o.role          ?? t.role;
+            t.company       = o.company       ?? t.company;
+            t.dateRangeText = o.dateRangeText ?? t.dateRangeText;
+            t.location      = o.location      ?? t.location;
+        }
+    }
+    for (let i = 0; i < (translated.education || []).length; i++) {
+        const o = orig.education?.[i];
+        const t = translated.education[i];
+        if (o && t) {
+            t.degree        = o.degree        ?? t.degree;
+            t.institution   = o.institution   ?? t.institution;
+            t.dateRangeText = o.dateRangeText ?? t.dateRangeText;
+            t.grade         = o.grade         ?? t.grade;
+        }
+    }
+    // Arrays the AI may have dropped entirely → restore from original.
+    if (orig.languages?.length && !translated.languages?.length) {
+        translated.languages = orig.languages;
+    }
+    if (orig.certifications?.length && !translated.certifications?.length) {
+        translated.certifications = orig.certifications;
     }
 }

@@ -482,28 +482,39 @@ WICHTIG für Listen (hard_requirements, soft_requirements, tasks, benefits_and_p
 - Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
 - Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
 
+HARD RULE (überschreibt alles andere):
+Jedes ats_keyword MUSS wörtlich, als direkte Übersetzung oder als klar erkennbare
+semantische Entsprechung im untenstehenden Stellenanzeigen-Text vorkommen. Wenn ein
+Begriff NICHT im Text steht, darfst du ihn NICHT aufnehmen — auch wenn er in deinem
+Trainingswissen häufig zur Branche passt. Erfinde keine Keywords, übernehme nichts
+aus früheren Aufgaben. Im Zweifel: weglassen.
+
 DEFINITION ats_keywords (PFLICHTLEKTÜRE):
 Ein ATS-Keyword ist ein konkreter, eindeutig kategorisierbarer Such-Term, den ein
 Bewerbungsmanagement-System (Greenhouse, Workday, Lever, Personio, Softgarden)
 in seinem Skill-/Tag-Index führen würde, um Bewerbungen automatisiert zu screenen.
 
-ZULÄSSIGE KATEGORIEN (nur diese 6):
-1. Tools/Software: "Salesforce", "Python", "SAP S/4HANA", "TypeScript", "Adobe Photoshop",
-   "DATEV", "Lexware", "Personio", "Softgarden", "HRworks", "Power BI", "Tableau"
-2. Methoden/Frameworks: "Scrum", "OKR", "Six Sigma", "ITIL", "Agile", "Kanban", "Lean",
-   "Prince2", "Design Thinking", "GDPR", "ISO 9001", "ISO 27001"
-3. Hard Skills: "SQL", "Machine Learning", "API-Design", "Buchhaltung", "Controlling",
-   "Stakeholder Management", "Change Management", "P&L Management", "Budget Ownership",
-   "Cross-Functional Collaboration", "Risk Management", "Process Improvement",
-   "Bilanzbuchhaltung", "Anlagenbuchhaltung", "Finanzbuchhaltung", "Kostenrechnung",
-   "Gehaltsabrechnung", "Lohnsteuer", "Sozialversicherung",
-   "Prokura", "Handlungsbevollmächtigt", "Tarifvertrag" (DACH-spezifisch)
-4. Zertifizierungen: "PMP", "AWS Solutions Architect", "Scrum Master", "CISSP",
+ZULÄSSIGE KATEGORIEN (nur diese 6 — Beispiele zeigen den Kategorie-TYP, sind KEINE
+Aufnahme-Pflicht; nimm nur, was tatsächlich in der JD steht):
+1. Tools/Software: z.B. "Salesforce", "Python", "SAP S/4HANA", "TypeScript",
+   "DATEV", "Lexware", "Personio", "Power BI", "Tableau"
+2. Methoden/Frameworks: z.B. "Scrum", "OKR", "Six Sigma", "ITIL", "Agile", "Kanban",
+   "Lean", "Prince2", "Design Thinking"
+3. Hard Skills: z.B. "SQL", "Machine Learning", "API-Design", "Buchhaltung",
+   "Controlling", "Stakeholder Management", "Change Management", "P&L Management",
+   "Bilanzbuchhaltung", "Kostenrechnung", "Gehaltsabrechnung",
+   "Prokura", "Tarifvertrag" (DACH-spezifisch)
+4. Zertifizierungen: z.B. "PMP", "AWS Solutions Architect", "Scrum Master",
    "Bilanzbuchhalter IHK", "Industriemeister IHK", "Fachinformatiker IHK",
-   "Geprüfter Controller IHK", "Prince2 Practitioner", "ITIL 4 Foundation"
-5. Domain-Begriffe: "B2B SaaS", "FinTech", "PropTech", "EdTech", "HealthTech",
-   "Supply Chain", "M&A", "Private Equity", "ESG Strategy", "Net Zero"
-6. Berufsbezeichnungen: "Account Executive", "Senior Backend Engineer", "Bilanzbuchhalter"
+   "ITIL 4 Foundation"
+5. Domain-Begriffe: z.B. "B2B SaaS", "FinTech", "EdTech", "HealthTech",
+   "Supply Chain", "Private Equity"
+6. Berufsbezeichnungen: z.B. "Account Executive", "Senior Backend Engineer",
+   "Bilanzbuchhalter"
+
+Branchen- und Compliance-Standards (z.B. ISO-Normen, branchenspezifische Regularien)
+sind ZULÄSSIG — aber NUR wenn sie im JD-Text wörtlich oder als direkter Hinweis
+genannt werden. Niemals präventiv aufnehmen, weil "die Branche das oft hat".
 
 VALIDE SOFT-SKILL-PHRASEN (echte ATS-Filter-Terme — nicht mit Floskeln verwechseln):
 Diese DÜRFEN aufgenommen werden, weil ATS sie als spezifische Kompetenz indexieren:
@@ -560,8 +571,9 @@ ZIELSPRACHE: ${LOCALE_NAME[userLocale]}
   → Tools/Brands: "Salesforce", "SAP", "Python", "TypeScript", "DATEV", "Personio"
   → Frameworks/Methoden: "Scrum", "Kanban", "OKR", "Six Sigma", "ITIL", "Agile"
   → Zertifizierungen: "PMP", "AWS Solutions Architect", "Bilanzbuchhalter IHK"
-  → Standards: "ISO 9001", "ISO 27001", "ISO 26262", "PCI DSS"
-- AUSNAHME: Sprach-Versionen desselben Standards übersetzen wie normale Begriffe:
+  → Branchen-Standards bleiben in der Schreibweise, in der sie im JD-Text stehen
+- AUSNAHME: Sprach-Versionen derselben Regulierung übersetzen wie normale Begriffe
+  (nur falls die Regulierung im JD-Text auftaucht):
   → "GDPR" (en) ↔ "DSGVO" (de) ↔ "RGPD" (es)  — NICHT als Eigenname behandeln
 - Wenn der Job-Text in einer anderen Sprache als ${LOCALE_NAME[userLocale]} ist:
   → Übersetze die sprachabhängigen Begriffe trotzdem in ${LOCALE_NAME[userLocale]}
@@ -598,10 +610,11 @@ JSON-Schema:
 }
 
 ats_keywords-CHECKLIST (vor Output prüfen):
+✓ Steht dieses Keyword (oder seine direkte Übersetzung) wörtlich oder als klare semantische Entsprechung im obigen Stellenanzeigen-Text?
 ✓ Würde ein Recruiter dieses Wort als Filter im Greenhouse-Suchfeld eingeben?
 ✓ Fällt es eindeutig unter eine der 6 zulässigen Kategorien?
 ✓ Max. 3 Wörter, kein Adjektiv-Floskel, kein Benefit, keine Soft-Skill-Phrase?
-Wenn EINE Antwort "nein" → Keyword WEGLASSEN.`;
+Wenn EINE Antwort "nein" → Keyword WEGLASSEN. Lieber 5 belegte Keywords als 15 mit Halluzinationen.`;
 
     try {
         console.log('✅ [Pipeline] Claude Haiku harvesting...');

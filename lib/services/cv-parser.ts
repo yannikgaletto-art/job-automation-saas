@@ -92,11 +92,17 @@ PASS 2: Ordne sie logisch zu — welche Firma gehört zu welchem Datumsbereich? 
 7. **DATE-COMPANY MATCHING**: Lies den gesamten CV-Text zuerst vollständig, bevor du die Zuordnung machst. Stelle sicher, dass jede Firma/Rolle mit dem korrekten Datumsbereich (Start - Ende) verknüpft wird. Bei OCR-extrahiertem Text kann die Textreihenfolge FALSCH sein — prüfe die logische Konsistenz.
 8. **SECTION MARKERS**: Der Text kann Markdown-artige Abschnittsmarkierungen enthalten (z.B. "## Berufserfahrung"). Nutze diese als Hilfe, um die CV-Sektionen zu unterscheiden.
 9. **PIPE-SEPARATOR "I" IN ERFAHRUNG UND SPRACHEN:**
-   - Beispiel Erfahrung: "Ingrano Solutions I AI Business Development Manager"
+   - 2-Teile-Pattern: "Ingrano Solutions I AI Business Development Manager"
      → company: "Ingrano Solutions", role: "AI Business Development Manager"
+   - 3-Teile-Pattern (Anstellungsart-Suffix): "Fraunhofer FOKUS I Innovation Consultant I Werkstudent"
+     → company: "Fraunhofer FOKUS", role: "Innovation Consultant", summary: "Werkstudent"
+   - 3-Teile-Pattern: "Medieninnovationszentrum I Projektleitung I Werkstudent"
+     → company: "Medieninnovationszentrum", role: "Projektleitung", summary: "Werkstudent"
+   - Anstellungsart-Tokens (Werkstudent, Intern, Praktikum, Trainee, Volontariat, Freelance) gehören NIEMALS in role — sie gehören in summary oder werden weggelassen.
    - Beispiel Sprachen: "Deutsch I Muttersprache" → language: "Deutsch", proficiency: "Muttersprache"
    - Das "I" als Trennzeichen gilt nur wenn es ALLEIN steht (Leerzeichen beiderseits).
-   - NIEMALS nur den Teil vor oder nach dem "I" extrahieren — IMMER beide Seiten auswerten.
+   - NIEMALS nur den Teil vor oder nach dem "I" extrahieren — IMMER ALLE Teile auswerten.
+   - PFLICHT: Bei mehrfachem Pipe MUSS company aus dem ersten Teil extrahiert werden — niemals null/leer lassen, wenn das erste Token erkennbar ein Firmenname ist.
 10. **DATUM-REKONSTRUKTION (MEHRZEILIG):**
    - OCR liefert Start- und Enddatum oft auf GETRENNTEN Zeilen, z.B.: "09.2025\nHeute" oder "11.2023\n09.2025"
    - Diese MÜSSEN als "09.2025 - Heute" bzw. "11.2023 - 09.2025" kombiniert werden.
@@ -104,10 +110,20 @@ PASS 2: Ordne sie logisch zu — welche Firma gehört zu welchem Datumsbereich? 
    - Wenn nach einer Jahreszahl eine weitere Jahreszahl oder "Heute"/"Present" auf der nächsten Zeile folgt: → kombiniere zu "START - END".
 11. **ARBEITGEBER MIT BINDESTRICH-ABTEILUNG (FIRMA - ABTEILUNG):**
    - Format "FIRMA - ABTEILUNG" (kein Jobtitel vor dem Strich): company=FIRMA, role=ABTEILUNG.
-   - Beispiel: "KPMG - Public Sector Consulting" → company: "KPMG", role: "Public Sector Consulting"
-   - Beispiel: "KPMG - Central Services" → company: "KPMG", role: "Central Services"
-   - AUSNAHME: Wenn der Teil VOR dem Strich ein Jobtitel ist (Co-Founder, CEO, Manager, etc.): role=erster Teil, company=zweiter Teil.
+   - Beispiel: "KPMG - Public Sector Consulting I Intern" → company: "KPMG", role: "Public Sector Consulting", summary: "Intern"
+   - Beispiel: "KPMG - Central Services I Intern" → company: "KPMG", role: "Central Services", summary: "Intern"
+   - AUSNAHME: Wenn der Teil VOR dem Strich ein Jobtitel ist (Co-Founder, CEO, Manager, Founder, Owner, Partner, Director, Lead): role=erster Teil, company=zweiter Teil.
    - Beispiel: "Co-Founder - Xorder Menues" → role: "Co-Founder", company: "Xorder Menues"
+   - PFLICHT: company darf NIEMALS null/leer sein wenn ein Firmenname im Header erkennbar ist. Wenn unsicher: Setze company auf den vollständigen Header-Text vor der Datumsangabe — das ist besser als null.
+11b. **EDUCATION — STUDIENGANG UND UNIVERSITÄT:**
+   - degree: Übernimm den GENAUEN Studiengangsnamen aus dem CV — KEINE Umformulierung, KEINE Verkürzung, KEINE "Modernisierung".
+   - VERBOTEN: "Business Innovation & Entrepreneurship" zu "Digital Strategy & Entrepreneurship" zu ändern (Halluzination).
+   - VERBOTEN: "Europäische Medienwissenschaften" zu "Medien" zu verkürzen.
+   - institution: PFLICHT-FELD wenn im CV erkennbar. Häufige deutsche Patterns:
+     - "Studiengangsname (M.Sc.) BSP" → degree: "Studiengangsname (M.Sc.)", institution: "BSP"
+     - "Studiengangsname (B.A.) Universität Potsdam" → degree: "Studiengangsname (B.A.)", institution: "Universität Potsdam"
+     - "Universität/Hochschule/FH/TU [NAME]" am Zeilenende oder nach degree → das ist die institution.
+   - NIEMALS institution null lassen wenn eine Bildungseinrichtung im Header oder direkt darunter steht.
 12. **ZERTIFIKATE — OCR-MUSTER:**
    - Zeile 1: Zertifikatsname, ggf. mit Aussteller in Klammern oder nach "I"-Separator (z.B. "Design Thinking Coach (Hasso-Plattner-Institut)")
    - Zeile 2+: Komma-getrennte Kompetenzbereiche → das ist das "description"-Feld des Zertifikats
@@ -221,11 +237,23 @@ ${sanitized}
     const CERT_NOISE = new Set(['zertifikate', 'certificates', 'certifications', 'zertifizierungen', 'weiterbildung', 'weitere kompetenzen']);
     const sorted = {
       ...validated,
-      experience: sortExperienceByDate(
-        (validated.experience ?? []).map((e: any) => ({
-          ...e,
-          role: stripRoleDateMarkers(e.role),
-        }))
+      // The LLM occasionally drops `company` even when the OCR text shows
+      // "Firma I Rolle" or "Co-Founder - Firma" cleanly on one line. Recover
+      // deterministically from the original text before downstream consumers
+      // see the gap.
+      experience: recoverMissingExperienceCompany(
+        sortExperienceByDate(
+          (validated.experience ?? []).map((e: any) => ({
+            ...e,
+            role: stripRoleDateMarkers(e.role),
+          }))
+        ) as Array<{ role?: string | null; company?: string | null; [k: string]: any }>,
+        text
+      ),
+      // Same drop pattern for education.institution when "Studiengang (X.Y.) Universität ..." sits on one line.
+      education: recoverMissingEducationInstitution(
+        (validated.education ?? []) as Array<{ degree?: string | null; institution?: string | null; [k: string]: any }>,
+        text
       ),
       languages: (validated.languages ?? []).filter((l: any) => {
         const lang = (l.language || '').trim().toLowerCase();
@@ -417,3 +445,121 @@ export const KNOWN_LANGUAGES = new Set<string>([
   // Sign languages
   'gebärdensprache', 'sign language', 'lengua de signos', 'dgs', 'asl', 'bsl',
 ]);
+
+/**
+ * If the LLM dropped `experience[].company` (it does this even with explicit
+ * prompt rules — observed for "Ingrano Solutions I Innovation Manager" and
+ * "Co-Founder - Xorder Menues" on Yannik's Exxeta CV), search the original
+ * extracted text for "Firma I role" or "JobTitle - Firma" patterns and recover
+ * the missing token deterministically.
+ *
+ * Idempotent: experience entries that already have a non-empty company are untouched.
+ * Exported for testing.
+ */
+export function recoverMissingExperienceCompany<T extends { role?: string | null; company?: string | null }>(
+  experience: T[],
+  rawText: string
+): T[] {
+  // Job-title prefixes that mean "this is a role, not a company" — used to
+  // disambiguate the dash pattern. Lowercased for comparison.
+  const ROLE_PREFIXES = new Set([
+    'co-founder', 'cofounder', 'founder', 'gründer', 'mitgründer',
+    'ceo', 'cto', 'cfo', 'coo', 'cmo',
+    'manager', 'director', 'lead', 'head', 'partner', 'owner',
+    'consultant', 'berater', 'analyst', 'praktikant', 'intern',
+  ]);
+
+  // Walk every non-empty line and try to recover company per pattern.
+  // Line-based is more robust than a monolithic regex against multi-line OCR text.
+  const lines = rawText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+
+  return experience.map((entry) => {
+    const role = (entry.role || '').trim();
+    const company = (entry.company || '').trim();
+    if (company.length > 0 || role.length === 0) return entry;
+
+    for (const line of lines) {
+      // Pattern A: "<COMPANY> I <ROLE>" or "<COMPANY> | <ROLE>" — possibly with trailing " I <Status>".
+      // Capital I is how Azure DI represents the typographic pipe character in many CVs.
+      // Split on " I " (space-I-space) or " | " — case-sensitive, since lowercase "i" is just a letter.
+      const parts = line.split(/\s+[I|]\s+/);
+      if (parts.length >= 2) {
+        // Find which part contains the role (case-insensitive contains).
+        const roleIdx = parts.findIndex((p) => p.toLowerCase() === role.toLowerCase());
+        if (roleIdx > 0) {
+          const candidate = parts[0].trim();
+          if (isPlausibleCompanyToken(candidate)) {
+            return { ...entry, company: candidate };
+          }
+        }
+      }
+
+      // Pattern B: "<JOBTITLE> - <COMPANY>" — role is a known job title.
+      // Optional date prefix is allowed (e.g. "07.2022 Co-Founder - Xorder Menues").
+      if (ROLE_PREFIXES.has(role.toLowerCase())) {
+        const dashSplit = line.split(/\s+-\s+/);
+        if (dashSplit.length >= 2) {
+          const before = dashSplit[0].trim();
+          // Strip optional leading date "07.2022 " from the "before" part.
+          const beforeNoDate = before.replace(/^\d{1,2}[./]\d{4}\s+/, '').trim();
+          if (beforeNoDate.toLowerCase() === role.toLowerCase()) {
+            const candidate = dashSplit[1].trim();
+            if (isPlausibleCompanyToken(candidate)) {
+              return { ...entry, company: candidate };
+            }
+          }
+        }
+      }
+    }
+    return entry;
+  });
+}
+
+/**
+ * Recovers `education[].institution` when missing. Pattern observed on
+ * Yannik's CV: "Europäische Medienwissenschaften (B.A.) Universität Potsdam"
+ * — degree + institution on one OCR line, LLM keeps degree but drops institution.
+ *
+ * Strategy: find the degree string in raw text; the trailing chunk after the
+ * last "(X.Y.)" or after the degree's last word is the institution candidate.
+ * Conservative: only recovers when the candidate looks like a university name.
+ */
+export function recoverMissingEducationInstitution<T extends { degree?: string | null; institution?: string | null }>(
+  education: T[],
+  rawText: string
+): T[] {
+  const UNI_HINTS = /(universität|hochschule|fachhochschule|\bfh\b|\btu\b|\buni\b|university|institute|akademie|college|school|school of|escuela|universidad|universidade)/i;
+
+  return education.map((entry) => {
+    const degree = (entry.degree || '').trim();
+    const inst = (entry.institution || '').trim();
+    if (inst.length > 0 || degree.length === 0) return entry;
+
+    // Find degree in raw text, then look at the rest of that line.
+    const idx = rawText.indexOf(degree);
+    if (idx === -1) return entry;
+    const lineEnd = rawText.indexOf('\n', idx);
+    const tail = rawText.slice(idx + degree.length, lineEnd === -1 ? rawText.length : lineEnd).trim();
+    if (tail.length === 0 || tail.length > 120) return entry;
+    if (!UNI_HINTS.test(tail) && !/[A-Z]{2,}/.test(tail)) return entry; // BSP, MIT etc are all-caps acronyms
+    return { ...entry, institution: tail };
+  });
+}
+
+/**
+ * Heuristic: does this token look like a real company/organisation name?
+ * Rejects pure date fragments, pure numbers, common header words.
+ */
+function isPlausibleCompanyToken(token: string): boolean {
+  if (token.length < 2 || token.length > 80) return false;
+  if (/^\d{2,}\.?\d*$/.test(token)) return false; // dates / numbers only
+  const lower = token.toLowerCase();
+  const NOISE = new Set([
+    'heute', 'present', 'aktuell', 'laufend', 'now', 'current',
+    'berufserfahrung', 'experience', 'bildungsweg', 'education',
+    'werkstudent', 'intern', 'praktikum', 'trainee', 'volontariat', 'freelance',
+  ]);
+  if (NOISE.has(lower)) return false;
+  // Reject if token is JUST a job-status word
+  return true;
+}

@@ -34,6 +34,25 @@ export function inferLanguageLevel(proficiency?: string): number {
 }
 
 /**
+ * Strips US-style GPA conversions from a grade string.
+ * The translator and parser sometimes append "(approx. GPA 3.7)" or similar to
+ * a German "1.3" — irrelevant for German recruiters and looks unprofessional.
+ *
+ * Patterns covered:
+ *   "1.3 (approx. GPA 3.7)"        → "1.3"
+ *   "1,3 (GPA 3.7)"                → "1,3"
+ *   "1.3 (approximately 3.7 GPA)"  → "1.3"
+ *   "Sehr gut (1,3)"               → "Sehr gut (1,3)"  (untouched — no GPA marker)
+ */
+export function cleanGrade(grade: string | undefined | null): string {
+    if (!grade) return '';
+    return grade
+        .replace(/\s*\(\s*(?:approx\.?|approximately)?\s*GPA[^)]*\)/gi, '')
+        .replace(/\s*\(\s*(?:approx\.?|approximately)\s*[\d.,]+\s*GPA\s*\)/gi, '')
+        .trim();
+}
+
+/**
  * Normalizes dateRangeText to replace language-specific "present" indicators
  * with the locale-appropriate label.
  *
