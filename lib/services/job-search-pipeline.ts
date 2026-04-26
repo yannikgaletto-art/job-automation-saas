@@ -538,6 +538,13 @@ VERBOTEN als ats_keywords (NIEMALS aufnehmen — auch wenn sie häufig vorkommen
   "Social Media" (nutze "LinkedIn Ads"/"Instagram Marketing"),
   "Web 2.0", "EDV-Kenntnisse", "Internet-Kenntnisse", "PC-Kenntnisse"
 - Personennamen, geographische Allgemeinplätze ohne Job-Bezug
+- DOMAIN/THEME-Begriffe alleinstehend: Krankheitsbilder ("Tinnitus", "COPD", "Diabetes",
+  "Asthma"), medizinische Themenfelder ("Audiologie", "Onkologie") oder Branchen-
+  Schlagworte ("Healthcare", "Logistics") — nur erlauben wenn mit konkretem Tool/
+  Methode gepaart ("SAP Healthcare", "Onkologie-Studien"). Themen gehören in den
+  Steckbrief-Text, nicht in die ATS-Keyword-Liste.
+- FORMAT-Begriffe: "Webinare", "Workshops", "Seminare", "Konferenzen", "Trainings",
+  "Schulungen", "Roundtables" — das sind Liefer-Formate, keine Skills.
 
 DACH-KOMPOSITUM-REGEL (KRITISCH für deutsche Stellenanzeigen):
 Deutsche ATS-Systeme (Personio, Softgarden, SAP SuccessFactors) indexieren

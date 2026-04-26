@@ -317,16 +317,29 @@ export function filterAtsKeywords(candidates: string[] | null | undefined): Filt
     return result;
 }
 
-// ─── Verbatim JD-Presence Filter (Defense-in-Depth gegen LLM-Halluzinationen) ────
+// ─── Surgical Hallucination Filter (Defense-in-Depth, Cross-Locale-safe) ────
 //
+// CONTEXT
 // The Mistral/Haiku ATS-extraction prompt instructs the LLM to only emit keywords
 // that appear in the JD text. Empirical evidence (2026-04-26 SAP-Job test) shows
-// that Mistral ignores the HARD RULE and still emits training-data-derived
-// keywords like "DSGVO", "ISO 27001", "Cloud Computing" even when they are absent
-// from the JD. This filter verifies each keyword's presence in the JD text and
-// drops anything that cannot be substantiated.
+// that Mistral persistently halluzinates a small set of well-known compliance
+// terms ("DSGVO", "ISO 27001", "PCI DSS", "Cloud Computing") even when they are
+// absent from the JD — these are training-data favorites.
 //
-// Strategy:
+// PRIOR APPROACH (Phase-3 v1, reverted 2026-04-26)
+// A blanket verbatim-match filter that tested EVERY keyword against the JD text.
+// This worked against compliance hallucinations BUT broke Cross-Locale UX:
+// when Mistral correctly translated "physician relations" → "Arztbeziehungen"
+// for a German-locale user reading an English JD, the German translation was
+// not literally present in the English JD — and the filter dropped it.
+// Result: legitimate translations were thrown out as "hallucinations".
+//
+// CURRENT APPROACH (Phase-3 v2, surgical)
+// Verify ONLY keywords on a curated `KNOWN_HALLUCINATIONS` allowlist. All other
+// keywords pass through untouched. Compliance hallucinations are still caught;
+// cross-locale translations are no longer falsely rejected.
+//
+// VERIFICATION STRATEGY (only for known-hallucination candidates)
 //   1. Normalize keyword + JD (lowercase, strip diacritics, normalize whitespace)
 //   2. Try exact phrase match
 //   3. Try hyphen-stripped variant ("Stakeholder-Management" ↔ "Stakeholdermanagement")
@@ -334,6 +347,38 @@ export function filterAtsKeywords(candidates: string[] | null | undefined): Filt
 //      Long tokens (≥4 chars): prefix-stem match (handles German declension —
 //        "Sektor" matches "Sektors", "Öffentlicher" matches "öffentlichen")
 //      Short tokens (<4 chars): word-boundary match (prevents "ISO" matching "Position")
+//
+// MAINTENANCE
+// Add new entries to `KNOWN_HALLUCINATIONS` when empirical evidence shows Mistral
+// repeatedly halluzinating a specific term. Keep the list short and high-signal —
+// every entry is a potential false-reject for users whose JDs actually mention
+// the term.
+
+/**
+ * Curated set of LLM training-data favorites that Mistral persistently halluzinates.
+ * Each entry is verified against the JD before being kept.
+ *
+ * NORMALIZATION CONTRACT: entries are stored already lowercased + diacritic-stripped
+ * (NFKD), so they can be matched directly against `normalizeForComparison(keyword)`.
+ */
+const KNOWN_HALLUCINATIONS: ReadonlySet<string> = new Set([
+    // Compliance / data-protection (cross-locale variants)
+    'dsgvo', 'gdpr', 'rgpd',
+    'datenschutz-grundverordnung', 'datenschutzgrundverordnung',
+    // ISO standards (commonly halluzinated in B2B/consulting JDs)
+    'iso 27001', 'iso27001', 'iso-27001',
+    'iso 9001', 'iso9001', 'iso-9001',
+    'iso 26262', 'iso26262', 'iso-26262',
+    'iso 14001', 'iso14001', 'iso-14001',
+    'iso 13485', 'iso13485', 'iso-13485',
+    'iso 45001', 'iso45001', 'iso-45001',
+    // Payment-card & SOC standards
+    'pci dss', 'pci-dss', 'pcidss',
+    'soc 2', 'soc-2', 'soc2',
+    'soc 1', 'soc-1', 'soc1',
+    // Generic IT-domain hallucinations (vague, often fabricated)
+    'cloud computing',
+]);
 
 const STOP_TOKENS_FOR_VERIFICATION: ReadonlySet<string> = new Set([
     'and', 'or', 'the', 'of', 'in', 'on', 'at', 'to', 'for', 'as', 'by', 'with',
@@ -377,11 +422,51 @@ function isTokenInJD(token: string, normalizedJD: string): boolean {
 }
 
 /**
- * Verify each keyword can be substantiated in the job description text.
- * Drops keywords that the LLM hallucinated (verbatim/translation/semantic match required).
+ * Internal: verify a single keyword's presence in the (already normalized) JD.
+ * Used only for keywords on the KNOWN_HALLUCINATIONS allowlist.
+ */
+function isKeywordSubstantiated(
+    normalizedKw: string,
+    normalizedJD: string,
+    jdNoSeparators: string,
+): boolean {
+    // Check 1: Exact phrase match
+    if (normalizedKw.length > 0 && normalizedJD.includes(normalizedKw)) {
+        return true;
+    }
+
+    // Check 2: Hyphen/space-stripped variant
+    // "Stakeholder-Management" ↔ "Stakeholder Management" ↔ "Stakeholdermanagement"
+    const kwNoSeparators = normalizedKw.replace(/[-_\s]+/g, '');
+    if (kwNoSeparators.length >= 4 && jdNoSeparators.includes(kwNoSeparators)) {
+        return true;
+    }
+
+    // Check 3: Token-level verification — ALL significant tokens must be present
+    const tokens = normalizedKw
+        .split(/[\s\-_]+/)
+        .filter(t => t.length >= 3 && !STOP_TOKENS_FOR_VERIFICATION.has(t));
+
+    if (tokens.length === 0) {
+        // Pure short-token keyword like "AI" or "BI" — keep only if word-boundary match
+        const allTokens = normalizedKw.split(/[\s\-_]+/).filter(t => t.length >= 2);
+        return allTokens.length > 0 && allTokens.every(t => isTokenInJD(t, normalizedJD));
+    }
+
+    return tokens.every(t => isTokenInJD(t, normalizedJD));
+}
+
+/**
+ * Surgical hallucination filter. Verifies only keywords that match the curated
+ * KNOWN_HALLUCINATIONS allowlist. All other keywords pass through unchanged,
+ * preserving cross-locale translations like "Arztbeziehungen" for "physician
+ * relations" that would otherwise be falsely rejected as not-in-JD.
  *
  * If the JD text is missing or too short (< 50 chars), all keywords are kept
  * (no false rejection when verification context is absent).
+ *
+ * NAME RETAINED for backward compatibility with 5 existing call-sites; semantics
+ * are now allowlist-based, NOT blanket verbatim-match.
  */
 export function filterByVerbatimJDPresence(
     keywords: string[] | null | undefined,
@@ -409,38 +494,15 @@ export function filterByVerbatimJDPresence(
 
         const normalizedKw = normalizeForComparison(kw);
 
-        // Check 1: Exact phrase match
-        if (normalizedKw.length > 0 && normalizedJD.includes(normalizedKw)) {
+        // Pass-through path: keyword is NOT a known LLM-hallucination favorite.
+        // We trust the harvester output (preserves cross-locale translations).
+        if (!KNOWN_HALLUCINATIONS.has(normalizedKw)) {
             kept.push(kw);
             continue;
         }
 
-        // Check 2: Hyphen/space-stripped variant
-        // "Stakeholder-Management" ↔ "Stakeholder Management" ↔ "Stakeholdermanagement"
-        const kwNoSeparators = normalizedKw.replace(/[-_\s]+/g, '');
-        if (kwNoSeparators.length >= 4 && jdNoSeparators.includes(kwNoSeparators)) {
-            kept.push(kw);
-            continue;
-        }
-
-        // Check 3: Token-level verification — ALL significant tokens must be present
-        const tokens = normalizedKw
-            .split(/[\s\-_]+/)
-            .filter(t => t.length >= 3 && !STOP_TOKENS_FOR_VERIFICATION.has(t));
-
-        if (tokens.length === 0) {
-            // Pure short-token keyword like "AI" or "BI" — keep only if word-boundary match
-            const allTokens = normalizedKw.split(/[\s\-_]+/).filter(t => t.length >= 2);
-            if (allTokens.length > 0 && allTokens.every(t => isTokenInJD(t, normalizedJD))) {
-                kept.push(kw);
-            } else {
-                removed.push(kw);
-            }
-            continue;
-        }
-
-        const allFound = tokens.every(t => isTokenInJD(t, normalizedJD));
-        if (allFound) {
+        // Verification path: keyword IS a known hallucination → must be substantiated.
+        if (isKeywordSubstantiated(normalizedKw, normalizedJD, jdNoSeparators)) {
             kept.push(kw);
         } else {
             removed.push(kw);
@@ -449,3 +511,9 @@ export function filterByVerbatimJDPresence(
 
     return { kept, removed };
 }
+
+/**
+ * Read-only export of the hallucination allowlist for tests and audits.
+ * Each entry is already lowercased + diacritic-stripped.
+ */
+export { KNOWN_HALLUCINATIONS };

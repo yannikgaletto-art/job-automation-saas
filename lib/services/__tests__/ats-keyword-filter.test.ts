@@ -1,4 +1,4 @@
-import { filterAtsKeywords, filterByVerbatimJDPresence, ATS_STOP_LIST } from '../ats-keyword-filter';
+import { filterAtsKeywords, filterByVerbatimJDPresence, ATS_STOP_LIST, KNOWN_HALLUCINATIONS } from '../ats-keyword-filter';
 
 describe('ats-keyword-filter', () => {
 
@@ -430,10 +430,34 @@ describe('ats-keyword-filter', () => {
     });
 
     // ────────────────────────────────────────────────────────────────────
-    // filterByVerbatimJDPresence — Defense-in-Depth gegen LLM-Halluzinationen
-    // Reproduziert SAP-Job-Test (2026-04-26) — DSGVO/ISO 27001/Cloud Computing
-    // halluziniert obwohl JD-Text sie nicht erwähnt.
+    // filterByVerbatimJDPresence — Surgical hallucination filter (v2, 2026-04-26)
+    //
+    // SEMANTICS: only keywords on the curated KNOWN_HALLUCINATIONS allowlist
+    // (DSGVO, ISO 27001, PCI DSS, etc.) are verified against the JD text.
+    // All other keywords pass through unchanged so cross-locale translations
+    // like "Arztbeziehungen" (for English JD "physician relations") survive.
+    //
+    // Reproduces SAP-Job 2026-04-26 hallucination set + cross-locale guard.
     // ────────────────────────────────────────────────────────────────────
+    describe('KNOWN_HALLUCINATIONS — allowlist sanity', () => {
+        it('contains the canonical compliance halluzinations from SAP/EY tests', () => {
+            expect(KNOWN_HALLUCINATIONS.has('dsgvo')).toBe(true);
+            expect(KNOWN_HALLUCINATIONS.has('iso 27001')).toBe(true);
+            expect(KNOWN_HALLUCINATIONS.has('iso 9001')).toBe(true);
+            expect(KNOWN_HALLUCINATIONS.has('iso 26262')).toBe(true);
+            expect(KNOWN_HALLUCINATIONS.has('pci dss')).toBe(true);
+            expect(KNOWN_HALLUCINATIONS.has('cloud computing')).toBe(true);
+        });
+
+        it('all entries are normalized (lowercased, no diacritics)', () => {
+            for (const entry of KNOWN_HALLUCINATIONS) {
+                expect(entry).toBe(entry.toLowerCase());
+                // NFKD-normalized form should equal the entry (no combining marks left)
+                expect(entry.normalize('NFKD').replace(/[̀-ͯ]/g, '')).toBe(entry);
+            }
+        });
+    });
+
     describe('filterByVerbatimJDPresence — empty / null guards', () => {
         it('returns empty arrays when keywords are null/undefined/empty', () => {
             expect(filterByVerbatimJDPresence(null, 'long enough description text here')).toEqual({ kept: [], removed: [] });
@@ -526,73 +550,155 @@ Mehrjährige Erfahrung in Business Development, Consulting, Vertrieb oder strate
             expect(r.kept).toContain('Öffentlicher Sektor');
         });
 
-        it('end-to-end: from the actual SAP-Job hallucination set, only the substantiated keywords remain', () => {
+        it('end-to-end: from the actual SAP-Job hallucination set, compliance halluzinations are dropped', () => {
             const fromHallucinatedOutput = [
-                'Ausschreibungen',          // ✓ verbatim
-                'Cloud Computing',          // ✗ "computing" not in JD
-                'Digitale Transformation',  // ✓ "digitale Transformation" verbatim
-                'DSGVO',                    // ✗ not in JD
-                'ERP',                      // ✓ "Cloud ERP"
-                'Go-to-Market',             // ✓ verbatim
-                'ISO 27001',                // ✗ not in JD
-                'KI',                       // ✓ verbatim
-                'Öffentlicher Sektor',      // ✓ declension
-                'Pilotprojekte',            // ✓ declension
-                'Projektmanagement',        // ✗ not in JD (no "projekt..." word)
-                'SAP ERP',                  // ✓ both tokens present
-                'Stakeholder-Management',   // ✗ "management" alone not in JD
-                'Strategieentwicklung',     // ✗ no "strategieentwicklung" stem in JD
-                'Vertrieb',                 // ✓ verbatim
+                'Ausschreibungen',          // ✓ pass-through (not in allowlist)
+                'Cloud Computing',          // ✗ allowlist + not in JD → REMOVED
+                'Digitale Transformation',  // ✓ pass-through
+                'DSGVO',                    // ✗ allowlist + not in JD → REMOVED
+                'ERP',                      // ✓ pass-through
+                'Go-to-Market',             // ✓ pass-through
+                'ISO 27001',                // ✗ allowlist + not in JD → REMOVED
+                'KI',                       // ✓ pass-through
+                'Öffentlicher Sektor',      // ✓ pass-through
+                'Pilotprojekte',            // ✓ pass-through
+                'Projektmanagement',        // ✓ pass-through (NOT in allowlist v2 — common term)
+                'SAP ERP',                  // ✓ pass-through
+                'Stakeholder-Management',   // ✓ pass-through (translations preserved)
+                'Strategieentwicklung',     // ✓ pass-through
+                'Vertrieb',                 // ✓ pass-through
             ];
             const r = filterByVerbatimJDPresence(fromHallucinatedOutput, SAP_JD);
-            // Confirm the 4 high-priority hallucinations are gone
+            // Confirm the 3 compliance halluzinations are gone
             expect(r.removed).toContain('DSGVO');
             expect(r.removed).toContain('ISO 27001');
             expect(r.removed).toContain('Cloud Computing');
-            expect(r.removed).toContain('Projektmanagement');
-            // Confirm valid keywords survived
+            // PCI DSS would also be dropped if present (in allowlist)
+            // Confirm pass-through keywords survived (cross-locale safety)
             expect(r.kept).toContain('Ausschreibungen');
             expect(r.kept).toContain('Vertrieb');
             expect(r.kept).toContain('Go-to-Market');
             expect(r.kept).toContain('Pilotprojekte');
             expect(r.kept).toContain('SAP ERP');
+            expect(r.kept).toContain('Projektmanagement');     // pass-through, not in allowlist
+            expect(r.kept).toContain('Stakeholder-Management'); // pass-through
+            expect(r.kept).toContain('Strategieentwicklung');   // pass-through
         });
     });
 
-    describe('filterByVerbatimJDPresence — false-positive guards', () => {
+    // Cross-Locale Regression Suite (Sonova/Tinnitus 2026-04-26)
+    // Mistral correctly translates English JD → German keywords for de-locale users.
+    // Phase-3 v1 falsely rejected those translations; v2 must preserve them.
+    describe('filterByVerbatimJDPresence — cross-locale translation safety', () => {
+        const SONOVA_EN_JD = `As Senior Medical Engagement Manager you will drive growth and engagement for Sonova's tinnitus-focused digital health services. You will build trusted relationships with healthcare professionals, plan and deliver trainings, webinars, clinical discussions, site visits and community engagement events. Define and execute clinically relevant content strategies. Collaborate with product, medical affairs and marketing teams. Monitor engagement metrics, app adoption and ROI. 5+ years of experience in healthcare marketing, medical engagement, physician relations, medical affairs or digital health.`;
+
+        it('KEEPS German translations of English JD terms (Arztbeziehungen for physician relations)', () => {
+            const r = filterByVerbatimJDPresence(['Arztbeziehungen'], SONOVA_EN_JD);
+            expect(r.kept).toContain('Arztbeziehungen');
+            expect(r.removed).not.toContain('Arztbeziehungen');
+        });
+
+        it('KEEPS Digitale Gesundheit (translation of "digital health")', () => {
+            const r = filterByVerbatimJDPresence(['Digitale Gesundheit'], SONOVA_EN_JD);
+            expect(r.kept).toContain('Digitale Gesundheit');
+        });
+
+        it('KEEPS Klinische Inhalte (translation of "clinical content")', () => {
+            const r = filterByVerbatimJDPresence(['Klinische Inhalte'], SONOVA_EN_JD);
+            expect(r.kept).toContain('Klinische Inhalte');
+        });
+
+        it('KEEPS Gesundheitsmarketing (translation of "healthcare marketing")', () => {
+            const r = filterByVerbatimJDPresence(['Gesundheitsmarketing'], SONOVA_EN_JD);
+            expect(r.kept).toContain('Gesundheitsmarketing');
+        });
+
+        it('KEEPS Hybrides Arbeiten (translation of "hybrid working")', () => {
+            const r = filterByVerbatimJDPresence(['Hybrides Arbeiten'], SONOVA_EN_JD);
+            expect(r.kept).toContain('Hybrides Arbeiten');
+        });
+
+        it('KEEPS ROI-Analyse even when only "ROI" appears in JD (pass-through)', () => {
+            const r = filterByVerbatimJDPresence(['ROI-Analyse'], SONOVA_EN_JD);
+            expect(r.kept).toContain('ROI-Analyse');
+        });
+
+        it('still REMOVES DSGVO from English JD (allowlist verification path)', () => {
+            const r = filterByVerbatimJDPresence(['DSGVO', 'Arztbeziehungen'], SONOVA_EN_JD);
+            expect(r.removed).toContain('DSGVO');
+            expect(r.kept).toContain('Arztbeziehungen');
+        });
+
+        it('end-to-end Sonova: pass-through translations, drop compliance halluzinations', () => {
+            const mistralOutput = [
+                'Arztbeziehungen',
+                'Digitale Gesundheit',
+                'Klinische Inhalte',
+                'Hybrides Arbeiten',
+                'ROI-Analyse',
+                'Gesundheitsmarketing',
+                'Medical Affairs',
+                'DSGVO',          // halluzinated
+                'ISO 27001',      // halluzinated
+                'PCI DSS',        // halluzinated
+            ];
+            const r = filterByVerbatimJDPresence(mistralOutput, SONOVA_EN_JD);
+            expect(r.removed).toEqual(expect.arrayContaining(['DSGVO', 'ISO 27001', 'PCI DSS']));
+            expect(r.kept).toEqual(expect.arrayContaining([
+                'Arztbeziehungen',
+                'Digitale Gesundheit',
+                'Klinische Inhalte',
+                'Hybrides Arbeiten',
+                'ROI-Analyse',
+                'Gesundheitsmarketing',
+                'Medical Affairs',
+            ]));
+        });
+    });
+
+    describe('filterByVerbatimJDPresence — pass-through behavior (v2)', () => {
         const TECH_JD = `We are looking for a Senior Software Engineer with strong Python and TypeScript experience.
 You will work on Salesforce integrations using SAP, build microservices with Node.js, and deploy to AWS.
 Experience with Scrum, OKR and PMP certification is a plus.
 Familiarity with PostgreSQL and Redis is required.
 You will collaborate with stakeholders across product and engineering teams.`;
 
-        it('KEEPS verbatim tech keywords (Salesforce, Python, TypeScript)', () => {
+        it('KEEPS tech keywords (pass-through, not in allowlist)', () => {
             const r = filterByVerbatimJDPresence(['Salesforce', 'Python', 'TypeScript'], TECH_JD);
             expect(r.kept).toEqual(['Salesforce', 'Python', 'TypeScript']);
         });
 
-        it('KEEPS short-token brand names with word-boundary match (SAP, AWS, OKR, PMP)', () => {
+        it('KEEPS short-token brand names (pass-through)', () => {
             const r = filterByVerbatimJDPresence(['SAP', 'AWS', 'OKR', 'PMP'], TECH_JD);
             expect(r.kept).toEqual(['SAP', 'AWS', 'OKR', 'PMP']);
         });
 
-        it('REJECTS hallucinated 3-char tokens that appear only as substrings (e.g. ISO inside "Position")', () => {
-            // "Position" contains "iso" as substring but should not match — word-boundary required
-            const jdWithPosition = `${TECH_JD}\nThe Position requires strong communication.`;
-            const r = filterByVerbatimJDPresence(['ISO'], jdWithPosition);
-            expect(r.removed).toContain('ISO');
-        });
-
-        it('KEEPS Stakeholder Management when JD has both tokens verbatim', () => {
+        it('KEEPS Stakeholder Management (pass-through — translations preserved)', () => {
             const r = filterByVerbatimJDPresence(['Stakeholder Management'], TECH_JD);
-            // "stakeholders" — stem "stakeh" matches; but "management" not in TECH_JD
-            // stakeholders ✓, management ✗ → REJECT
-            expect(r.removed).toContain('Stakeholder Management');
+            expect(r.kept).toContain('Stakeholder Management');
         });
 
-        it('handles diacritics correctly (Übersetzung normalized to ubersetzung)', () => {
+        it('KEEPS arbitrary German keyword on English JD (cross-locale pass-through)', () => {
+            const r = filterByVerbatimJDPresence(['Stakeholder-Beziehungen', 'Vertriebsmanagement'], TECH_JD);
+            expect(r.kept).toEqual(['Stakeholder-Beziehungen', 'Vertriebsmanagement']);
+        });
+
+        it('handles diacritics in pass-through path', () => {
             const r = filterByVerbatimJDPresence(['Übersetzung'], 'Wir suchen jemanden für Übersetzungen.');
             expect(r.kept).toContain('Übersetzung');
+        });
+
+        it('REMOVES DSGVO when not in JD (allowlist enforcement on Tech-JD)', () => {
+            const r = filterByVerbatimJDPresence(['Salesforce', 'DSGVO', 'Python'], TECH_JD);
+            expect(r.kept).toContain('Salesforce');
+            expect(r.kept).toContain('Python');
+            expect(r.removed).toContain('DSGVO');
+        });
+
+        it('KEEPS DSGVO when JD actually mentions Datenschutz-Grundverordnung', () => {
+            const complianceJD = `${TECH_JD}\nKnowledge of DSGVO and Datenschutz-Grundverordnung is required.`;
+            const r = filterByVerbatimJDPresence(['DSGVO'], complianceJD);
+            expect(r.kept).toContain('DSGVO');
         });
     });
 });

@@ -254,7 +254,7 @@ export async function POST(request: NextRequest) {
 
   CATEGORIES (apply ONLY when present in the JD): software tools, frameworks, platforms, technical standards, certifications, and specific domain/methodology terms that an ATS robot would scan for.
 
-  EXCLUDE: generic verbs ("Implementierung", "Schulungen", "Analyse"), language names ("Deutsch", "Englisch", "Fließend"), company/product names that are the job focus ("Odoo"-role = not a keyword), generic adjectives ("Agile", "modern"), soft skills ("Kommunikation"), job titles ("Business Consultant").
+  EXCLUDE: generic verbs ("Implementierung", "Schulungen", "Analyse"), language names ("Deutsch", "Englisch", "Fließend"), company/product names that are the job focus ("Odoo"-role = not a keyword), generic adjectives ("Agile", "modern"), soft skills ("Kommunikation"), job titles ("Business Consultant"), DOMAIN/THEME terms (medical conditions like "Tinnitus", "COPD", "Diabetes"; topic areas like "Healthcare", "Logistics" alone — only allow when paired with a specific tool/method like "SAP Healthcare"), FORMAT terms ("Webinare", "Workshops", "Seminare", "Konferenzen", "Trainings", "Schulungen") — these are delivery formats, not skills.
 
   Quality over quantity. 8–12 high-signal keywords is better than 20 weak ones.
 
