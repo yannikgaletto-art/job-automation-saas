@@ -569,11 +569,12 @@ Suffixe die zu entfernen sind: "-erfahrung", "-kompetenz", "-kenntnisse",
 "-fähigkeit" (wenn an Skill drangehängt, nicht bei "Teamfähigkeit").
 
 FORMAT-REGELN für ats_keywords:
+- MAXIMUM 18 ats_keywords pro Job (harte Obergrenze).
 - Max. 3 Wörter pro Keyword.
 - Original-Schreibweise behalten (nicht lowercased).
 - Keine Duplikate.
 - Wenn unsicher ob Keyword unter eine der 6 Kategorien fällt: WEGLASSEN.
-- Lieber 5 starke ATS-Keywords als 20 schwache.
+- Lieber 10 starke ATS-Keywords als 18 schwache — Qualität schlägt Quantität, aber 18 ist das Cap.
 
 SPRACH-REGEL für ats_keywords (KRITISCH für CV-Match-Konsistenz):
 ZIELSPRACHE: ${LOCALE_NAME[userLocale]}

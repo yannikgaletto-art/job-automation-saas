@@ -104,7 +104,7 @@ WICHTIG für Listen (responsibilities, qualifications, benefits):
 - Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
 - Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
 
-{"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben als verdichtete vollständige Sätze"],"qualifications":["max 8 Anforderungen als verdichtete vollständige Sätze"],"benefits":["max 5"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["max 12 ATS Keywords"]}`,
+{"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben als verdichtete vollständige Sätze"],"qualifications":["max 8 Anforderungen als verdichtete vollständige Sätze"],"benefits":["max 5"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["max 18 ATS Keywords"]}`,
                 prompt: job.description,
                 temperature: 0,
                 maxTokens: 2000,

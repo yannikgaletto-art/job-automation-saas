@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
                     qualifications: `string[] — qualifications (max 8), in ${languageName}`,
                     benefits: `string[] — TOP 6 most important benefits, max 3 words each (e.g. "30 Tage Urlaub", "Remote Work", "Betriebliche Altersvorsorge"). No full sentences. No copy-paste.`,
                     seniority: "'junior' | 'mid' | 'senior' | 'lead' | 'unknown'",
-                    buzzwords: `string[] — ATS keywords: MAXIMUM 15, extracted EXCLUSIVELY from the job description text below.
+                    buzzwords: `string[] — ATS keywords: MAXIMUM 18, extracted EXCLUSIVELY from the job description text below.
 
   HARD RULE (overrides everything else): Each keyword MUST appear verbatim, as a direct translation, or as a clear semantic match in the JD text. If a keyword does NOT appear in the JD, you MUST NOT include it. Never invent keywords from your training data; never carry over keywords from prior tasks. When in doubt, leave it out.
 
