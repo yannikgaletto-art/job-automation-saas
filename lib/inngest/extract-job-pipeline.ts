@@ -14,7 +14,7 @@ import { complete } from '@/lib/ai/model-router';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
 import { deepScrapeJob } from '@/lib/services/job-search-pipeline';
-import { filterAtsKeywords } from '@/lib/services/ats-keyword-filter';
+import { filterAtsKeywords, filterByVerbatimJDPresence } from '@/lib/services/ats-keyword-filter';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -243,6 +243,17 @@ IMPORTANT for benefits:
                     }
                     if (atsFilter.rewritten && atsFilter.rewritten.length > 0) {
                         console.log(`[Extract] Job ${jobId} ats_filter rewrote=${atsFilter.rewritten.slice(0, 3).map(r => `${r.from}→${r.to}`).join(', ')}`);
+                    }
+
+                    // Verbatim-Verification: drop hallucinations the LLM emitted despite the HARD RULE.
+                    // The JD text (job.description) is the source-of-truth — every kept keyword must
+                    // appear verbatim, as a German declension variant, or as substring.
+                    if (newBuzzwords.length > 0 && job.description) {
+                        const verbatim = filterByVerbatimJDPresence(newBuzzwords, job.description);
+                        if (verbatim.removed.length > 0) {
+                            console.log(`[Extract] Job ${jobId} verbatim_filter dropped=${verbatim.removed.length}: ${verbatim.removed.slice(0, 5).join(', ')}`);
+                        }
+                        newBuzzwords = verbatim.kept;
                     }
                 }
 

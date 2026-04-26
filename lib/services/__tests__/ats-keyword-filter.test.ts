@@ -1,4 +1,4 @@
-import { filterAtsKeywords, ATS_STOP_LIST } from '../ats-keyword-filter';
+import { filterAtsKeywords, filterByVerbatimJDPresence, ATS_STOP_LIST } from '../ats-keyword-filter';
 
 describe('ats-keyword-filter', () => {
 
@@ -426,6 +426,173 @@ describe('ats-keyword-filter', () => {
             // All five should survive — the filter must not over-strip German tools.
             expect(result.kept.length).toBe(5);
             expect(result.removed).toEqual([]);
+        });
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    // filterByVerbatimJDPresence — Defense-in-Depth gegen LLM-Halluzinationen
+    // Reproduziert SAP-Job-Test (2026-04-26) — DSGVO/ISO 27001/Cloud Computing
+    // halluziniert obwohl JD-Text sie nicht erwähnt.
+    // ────────────────────────────────────────────────────────────────────
+    describe('filterByVerbatimJDPresence — empty / null guards', () => {
+        it('returns empty arrays when keywords are null/undefined/empty', () => {
+            expect(filterByVerbatimJDPresence(null, 'long enough description text here')).toEqual({ kept: [], removed: [] });
+            expect(filterByVerbatimJDPresence(undefined, 'long enough description text here')).toEqual({ kept: [], removed: [] });
+            expect(filterByVerbatimJDPresence([], 'long enough description text here')).toEqual({ kept: [], removed: [] });
+        });
+
+        it('keeps all keywords when JD is missing or too short (avoids false rejection)', () => {
+            const kws = ['DSGVO', 'ISO 27001', 'AnythingGoes'];
+            expect(filterByVerbatimJDPresence(kws, null)).toEqual({ kept: kws, removed: [] });
+            expect(filterByVerbatimJDPresence(kws, '')).toEqual({ kept: kws, removed: [] });
+            expect(filterByVerbatimJDPresence(kws, 'too short')).toEqual({ kept: kws, removed: [] });
+        });
+    });
+
+    describe('filterByVerbatimJDPresence — SAP-Job 2026-04-26 hallucination reproduction', () => {
+        const SAP_JD = `Bei SAP halten wir es einfach: Du bringst dein Bestes mit, und wir holen das Beste aus dir heraus.
+Wir sind Macher, die über 20 Branchen und 80% des weltweiten Handels beeinflussen.
+Gestalte die digitale Zukunft der öffentlichen Verwaltung mit uns.
+Die Digitalisierung der öffentlichen Verwaltung ist eine der zentralen gesellschaftlichen Aufgaben unserer Zeit.
+Als Senior Solution Advisor mit Fokus Business Development für Länder & Kommunen gestaltest du die strategische
+Weiterentwicklung unseres Public Sector-Geschäfts. Du identifizierst neue Marktpotenziale, entwickelst skalierbare
+Use Cases und positionierst das ganzheitliche Lösungsportfolio der SAP – von Cloud ERP über unsere
+Technologie-Plattform bis zu Daten und KI. Dabei baust du nachhaltige Partnerschaften mit öffentlichen
+Auftraggebern, Institutionen und unserem Partner-Ökosystem auf.
+Identifikation, Strukturierung und Priorisierung neuer Geschäftspotenziale, Themenfelder und Use Cases für SAP
+im öffentlichen Sektor – mit Fokus auf Länder und Kommunen.
+Entwicklung und Umsetzung von Go-to-Market-Initiativen und Wachstumsstrategien.
+Definition von Use Cases für unsere Kunden und Herausstellung der Wettbewerbsvorteile von SAP sowie deren
+Positionierung bei den Kunden.
+Aufbau und Pflege eines belastbaren Stakeholder-Netzwerks und strategischen Partnerschaften.
+Unterstützung bei Demand Generation Maßnahmen, Kundeninitiativen, Pilotprojekten und Leuchtturmvorhaben.
+Unterstützung komplexer Vertriebszyklen inkl. Ausschreibungen, Business Cases und Entscheidungspräsentationen.
+Erfolgreich abgeschlossenes Studium in Wirtschaft, Verwaltung, Informatik, Politik oder vergleichbar.
+Mehrjährige Erfahrung in Business Development, Consulting, Vertrieb oder strategischer Geschäftsentwicklung.`;
+
+        it('REJECTS DSGVO when JD has no compliance reference', () => {
+            const r = filterByVerbatimJDPresence(['DSGVO'], SAP_JD);
+            expect(r.removed).toContain('DSGVO');
+            expect(r.kept).not.toContain('DSGVO');
+        });
+
+        it('REJECTS ISO 27001 when JD has no ISO reference', () => {
+            const r = filterByVerbatimJDPresence(['ISO 27001'], SAP_JD);
+            expect(r.removed).toContain('ISO 27001');
+        });
+
+        it('REJECTS Cloud Computing when JD only mentions Cloud ERP (computing absent)', () => {
+            const r = filterByVerbatimJDPresence(['Cloud Computing'], SAP_JD);
+            expect(r.removed).toContain('Cloud Computing');
+        });
+
+        it('REJECTS PCI DSS when JD has no payment-card reference', () => {
+            const r = filterByVerbatimJDPresence(['PCI DSS'], SAP_JD);
+            expect(r.removed).toContain('PCI DSS');
+        });
+
+        it('KEEPS Ausschreibungen (verbatim in JD)', () => {
+            const r = filterByVerbatimJDPresence(['Ausschreibungen'], SAP_JD);
+            expect(r.kept).toContain('Ausschreibungen');
+        });
+
+        it('KEEPS Vertrieb (verbatim in JD)', () => {
+            const r = filterByVerbatimJDPresence(['Vertrieb'], SAP_JD);
+            expect(r.kept).toContain('Vertrieb');
+        });
+
+        it('KEEPS Go-to-Market (verbatim in JD as "Go-to-Market-Initiativen")', () => {
+            const r = filterByVerbatimJDPresence(['Go-to-Market'], SAP_JD);
+            expect(r.kept).toContain('Go-to-Market');
+        });
+
+        it('KEEPS Pilotprojekte (German declension — JD has "Pilotprojekten")', () => {
+            const r = filterByVerbatimJDPresence(['Pilotprojekte'], SAP_JD);
+            expect(r.kept).toContain('Pilotprojekte');
+        });
+
+        it('KEEPS SAP ERP (both 3-char tokens present in JD: SAP and ERP via "Cloud ERP")', () => {
+            const r = filterByVerbatimJDPresence(['SAP ERP'], SAP_JD);
+            expect(r.kept).toContain('SAP ERP');
+        });
+
+        it('KEEPS KI (2-char abbreviation, word-boundary in JD)', () => {
+            const r = filterByVerbatimJDPresence(['KI'], SAP_JD);
+            expect(r.kept).toContain('KI');
+        });
+
+        it('KEEPS Öffentlicher Sektor (umlaut + declension — JD has "öffentlichen Sektors")', () => {
+            const r = filterByVerbatimJDPresence(['Öffentlicher Sektor'], SAP_JD);
+            expect(r.kept).toContain('Öffentlicher Sektor');
+        });
+
+        it('end-to-end: from the actual SAP-Job hallucination set, only the substantiated keywords remain', () => {
+            const fromHallucinatedOutput = [
+                'Ausschreibungen',          // ✓ verbatim
+                'Cloud Computing',          // ✗ "computing" not in JD
+                'Digitale Transformation',  // ✓ "digitale Transformation" verbatim
+                'DSGVO',                    // ✗ not in JD
+                'ERP',                      // ✓ "Cloud ERP"
+                'Go-to-Market',             // ✓ verbatim
+                'ISO 27001',                // ✗ not in JD
+                'KI',                       // ✓ verbatim
+                'Öffentlicher Sektor',      // ✓ declension
+                'Pilotprojekte',            // ✓ declension
+                'Projektmanagement',        // ✗ not in JD (no "projekt..." word)
+                'SAP ERP',                  // ✓ both tokens present
+                'Stakeholder-Management',   // ✗ "management" alone not in JD
+                'Strategieentwicklung',     // ✗ no "strategieentwicklung" stem in JD
+                'Vertrieb',                 // ✓ verbatim
+            ];
+            const r = filterByVerbatimJDPresence(fromHallucinatedOutput, SAP_JD);
+            // Confirm the 4 high-priority hallucinations are gone
+            expect(r.removed).toContain('DSGVO');
+            expect(r.removed).toContain('ISO 27001');
+            expect(r.removed).toContain('Cloud Computing');
+            expect(r.removed).toContain('Projektmanagement');
+            // Confirm valid keywords survived
+            expect(r.kept).toContain('Ausschreibungen');
+            expect(r.kept).toContain('Vertrieb');
+            expect(r.kept).toContain('Go-to-Market');
+            expect(r.kept).toContain('Pilotprojekte');
+            expect(r.kept).toContain('SAP ERP');
+        });
+    });
+
+    describe('filterByVerbatimJDPresence — false-positive guards', () => {
+        const TECH_JD = `We are looking for a Senior Software Engineer with strong Python and TypeScript experience.
+You will work on Salesforce integrations using SAP, build microservices with Node.js, and deploy to AWS.
+Experience with Scrum, OKR and PMP certification is a plus.
+Familiarity with PostgreSQL and Redis is required.
+You will collaborate with stakeholders across product and engineering teams.`;
+
+        it('KEEPS verbatim tech keywords (Salesforce, Python, TypeScript)', () => {
+            const r = filterByVerbatimJDPresence(['Salesforce', 'Python', 'TypeScript'], TECH_JD);
+            expect(r.kept).toEqual(['Salesforce', 'Python', 'TypeScript']);
+        });
+
+        it('KEEPS short-token brand names with word-boundary match (SAP, AWS, OKR, PMP)', () => {
+            const r = filterByVerbatimJDPresence(['SAP', 'AWS', 'OKR', 'PMP'], TECH_JD);
+            expect(r.kept).toEqual(['SAP', 'AWS', 'OKR', 'PMP']);
+        });
+
+        it('REJECTS hallucinated 3-char tokens that appear only as substrings (e.g. ISO inside "Position")', () => {
+            // "Position" contains "iso" as substring but should not match — word-boundary required
+            const jdWithPosition = `${TECH_JD}\nThe Position requires strong communication.`;
+            const r = filterByVerbatimJDPresence(['ISO'], jdWithPosition);
+            expect(r.removed).toContain('ISO');
+        });
+
+        it('KEEPS Stakeholder Management when JD has both tokens verbatim', () => {
+            const r = filterByVerbatimJDPresence(['Stakeholder Management'], TECH_JD);
+            // "stakeholders" — stem "stakeh" matches; but "management" not in TECH_JD
+            // stakeholders ✓, management ✗ → REJECT
+            expect(r.removed).toContain('Stakeholder Management');
+        });
+
+        it('handles diacritics correctly (Übersetzung normalized to ubersetzung)', () => {
+            const r = filterByVerbatimJDPresence(['Übersetzung'], 'Wir suchen jemanden für Übersetzungen.');
+            expect(r.kept).toContain('Übersetzung');
         });
     });
 });

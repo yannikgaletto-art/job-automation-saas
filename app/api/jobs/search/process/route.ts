@@ -19,7 +19,7 @@ import {
     type SerpApiJob,
     type UserValues,
 } from '@/lib/services/job-search-pipeline';
-import { filterAtsKeywords } from '@/lib/services/ats-keyword-filter';
+import { filterAtsKeywords, filterByVerbatimJDPresence } from '@/lib/services/ats-keyword-filter';
 import { getUserLocale } from '@/lib/i18n/get-user-locale';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
@@ -133,7 +133,17 @@ export async function POST(request: NextRequest) {
         if (atsFilter.rewritten && atsFilter.rewritten.length > 0) {
             console.log(`✅ [Process] ATS-Filter: rewrote ${atsFilter.rewritten.length} compounds: ${atsFilter.rewritten.slice(0, 3).map(r => `${r.from}→${r.to}`).join(', ')}`);
         }
-        const cleanedAtsKeywords = atsFilter.kept;
+        let cleanedAtsKeywords = atsFilter.kept;
+
+        // Verbatim-Verification: drop hallucinations the LLM emitted despite the HARD RULE.
+        // primaryDescription is the source-of-truth (SerpAPI full description or short description).
+        if (cleanedAtsKeywords.length > 0 && primaryDescription) {
+            const verbatim = filterByVerbatimJDPresence(cleanedAtsKeywords, primaryDescription);
+            if (verbatim.removed.length > 0) {
+                console.log(`✅ [Process] Verbatim-Filter: dropped ${verbatim.removed.length}: ${verbatim.removed.slice(0, 5).join(', ')}`);
+            }
+            cleanedAtsKeywords = verbatim.kept;
+        }
 
         // ─── §12.3 Verification Guard: Company Mismatch (soft-warn) ──
         // Substring check stays simple. Mismatch is now a NON-BLOCKING warning

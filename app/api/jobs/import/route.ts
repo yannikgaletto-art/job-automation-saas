@@ -10,7 +10,7 @@ import { getUserLocale, getLanguageName, type SupportedLocale } from '@/lib/i18n
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash'
 import { complete } from '@/lib/ai/model-router'
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer'
-import { filterAtsKeywords } from '@/lib/services/ats-keyword-filter'
+import { filterAtsKeywords, filterByVerbatimJDPresence } from '@/lib/services/ats-keyword-filter'
 
 // ================================================================
 // CORS Headers — required for Browser Extension (chrome-extension:// origin)
@@ -314,6 +314,15 @@ Schema: {"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8
                         }
                         if (atsFilter.rewritten && atsFilter.rewritten.length > 0) {
                             console.log(`[${requestId}] route=jobs/import step=ats_filter rewrote=${atsFilter.rewritten.slice(0, 3).map(r => `${r.from}→${r.to}`).join(', ')}`)
+                        }
+
+                        // Verbatim-Verification: drop hallucinations the LLM emitted despite the HARD RULE.
+                        if (buzzwords && buzzwords.length > 0 && description) {
+                            const verbatim = filterByVerbatimJDPresence(buzzwords, description)
+                            if (verbatim.removed.length > 0) {
+                                console.log(`[${requestId}] route=jobs/import step=verbatim_filter dropped=${verbatim.removed.length}: ${verbatim.removed.slice(0, 5).join(', ')}`)
+                            }
+                            buzzwords = verbatim.kept.length > 0 ? verbatim.kept : null
                         }
                     }
 

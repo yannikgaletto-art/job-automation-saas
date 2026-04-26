@@ -10,7 +10,7 @@ import { inngest } from '@/lib/inngest/client';
 import { complete } from '@/lib/ai/model-router';
 import { getUserLocale, getLanguageName } from '@/lib/i18n/get-user-locale';
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
-import { filterAtsKeywords } from '@/lib/services/ats-keyword-filter';
+import { filterAtsKeywords, filterByVerbatimJDPresence } from '@/lib/services/ats-keyword-filter';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = createAdminClient(
@@ -190,8 +190,20 @@ export async function POST(request: NextRequest) {
                 // ATS-Filter applied to legacy cache entries — old caches may contain
                 // pre-hardening garbage (Bürozeit, Teamfähigkeit, etc.).
                 const cacheFilter = filterAtsKeywords(cached.buzzwords as string[]);
+                let cleanedBuzzwords = cacheFilter.kept;
+
+                // Verbatim-Verification on cached buzzwords too — old caches may contain
+                // pre-fix LLM hallucinations (compliance terms without JD reference).
+                if (cleanedBuzzwords.length > 0) {
+                    const verbatim = filterByVerbatimJDPresence(cleanedBuzzwords, enrichedDescription);
+                    if (verbatim.removed.length > 0) {
+                        console.log(`[${requestId}] route=jobs/ingest step=cache_verbatim_filter dropped=${verbatim.removed.length}: ${verbatim.removed.slice(0, 5).join(', ')}`);
+                    }
+                    cleanedBuzzwords = verbatim.kept;
+                }
+
                 cachedExtraction = {
-                    buzzwords: cacheFilter.kept,
+                    buzzwords: cleanedBuzzwords,
                     summary: cached.summary || null,
                     qualifications: Array.isArray(cached.requirements) ? cached.requirements : [],
                     responsibilities: Array.isArray(cached.responsibilities) ? cached.responsibilities : [],
@@ -199,7 +211,7 @@ export async function POST(request: NextRequest) {
                     seniority: cached.seniority || 'unknown',
                     location: cached.location || null,
                 };
-                console.log(`[${requestId}] route=jobs/ingest step=extraction_cache HIT — reusing ${cacheFilter.kept.length}/${cached.buzzwords.length} buzzwords after filter (hash: ${descriptionHash.slice(0, 8)}…)`);
+                console.log(`[${requestId}] route=jobs/ingest step=extraction_cache HIT — reusing ${cleanedBuzzwords.length}/${cached.buzzwords.length} buzzwords after filter (hash: ${descriptionHash.slice(0, 8)}…)`);
                 if (cacheFilter.removed.length > 0) {
                     console.log(`[${requestId}] route=jobs/ingest step=cache_filter removed=${cacheFilter.removed.length}: ${cacheFilter.removed.slice(0, 5).join(', ')}`);
                 }
@@ -338,6 +350,15 @@ Schema: ${JSON.stringify(extractionSchema)}`,
             }
             if (atsFilter.rewritten && atsFilter.rewritten.length > 0) {
                 console.log(`[${requestId}] route=jobs/ingest step=ats_filter rewrote=${atsFilter.rewritten.slice(0, 3).map(r => `${r.from}→${r.to}`).join(', ')}`);
+            }
+
+            // Verbatim-Verification: drop hallucinations the LLM emitted despite the HARD RULE.
+            if (extractedData.buzzwords.length > 0) {
+                const verbatim = filterByVerbatimJDPresence(extractedData.buzzwords as string[], enrichedDescription);
+                if (verbatim.removed.length > 0) {
+                    console.log(`[${requestId}] route=jobs/ingest step=verbatim_filter dropped=${verbatim.removed.length}: ${verbatim.removed.slice(0, 5).join(', ')}`);
+                }
+                extractedData.buzzwords = verbatim.kept;
             }
         }
         if (Array.isArray(extractedData.qualifications) && extractedData.qualifications.length > 0) {

@@ -316,3 +316,136 @@ export function filterAtsKeywords(candidates: string[] | null | undefined): Filt
     if (rewritten.length > 0) result.rewritten = rewritten;
     return result;
 }
+
+// ─── Verbatim JD-Presence Filter (Defense-in-Depth gegen LLM-Halluzinationen) ────
+//
+// The Mistral/Haiku ATS-extraction prompt instructs the LLM to only emit keywords
+// that appear in the JD text. Empirical evidence (2026-04-26 SAP-Job test) shows
+// that Mistral ignores the HARD RULE and still emits training-data-derived
+// keywords like "DSGVO", "ISO 27001", "Cloud Computing" even when they are absent
+// from the JD. This filter verifies each keyword's presence in the JD text and
+// drops anything that cannot be substantiated.
+//
+// Strategy:
+//   1. Normalize keyword + JD (lowercase, strip diacritics, normalize whitespace)
+//   2. Try exact phrase match
+//   3. Try hyphen-stripped variant ("Stakeholder-Management" ↔ "Stakeholdermanagement")
+//   4. Token-level check: every significant token must appear in JD.
+//      Long tokens (≥4 chars): prefix-stem match (handles German declension —
+//        "Sektor" matches "Sektors", "Öffentlicher" matches "öffentlichen")
+//      Short tokens (<4 chars): word-boundary match (prevents "ISO" matching "Position")
+
+const STOP_TOKENS_FOR_VERIFICATION: ReadonlySet<string> = new Set([
+    'and', 'or', 'the', 'of', 'in', 'on', 'at', 'to', 'for', 'as', 'by', 'with',
+    'und', 'oder', 'der', 'die', 'das', 'ein', 'eine', 'mit', 'auf', 'für', 'bei',
+    'y', 'o', 'el', 'la', 'los', 'las', 'un', 'una', 'de', 'en', 'con',
+]);
+
+function normalizeForComparison(s: string): string {
+    return (s ?? '')
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[̀-ͯ]/g, '')      // strip combining diacritics (umlauts → base letter)
+        .replace(/[^a-z0-9\s\-_]/g, ' ')      // strip punctuation/special chars
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function escapeRegex(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isTokenInJD(token: string, normalizedJD: string): boolean {
+    if (!token) return false;
+    if (token.length < 3) {
+        // Very short tokens (1-2 chars) — too noisy, ignore them
+        return true;
+    }
+    if (token.length === 3) {
+        // 3-char tokens like "SAP", "ERP", "OKR", "CEO" → require word-boundary match
+        // to prevent false positives like "iso" matching "position"
+        const regex = new RegExp(`\\b${escapeRegex(token)}\\b`);
+        return regex.test(normalizedJD);
+    }
+    // Longer tokens (≥4 chars) → prefix-stem match (handles German declension).
+    // Stem length 6 chars is a compromise: short enough for "Sektor"→"Sektors"
+    // but long enough to reject false matches.
+    const stemLen = Math.min(token.length, 6);
+    const stem = token.slice(0, stemLen);
+    const regex = new RegExp(`\\b${escapeRegex(stem)}`);
+    return regex.test(normalizedJD);
+}
+
+/**
+ * Verify each keyword can be substantiated in the job description text.
+ * Drops keywords that the LLM hallucinated (verbatim/translation/semantic match required).
+ *
+ * If the JD text is missing or too short (< 50 chars), all keywords are kept
+ * (no false rejection when verification context is absent).
+ */
+export function filterByVerbatimJDPresence(
+    keywords: string[] | null | undefined,
+    jdText: string | null | undefined,
+): FilterResult {
+    if (!keywords || keywords.length === 0) {
+        return { kept: [], removed: [] };
+    }
+    // Without a reliable JD, we cannot verify — keep all to avoid false rejects
+    if (!jdText || jdText.length < 50) {
+        return { kept: [...keywords], removed: [] };
+    }
+
+    const normalizedJD = normalizeForComparison(jdText);
+    const jdNoSeparators = normalizedJD.replace(/[-_\s]+/g, '');
+
+    const kept: string[] = [];
+    const removed: string[] = [];
+
+    for (const kw of keywords) {
+        if (typeof kw !== 'string' || !kw.trim()) {
+            removed.push(String(kw));
+            continue;
+        }
+
+        const normalizedKw = normalizeForComparison(kw);
+
+        // Check 1: Exact phrase match
+        if (normalizedKw.length > 0 && normalizedJD.includes(normalizedKw)) {
+            kept.push(kw);
+            continue;
+        }
+
+        // Check 2: Hyphen/space-stripped variant
+        // "Stakeholder-Management" ↔ "Stakeholder Management" ↔ "Stakeholdermanagement"
+        const kwNoSeparators = normalizedKw.replace(/[-_\s]+/g, '');
+        if (kwNoSeparators.length >= 4 && jdNoSeparators.includes(kwNoSeparators)) {
+            kept.push(kw);
+            continue;
+        }
+
+        // Check 3: Token-level verification — ALL significant tokens must be present
+        const tokens = normalizedKw
+            .split(/[\s\-_]+/)
+            .filter(t => t.length >= 3 && !STOP_TOKENS_FOR_VERIFICATION.has(t));
+
+        if (tokens.length === 0) {
+            // Pure short-token keyword like "AI" or "BI" — keep only if word-boundary match
+            const allTokens = normalizedKw.split(/[\s\-_]+/).filter(t => t.length >= 2);
+            if (allTokens.length > 0 && allTokens.every(t => isTokenInJD(t, normalizedJD))) {
+                kept.push(kw);
+            } else {
+                removed.push(kw);
+            }
+            continue;
+        }
+
+        const allFound = tokens.every(t => isTokenInJD(t, normalizedJD));
+        if (allFound) {
+            kept.push(kw);
+        } else {
+            removed.push(kw);
+        }
+    }
+
+    return { kept, removed };
+}
