@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server' // Auth client
 import { createClient as createAdminClient } from '@supabase/supabase-js' // Admin client
 import { processDocument } from '@/lib/services/document-processor'
+import { decideMasterUpdate } from '@/lib/services/cv-master-sync'
 
 
 // Admin client for bypassing RLS
@@ -250,32 +251,39 @@ export async function POST(req: NextRequest) {
                             // Phase 9 (2026-04-27) — only the FIRST upload becomes the master CV.
                             // Subsequent uploads add a document row but do NOT overwrite the master.
                             // User explicitly switches the master via the Profil Re-Parse button (Welle C).
-                            const { decideMasterUpdate } = await import('@/lib/services/cv-master-sync');
-                            const { data: existingProfile } = await supabaseAdmin
+                            const { data: existingProfile, error: lookupErr } = await supabaseAdmin
                                 .from('user_profiles')
                                 .select('cv_original_file_path')
                                 .eq('id', userId)
                                 .maybeSingle();
-                            const decision = decideMasterUpdate(existingProfile?.cv_original_file_path);
-                            console.log(`[${requestId}] route=documents/upload step=master_decision update=${decision.shouldUpdate} reason=${decision.reason}`);
 
-                            if (decision.shouldUpdate) {
-                                const { error: profileErr } = await supabaseAdmin
-                                    .from('user_profiles')
-                                    .update({
-                                        cv_structured_data: structuredCv,
-                                        cv_original_file_path: cvUploadData.path,
-                                        ...(resolvedName ? { full_name: resolvedName } : {}),
-                                    })
-                                    .eq('id', userId);
-
-                                if (profileErr) {
-                                    console.error(`[${requestId}] route=documents/upload step=save_profile supabase_error=${profileErr.message}`);
-                                } else {
-                                    console.log(`[${requestId}] route=documents/upload step=save_profile success`);
-                                }
+                            // Fail-safe (Phase 9 pentest finding): if the lookup itself errors,
+                            // do NOT touch the master. The previous behaviour would silently treat
+                            // a failed lookup as "first-upload" and overwrite an existing master.
+                            if (lookupErr) {
+                                console.error(`[${requestId}] route=documents/upload step=master_lookup supabase_error=${lookupErr.message} — failing safe, master untouched`);
                             } else {
-                                console.log(`[${requestId}] route=documents/upload step=save_profile skipped (master already set, doc added only)`);
+                                const decision = decideMasterUpdate(existingProfile?.cv_original_file_path);
+                                console.log(`[${requestId}] route=documents/upload step=master_decision update=${decision.shouldUpdate} reason=${decision.reason}`);
+
+                                if (decision.shouldUpdate) {
+                                    const { error: profileErr } = await supabaseAdmin
+                                        .from('user_profiles')
+                                        .update({
+                                            cv_structured_data: structuredCv,
+                                            cv_original_file_path: cvUploadData.path,
+                                            ...(resolvedName ? { full_name: resolvedName } : {}),
+                                        })
+                                        .eq('id', userId);
+
+                                    if (profileErr) {
+                                        console.error(`[${requestId}] route=documents/upload step=save_profile supabase_error=${profileErr.message}`);
+                                    } else {
+                                        console.log(`[${requestId}] route=documents/upload step=save_profile success`);
+                                    }
+                                } else {
+                                    console.log(`[${requestId}] route=documents/upload step=save_profile skipped (master already set, doc added only)`);
+                                }
                             }
                         } catch (parseError: unknown) {
                             const msg = parseError instanceof Error ? parseError.message : String(parseError);
