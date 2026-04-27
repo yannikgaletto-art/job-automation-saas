@@ -93,9 +93,11 @@ export async function POST(request: NextRequest) {
             console.log('🔧 [Extract] DEV MODE — running synchronously');
             const { complete } = await import('@/lib/ai/model-router');
 
-            const response = await complete({
-                taskType: 'extract_job_fields',
-                systemPrompt: `Extrahiere aus der Stellenbeschreibung diese JSON-Struktur. NUR JSON zurückgeben, kein Markdown, keine Erklärungen.
+            let response;
+            try {
+                response = await complete({
+                    taskType: 'extract_job_fields',
+                    systemPrompt: `Extrahiere aus der Stellenbeschreibung diese JSON-Struktur. NUR JSON zurückgeben, kein Markdown, keine Erklärungen.
 
 WICHTIG für Listen (responsibilities, qualifications, benefits):
 - Schreibe verdichtete, vollständige Sätze — ca. 20% kürzer als das Original.
@@ -105,10 +107,29 @@ WICHTIG für Listen (responsibilities, qualifications, benefits):
 - Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
 
 {"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben als verdichtete vollständige Sätze"],"qualifications":["max 8 Anforderungen als verdichtete vollständige Sätze"],"benefits":["max 5"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["max 18 ATS Keywords"]}`,
-                prompt: job.description,
-                temperature: 0,
-                maxTokens: 2000,
-            });
+                    prompt: job.description,
+                    temperature: 0,
+                    maxTokens: 2000,
+                });
+            } catch (aiErr: any) {
+                const aiMsg = aiErr?.message ?? String(aiErr);
+                console.error(`❌ [Extract DEV] AI call failed for job ${jobId}: ${aiMsg}`);
+                // Persist the error so the user can see what went wrong instead of a silent empty job.
+                const currentMetadata = (job.metadata as Record<string, unknown>) || {};
+                await supabaseAdmin.from('job_queue').update({
+                    metadata: { ...currentMetadata, extract_error: aiMsg, extract_failed_at: new Date().toISOString() },
+                }).eq('id', jobId).eq('user_id', user.id);
+
+                // Return user-friendly message for known patterns
+                const friendly = aiMsg.includes('usage limits') || aiMsg.includes('quota') || aiMsg.includes('credit balance')
+                    ? 'Anthropic API-Limit erreicht. Bitte in console.anthropic.com unter Settings → Limits erhöhen.'
+                    : aiMsg.includes('rate limit')
+                        ? 'AI-Provider Rate-Limit erreicht. Bitte 1 Minute warten und erneut versuchen.'
+                        : aiMsg.includes('Invalid API Key') || aiMsg.includes('authentication')
+                            ? 'AI-Provider API-Key ungültig. Bitte .env.local prüfen.'
+                            : `AI-Provider-Fehler: ${aiMsg}`;
+                return NextResponse.json({ success: false, error: friendly }, { status: 502 });
+            }
 
             const extracted = safeParseJSON(response.text);
             const currentMetadata = (job.metadata as Record<string, unknown>) || {};

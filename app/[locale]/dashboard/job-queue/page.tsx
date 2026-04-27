@@ -311,7 +311,7 @@ export default function JobQueuePage() {
                 body: JSON.stringify({ jobId }),
             });
             const data = await res.json();
-            if (!data.success) throw new Error(data.error);
+            if (!data.success) throw new Error(data.error || `HTTP ${res.status}`);
 
             let attempts = 0;
             const maxAttempts = 20;
@@ -325,13 +325,27 @@ export default function JobQueuePage() {
                         notify(t('notify_steckbrief'));
                     } else if (attempts >= maxAttempts) {
                         clearInterval(pollInterval);
+                        notify('⚠️ Analyse läuft länger als erwartet. Bitte Seite neu laden.');
                     }
-                } catch {
+                } catch (pollErr: any) {
                     clearInterval(pollInterval);
+                    console.error('[handleReanalyze] poll error:', pollErr);
+                    notify(`⚠️ Polling-Fehler: ${pollErr?.message ?? 'unbekannt'}`);
                 }
             }, 3000);
 
-        } catch (err) {
+        } catch (err: any) {
+            console.error('[handleReanalyze] failed:', err);
+            const msg = err?.message ?? 'Unbekannter Fehler';
+            // Surface common backend errors clearly so the user knows where to act.
+            const userMsg = msg.includes('usage limits') || msg.includes('quota')
+                ? '❌ Anthropic API-Limit erreicht. Bitte in console.anthropic.com unter Settings → Limits erhöhen.'
+                : msg.includes('Not authenticated')
+                    ? '❌ Sitzung abgelaufen. Bitte erneut einloggen.'
+                    : msg.includes('Beschreibung zu kurz')
+                        ? '❌ Stellenbeschreibung zu kurz für die Analyse.'
+                        : `❌ Analyse fehlgeschlagen: ${msg}`;
+            notify(userMsg);
         }
     };
 
