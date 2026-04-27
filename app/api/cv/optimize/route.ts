@@ -17,8 +17,7 @@ import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
 
 // Vercel timeout protection — Claude Sonnet can take 40-75s on large payloads.
-// Welle E (2026-04-27): pageMode='3-pages' adds ~30% output tokens (4 vs 3 bullets per station × 6 stations);
-// 150s gives a safe buffer instead of cutting it close at 120.
+// 150s gives a safe buffer for 6+ stations × 3 bullets each.
 export const maxDuration = 150;
 
 // Prompt version for tracking and rollback
@@ -231,12 +230,10 @@ Sentence 3: what value the candidate brings to the employer; no filler words lik
 Always emit a "summary" change in the diff-list, even if the existing summary is missing or empty.\n`;
         }
 
-        // Welle E (2026-04-27): pageMode controls layout density.
-        // Phase 9 added '1-page' mode for early-career or executive-summary CVs.
-        const pageMode: '1-page' | '2-pages' | '3-pages' =
-            cv_opt_settings?.pageMode === '1-page' ? '1-page'
-                : cv_opt_settings?.pageMode === '3-pages' ? '3-pages'
-                : '2-pages';
+        // pageMode controls layout density. Welle 2 Phase 3 (2026-04-27): '3-pages'
+        // option removed (Reduce Complexity: industry standard is 2-pages).
+        const pageMode: '1-page' | '2-pages' =
+            cv_opt_settings?.pageMode === '1-page' ? '1-page' : '2-pages';
         const layoutConstraints = pageMode === '1-page'
             ? `[LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION} — pageMode=1-page]
 HARD RULE: The final CV MUST fit on exactly 1 printed A4 page. NEVER generate content for 2+ pages.
@@ -249,20 +246,6 @@ HARD RULE: The final CV MUST fit on exactly 1 printed A4 page. NEVER generate co
 - Certificates: keep only the 4 most relevant
 - Page budget:
   → Page 1: Header + Summary + Top 3-4 Experience entries + Education + Skills + Languages`
-            : pageMode === '3-pages'
-            ? `[LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION} — pageMode=3-pages]
-HARD RULE: The final CV MUST fit on at most 3 printed A4 pages. NEVER generate content for 4+ pages.
-- Max 4 bullet points per experience entry (quality over quantity)
-- Max 22 words per bullet point. Aim for high information density.
-- Summary: max 3 sentences
-- If ≥6 experience entries: oldest 2 entries get max 3 bullets each (preserved detail)
-- If >3 education entries: top 3 most relevant get full description
-- Skills: max 3 categories, max 8 items per category
-- Certificates: keep only the 6 most relevant (drop the rest)
-- Page budget:
-  → Page 1: Header + Summary + Experience (recent 2-3 stations)
-  → Page 2: Experience (older stations) + Education
-  → Page 3: Skills, Languages, Certificates`
             : `[LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION} — pageMode=2-pages]
 HARD RULE: The final CV MUST fit on exactly 2 printed A4 pages. NEVER generate content for 3+ pages.
 - Max 3 bullet points per experience entry (quality over quantity — user can add more)
@@ -370,10 +353,10 @@ SELF-JUDGE VALIDATION (run this before returning):
 Before returning your output, mentally verify:
 1. Count total changes. If >18, keep only the 18 most impactful.
 2. Verify at least 2 sections are covered (experience + skills/summary). If not, add 1–2 skills/summary changes.
-3. Count total bullet points across all experience entries. If >${pageMode === '3-pages' ? '24' : pageMode === '1-page' ? '8' : '15'}, cut the weakest.
+3. Count total bullet points across all experience entries. If >${pageMode === '1-page' ? '8' : '15'}, cut the weakest.
 4. Count total skill items. If >${pageMode === '1-page' ? '12' : '24'}, remove least relevant.
 5. Count certificates. If >${pageMode === '1-page' ? '4' : '6'}, keep only the most relevant.
-6. If total content is likely to overflow ${pageMode === '3-pages' ? '3' : pageMode === '1-page' ? '1' : '2'} pages, aggressively cut the oldest/weakest entries.
+6. If total content is likely to overflow ${pageMode === '1-page' ? '1' : '2'} pages, aggressively cut the oldest/weakest entries.
 7. For each change: does it pass the QUALITY GATE? If not, drop it.
 If any check fails, revise your output before returning.
 [END LAYOUT CONSTRAINTS]
@@ -652,6 +635,34 @@ Must conform to the following Zod schema:
                 source: cv_structured_data.education.length,
             });
             safeTranslated.education = cv_structured_data.education;
+        }
+
+        // Welle 2 Phase 2 (2026-04-27): final defense-in-depth against any extra
+        // experience/education/certifications entries that may have slipped through
+        // the Translator cap (e.g. from a future code path where translateCvIfNeeded
+        // is bypassed). Cap optimizedCv against the original cv_structured_data,
+        // not against translatedCv — both should match anyway, but cv_structured_data
+        // is the immutable source of truth from the request body.
+        if (cv_structured_data.experience && optimizedCv.experience && optimizedCv.experience.length > cv_structured_data.experience.length) {
+            log.warn('Optimizer length-guard: experience grew beyond source, truncating', {
+                source: cv_structured_data.experience.length,
+                optimized: optimizedCv.experience.length,
+            });
+            optimizedCv.experience = optimizedCv.experience.slice(0, cv_structured_data.experience.length);
+        }
+        if (cv_structured_data.education && optimizedCv.education && optimizedCv.education.length > cv_structured_data.education.length) {
+            log.warn('Optimizer length-guard: education grew beyond source, truncating', {
+                source: cv_structured_data.education.length,
+                optimized: optimizedCv.education.length,
+            });
+            optimizedCv.education = optimizedCv.education.slice(0, cv_structured_data.education.length);
+        }
+        if (cv_structured_data.certifications && optimizedCv.certifications && optimizedCv.certifications.length > cv_structured_data.certifications.length) {
+            log.warn('Optimizer length-guard: certifications grew beyond source, truncating', {
+                source: cv_structured_data.certifications.length,
+                optimized: optimizedCv.certifications.length,
+            });
+            optimizedCv.certifications = optimizedCv.certifications.slice(0, cv_structured_data.certifications.length);
         }
 
         // Construct the final proposal object.

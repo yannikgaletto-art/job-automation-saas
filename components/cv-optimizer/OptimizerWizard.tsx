@@ -744,7 +744,8 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                                 </button>
                                             </div>
 
-                                            {/* Welle E (2026-04-27) + Phase 9 (1-page): page-count target */}
+                                            {/* Page-count target. Welle 2 Phase 3 (2026-04-27):
+                                                3-pages option removed (Reduce Complexity). */}
                                             <div className="pt-2 border-t border-gray-200">
                                                 <div className="flex items-center justify-between mb-1.5">
                                                     <span className="text-sm text-gray-700">{t('page_mode_label')}</span>
@@ -770,16 +771,6 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                                             className="accent-[#012e7a]"
                                                         />
                                                         {t('page_mode_2')}
-                                                    </label>
-                                                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-                                                        <input
-                                                            type="radio"
-                                                            name="pageMode"
-                                                            checked={cvOptSettings.pageMode === '3-pages'}
-                                                            onChange={() => setCvOptSettings(s => ({ ...s, pageMode: '3-pages' }))}
-                                                            className="accent-[#012e7a]"
-                                                        />
-                                                        {t('page_mode_3')}
                                                     </label>
                                                 </div>
                                             </div>

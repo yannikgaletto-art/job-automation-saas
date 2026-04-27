@@ -7,7 +7,7 @@
  * CVs (German experience + English education) were never flagged for translation.
  */
 
-import { needsTranslation, restoreImmutableFields, detectStringLanguage, countLanguageMarkers } from '../cv-translator';
+import { needsTranslation, restoreImmutableFields, detectStringLanguage, countLanguageMarkers, capArrayLengthsToSource } from '../cv-translator';
 import type { CvStructuredData } from '@/types/cv';
 
 const baseCv: CvStructuredData = {
@@ -470,5 +470,76 @@ describe('countLanguageMarkers — primitive used by detect', () => {
 
     test('case-insensitive', () => {
         expect(countLanguageMarkers('LED Managed', 'en')).toBe(2);
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Welle 2 Phase 2 (2026-04-27) — capArrayLengthsToSource
+// Bug: Translator-LLM hallucinated a 6th experience entry on Yannik's
+// Exxeta CV (5 stations in source). Hard-cap deterministically.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('capArrayLengthsToSource — Welle 2 Phase 2', () => {
+    const mkExp = (id: string, role: string) => ({ id, role, company: 'X', dateRangeText: '', description: [] });
+
+    test('REGRESSION: drops 6th hallucinated experience entry to source length 5', () => {
+        const orig: CvStructuredData = {
+            ...baseCv,
+            experience: [mkExp('e1', 'A'), mkExp('e2', 'B'), mkExp('e3', 'C'), mkExp('e4', 'D'), mkExp('e5', 'E')],
+        };
+        const translated: CvStructuredData = {
+            ...baseCv,
+            experience: [mkExp('e1', 'A'), mkExp('e2', 'B'), mkExp('e3', 'C'), mkExp('e4', 'D'), mkExp('e5', 'E'), mkExp('e6', 'HALLUCINATED ZF')],
+        };
+        capArrayLengthsToSource(orig, translated);
+        expect(translated.experience.length).toBe(5);
+        expect(translated.experience.some(e => e.role === 'HALLUCINATED ZF')).toBe(false);
+    });
+
+    test('does not grow when translated has fewer entries than source', () => {
+        const orig: CvStructuredData = { ...baseCv, experience: [mkExp('e1', 'A'), mkExp('e2', 'B')] };
+        const translated: CvStructuredData = { ...baseCv, experience: [mkExp('e1', 'A')] };
+        capArrayLengthsToSource(orig, translated);
+        expect(translated.experience.length).toBe(1); // unchanged
+    });
+
+    test('caps education when LLM grows it', () => {
+        const orig: CvStructuredData = { ...baseCv, education: [{ id: 'edu-1', degree: 'BA', institution: 'X' }] as any };
+        const translated: CvStructuredData = {
+            ...baseCv,
+            education: [{ id: 'edu-1', degree: 'BA', institution: 'X' }, { id: 'edu-fake', degree: 'PhD', institution: 'fake' }] as any,
+        };
+        capArrayLengthsToSource(orig, translated);
+        expect(translated.education.length).toBe(1);
+    });
+
+    test('caps certifications when LLM grows it', () => {
+        const orig: CvStructuredData = { ...baseCv, certifications: [{ id: 'c1', name: 'A' } as any] };
+        const translated: CvStructuredData = {
+            ...baseCv,
+            certifications: [{ id: 'c1', name: 'A' }, { id: 'c-fake', name: 'fake' }] as any,
+        };
+        capArrayLengthsToSource(orig, translated);
+        expect(translated.certifications!.length).toBe(1);
+    });
+
+    test('idempotent: running twice yields same result', () => {
+        const orig: CvStructuredData = { ...baseCv, experience: [mkExp('e1', 'A'), mkExp('e2', 'B')] };
+        const translated: CvStructuredData = {
+            ...baseCv,
+            experience: [mkExp('e1', 'A'), mkExp('e2', 'B'), mkExp('e3', 'C')],
+        };
+        capArrayLengthsToSource(orig, translated);
+        const after1 = translated.experience.length;
+        capArrayLengthsToSource(orig, translated);
+        expect(translated.experience.length).toBe(after1);
+        expect(translated.experience.length).toBe(2);
+    });
+
+    test('empty translated arrays: noop', () => {
+        const orig: CvStructuredData = { ...baseCv, experience: [mkExp('e1', 'A')] };
+        const translated: CvStructuredData = { ...baseCv, experience: [] };
+        capArrayLengthsToSource(orig, translated);
+        expect(translated.experience.length).toBe(0);
     });
 });

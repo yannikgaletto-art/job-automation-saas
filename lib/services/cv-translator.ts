@@ -236,6 +236,9 @@ ${JSON.stringify(cvForAI, null, 2)}`;
             return { cv, wasTranslated: false };
         }
 
+        // Welle 2 Phase 2 (2026-04-27): Hard-cap array lengths to source.
+        capArrayLengthsToSource(cv, translated);
+
         // Preserve IDs from original (safety net — AI should keep them, but verify)
         translated.version = cv.version;
         for (let i = 0; i < (translated.experience || []).length; i++) {
@@ -332,5 +335,31 @@ export function restoreImmutableFields(orig: CvStructuredData, translated: CvStr
     }
     if (orig.certifications?.length && !translated.certifications?.length) {
         translated.certifications = orig.certifications;
+    }
+}
+
+/**
+ * Welle 2 Phase 2 (2026-04-27): Hard-cap translated array lengths to the source.
+ *
+ * Bug repro: Yannik's Exxeta CV had 5 experience entries; translator-LLM occasionally
+ * emitted a 6th hallucinated entry ("HR-Transformation @ ZF") promoted from a cert
+ * line. The prompt rule "STRUCTURAL: same array lengths" is unreliable — LLMs ignore
+ * it, especially with Haiku-class models. Enforce deterministically by truncating
+ * excess entries. Never grows arrays — only shrinks if translated is longer than orig.
+ *
+ * Pure function — mutates `translated` in place. Idempotent. Exported for testing.
+ */
+export function capArrayLengthsToSource(orig: CvStructuredData, translated: CvStructuredData): void {
+    if (orig.experience && translated.experience && translated.experience.length > orig.experience.length) {
+        console.warn(`[cv-translator] LLM hallucinated extra experience entries (${translated.experience.length} > ${orig.experience.length}); truncating to source length`);
+        translated.experience = translated.experience.slice(0, orig.experience.length);
+    }
+    if (orig.education && translated.education && translated.education.length > orig.education.length) {
+        console.warn(`[cv-translator] LLM hallucinated extra education entries (${translated.education.length} > ${orig.education.length}); truncating`);
+        translated.education = translated.education.slice(0, orig.education.length);
+    }
+    if (orig.certifications && translated.certifications && translated.certifications.length > orig.certifications.length) {
+        console.warn(`[cv-translator] LLM hallucinated extra certifications (${translated.certifications.length} > ${orig.certifications.length}); truncating`);
+        translated.certifications = translated.certifications.slice(0, orig.certifications.length);
     }
 }

@@ -355,14 +355,20 @@ ${sanitized}
       // "Firma I Rolle" or "Co-Founder - Firma" cleanly on one line. Recover
       // deterministically from the original text before downstream consumers
       // see the gap.
-      experience: recoverMissingExperienceCompany(
-        sortExperienceByDate(
-          (validated.experience ?? []).map((e: any) => ({
-            ...e,
-            role: stripRoleDateMarkers(e.role),
-          }))
-        ) as Array<{ role?: string | null; company?: string | null; [k: string]: any }>,
-        text
+      experience: dropExperienceDuplicatedAsCert(
+        recoverMissingExperienceStation(
+          recoverMissingExperienceCompany(
+            sortExperienceByDate(
+              (validated.experience ?? []).map((e: any) => ({
+                ...e,
+                role: stripRoleDateMarkers(e.role),
+              }))
+            ) as Array<{ role?: string | null; company?: string | null; [k: string]: any }>,
+            text
+          ),
+          text
+        ),
+        certifications,
       ),
       // Same drop pattern for education.institution when "Studiengang (X.Y.) Universität ..." sits on one line.
       // validateDescriptionsAgainstRawText drops fully-fabricated descriptions.
@@ -1338,7 +1344,7 @@ export function extractCertCandidates(lines: string[]): CertCandidate[] {
   return out;
 }
 
-function tokenOverlapScore(a: string, b: string): number {
+export function tokenOverlapScore(a: string, b: string): number {
   const tokenize = (s: string) =>
     new Set(
       s
@@ -1434,4 +1440,157 @@ export function recoverCertsFromRawSection<
   }
 
   return corrected;
+}
+
+/**
+ * Welle 2A (2026-04-27): Drops experience entries that are duplicates of
+ * a certification entry. Repro: Yannik's Exxeta CV has the cert
+ * "HR-Transformation @ ZF GmbH (2022)" — the parser-LLM occasionally
+ * mis-classifies it as an experience entry (role="HR-Transformation &
+ * Organisationsentwicklung", company="ZF"). Identify by token overlap
+ * between role↔cert.name AND company↔cert.issuer.
+ *
+ * Conservative thresholds (avoid false positives on legitimate stations):
+ *   - role↔cert.name overlap ≥ 0.7
+ *   - either: company+issuer both present AND overlap ≥ 0.5
+ *     OR:    role↔cert.name overlap ≥ 0.85 (very strong on its own)
+ *
+ * Idempotent. Pure function. Exported for testing.
+ */
+export function dropExperienceDuplicatedAsCert<TExp extends { role?: string | null; company?: string | null;[k: string]: any }>(
+  experience: TExp[],
+  certifications: Array<{ name?: string | null; issuer?: string | null;[k: string]: any }>,
+): TExp[] {
+  if (!Array.isArray(certifications) || certifications.length === 0) return experience;
+  // Helper: count meaningful (≥3 char) tokens — prevents single-token role hits.
+  const tokenCount = (s: string): number =>
+    s.toLowerCase().split(/[\s\-_/.,;:()]+/).filter((t) => t.length >= 3).length;
+  return experience.filter((exp) => {
+    const role = (exp.role || '').toString().trim();
+    const company = (exp.company || '').toString().trim();
+    if (role.length === 0) return true; // can't compare without role
+    // Require at least 2 meaningful tokens in role to engage the duplicate check.
+    // Otherwise a single-token role like "Manager" matches any cert name containing "Manager".
+    if (tokenCount(role) < 2) return true;
+    for (const cert of certifications) {
+      const certName = (cert.name || '').toString().trim();
+      const certIssuer = (cert.issuer || '').toString().trim();
+      if (certName.length === 0) continue;
+      if (tokenCount(certName) < 2) continue;
+      const roleOverlap = tokenOverlapScore(role, certName);
+      if (roleOverlap < 0.7) continue;
+      // Strong signal: company-issuer agreement
+      if (company.length > 0 && certIssuer.length > 0) {
+        const companyOverlap = tokenOverlapScore(company, certIssuer);
+        if (companyOverlap >= 0.5) return false; // drop — clear cert duplicate
+      }
+      // Very strong role overlap on its own (covers cases where issuer is null)
+      if (roleOverlap >= 0.85) return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Welle 2B (2026-04-27): Recovers missing experience stations from the raw
+ * OCR text. Repro: Yannik's Exxeta CV has 6 stations in the source PDF;
+ * the parser occasionally drops "Ingrano Solutions I Innovation Manager"
+ * because that line is wedged between an education entry and the next
+ * experience header in Azure DI's flattened text.
+ *
+ * Strategy: scan rawText for "<COMPANY> I <ROLE>" or "<COMPANY> | <ROLE>"
+ * pipe patterns where the role contains a known job-title suffix
+ * (Manager, Consultant, Founder, etc.). For each candidate not present
+ * in `existingExperience` (fuzzy-matched on company tokens), append a
+ * minimal entry with role + company. Bullets/dates stay empty — better
+ * a present-but-incomplete station than a silently-dropped one.
+ *
+ * False-positive guards:
+ *   - role MUST contain a job-title suffix
+ *   - company MUST be a plausible company token (not a date, not a
+ *     status word, not an institutional suffix-only)
+ *   - role + company combined ≤ 80 chars (prevents grabbing whole
+ *     bullet lines that happen to contain "Manager" or "I")
+ *   - duplicate suppression by company-token-overlap ≥ 0.7
+ *
+ * Idempotent. Pure function. Exported for testing.
+ */
+export function recoverMissingExperienceStation<TExp extends { id?: string; role?: string | null; company?: string | null;[k: string]: any }>(
+  experience: TExp[],
+  rawText: string,
+): TExp[] {
+  if (!rawText || rawText.length < 50) return experience;
+
+  // Job-title suffix words. Conservative: must appear as a whole word.
+  const JOB_TITLE_SUFFIX = /\b(?:Manager|Director|Consultant|Founder|Co-Founder|Cofounder|CEO|CTO|CFO|COO|CMO|Lead|Head|Owner|Coach|Specialist|Architect|Developer|Designer|Officer|Analyst|Coordinator|Engineer|Strateg(?:ist|e)|Berater|Berater(?:in)?|Praktikant(?:in)?|Intern|Werkstudent(?:in)?|Trainee|Volunteer|Volontär(?:in)?)\b/i;
+
+  // Phrases: split rawText by line OR by 2+ whitespace clusters (Azure DI flattens columns).
+  // Use newline as primary boundary; fallback to phrase splits is too noisy.
+  const lines = rawText.split(/\n+/).map((l) => l.trim()).filter((l) => l.length > 0);
+
+  const candidates: Array<{ company: string; role: string }> = [];
+  // Capital-I (the Azure DI pipe replacement) and standard pipe — separated by spaces.
+  // Pattern: anchor allows mid-line matches; group 2 stops at a sentence boundary
+  // (colon/semicolon/comma/period, double whitespace, next pipe, or end-of-line).
+  // The colon stop is critical for Yannik's Exxeta CV: "Ingrano Solutions I Innovation Manager Tech-Driven Efficiency:"
+  // — without it, group 2 over-captures into the bullet body.
+  const pipeRe = /(?:^|\s{2,})([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9&.\- ]{1,55}?)\s+[I|]\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9&.\- ]{1,55}?)(?=\s+[I|]\s|\s{2,}|[.:;,]|$)/g;
+
+  for (const line of lines) {
+    pipeRe.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = pipeRe.exec(line)) !== null) {
+      const candidateCompany = m[1].trim();
+      const candidateRoleRaw = m[2].trim();
+      if (candidateCompany.length === 0 || candidateRoleRaw.length === 0) continue;
+      // Role must contain a job-title suffix
+      const suffixMatch = JOB_TITLE_SUFFIX.exec(candidateRoleRaw);
+      if (!suffixMatch) continue;
+      // Trim role: keep everything up to and including the first job-title suffix word.
+      // Drops trailing bullet text like "Innovation Manager Tech-Driven Efficiency"
+      // → "Innovation Manager".
+      const endOfSuffix = suffixMatch.index + suffixMatch[0].length;
+      const candidateRole = candidateRoleRaw.slice(0, endOfSuffix).trim();
+      if (candidateRole.length === 0) continue;
+      if (candidateCompany.length + candidateRole.length > 80) continue;
+      // Company must be plausible
+      if (!isPlausibleCompanyToken(candidateCompany)) continue;
+      // Skip pure date-like or numeric companies
+      if (/^\d/.test(candidateCompany)) continue;
+      candidates.push({ company: candidateCompany, role: candidateRole });
+    }
+  }
+
+  if (candidates.length === 0) return experience;
+
+  // Dedup candidates against each other by company-overlap
+  const uniqueCandidates: Array<{ company: string; role: string }> = [];
+  for (const c of candidates) {
+    const dup = uniqueCandidates.find((u) => tokenOverlapScore(u.company, c.company) >= 0.7);
+    if (!dup) uniqueCandidates.push(c);
+  }
+
+  const recovered = [...experience];
+  let addedCount = 0;
+  for (const c of uniqueCandidates) {
+    const existing = recovered.find((e) => {
+      const eCompany = (e.company || '').toString().trim();
+      if (eCompany.length === 0) return false;
+      return tokenOverlapScore(eCompany, c.company) >= 0.7;
+    });
+    if (!existing) {
+      addedCount++;
+      const id = `exp-recovered-${addedCount}`;
+      recovered.push({
+        id,
+        role: c.role,
+        company: c.company,
+        dateRangeText: null,
+        location: null,
+        description: [],
+      } as unknown as TExp);
+    }
+  }
+
+  return recovered;
 }

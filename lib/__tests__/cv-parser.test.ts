@@ -17,6 +17,8 @@ import {
     extractCertSectionLines,
     extractCertCandidates,
     stripGradeFromEducationDescription,
+    dropExperienceDuplicatedAsCert,
+    recoverMissingExperienceStation,
 } from '../services/cv-parser';
 import { complete } from '@/lib/ai/model-router';
 
@@ -1659,5 +1661,176 @@ Led various initiatives.
         // Real name should be picked
         expect(result.personalInfo?.name).toBeTruthy();
         expect(result.personalInfo?.name).not.toMatch(/Berlin|München|Familienstatus/i);
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Welle 2A (2026-04-27) — dropExperienceDuplicatedAsCert
+// Bug: Parser-LLM occasionally promotes a cert ("HR-Transformation @ ZF GmbH")
+// into experience, polluting the optimizer output with a 6th hallucinated
+// station. Drop experience entries whose role+company match a cert by token
+// overlap. Conservative thresholds to avoid dropping legitimate stations.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('dropExperienceDuplicatedAsCert — Welle 2A', () => {
+    test('REGRESSION: ZF cert wrongly classified as experience is dropped', () => {
+        const exp = [
+            { id: 'e1', role: 'Innovation Consultant', company: 'Fraunhofer FOKUS' },
+            { id: 'e2', role: 'HR-Transformation & Organisationsentwicklung', company: 'ZF' },
+        ];
+        const certs = [
+            { id: 'c1', name: 'HR-Transformation & Organisationsentwicklung', issuer: 'ZF GmbH' },
+        ];
+        const result = dropExperienceDuplicatedAsCert(exp, certs);
+        expect(result.length).toBe(1);
+        expect(result[0].role).toBe('Innovation Consultant');
+    });
+
+    test('drops when role overlap >= 0.85 even without issuer agreement', () => {
+        const exp = [
+            { id: 'e1', role: 'Design Thinking Coach Programm Hasso Plattner', company: null },
+        ];
+        const certs = [
+            { id: 'c1', name: 'Design Thinking Coach Programm Hasso Plattner Institut', issuer: null },
+        ];
+        const result = dropExperienceDuplicatedAsCert(exp, certs);
+        expect(result.length).toBe(0);
+    });
+
+    test('keeps legitimate experience when role overlap with cert is below 0.7', () => {
+        const exp = [
+            { id: 'e1', role: 'Innovation Consultant', company: 'Fraunhofer FOKUS' },
+        ];
+        const certs = [
+            { id: 'c1', name: 'Design Thinking Coach', issuer: 'Hasso-Plattner-Institut' },
+        ];
+        const result = dropExperienceDuplicatedAsCert(exp, certs);
+        expect(result.length).toBe(1);
+    });
+
+    test('keeps experience when role partially overlaps a cert but company differs', () => {
+        const exp = [
+            { id: 'e1', role: 'Manager', company: 'Acme Corp' },
+        ];
+        const certs = [
+            { id: 'c1', name: 'Project Manager Certification', issuer: 'PMI' },
+        ];
+        // role overlap is moderate (just "manager"), company differs → keep
+        const result = dropExperienceDuplicatedAsCert(exp, certs);
+        expect(result.length).toBe(1);
+    });
+
+    test('idempotent: running twice yields same result', () => {
+        const exp = [
+            { id: 'e1', role: 'Innovation Consultant', company: 'Fraunhofer FOKUS' },
+            { id: 'e2', role: 'HR-Transformation & Organisationsentwicklung', company: 'ZF' },
+        ];
+        const certs = [
+            { id: 'c1', name: 'HR-Transformation & Organisationsentwicklung', issuer: 'ZF GmbH' },
+        ];
+        const once = dropExperienceDuplicatedAsCert(exp, certs);
+        const twice = dropExperienceDuplicatedAsCert(once, certs);
+        expect(twice).toEqual(once);
+    });
+
+    test('empty certifications: noop', () => {
+        const exp = [
+            { id: 'e1', role: 'Innovation Consultant', company: 'Fraunhofer FOKUS' },
+        ];
+        const result = dropExperienceDuplicatedAsCert(exp, []);
+        expect(result).toEqual(exp);
+    });
+
+    test('empty experience: noop', () => {
+        const result = dropExperienceDuplicatedAsCert([], [{ id: 'c1', name: 'X', issuer: 'Y' }]);
+        expect(result).toEqual([]);
+    });
+
+    test('experience with no role: kept (cannot compare)', () => {
+        const exp = [{ id: 'e1', role: null, company: 'X' }];
+        const certs = [{ id: 'c1', name: 'Some Cert', issuer: 'X' }];
+        const result = dropExperienceDuplicatedAsCert(exp, certs);
+        expect(result.length).toBe(1);
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Welle 2B (2026-04-27) — recoverMissingExperienceStation
+// Bug: Parser-LLM occasionally drops a whole experience station when the
+// raw text is column-flattened. Repro: "Ingrano Solutions I Innovation Manager"
+// in Yannik's Exxeta CV is wedged between an education line and a bullet
+// list, and the LLM skips it. Pipe pattern + job-title-suffix detection.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('recoverMissingExperienceStation — Welle 2B', () => {
+    test('REGRESSION: Ingrano Solutions I Innovation Manager is recovered when missing', () => {
+        const exp = [
+            { id: 'e1', role: 'Innovation Consultant', company: 'Fraunhofer FOKUS' },
+        ];
+        const rawText = `Ingrano Solutions I Innovation Manager  Tech-Driven Efficiency: Optimierung von Arbeitsprozessen.`;
+        const result = recoverMissingExperienceStation(exp, rawText);
+        expect(result.length).toBe(2);
+        const ingrano = result.find((e: any) => /ingrano/i.test(e.company || ''));
+        expect(ingrano).toBeTruthy();
+        expect(ingrano!.role).toMatch(/Innovation Manager/);
+    });
+
+    test('does NOT add when station already exists (fuzzy company match)', () => {
+        const exp = [
+            { id: 'e1', role: 'Manager', company: 'Ingrano Solutions GmbH' },
+        ];
+        const rawText = `Ingrano Solutions I Innovation Manager`;
+        const result = recoverMissingExperienceStation(exp, rawText);
+        expect(result.length).toBe(1);
+    });
+
+    test('skips pipe patterns without a job-title suffix', () => {
+        const exp: Array<{ role?: string | null; company?: string | null }> = [];
+        const rawText = `IT-Kenntnisse I Programming  Some bullet text here.`;
+        const result = recoverMissingExperienceStation(exp, rawText);
+        expect(result.length).toBe(0);
+    });
+
+    test('skips when role + company combined exceeds 80 chars', () => {
+        const exp: Array<{ role?: string | null; company?: string | null }> = [];
+        const rawText = `A Very Long Company Name With Many Words That Goes On And On I A Very Long Role Title Manager`;
+        const result = recoverMissingExperienceStation(exp, rawText);
+        expect(result.length).toBe(0);
+    });
+
+    test('idempotent: running twice yields same result', () => {
+        const exp = [
+            { id: 'e1', role: 'Innovation Consultant', company: 'Fraunhofer FOKUS' },
+        ];
+        const rawText = `Ingrano Solutions I Innovation Manager  Tech-Driven Efficiency.`;
+        const once = recoverMissingExperienceStation(exp, rawText);
+        const twice = recoverMissingExperienceStation(once, rawText);
+        expect(twice.length).toBe(once.length);
+    });
+
+    test('empty raw text: noop', () => {
+        const exp = [{ id: 'e1', role: 'Manager', company: 'Acme' }];
+        const result = recoverMissingExperienceStation(exp, '');
+        expect(result).toEqual(exp);
+    });
+
+    test('preserves existing experience entries (no mutation, only append)', () => {
+        const exp = [
+            { id: 'e1', role: 'Innovation Consultant', company: 'Fraunhofer FOKUS' },
+            { id: 'e2', role: 'Co-Founder', company: 'Xorder Menues' },
+        ];
+        const rawText = `Ingrano Solutions I Innovation Manager  Some bullet.`;
+        const result = recoverMissingExperienceStation(exp, rawText);
+        expect(result.length).toBe(3);
+        expect(result[0].role).toBe('Innovation Consultant');
+        expect(result[1].role).toBe('Co-Founder');
+        expect(result[2].role).toMatch(/Innovation Manager/);
+    });
+
+    test('rejects pure-numeric company like "2022 I Manager"', () => {
+        const exp: Array<{ role?: string | null; company?: string | null }> = [];
+        const rawText = `2022 I Innovation Manager  Some bullet.`;
+        const result = recoverMissingExperienceStation(exp, rawText);
+        expect(result.length).toBe(0);
     });
 });

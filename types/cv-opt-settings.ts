@@ -15,13 +15,16 @@
 export type LayoutMode = 'default' | 'compact';
 
 /**
- * Welle E (2026-04-27) — page-count target for the optimizer + template caps.
- *  - '1-page' (Phase 9 added): tightest cap for early-career / executive-summary CVs.
+ * Page-count target for the optimizer + template caps.
+ *  - '1-page': tightest cap for early-career / executive-summary CVs.
  *    Max 2 bullets per entry, oldest 3 entries get 1 bullet each.
- *  - '2-pages' (default): aggressive cap, oldest stations max 1 bullet, 2-page submission.
- *  - '3-pages': preserves more detail across older stations (good for 6+ work years).
+ *  - '2-pages' (default): industry standard for applications, 3 bullets per entry.
+ *
+ * Welle 2 Phase 3 (2026-04-27): '3-pages' option removed (User-Direktive
+ * Reduce Complexity: industry standard is 2-pages; 3-pages had a layout bug
+ * where Page 1 rendered nearly empty when content fit fully on 2 pages).
  */
-export type PageMode = '1-page' | '2-pages' | '3-pages';
+export type PageMode = '1-page' | '2-pages';
 
 export interface CVOptSettings {
     /** Whether to show the professional summary section. Default: true */

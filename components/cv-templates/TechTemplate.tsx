@@ -196,12 +196,12 @@ export function TechTemplate({
     data: CvStructuredData;
     qrBase64?: string;
     labels: CvTemplateLabels;
-    pageMode?: '1-page' | '2-pages' | '3-pages';
+    pageMode?: '1-page' | '2-pages';
 }) {
     const pi = data.personalInfo;
-    // Welle E (2026-04-27): pageMode lifts max bullets per entry to 4.
-    // Phase 9 (2026-04-27): 1-page tightens to 2.
-    const maxBullets = pageMode === '1-page' ? 2 : pageMode === '3-pages' ? 4 : 3;
+    // Phase 9 (2026-04-27): 1-page tightens to 2 bullets per entry.
+    // Welle 2 Phase 3 (2026-04-27): 3-pages removed (Reduce Complexity).
+    const maxBullets = pageMode === '1-page' ? 2 : 3;
 
     return (
         <Document>

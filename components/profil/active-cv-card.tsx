@@ -335,12 +335,17 @@ export function ActiveCVCard() {
                 xhr.send(fd);
             });
 
-            notify(type === 'cv' ? t('cv_uploaded_toast') : t('cl_uploaded_toast'));
-            // Welle 1: surface the master-kept hint on subsequent CV uploads so
-            // the user understands the master stays unchanged until they click
-            // the refresh icon next to the CV they want as the new master.
+            // Welle 1 (refined 2026-04-27): on 2nd+ CV upload, show only the
+            // master-kept hint as the single notification. Stacking two toasts
+            // back-to-back made the second one easy to miss (user reported it
+            // flashed for ~1ms). Single, longer message stays visible across
+            // the full 3.5s cycle. Status box mirrors the hint so it lingers
+            // for 3s after the toast fades.
             if (type === 'cv' && masterActionFromResponse === 'kept') {
                 notify(`${t('master_kept_title')}: ${t('master_kept_desc')}`);
+                setUploadStatus(t('master_kept_title'));
+            } else {
+                notify(type === 'cv' ? t('cv_uploaded_toast') : t('cl_uploaded_toast'));
             }
             await loadDocs();
 
