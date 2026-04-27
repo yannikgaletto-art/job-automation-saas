@@ -344,7 +344,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                     user_id: userId,
                     locale,
                     ...(metricsToSend && metricsToSend.length > 0 ? { station_metrics: metricsToSend } : {}),
-                    cv_opt_settings: { showSummary: cvOptSettings.showSummary, summaryMode: cvOptSettings.summaryMode },
+                    cv_opt_settings: { showSummary: cvOptSettings.showSummary, summaryMode: cvOptSettings.summaryMode, pageMode: cvOptSettings.pageMode },
                 }),
                 signal: controller.signal,
             });
@@ -739,6 +739,36 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                                         : <ToggleLeft className="w-7 h-7 text-gray-400" />}
                                                 </button>
                                             </div>
+
+                                            {/* Welle E (2026-04-27): page-count target */}
+                                            <div className="pt-2 border-t border-gray-200">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <span className="text-sm text-gray-700">{t('page_mode_label')}</span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mb-2">{t('page_mode_desc')}</p>
+                                                <div className="flex gap-3">
+                                                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name="pageMode"
+                                                            checked={cvOptSettings.pageMode === '2-pages'}
+                                                            onChange={() => setCvOptSettings(s => ({ ...s, pageMode: '2-pages' }))}
+                                                            className="accent-[#012e7a]"
+                                                        />
+                                                        {t('page_mode_2')}
+                                                    </label>
+                                                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name="pageMode"
+                                                            checked={cvOptSettings.pageMode === '3-pages'}
+                                                            onChange={() => setCvOptSettings(s => ({ ...s, pageMode: '3-pages' }))}
+                                                            className="accent-[#012e7a]"
+                                                        />
+                                                        {t('page_mode_3')}
+                                                    </label>
+                                                </div>
+                                            </div>
                                         </div>
                                     </details>
 
@@ -905,7 +935,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                         {/* PDF Preview + optional editor panel */}
                         {isEditing ? (
                             <div className="grid grid-cols-[1fr_480px] gap-4 items-start">
-                                <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
+                                <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} pageMode={cvOptSettings.pageMode} />
                                 <div className="sticky top-4 bg-white rounded-xl border border-slate-200 p-4 h-[800px]">
                                     <InlineCvEditor
                                         data={activePdfData}
@@ -915,7 +945,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                 </div>
                             </div>
                         ) : (
-                            <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
+                            <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} pageMode={cvOptSettings.pageMode} />
                         )}
 
                         <div className="flex flex-col sm:flex-row justify-between items-center py-4 border-t border-gray-100 mt-6 mb-8 gap-4 pb-4">
@@ -928,7 +958,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
 
                             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                                 <div className="w-full sm:w-auto">
-                                    <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
+                                    <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} pageMode={cvOptSettings.pageMode} />
                                 </div>
                                 <button
                                     onClick={() => onGoToCoverLetter?.()}

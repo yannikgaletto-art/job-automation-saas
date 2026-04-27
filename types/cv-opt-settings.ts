@@ -14,6 +14,13 @@
  */
 export type LayoutMode = 'default' | 'compact';
 
+/**
+ * Welle E (2026-04-27) — page-count target for the optimizer + template caps.
+ *  - '2-pages' (default): aggressive cap, oldest stations max 1 bullet, 2-page submission.
+ *  - '3-pages': preserves more detail across older stations (good for 6+ work years).
+ */
+export type PageMode = '2-pages' | '3-pages';
+
 export interface CVOptSettings {
     /** Whether to show the professional summary section. Default: true */
     showSummary: boolean;
@@ -27,6 +34,8 @@ export interface CVOptSettings {
     templateId: 'tech' | 'valley';
     /** Layout density control (Valley template only). Default: 'compact' (tightest, most ATS-dense) */
     layoutMode: LayoutMode;
+    /** Page-count target for optimizer + template caps. Default: '2-pages' (industry standard). */
+    pageMode: PageMode;
 }
 
 export const DEFAULT_CV_OPT_SETTINGS: CVOptSettings = {
@@ -36,6 +45,7 @@ export const DEFAULT_CV_OPT_SETTINGS: CVOptSettings = {
     showLanguages: true,
     templateId: 'valley',
     layoutMode: 'compact',
+    pageMode: '2-pages',
 };
 
 /** Station-specific metrics provided by the user for the Numbers Check Flow */

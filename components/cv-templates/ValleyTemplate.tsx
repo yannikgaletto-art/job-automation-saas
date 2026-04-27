@@ -23,9 +23,12 @@ const DARK = '#000000';
 const MUTED = '#444444';
 const DIVIDER = '#CCCCCC';
 
-/** Max bullets per experience entry — HARD CAP, matches AI prompt rule */
+/** Max bullets per experience entry — HARD CAP, matches AI prompt rule.
+ *  Welle E (2026-04-27): 3-pages mode lifts the cap to 4 to preserve detail
+ *  across older stations for users with 6+ work years. */
 const MAX_BULLETS_DEFAULT = 3;
 const MAX_BULLETS_COMPACT = 3;
+const MAX_BULLETS_3PAGES = 4;
 /** Max certifications — HARD CAP, matches AI prompt rule */
 const MAX_CERTS = 6;
 /** Max skill categories rendered — HARD CAP, matches AI prompt "max 3 categories".
@@ -108,7 +111,19 @@ const RenderBullet = ({ text }: { text: string }) => {
 };
 
 
-export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels; layoutMode?: LayoutMode }) {
+export function ValleyTemplate({
+    data,
+    qrBase64,
+    labels,
+    layoutMode = 'default',
+    pageMode = '2-pages',
+}: {
+    data: CvStructuredData;
+    qrBase64?: string;
+    labels: CvTemplateLabels;
+    layoutMode?: LayoutMode;
+    pageMode?: '2-pages' | '3-pages';
+}) {
     const pi = data.personalInfo;
     const hasSkills = data.skills.length > 0;
     const hasLanguages = data.languages.length > 0;
@@ -116,8 +131,11 @@ export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' 
 
     const s = buildStyles(layoutMode);
 
-    // HARD CAPS — prevent 3-page overflow regardless of AI output
-    const maxBullets = layoutMode === 'compact' ? MAX_BULLETS_COMPACT : MAX_BULLETS_DEFAULT;
+    // HARD CAPS — prevent overflow regardless of AI output.
+    // pageMode='3-pages' lifts bullets to 4; layoutMode still affects spacing.
+    const maxBullets = pageMode === '3-pages'
+        ? MAX_BULLETS_3PAGES
+        : layoutMode === 'compact' ? MAX_BULLETS_COMPACT : MAX_BULLETS_DEFAULT;
     const cappedCerts = hasCerts ? data.certifications!.slice(0, MAX_CERTS) : [];
     // Skills are capped at category-level AND item-level. Without these caps a CV
     // with 7 categories × 12 items overflows page 2 even though the optimizer prompt

@@ -9,24 +9,25 @@ import { Download, Loader2, RefreshCw } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { getCvTemplateLabels, CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
-import { LayoutMode } from '@/types/cv-opt-settings';
+import { LayoutMode, PageMode } from '@/types/cv-opt-settings';
 
 interface PdfViewerWrapperProps {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
     layoutMode?: LayoutMode;
+    pageMode?: PageMode;
 }
 
-function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: string | undefined, labels: CvTemplateLabels, layoutMode?: LayoutMode) {
+function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: string | undefined, labels: CvTemplateLabels, layoutMode?: LayoutMode, pageMode?: PageMode) {
     switch (templateId) {
         case 'tech':
-            return <TechTemplate data={data} qrBase64={qrBase64} labels={labels} />;
+            return <TechTemplate data={data} qrBase64={qrBase64} labels={labels} pageMode={pageMode} />;
         case 'valley':
         case 'classic':  // deprecated — fallback to Valley
         case 'modern':   // deprecated — fallback to Valley
         default:
-            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} />;
+            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} pageMode={pageMode} />;
     }
 }
 
@@ -41,12 +42,13 @@ function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: s
  * The blob URL is managed via useRef + useEffect cleanup to prevent
  * memory leaks (URL.revokeObjectURL on unmount or re-render).
  */
-function DesktopPdfViewer({ data, templateId, qrBase64, labels, layoutMode }: {
+function DesktopPdfViewer({ data, templateId, qrBase64, labels, layoutMode, pageMode }: {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
     labels: CvTemplateLabels;
     layoutMode?: LayoutMode;
+    pageMode?: PageMode;
 }) {
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -66,7 +68,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels, layoutMode }: {
 
             try {
                 registerPdfFonts();
-                const document = resolveTemplate(data, templateId, qrBase64, labels, layoutMode);
+                const document = resolveTemplate(data, templateId, qrBase64, labels, layoutMode, pageMode);
                 const blob = await pdf(document).toBlob();
 
                 if (cancelled || generation !== generationRef.current) return;
@@ -100,7 +102,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels, layoutMode }: {
                 blobUrlRef.current = null;
             }
         };
-    }, [data, templateId, qrBase64, labels, layoutMode]);
+    }, [data, templateId, qrBase64, labels, layoutMode, pageMode]);
 
     if (loading) {
         return (
@@ -126,7 +128,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels, layoutMode }: {
                         setError(null);
                         generationRef.current++;
                         const gen = generationRef.current;
-                        const document = resolveTemplate(data, templateId, qrBase64, labels, layoutMode);
+                        const document = resolveTemplate(data, templateId, qrBase64, labels, layoutMode, pageMode);
                         pdf(document).toBlob().then(blob => {
                             if (gen !== generationRef.current) return;
                             if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
@@ -161,7 +163,7 @@ function DesktopPdfViewer({ data, templateId, qrBase64, labels, layoutMode }: {
     );
 }
 
-export default function PdfViewerWrapper({ data, templateId, qrBase64, layoutMode }: PdfViewerWrapperProps) {
+export default function PdfViewerWrapper({ data, templateId, qrBase64, layoutMode, pageMode }: PdfViewerWrapperProps) {
     const [isMobile, setIsMobile] = useState(false);
     const [hasMounted, setHasMounted] = useState(false);
     const locale = useLocale();
@@ -184,22 +186,23 @@ export default function PdfViewerWrapper({ data, templateId, qrBase64, layoutMod
     }
 
     if (isMobile) {
-        return <MobileDownload data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} />;
+        return <MobileDownload data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} pageMode={pageMode} />;
     }
 
-    return <DesktopPdfViewer data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} />;
+    return <DesktopPdfViewer data={data} templateId={templateId} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} pageMode={pageMode} />;
 }
 
 /**
  * Mobile fallback: uses pdf().toBlob() to generate a download link.
  * Same proven approach as DownloadButton.
  */
-function MobileDownload({ data, templateId, qrBase64, labels, layoutMode }: {
+function MobileDownload({ data, templateId, qrBase64, labels, layoutMode, pageMode }: {
     data: CvStructuredData;
     templateId: string;
     qrBase64?: string;
     labels: CvTemplateLabels;
     layoutMode?: LayoutMode;
+    pageMode?: PageMode;
 }) {
     const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -210,7 +213,7 @@ function MobileDownload({ data, templateId, qrBase64, labels, layoutMode }: {
         async function generate() {
             try {
                 registerPdfFonts();
-                const document = resolveTemplate(data, templateId, qrBase64, labels, layoutMode);
+                const document = resolveTemplate(data, templateId, qrBase64, labels, layoutMode, pageMode);
                 const blob = await pdf(document).toBlob();
                 if (cancelled) return;
                 setDownloadUrl(URL.createObjectURL(blob));
@@ -223,7 +226,7 @@ function MobileDownload({ data, templateId, qrBase64, labels, layoutMode }: {
         }
         generate();
         return () => { cancelled = true; };
-    }, [data, templateId, qrBase64, labels, layoutMode]);
+    }, [data, templateId, qrBase64, labels, layoutMode, pageMode]);
 
     if (loading) {
         return (

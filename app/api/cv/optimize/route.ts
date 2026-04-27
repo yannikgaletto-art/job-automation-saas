@@ -16,7 +16,10 @@ import { CREDIT_COSTS } from '@/lib/services/credit-types';
 
 
 
-export const maxDuration = 120; // Vercel timeout protection — Claude Sonnet can take 40-75s on large payloads
+// Vercel timeout protection — Claude Sonnet can take 40-75s on large payloads.
+// Welle E (2026-04-27): pageMode='3-pages' adds ~30% output tokens (4 vs 3 bullets per station × 6 stations);
+// 150s gives a safe buffer instead of cutting it close at 120.
+export const maxDuration = 150;
 
 // Prompt version for tracking and rollback
 const PROMPT_VERSION = 'v2.4';
@@ -228,6 +231,40 @@ Sentence 3: what value the candidate brings to the employer; no filler words lik
 Always emit a "summary" change in the diff-list, even if the existing summary is missing or empty.\n`;
         }
 
+        // Welle E (2026-04-27): pageMode controls layout density.
+        // - '2-pages' (default): aggressive cap, oldest stations get max 1 bullet,
+        //   max 3 bullets per entry, optimized for two-pager submission.
+        // - '3-pages': preserves more detail across older stations (great for users
+        //   with 6+ work years), max 4 bullets per entry, oldest 2 still get max 3.
+        const pageMode: '2-pages' | '3-pages' = cv_opt_settings?.pageMode === '3-pages' ? '3-pages' : '2-pages';
+        const layoutConstraints = pageMode === '3-pages'
+            ? `[LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION} — pageMode=3-pages]
+HARD RULE: The final CV MUST fit on at most 3 printed A4 pages. NEVER generate content for 4+ pages.
+- Max 4 bullet points per experience entry (quality over quantity)
+- Max 22 words per bullet point. Aim for high information density.
+- Summary: max 3 sentences
+- If ≥6 experience entries: oldest 2 entries get max 3 bullets each (preserved detail)
+- If >3 education entries: top 3 most relevant get full description
+- Skills: max 3 categories, max 8 items per category
+- Certificates: keep only the 6 most relevant (drop the rest)
+- Page budget:
+  → Page 1: Header + Summary + Experience (recent 2-3 stations)
+  → Page 2: Experience (older stations) + Education
+  → Page 3: Skills, Languages, Certificates`
+            : `[LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION} — pageMode=2-pages]
+HARD RULE: The final CV MUST fit on exactly 2 printed A4 pages. NEVER generate content for 3+ pages.
+- Max 3 bullet points per experience entry (quality over quantity — user can add more)
+- Max 20 words per bullet point. Aim for high information density — every word must be earned.
+- Summary: max 3 sentences
+- If ≥5 experience entries: oldest entries get max 1 bullet
+- If ≥6 experience entries: oldest 2 entries get max 1 bullet each
+- If >3 education entries: only 2 most relevant get full description
+- Skills: max 3 categories, max 8 items per category
+- Certificates: keep only the 6 most relevant (drop the rest)
+- Page budget:
+  → Page 1: Header + Summary + Experience + Education
+  → Page 2: Skills, Languages, Certificates (right column)`;
+
         // Build structured metrics context from station_metrics
         const metricsContext = station_metrics
             ?.filter((s: { metrics: string }) => s.metrics?.trim()?.length > 0)
@@ -284,19 +321,7 @@ Your task: receive a CV JSON (CV SSoT) and an analysis (CV Match Result), then p
    - "requirementRef.requirement": which requirement from the CV Match this derives from.
 ${summaryInstruction}
 
-[LAYOUT CONSTRAINTS — MANDATORY — DO NOT EXCEED — PROMPT ${PROMPT_VERSION}]
-HARD RULE: The final CV MUST fit on exactly 2 printed A4 pages. NEVER generate content for 3+ pages.
-- Max 3 bullet points per experience entry (quality over quantity — user can add more)
-- Max 20 words per bullet point. Aim for high information density — every word must be earned.
-- Summary: max 3 sentences
-- If ≥5 experience entries: oldest entries get max 1 bullet
-- If ≥6 experience entries: oldest 2 entries get max 1 bullet each
-- If >3 education entries: only 2 most relevant get full description
-- Skills: max 3 categories, max 8 items per category
-- Certificates: keep only the 6 most relevant (drop the rest)
-- Page budget:
-  → Page 1: Header + Summary + Experience + Education
-  → Page 2: Skills, Languages, Certificates (right column)
+${layoutConstraints}
 
 QUALITY GATE (MANDATORY):
 - Every change MUST have at least ONE of these justifications:
@@ -333,10 +358,10 @@ SELF-JUDGE VALIDATION (run this before returning):
 Before returning your output, mentally verify:
 1. Count total changes. If >18, keep only the 18 most impactful.
 2. Verify at least 2 sections are covered (experience + skills/summary). If not, add 1–2 skills/summary changes.
-3. Count total bullet points across all experience entries. If >15, cut the weakest.
+3. Count total bullet points across all experience entries. If >${pageMode === '3-pages' ? '24' : '15'}, cut the weakest.
 4. Count total skill items. If >24, remove least relevant.
 5. Count certificates. If >6, keep only the 6 most relevant.
-6. If total content is likely to overflow 2 pages, aggressively cut the oldest/weakest entries.
+6. If total content is likely to overflow ${pageMode === '3-pages' ? '3' : '2'} pages, aggressively cut the oldest/weakest entries.
 7. For each change: does it pass the QUALITY GATE? If not, drop it.
 If any check fails, revise your output before returning.
 [END LAYOUT CONSTRAINTS]

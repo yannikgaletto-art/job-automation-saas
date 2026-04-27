@@ -187,8 +187,20 @@ const RenderBullet = ({ text }: { text: string }) => {
     return <Text style={s.bulletText}>{text}</Text>;
 };
 
-export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels }) {
+export function TechTemplate({
+    data,
+    qrBase64,
+    labels,
+    pageMode = '2-pages',
+}: {
+    data: CvStructuredData;
+    qrBase64?: string;
+    labels: CvTemplateLabels;
+    pageMode?: '2-pages' | '3-pages';
+}) {
     const pi = data.personalInfo;
+    // Welle E (2026-04-27): pageMode lifts max bullets per entry to 4.
+    const maxBullets = pageMode === '3-pages' ? 4 : 3;
 
     return (
         <Document>
@@ -242,7 +254,7 @@ export function TechTemplate({ data, qrBase64, labels }: { data: CvStructuredDat
                                         </View>
                                         <Text style={s.expCompany}>{exp.company || ''} {exp.location ? `// ${exp.location}` : ''}</Text>
 
-                                        {exp.description?.slice(0, 4).map(bullet => (
+                                        {exp.description?.slice(0, maxBullets).map(bullet => (
                                             <View key={bullet.id} style={s.bulletRow}>
                                                 <Text style={s.bulletDot}>{'\u203A'}</Text>
                                                 <RenderBullet text={bullet.text} />

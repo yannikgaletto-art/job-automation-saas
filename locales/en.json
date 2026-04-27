@@ -1059,7 +1059,11 @@
     "inline_editor_delete_group": "Delete category",
     "inline_editor_delete_skill": "Delete skill",
     "inline_editor_delete_cert": "Delete certificate",
-    "error_network": "Connection to server failed. Check your internet connection, or restart the dev server if you're working locally."
+    "error_network": "Connection to server failed. Check your internet connection, or restart the dev server if you're working locally.",
+    "page_mode_label": "Page count",
+    "page_mode_desc": "2 pages is the standard. 3 pages preserves more detail across older roles.",
+    "page_mode_2": "2 pages",
+    "page_mode_3": "3 pages"
   },
   "diff_review": {
     "section_experience": "Experience",
