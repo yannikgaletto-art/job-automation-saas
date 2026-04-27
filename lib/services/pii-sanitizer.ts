@@ -44,7 +44,12 @@ const IBAN_REGEX = /[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}[A-Z0-9]{0,16}/g;
 // Supports: hyphenated names (Anna-Lena), accented chars (García, José)
 // Guard: Single capitalized words (Berlin, JavaScript) are NOT matched.
 // Note: (?<![.!?]\s) prevents matching after sentence-end punctuation
-const NAME_REGEX = /(?<![.!?]\s)([A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+(?:-[A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+)?)\s+([A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+(?:-[A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+)?)/gm;
+// Phase 9 (2026-04-27): separator restricted to spaces/tabs (NOT newlines).
+// First and last name must sit on the SAME line — prevents "Berlin\nYannik"
+// from matching as a single name where "Berlin" is rejected and "Yannik
+// Galetto" then never gets a second chance because the regex already consumed
+// part of it.
+const NAME_REGEX = /(?<![.!?][ \t])([A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+(?:-[A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+)?)[ \t]+([A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+(?:-[A-ZÁÀÂÄÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝ][a-záàâäãåæçéèêëíìîïñóòôöõúùûüý]+)?)/gm;
 
 // CAPS name heuristic: Two consecutive ALL-UPPERCASE words (≥2 chars each).
 // Common in traditional DE/AT CVs: "MAX MUSTERMANN", "ANNA-LENA SCHMIDT"
@@ -131,6 +136,47 @@ const FIRST_WORD_STOPLIST = new Set([
     // Prevents "Deutsche Rentenversicherung", "Deutsche Bank", etc. from matching as names
     'Deutsche', 'DEUTSCHE', 'Deutschen', 'DEUTSCHEN',
     'Bundesagentur', 'BUNDESAGENTUR', 'Bundesministerium', 'BUNDESMINISTERIUM',
+    // Phase 9 (2026-04-27) — DACH cities that lead a city + noun pair in CV headers.
+    // Repro: "in Berlin   Familienstatus: ledig" → NAME_REGEX matched "Berlin Familienstatus".
+    'Berlin', 'BERLIN', 'München', 'MÜNCHEN', 'Munchen', 'MUNCHEN',
+    'Hamburg', 'HAMBURG', 'Köln', 'KÖLN', 'Koeln', 'KOELN',
+    'Frankfurt', 'FRANKFURT', 'Stuttgart', 'STUTTGART',
+    'Düsseldorf', 'DÜSSELDORF', 'Duesseldorf', 'DUESSELDORF',
+    'Leipzig', 'LEIPZIG', 'Bremen', 'BREMEN',
+    'Hannover', 'HANNOVER', 'Hanover', 'HANOVER',
+    'Essen', 'ESSEN', 'Dortmund', 'DORTMUND',
+    'Nürnberg', 'NÜRNBERG', 'Nuernberg', 'NUERNBERG',
+    'Dresden', 'DRESDEN', 'Bonn', 'BONN', 'Mannheim', 'MANNHEIM',
+    'Karlsruhe', 'KARLSRUHE', 'Wiesbaden', 'WIESBADEN',
+    'Münster', 'MÜNSTER', 'Muenster', 'MUENSTER', 'Aachen', 'AACHEN',
+    'Mainz', 'MAINZ', 'Lübeck', 'LÜBECK', 'Luebeck', 'LUEBECK',
+    'Erfurt', 'ERFURT', 'Rostock', 'ROSTOCK', 'Kassel', 'KASSEL',
+    'Potsdam', 'POTSDAM',
+    // AT/CH capitals
+    'Wien', 'WIEN', 'Zürich', 'ZÜRICH', 'Zurich', 'ZURICH',
+    'Bern', 'BERN', 'Basel', 'BASEL', 'Genf', 'GENF', 'Geneva', 'GENEVA',
+    'Salzburg', 'SALZBURG', 'Innsbruck', 'INNSBRUCK', 'Graz', 'GRAZ', 'Linz', 'LINZ',
+]);
+
+// Phase 9 (2026-04-27) — second-word reject list. Words that look like names
+// (TitleCase, ≥3 chars) but are German common nouns / form labels in CV headers.
+// Catches "Berlin Familienstatus", "Hamburg Anschrift", etc. — independent of
+// whether the first word is a known city.
+const SECOND_WORD_STOPLIST = new Set([
+    'Familienstatus', 'FAMILIENSTATUS', 'Familienstand', 'FAMILIENSTAND',
+    'Geburtsdatum', 'GEBURTSDATUM', 'Geburtstag', 'GEBURTSTAG',
+    'Geburtsort', 'GEBURTSORT', 'Geburtsname', 'GEBURTSNAME',
+    'Anschrift', 'ANSCHRIFT', 'Adresse', 'ADRESSE',
+    'Wohnort', 'WOHNORT', 'Wohnsitz', 'WOHNSITZ',
+    'Telefon', 'TELEFON', 'Mobil', 'MOBIL', 'Handy', 'HANDY',
+    'Kontakt', 'KONTAKT',
+    'Nationalität', 'NATIONALITÄT', 'Staatsangehörigkeit', 'STAATSANGEHÖRIGKEIT',
+    'Personalien', 'PERSONALIEN',
+    'Lebenslauf', 'LEBENSLAUF', 'Profil', 'PROFIL',
+    // English equivalents
+    'Birthday', 'BIRTHDAY', 'Birthdate', 'BIRTHDATE',
+    'Address', 'ADDRESS', 'Phone', 'PHONE', 'Mobile', 'MOBILE',
+    'Contact', 'CONTACT', 'Nationality', 'NATIONALITY',
 ]);
 
 /**
@@ -185,6 +231,7 @@ export function sanitizeForAI(input: string): SanitizeResult {
         const fullName = `${first} ${last}`;
         if (FALSE_POSITIVE_GUARD.has(fullName)) return match;
         if (FIRST_WORD_STOPLIST.has(first)) return match;
+        if (SECOND_WORD_STOPLIST.has(last)) return match;
         const token = `__NAME_${counters.NAME}__`;
         counters.NAME++;
         tokenMap.set(token, match);
@@ -197,6 +244,7 @@ export function sanitizeForAI(input: string): SanitizeResult {
         const fullName = `${first} ${last}`;
         if (FALSE_POSITIVE_GUARD.has(fullName)) return match;
         if (FIRST_WORD_STOPLIST.has(first)) return match;
+        if (SECOND_WORD_STOPLIST.has(last)) return match;
         const token = `__NAME_${counters.NAME}__`;
         counters.NAME++;
         tokenMap.set(token, match);

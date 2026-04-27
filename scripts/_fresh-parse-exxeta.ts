@@ -7,7 +7,7 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-const DOC_ID = '0f9a8606-728c-4f34-8c28-96735de17121'; // Exxeta
+const DOC_ID = 'e43fd1b6-6dc4-480e-9ce1-4d23d510c43c'; // Exxeta (current upload)
 
 (async () => {
     const { data: doc } = await supabase

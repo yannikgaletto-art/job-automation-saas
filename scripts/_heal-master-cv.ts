@@ -8,7 +8,7 @@ const supabase = createClient(
 );
 
 const USER_ID = 'f1cea2b5-0a60-46b9-afc3-59fcb4a1d34c';
-const EXXETA_DOC_ID = '0f9a8606-728c-4f34-8c28-96735de17121';
+const EXXETA_DOC_ID = 'e43fd1b6-6dc4-480e-9ce1-4d23d510c43c'; // current Exxeta doc
 
 (async () => {
     const { syncMasterCvFromDocument } = await import('../lib/services/cv-master-sync');

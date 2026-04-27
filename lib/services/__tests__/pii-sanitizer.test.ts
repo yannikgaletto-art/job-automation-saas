@@ -136,3 +136,69 @@ test('sanitizeForAI: handles same name appearing multiple times', () => {
     // Both occurrences should be tokenized (may have different indices)
     expect(sanitized).not.toContain('Max Mustermann');
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// PHASE 9 (2026-04-27) — User-reported "Berlin Familienstatus" bug
+// Yannik's CV header: "Exxeta 04.08.1996 in Berlin   Familienstatus: ledig"
+// Old behavior: NAME_REGEX matched "Berlin Familienstatus" as the FIRST
+// person name → encryptedPii.name was passed downstream as the user's name
+// → user_profiles.full_name = "Berlin   Familienstatus" → CV header showed
+// "Berlin Familienstatus" instead of "Yannik Galetto".
+// ═══════════════════════════════════════════════════════════════════
+
+test('REGRESSION: "Berlin Familienstatus" must NOT be picked as a name', () => {
+    const input = 'Exxeta 04.08.1996 in Berlin   Familienstatus: ledig\nYannik Galetto';
+    const { sanitized, tokenMap } = sanitizeForAI(input);
+
+    // Real name should be tokenised
+    expect(sanitized).toContain('__NAME_');
+    expect(sanitized).not.toContain('Yannik Galetto');
+
+    // The first __NAME_ token MUST resolve to the real name, not the city+noun.
+    const firstName = tokenMap.get('__NAME_0__');
+    expect(firstName).not.toBe('Berlin Familienstatus');
+    expect(firstName).not.toMatch(/^Berlin\s+/);
+    expect(firstName).toBe('Yannik Galetto');
+});
+
+test('REGRESSION: "München Geburtstag" must NOT be picked as a name', () => {
+    const input = 'In München Geburtstag: 04.08.1996\nMaria Schmidt';
+    const { sanitized, tokenMap } = sanitizeForAI(input);
+
+    const firstName = tokenMap.get('__NAME_0__');
+    expect(firstName).not.toMatch(/^München\s+/);
+    // Maria Schmidt should still be picked
+    expect(sanitized).not.toContain('Maria Schmidt');
+});
+
+test('Cities followed by common nouns are rejected (Hamburg Anschrift)', () => {
+    const input = 'Aus Hamburg Anschrift: Beispielstraße 1';
+    const { sanitized, warningFlags, tokenMap } = sanitizeForAI(input);
+
+    // Should NOT find a name in this input
+    if (warningFlags.includes('NAME')) {
+        const firstName = tokenMap.get('__NAME_0__');
+        expect(firstName).not.toMatch(/^Hamburg\s+/);
+    }
+});
+
+test('Real name BEFORE city still works (Petra Müller in Berlin)', () => {
+    const input = 'Petra Müller wohnt in Berlin.';
+    const { sanitized, tokenMap } = sanitizeForAI(input);
+
+    expect(sanitized).toContain('__NAME_0__');
+    expect(tokenMap.get('__NAME_0__')).toBe('Petra Müller');
+});
+
+test('Single-line city + common noun does not block a real name later', () => {
+    // Yannik's actual extracted_text pattern (simplified)
+    const input = `04.08.1996 in Berlin   Familienstatus: ledig
+Borsigstraße 12   10115 Berlin
+Yannik Galetto`;
+    const { tokenMap, warningFlags } = sanitizeForAI(input);
+
+    expect(warningFlags).toContain('NAME');
+    // The first NAME should be Yannik Galetto, NOT "Berlin Familienstatus" or any other city pair
+    const firstName = tokenMap.get('__NAME_0__');
+    expect(firstName).toBe('Yannik Galetto');
+});
