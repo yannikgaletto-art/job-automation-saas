@@ -143,6 +143,37 @@ export async function POST(req: NextRequest) {
         let cvUploadPath: string | null = null;
 
         if (cvFile) {
+            // Single-CV invariant: 409 if the user already has a CV. The DB has a
+            // partial unique index (one_cv_per_user) as the authoritative guard;
+            // this pre-check is friendlier UX and avoids an orphan storage upload
+            // before the index would reject the insert anyway.
+            const { data: existingCvs, error: existingErr } = await supabaseAdmin
+                .from('documents')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('document_type', 'cv')
+                .limit(1);
+
+            if (existingErr) {
+                console.error(`[${requestId}] route=documents/upload step=existing_cv_check supabase_error=${existingErr.message}`);
+                return NextResponse.json(
+                    { error: 'Internal error', details: existingErr.message, requestId },
+                    { status: 500 }
+                );
+            }
+
+            if (existingCvs && existingCvs.length > 0) {
+                console.log(`[${requestId}] route=documents/upload step=existing_cv_check rejected — user already has a CV`);
+                return NextResponse.json(
+                    {
+                        error: 'Du hast bereits einen Lebenslauf. Lösche ihn zuerst, um einen neuen hochzuladen.',
+                        code: 'CV_ALREADY_EXISTS',
+                        requestId,
+                    },
+                    { status: 409 }
+                );
+            }
+
             console.log(`[${requestId}] route=documents/upload step=storage_upload_cv`);
             const cvFileName = `${userId}/cv-${Date.now()}.${cvFile.name.split('.').pop()}`;
             const cvBytes = await cvFile.arrayBuffer();
@@ -189,6 +220,20 @@ export async function POST(req: NextRequest) {
 
                 if (cvDbError) {
                     console.error(`[${requestId}] route=documents/upload step=db_insert_cv supabase_error=${cvDbError.message} code=${cvDbError.code}`);
+                    // 23505 = unique_violation. Hits when a concurrent upload won
+                    // the race and the one_cv_per_user partial index now blocks
+                    // this row. Compensate the orphan storage upload, return 409.
+                    if (cvDbError.code === '23505') {
+                        await supabaseAdmin.storage.from('cvs').remove([cvUploadData.path]).catch(() => null);
+                        return NextResponse.json(
+                            {
+                                error: 'Du hast bereits einen Lebenslauf. Lösche ihn zuerst, um einen neuen hochzuladen.',
+                                code: 'CV_ALREADY_EXISTS',
+                                requestId,
+                            },
+                            { status: 409 }
+                        );
+                    }
                 } else {
                     // ✅ READ-BACK: Verify DB insert was successful (SICHERHEITSARCHITEKTUR.md Section 2)
                     const { data: verify, error: vErr } = await supabaseAdmin
@@ -283,6 +328,17 @@ export async function POST(req: NextRequest) {
                 if (!cvDbError && cvDoc) {
                     cvDocId = cvDoc.id;
                     console.log(`[${requestId}] route=documents/upload step=db_insert_cv_fallback success`);
+                } else if (cvDbError?.code === '23505') {
+                    // Race lost against unique index; clean up storage and signal 409.
+                    await supabaseAdmin.storage.from('cvs').remove([cvUploadData.path]).catch(() => null);
+                    return NextResponse.json(
+                        {
+                            error: 'Du hast bereits einen Lebenslauf. Lösche ihn zuerst, um einen neuen hochzuladen.',
+                            code: 'CV_ALREADY_EXISTS',
+                            requestId,
+                        },
+                        { status: 409 }
+                    );
                 }
             }
         }
