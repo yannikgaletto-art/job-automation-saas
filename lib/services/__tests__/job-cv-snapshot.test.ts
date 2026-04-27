@@ -99,3 +99,80 @@ describe('resolveJobCv', () => {
         expect(result.cv).toBe(innerData);
     });
 });
+
+/**
+ * Single-CV invariant (2026-04-28): after the migration, the user has at most
+ * one CV at any moment. In-flight jobs (CV Match, Optimizer, CL generation)
+ * must keep working even if the user deletes their CV mid-flow, because the
+ * snapshot persists the full CvStructuredData JSON inside job_queue.metadata.
+ *
+ * These tests exercise the resolver under the post-delete state where master
+ * is null but a snapshot still exists.
+ */
+describe('resolveJobCv — Single-CV invariant robustness', () => {
+    test('in-flight job survives master-CV deletion via snapshot fallback', () => {
+        // Scenario: user deleted their CV (master=null) but Optimizer is mid-run
+        // on a job whose snapshot was pinned at CV-Match time.
+        const snapshot = {
+            data: {
+                personalInfo: { name: 'Yannik Galetto', email: 'y@example.com' },
+                experience: [{ company: 'Pathly', role: 'CTO' }],
+            },
+            document_id: 'doc-deleted-since',
+            document_name: 'cv-pre-delete.pdf',
+            pinned_at: '2026-04-28T08:00:00Z',
+        };
+        const result = resolveJobCv({ cv_snapshot: snapshot }, null);
+        expect(result.source).toBe('job_snapshot');
+        expect((result.cv as { personalInfo: { name: string } })?.personalInfo.name).toBe('Yannik Galetto');
+        expect(result.documentName).toBe('cv-pre-delete.pdf');
+    });
+
+    test('snapshot wins over freshly uploaded master (post-delete-then-re-upload)', () => {
+        // Scenario: user deleted CV, uploaded a different one, but in-flight job
+        // still resolves to the original CV that was snapshotted at match time.
+        const oldSnapshot = {
+            data: { personalInfo: { name: 'Old' } },
+            document_id: 'doc-old',
+            document_name: 'old.pdf',
+            pinned_at: '2026-04-28T08:00:00Z',
+        };
+        const newMaster = { personalInfo: { name: 'New' } };
+        const result = resolveJobCv({ cv_snapshot: oldSnapshot }, newMaster);
+        expect(result.source).toBe('job_snapshot');
+        expect((result.cv as { personalInfo: { name: string } })?.personalInfo.name).toBe('Old');
+    });
+
+    test('post-delete fresh job (no snapshot, no master) returns null source=master', () => {
+        // Scenario: user deleted CV, then opens a job whose CV-Match never ran.
+        // Caller must handle null cv (UI shows "upload a CV first").
+        const result = resolveJobCv(null, null);
+        expect(result.source).toBe('master');
+        expect(result.cv).toBeNull();
+    });
+
+    test('snapshot with valid pinned_at survives null master', () => {
+        const snapshot = {
+            data: { personalInfo: { name: 'Snapshot only' } },
+            document_id: null,
+            document_name: null,
+            pinned_at: '2026-04-28T08:00:00Z',
+        };
+        const result = resolveJobCv({ cv_snapshot: snapshot }, null);
+        expect(result.source).toBe('job_snapshot');
+        expect(result.pinnedAt).toBe('2026-04-28T08:00:00Z');
+    });
+
+    test('builds a snapshot whose data round-trips through resolveJobCv', () => {
+        const cv = {
+            personalInfo: { name: 'RT', email: 'rt@example.com' },
+            experience: [{ company: 'X', role: 'Y' }],
+        };
+        const snap = buildJobCvSnapshot(cv, 'doc-rt', 'rt.pdf');
+        const result = resolveJobCv({ cv_snapshot: snap }, null);
+        expect(result.cv).toBe(cv);
+        expect(result.documentId).toBe('doc-rt');
+        expect(result.documentName).toBe('rt.pdf');
+        expect(result.source).toBe('job_snapshot');
+    });
+});
