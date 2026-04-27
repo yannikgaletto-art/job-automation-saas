@@ -247,19 +247,35 @@ export async function POST(req: NextRequest) {
                                 }
                             }
 
-                            const { error: profileErr } = await supabaseAdmin
+                            // Phase 9 (2026-04-27) — only the FIRST upload becomes the master CV.
+                            // Subsequent uploads add a document row but do NOT overwrite the master.
+                            // User explicitly switches the master via the Profil Re-Parse button (Welle C).
+                            const { decideMasterUpdate } = await import('@/lib/services/cv-master-sync');
+                            const { data: existingProfile } = await supabaseAdmin
                                 .from('user_profiles')
-                                .update({
-                                    cv_structured_data: structuredCv,
-                                    cv_original_file_path: cvUploadData.path,
-                                    ...(resolvedName ? { full_name: resolvedName } : {}),
-                                })
-                                .eq('id', userId);
+                                .select('cv_original_file_path')
+                                .eq('id', userId)
+                                .maybeSingle();
+                            const decision = decideMasterUpdate(existingProfile?.cv_original_file_path);
+                            console.log(`[${requestId}] route=documents/upload step=master_decision update=${decision.shouldUpdate} reason=${decision.reason}`);
 
-                            if (profileErr) {
-                                console.error(`[${requestId}] route=documents/upload step=save_profile supabase_error=${profileErr.message}`);
+                            if (decision.shouldUpdate) {
+                                const { error: profileErr } = await supabaseAdmin
+                                    .from('user_profiles')
+                                    .update({
+                                        cv_structured_data: structuredCv,
+                                        cv_original_file_path: cvUploadData.path,
+                                        ...(resolvedName ? { full_name: resolvedName } : {}),
+                                    })
+                                    .eq('id', userId);
+
+                                if (profileErr) {
+                                    console.error(`[${requestId}] route=documents/upload step=save_profile supabase_error=${profileErr.message}`);
+                                } else {
+                                    console.log(`[${requestId}] route=documents/upload step=save_profile success`);
+                                }
                             } else {
-                                console.log(`[${requestId}] route=documents/upload step=save_profile success`);
+                                console.log(`[${requestId}] route=documents/upload step=save_profile skipped (master already set, doc added only)`);
                             }
                         } catch (parseError: unknown) {
                             const msg = parseError instanceof Error ? parseError.message : String(parseError);

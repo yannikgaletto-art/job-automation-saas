@@ -5,7 +5,7 @@
  * both call. Three core stress patterns plus defensive guards.
  */
 
-import { syncMasterCvFromDocument } from '../cv-master-sync';
+import { syncMasterCvFromDocument, decideMasterUpdate } from '../cv-master-sync';
 
 jest.mock('@/lib/services/cv-parser', () => ({
     parseCvTextToJson: jest.fn(async (text: string) => ({
@@ -62,6 +62,46 @@ function makeSupabaseMock(state: MockState) {
     };
     return { from: fromImpl } as any;
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// Phase 9 (2026-04-27) — decideMasterUpdate
+// User uploaded 3 CVs (Exxeta first, AI TI last) and expected Exxeta as
+// master. Old upload route blindly overwrote master on every upload, so
+// AI TI ended up as master — leading to Mishmasch optimizer output.
+// New rule: first upload sets master, subsequent uploads only add the doc.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('decideMasterUpdate — Phase 9', () => {
+    test('REGRESSION: existing master path → no update on subsequent upload', () => {
+        const result = decideMasterUpdate('user-1/cv-exxeta.pdf');
+        expect(result.shouldUpdate).toBe(false);
+        expect(result.reason).toBe('master-already-set');
+    });
+
+    test('null master path → first upload becomes master', () => {
+        const result = decideMasterUpdate(null);
+        expect(result.shouldUpdate).toBe(true);
+        expect(result.reason).toBe('first-upload');
+    });
+
+    test('undefined master path → first upload becomes master', () => {
+        const result = decideMasterUpdate(undefined);
+        expect(result.shouldUpdate).toBe(true);
+        expect(result.reason).toBe('first-upload');
+    });
+
+    test('empty string master path → first upload becomes master', () => {
+        const result = decideMasterUpdate('');
+        expect(result.shouldUpdate).toBe(true);
+        expect(result.reason).toBe('first-upload');
+    });
+
+    test('whitespace-only master path treated as empty', () => {
+        const result = decideMasterUpdate('   ');
+        expect(result.shouldUpdate).toBe(true);
+        expect(result.reason).toBe('first-upload');
+    });
+});
 
 describe('syncMasterCvFromDocument — Welle Re-1 LITE', () => {
     const USER_ID = 'user-1';

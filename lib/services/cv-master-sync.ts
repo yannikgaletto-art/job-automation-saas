@@ -30,6 +30,31 @@ export interface SyncResult {
 }
 
 /**
+ * Phase 9 (2026-04-27) — decide whether a CV upload should overwrite the
+ * user's master CV.
+ *
+ * Old behaviour (before Phase 9): every upload overwrote
+ * user_profiles.cv_structured_data + cv_original_file_path. With multiple
+ * uploads the latest always won, with no UI feedback. Users who uploaded
+ * "best CV first, drafts later" got the wrong CV as their master.
+ *
+ * New rule: first upload sets the master; subsequent uploads only add a
+ * document row. The user explicitly switches the master via the Profil
+ * Re-Parse button (Welle C → calls syncMasterCvFromDocument with force=true).
+ *
+ * Pure function — no IO. Exported for testing.
+ */
+export function decideMasterUpdate(
+    existingMasterFilePath: string | null | undefined,
+): { shouldUpdate: boolean; reason: 'first-upload' | 'master-already-set' } {
+    const trimmed = (existingMasterFilePath ?? '').toString().trim();
+    if (trimmed.length === 0) {
+        return { shouldUpdate: true, reason: 'first-upload' };
+    }
+    return { shouldUpdate: false, reason: 'master-already-set' };
+}
+
+/**
  * Options for the master CV sync.
  */
 export interface SyncOptions {
