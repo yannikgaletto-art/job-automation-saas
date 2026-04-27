@@ -45,7 +45,7 @@ export async function syncMasterCvFromDocument(
         const [{ data: profile }, { data: doc }] = await Promise.all([
             supabaseAdmin
                 .from('user_profiles')
-                .select('cv_original_file_path, full_name')
+                .select('cv_original_file_path, full_name, cv_structured_data')
                 .eq('id', userId)
                 .maybeSingle(),
             supabaseAdmin
@@ -60,11 +60,24 @@ export async function syncMasterCvFromDocument(
             return { status: 'no-document', message: `Document ${cvDocumentId} not found for user` };
         }
 
-        if (profile?.cv_original_file_path === doc.file_url_encrypted) {
-            return { status: 'skipped', message: 'Profile already synced with chosen document' };
-        }
-
         const extractedText = (doc.metadata as Record<string, unknown> | null)?.extracted_text as string | undefined;
+
+        // Phase 5.8 (2026-04-27): Health-check — even if file paths match, force a
+        // re-parse when the master's personalInfo is suspicious (email/phone null
+        // BUT raw text clearly contains them). This recovers users who uploaded
+        // before the Tier-1 PII fallback was wired in.
+        if (profile && profile.cv_original_file_path === doc.file_url_encrypted) {
+            const masterPi = (profile.cv_structured_data as { personalInfo?: { email?: string | null; phone?: string | null } } | null)?.personalInfo;
+            const rawHasEmail = !!extractedText && /\S+@\S+\.\S+/.test(extractedText);
+            const rawHasPhone = !!extractedText && /(?:\+?\d[\d\s\-./()]{8,}\d)/.test(extractedText);
+            const piIsStale =
+                (rawHasEmail && !masterPi?.email) ||
+                (rawHasPhone && !masterPi?.phone);
+            if (!piIsStale) {
+                return { status: 'skipped', message: 'Profile already synced with chosen document' };
+            }
+            // Fall through to re-parse — master PII looks stale
+        }
         if (!extractedText || extractedText.trim().length < 50) {
             return { status: 'no-text', message: `Document ${cvDocumentId} has no usable extracted_text` };
         }

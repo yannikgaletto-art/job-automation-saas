@@ -211,13 +211,20 @@ ${sanitized}
     const restoredJsonString = restoreJson(jsonMatch[0]);
     const rawJson = JSON.parse(restoredJsonString);
 
-    // Phase 5.4 + 5.7 (2026-04-27): Tier-1 name fallback. If the LLM ignored
-    // the __NAME_0__ token and emitted personalInfo.name=null directly, recover
-    // from tokenMap. Heuristic: pick the FIRST candidate that looks like a
-    // realistic person name (TitleCase + TitleCase, both ≥3 chars, no
-    // institutional suffix). Avoids picking "AI Transformation Institute" or
-    // "Ingrano Solutions" etc. that the sanitizer over-flagged as NAME tokens.
+    // Phase 5.4 + 5.7 + 5.8 (2026-04-27): Tier-1 PII fallback. If the LLM
+    // ignored the __NAME_0__ / __EMAIL_0__ / __PHONE_0__ tokens and emitted
+    // personalInfo.{name,email,phone}=null directly, recover from tokenMap.
+    // Pattern observed on Yannik's Exxeta CV: email + phone in raw text but
+    // missing from rendered Optimizer output (Avenga job 04fce3f0 e2e).
     if (!rawJson.personalInfo) rawJson.personalInfo = {};
+
+    // Helper: pick first token by prefix
+    const pickToken = (prefix: string): string | null => {
+      const key = Array.from(tokenMap.keys()).find((k) => k.startsWith(prefix));
+      return key ? (tokenMap.get(key) ?? null) : null;
+    };
+
+    // Name: smart fallback — filter realistic person names, avoid institutional tokens
     if (!rawJson.personalInfo.name) {
       const INSTITUTIONAL_SUFFIX = /\b(institute|institut|gmbh|ag|kg|se|inc|ltd|llc|corp|company|consulting|solutions|group|technologies|systems|labs|studios|partners|holdings|university|universität|hochschule|fachhochschule|akademie|college|school)\b/i;
       const PERSON_NAME_RE = /^[A-ZÄÖÜ][a-zäöüß]{2,}\s+[A-ZÄÖÜ][a-zäöüß]{2,}(\s+[A-ZÄÖÜ][a-zäöüß]+)*$/;
@@ -231,12 +238,29 @@ ${sanitized}
         rawJson.personalInfo.name = candidates[0];
         console.log(`🔧 [cv-parser] Tier-1 name fallback (smart) → "${rawJson.personalInfo.name}"`);
       } else {
-        // No realistic candidate — last-resort: first NAME token (legacy behavior)
-        const firstNameToken = Array.from(tokenMap.keys()).find((k) => k.startsWith('__NAME_'));
-        if (firstNameToken) {
-          rawJson.personalInfo.name = tokenMap.get(firstNameToken) ?? null;
+        const fallback = pickToken('__NAME_');
+        if (fallback) {
+          rawJson.personalInfo.name = fallback;
           console.log(`🔧 [cv-parser] Tier-1 name fallback (last-resort) → "${rawJson.personalInfo.name}"`);
         }
+      }
+    }
+
+    // Email: simple first-token fallback (emails are deterministic — no false positives)
+    if (!rawJson.personalInfo.email) {
+      const fallback = pickToken('__EMAIL_');
+      if (fallback) {
+        rawJson.personalInfo.email = fallback;
+        console.log(`🔧 [cv-parser] Tier-1 email fallback → "${fallback}"`);
+      }
+    }
+
+    // Phone: simple first-token fallback
+    if (!rawJson.personalInfo.phone) {
+      const fallback = pickToken('__PHONE_');
+      if (fallback) {
+        rawJson.personalInfo.phone = fallback;
+        console.log(`🔧 [cv-parser] Tier-1 phone fallback → "${fallback}"`);
       }
     }
     console.log(`🔐 [cv-parser] PII restored in structured JSON. Name: ${rawJson.personalInfo?.name ? '✅' : '⚠️ null'}`);
