@@ -136,6 +136,9 @@ Last Updated: 2026-04-18
 #### Documents & User
 - `/api/documents/upload` (POST — CV/Cover Letter Upload)
 - `/api/documents/download` (GET — PDF Download)
+- `/api/documents/list` (GET — list user's CVs and Cover Letters)
+- `/api/documents/[id]` (DELETE — remove a document)
+- `/api/documents/reparse` (POST — Welle C: re-parses a CV's extracted_text via parseCvTextToJson, makes it the master)
 - `/api/onboarding/complete` (POST)
 - `/api/onboarding/status` (GET)
 - `/api/consent/record` (POST/GET)
