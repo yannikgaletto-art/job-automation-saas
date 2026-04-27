@@ -1617,7 +1617,9 @@
     "reparse_title": "Volver a procesar el CV",
     "reparse_in_progress": "Procesando de nuevo…",
     "reparse_success": "CV procesado de nuevo ✅",
-    "reparse_failed": "Error al volver a procesar: {error}"
+    "reparse_failed": "Error al volver a procesar: {error}",
+    "master_kept_title": "CV principal sin cambios",
+    "master_kept_desc": "Haz clic en el icono de actualización en tu perfil sobre el CV que quieres como nuevo principal."
   },
   "tour": {
     "step1_title": "Tus objetivos del día",

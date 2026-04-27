@@ -146,6 +146,10 @@ export async function POST(req: NextRequest) {
         let processedCv: { encryptedPii: Record<string, unknown>; metadata: Record<string, unknown>; extractedText: string } | null = null;
         let cvDocId: string | null = null;
         let cvUploadPath: string | null = null;
+        // Welle 1 (2026-04-27): tells the frontend whether the master CV was set
+        // (first upload) or kept unchanged (subsequent upload). Frontend shows a
+        // toast "Master kept — use Profil/Refresh to switch" when 'kept'.
+        let masterAction: 'set' | 'kept' | null = null;
 
         if (cvFile) {
             console.log(`[${requestId}] route=documents/upload step=storage_upload_cv`);
@@ -262,6 +266,7 @@ export async function POST(req: NextRequest) {
                             // a failed lookup as "first-upload" and overwrite an existing master.
                             if (lookupErr) {
                                 console.error(`[${requestId}] route=documents/upload step=master_lookup supabase_error=${lookupErr.message} — failing safe, master untouched`);
+                                masterAction = 'kept';
                             } else {
                                 const decision = decideMasterUpdate(existingProfile?.cv_original_file_path);
                                 console.log(`[${requestId}] route=documents/upload step=master_decision update=${decision.shouldUpdate} reason=${decision.reason}`);
@@ -278,11 +283,14 @@ export async function POST(req: NextRequest) {
 
                                     if (profileErr) {
                                         console.error(`[${requestId}] route=documents/upload step=save_profile supabase_error=${profileErr.message}`);
+                                        masterAction = 'kept';
                                     } else {
                                         console.log(`[${requestId}] route=documents/upload step=save_profile success`);
+                                        masterAction = 'set';
                                     }
                                 } else {
                                     console.log(`[${requestId}] route=documents/upload step=save_profile skipped (master already set, doc added only)`);
+                                    masterAction = 'kept';
                                 }
                             }
                         } catch (parseError: unknown) {
@@ -394,7 +402,8 @@ export async function POST(req: NextRequest) {
                 document_ids: {
                     cv: cvDocId,
                     coverLetters: coverLetterIds
-                }
+                },
+                master_action: masterAction
             }
         })
 

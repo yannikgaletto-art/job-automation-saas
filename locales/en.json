@@ -1634,7 +1634,9 @@
     "reparse_title": "Re-parse this CV",
     "reparse_in_progress": "Re-parsing…",
     "reparse_success": "CV re-parsed successfully ✅",
-    "reparse_failed": "Re-parse failed: {error}"
+    "reparse_failed": "Re-parse failed: {error}",
+    "master_kept_title": "Master CV unchanged",
+    "master_kept_desc": "Click the refresh icon in your profile on the CV you want as the new master."
   },
   "tour": {
     "step1_title": "Your Daily Goals",

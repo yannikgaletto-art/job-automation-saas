@@ -270,6 +270,11 @@ export function ActiveCVCard() {
             return false;
         };
 
+        // Welle 1 (2026-04-27): captures master_action from upload response so the
+        // frontend can show a hint when the master CV was kept (subsequent upload).
+        // Null when xhr.onerror -> verifySilentSuccess fallback fires (no body to parse).
+        let masterActionFromResponse: 'set' | 'kept' | null = null;
+
         try {
             const fd = new FormData();
             fd.append('file', file);
@@ -291,6 +296,13 @@ export function ActiveCVCard() {
 
                 xhr.onload = () => {
                     if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const body = JSON.parse(xhr.responseText);
+                            const action = body?.data?.master_action;
+                            if (action === 'set' || action === 'kept') {
+                                masterActionFromResponse = action;
+                            }
+                        } catch { /* response parse failed; hint stays null */ }
                         setUploadProgress(100);
                         setUploadStatus(t('status_done'));
                         resolve();
@@ -324,6 +336,12 @@ export function ActiveCVCard() {
             });
 
             notify(type === 'cv' ? t('cv_uploaded_toast') : t('cl_uploaded_toast'));
+            // Welle 1: surface the master-kept hint on subsequent CV uploads so
+            // the user understands the master stays unchanged until they click
+            // the refresh icon next to the CV they want as the new master.
+            if (type === 'cv' && masterActionFromResponse === 'kept') {
+                notify(`${t('master_kept_title')}: ${t('master_kept_desc')}`);
+            }
             await loadDocs();
 
             // QA Integration: If user came from a feature via DocumentsRequiredDialog,

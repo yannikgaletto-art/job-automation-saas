@@ -1634,7 +1634,9 @@
     "reparse_title": "Lebenslauf neu auswerten",
     "reparse_in_progress": "Wird neu ausgewertet…",
     "reparse_success": "Lebenslauf neu ausgewertet ✅",
-    "reparse_failed": "Neuauswertung fehlgeschlagen: {error}"
+    "reparse_failed": "Neuauswertung fehlgeschlagen: {error}",
+    "master_kept_title": "Master-CV bleibt unverändert",
+    "master_kept_desc": "Klick im Profil auf das Refresh-Symbol beim CV, das du als neuen Master setzen willst."
   },
   "tour": {
     "step1_title": "Deine Tagesziele",
