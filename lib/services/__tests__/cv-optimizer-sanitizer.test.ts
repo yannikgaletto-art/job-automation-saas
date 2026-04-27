@@ -16,6 +16,7 @@ import {
     isMissingSection,
     sanitizeOptimizerChanges,
     sanitizeBeforeText,
+    stripGradeAnnotationsFromSkills,
 } from '../cv-optimizer-sanitizer';
 
 const baseChange = (overrides: Partial<{
@@ -618,5 +619,116 @@ describe('sanitizeBeforeText — array sections (regression coverage)', () => {
         const result = sanitizeBeforeText([change], cv);
         expect(result.verified).toHaveLength(1);
         expect(result.verified[0].type).toBe('add');
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Welle 1.5 (2026-04-27) — stripGradeAnnotationsFromSkills
+// Bug: BSP M.Sc. education-description has German module grades like
+// "Strategisches Management (1,0)". Optimizer relocates the content into
+// skills.items, polluting the skills list. Strip the grade pattern from
+// skill-items only (not other sections — bullets may contain "(2024)" etc.).
+// ──────────────────────────────────────────────────────────────────────
+
+describe('stripGradeAnnotationsFromSkills — Welle 1.5', () => {
+    const skillChange = (after: string) => ({
+        id: 'c-1',
+        type: 'modify',
+        target: { section: 'skills', entityId: 's-1', field: 'items', bulletId: null },
+        before: '',
+        after,
+    });
+
+    test('REGRESSION: Yannik BSP module grades stripped from skills.items', () => {
+        const change = skillChange(
+            'Geschäftsentwicklung (1, 0); Strategie & Unternehmensentwicklung (1, 0); Stakeholder-Management',
+        );
+        stripGradeAnnotationsFromSkills([change]);
+        expect(change.after).toBe(
+            'Geschäftsentwicklung; Strategie & Unternehmensentwicklung; Stakeholder-Management',
+        );
+    });
+
+    test('handles comma-separated form "(1,3)" without space', () => {
+        const change = skillChange('Forschungsmethoden (1,3); Design Thinking (1,0); Agile Methoden');
+        stripGradeAnnotationsFromSkills([change]);
+        expect(change.after).toBe('Forschungsmethoden; Design Thinking; Agile Methoden');
+    });
+
+    test('idempotent: running twice yields same result', () => {
+        const change = skillChange('Big Data & Analytics (1, 0); Datenanalyse');
+        stripGradeAnnotationsFromSkills([change]);
+        const once = change.after;
+        stripGradeAnnotationsFromSkills([change]);
+        expect(change.after).toBe(once);
+        expect(change.after).toBe('Big Data & Analytics; Datenanalyse');
+    });
+
+    test('no-op when after has no grade annotations', () => {
+        const change = skillChange('React, TypeScript, Vue');
+        stripGradeAnnotationsFromSkills([change]);
+        expect(change.after).toBe('React, TypeScript, Vue');
+    });
+
+    test('does NOT strip legitimate parens like "(MS Office)" or "(Python 3.10)"', () => {
+        const change = skillChange('Office Tools (MS Office); Python (3.10); Java');
+        stripGradeAnnotationsFromSkills([change]);
+        expect(change.after).toBe('Office Tools (MS Office); Python (3.10); Java');
+    });
+
+    test('does NOT touch bullet changes outside skills section', () => {
+        const change = {
+            id: 'c-1',
+            type: 'modify',
+            target: { section: 'experience', entityId: 'exp-1', field: 'description', bulletId: 'b-1' },
+            before: '',
+            after: 'Lead M&A integration (2024) with revenue impact (1, 5)',
+        };
+        stripGradeAnnotationsFromSkills([change]);
+        expect(change.after).toBe('Lead M&A integration (2024) with revenue impact (1, 5)');
+    });
+
+    test('does NOT touch skills.category changes (only items)', () => {
+        const change = {
+            id: 'c-1',
+            type: 'modify',
+            target: { section: 'skills', entityId: 's-1', field: 'category', bulletId: null },
+            before: '',
+            after: 'Master-Module (1, 0)',
+        };
+        stripGradeAnnotationsFromSkills([change]);
+        expect(change.after).toBe('Master-Module (1, 0)');
+    });
+
+    test('handles multiple grade annotations in one string', () => {
+        const change = skillChange('A (1,0); B (2,3); C (1, 7); D');
+        stripGradeAnnotationsFromSkills([change]);
+        expect(change.after).toBe('A; B; C; D');
+    });
+
+    test('handles empty after gracefully', () => {
+        const change = skillChange('');
+        stripGradeAnnotationsFromSkills([change]);
+        expect(change.after).toBe('');
+    });
+
+    test('handles missing after gracefully', () => {
+        const change: any = {
+            id: 'c-1',
+            type: 'modify',
+            target: { section: 'skills', entityId: 's-1', field: 'items', bulletId: null },
+            before: '',
+        };
+        expect(() => stripGradeAnnotationsFromSkills([change])).not.toThrow();
+    });
+
+    test('returns the same array reference (in-place mutation)', () => {
+        const changes = [skillChange('A (1,0); B')];
+        const result = stripGradeAnnotationsFromSkills(changes);
+        expect(result).toBe(changes);
+    });
+
+    test('empty input returns empty array', () => {
+        expect(stripGradeAnnotationsFromSkills([])).toEqual([]);
     });
 });

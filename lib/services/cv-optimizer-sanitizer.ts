@@ -255,6 +255,29 @@ export function sanitizeBeforeText<T extends ChangeWithText>(
 }
 
 /**
+ * Welle 1.5 (2026-04-27): German module grades like "(1, 0)" or "(1,3)" leak from
+ * education-description into skills-items when the optimizer relocates content
+ * across sections. Repro: Yannik's BSP M.Sc. description has
+ * "Strategisches Management (1,0), Strategie & Unternehmensentwicklung (1,0)" —
+ * the optimizer moved this into skills-items, polluting the skills list.
+ *
+ * Strip the pattern \(\d+\s*,\s*\d+\) from change.after when the change targets
+ * skills.items. Idempotent. Does not touch other sections (bullets may legitimately
+ * contain numeric parens like "(2024)").
+ *
+ * Pure function — mutates change.after in place.
+ */
+export function stripGradeAnnotationsFromSkills<T extends ChangeWithText>(changes: T[]): T[] {
+    const gradePattern = /\s*\(\s*\d+\s*,\s*\d+\s*\)/g;
+    for (const c of changes) {
+        if (c.target?.section !== 'skills' || c.target?.field !== 'items') continue;
+        if (typeof c.after !== 'string' || c.after.length === 0) continue;
+        c.after = c.after.replace(gradePattern, '');
+    }
+    return changes;
+}
+
+/**
  * Single-pass triage for the optimizer's raw change list.
  * Returns the surviving changes plus a parallel array of drop reasons (for logging).
  *

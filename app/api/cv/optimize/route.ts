@@ -9,7 +9,7 @@ import { logger } from '@/lib/logging';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { translateCvIfNeeded } from '@/lib/services/cv-translator';
 import { sanitizeCv } from '@/lib/services/cv-data-sanitizer';
-import { sanitizeOptimizerChanges, sanitizeBeforeText } from '@/lib/services/cv-optimizer-sanitizer';
+import { sanitizeOptimizerChanges, sanitizeBeforeText, stripGradeAnnotationsFromSkills } from '@/lib/services/cv-optimizer-sanitizer';
 import { pruneForOptimizer } from '@/lib/utils/cv-payload-pruner';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
@@ -577,6 +577,11 @@ Must conform to the following Zod schema:
                 ? c.after.replace(/\s*[–—]\s*/g, '; ')
                 : c.after,
         }));
+
+        // Welle 1.5 (2026-04-27): strip German module grades like "(1, 0)" from
+        // skills.items. The optimizer occasionally relocates education-description
+        // content (which contains module grades) into skills, polluting the list.
+        stripGradeAnnotationsFromSkills(rawJson.changes);
 
         if (lookupFailures.length > 0) {
             log.warn('Before-text sanitizer: changes dropped due to path mismatch', {
