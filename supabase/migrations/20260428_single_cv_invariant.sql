@@ -12,6 +12,11 @@
 --      (master = file path stored in user_profiles.cv_original_file_path).
 --   4. Add a partial unique index so a 2nd CV insert fails with 23505.
 --
+-- Wrapped in BEGIN/COMMIT explicitly: even if this file is run via the
+-- Supabase SQL editor (which does not auto-wrap multi-statement scripts),
+-- a mid-flight error rolls back every prior step. Removes the window where
+-- the DELETE has run but the UNIQUE INDEX is not yet in place.
+--
 -- Note on CONCURRENTLY: skipped on purpose. The documents table currently
 -- holds ~15 cv rows and the lock window is sub-millisecond. Atomic rollback
 -- of backup+delete+index is more valuable here than non-blocking index
@@ -21,6 +26,12 @@
 -- Storage-file cleanup is intentionally NOT in SQL (Postgres cannot reach
 -- Supabase Storage). Run scripts/_cleanup-orphan-cv-storage.ts after the
 -- migration applies.
+--
+-- DSGVO note: the backup tables contain extracted_text + cv_structured_data
+-- (PII). Drop them after the verification window passes (see DROP commands
+-- at the bottom of this file, kept as comments).
+
+BEGIN;
 
 -- ─── Phase 0.5: Backup tables ────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS documents_backup_pre_singlecv AS
@@ -34,6 +45,12 @@ CREATE TABLE IF NOT EXISTS user_profiles_cv_backup_pre_singlecv AS
            cv_original_file_path,
            NOW() AS backup_at
     FROM user_profiles;
+
+-- Lock down the backup tables: enable RLS so authenticated/anon users
+-- cannot read the PII inside them. Only service_role bypasses RLS, which
+-- is what scripts/_cleanup-orphan-cv-storage.ts uses.
+ALTER TABLE documents_backup_pre_singlecv ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profiles_cv_backup_pre_singlecv ENABLE ROW LEVEL SECURITY;
 
 -- ─── Phase 11 prep: banner-seen tracker ──────────────────────────────
 -- Strategy: existing non-impacted users + every future user is auto-seen
@@ -85,6 +102,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_cv_per_user
     ON documents (user_id)
     WHERE document_type = 'cv';
 
+COMMIT;
+
 -- Smoke check: this query MUST return zero rows post-migration.
 -- (Kept as a comment so it does not run, but documented for verification.)
 -- SELECT user_id, COUNT(*)
@@ -92,3 +111,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_cv_per_user
 -- WHERE document_type = 'cv'
 -- GROUP BY user_id
 -- HAVING COUNT(*) > 1;
+
+-- ─── Cleanup AFTER verification window passes (run manually) ─────────
+-- After 7-30 days of stable operation, drop the backup tables to free
+-- DSGVO-relevant PII storage. Do not drop earlier — they are the only
+-- rollback path.
+--
+--   DROP TABLE IF EXISTS documents_backup_pre_singlecv;
+--   DROP TABLE IF EXISTS user_profiles_cv_backup_pre_singlecv;
