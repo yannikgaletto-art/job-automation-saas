@@ -10,14 +10,27 @@ const supabaseAdmin = createAdminClient(
     {
         auth: {
             autoRefreshToken: false,
-            persistSession: false
-        }
-    }
+            persistSession: false,
+        },
+    },
 );
 
+/**
+ * DELETE /api/documents/[id]
+ *
+ * Order of operations under the Single-CV invariant (Phase 3):
+ *   1. Audit log (DSGVO Art. 5(1)(f) Accountability).
+ *   2. Verify ownership.
+ *   3. For CVs: clear user_profiles.cv_* fields BEFORE deleting the row,
+ *      so we never end up with a profile pointer that resolves to nothing.
+ *   4. Delete the documents row.
+ *   5. Best-effort storage cleanup; storage failures do NOT fail the
+ *      request because the row is already gone — orphan files are
+ *      reaped by scripts/_cleanup-orphan-cv-storage.ts.
+ */
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: Promise<{ id: string }> },
 ) {
     try {
         const { id } = await params;
@@ -28,7 +41,12 @@ export async function DELETE(
             return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
         }
 
-        // Fetch document info to verify ownership and find the file path
+        // 1. Audit log — runs before any state change.
+        console.log(
+            `[audit] cv-delete user=${user.id} doc=${id} at=${new Date().toISOString()}`,
+        );
+
+        // 2. Fetch + ownership check.
         const { data: document, error: fetchError } = await supabase
             .from('documents')
             .select('id, document_type, file_url_encrypted')
@@ -37,27 +55,38 @@ export async function DELETE(
             .single();
 
         if (fetchError || !document) {
-            console.error('❌ Document not found or unauthorized:', fetchError);
-            return NextResponse.json({ success: false, error: 'Document not found or unauthorized' }, { status: 404 });
+            console.error('Document not found or unauthorized:', fetchError?.message);
+            return NextResponse.json(
+                { success: false, error: 'Document not found or unauthorized' },
+                { status: 404 },
+            );
         }
 
         const bucketName = document.document_type === 'cv' ? 'cvs' : 'cover-letters';
         const filePath = document.file_url_encrypted;
 
-        // Delete from storage
-        if (filePath) {
-            const { error: storageError } = await supabaseAdmin.storage
-                .from(bucketName)
-                .remove([filePath]);
+        // 3. CV-only: clear master pointer + structured data first. Idempotent.
+        // We clear before the row delete so a half-failed delete cannot leave
+        // the profile pointing at a row that no longer exists.
+        if (document.document_type === 'cv') {
+            const { error: profileErr } = await supabaseAdmin
+                .from('user_profiles')
+                .update({
+                    cv_structured_data: null,
+                    cv_original_file_path: null,
+                })
+                .eq('id', user.id);
 
-            if (storageError) {
-                console.error(`❌ Failed to delete file from storage (${bucketName}/${filePath}):`, storageError);
-                // Return 500 but log error
-                return NextResponse.json({ success: false, error: 'Failed to delete file from storage' }, { status: 500 });
+            if (profileErr) {
+                console.error(`[cv-delete] profile clear failed user=${user.id}:`, profileErr.message);
+                return NextResponse.json(
+                    { success: false, error: 'Failed to clear profile master pointer' },
+                    { status: 500 },
+                );
             }
         }
 
-        // Delete from database
+        // 4. Delete the documents row.
         const { error: deleteError } = await supabase
             .from('documents')
             .delete()
@@ -65,16 +94,32 @@ export async function DELETE(
             .eq('user_id', user.id);
 
         if (deleteError) {
-            console.error('❌ Failed to delete document from database:', deleteError);
-            return NextResponse.json({ success: false, error: 'Failed to delete document record' }, { status: 500 });
+            console.error(`[cv-delete] db delete failed doc=${id}:`, deleteError.message);
+            return NextResponse.json(
+                { success: false, error: 'Failed to delete document record' },
+                { status: 500 },
+            );
         }
 
-        console.log(`✅ Document ${id} deleted successfully`);
-        return NextResponse.json({ success: true });
+        // 5. Storage cleanup — best-effort. Orphans reaped offline.
+        if (filePath) {
+            const { error: storageError } = await supabaseAdmin.storage
+                .from(bucketName)
+                .remove([filePath]);
 
+            if (storageError) {
+                console.warn(
+                    `[cv-delete] storage cleanup failed (non-blocking) ${bucketName}/${filePath}:`,
+                    storageError.message,
+                );
+            }
+        }
+
+        console.log(`[cv-delete] success doc=${id} user=${user.id}`);
+        return NextResponse.json({ success: true });
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
-        console.error('❌ Server error deleting document:', errMsg);
+        console.error('[cv-delete] server error:', errMsg);
         return NextResponse.json({ success: false, error: errMsg }, { status: 500 });
     }
 }
