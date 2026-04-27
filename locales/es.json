@@ -1625,6 +1625,11 @@
     "master_kept_title": "CV principal sin cambios",
     "master_kept_desc": "Haz clic en el icono de actualización en tu perfil sobre el CV que quieres como nuevo principal."
   },
+  "cv_migration_banner": {
+    "title": "Hemos simplificado tu perfil: un CV por cuenta.",
+    "body": "Se eliminaron versiones anteriores; tu CV principal se mantiene. Elimina y vuelve a subir si quieres cambiar.",
+    "dismiss_label": "Cerrar aviso"
+  },
   "tour": {
     "step1_title": "Tus objetivos del día",
     "step1_body": "Un estudio de la Dra. Gail Matthews muestra: Quienes <b>escriben sus objetivos</b> y comparten su progreso los alcanzan un 33 a 42 por ciento más. Pathly te invita a establecer tus objetivos de hoy. Escríbelos directamente o usa arrastrar y soltar.",

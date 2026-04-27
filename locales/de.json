@@ -1642,6 +1642,11 @@
     "master_kept_title": "Master-CV bleibt unverändert",
     "master_kept_desc": "Klick im Profil auf das Refresh-Symbol beim CV, das du als neuen Master setzen willst."
   },
+  "cv_migration_banner": {
+    "title": "Wir haben dein Profil vereinfacht: ein Lebenslauf pro Konto.",
+    "body": "Ältere CV-Versionen wurden entfernt, dein Master bleibt. Lösche und lade neu, wenn du wechseln willst.",
+    "dismiss_label": "Hinweis schließen"
+  },
   "tour": {
     "step1_title": "Deine Tagesziele",
     "step1_body": "Eine Studie von Dr. Gail Matthews zeigt: Wer sich <b>Ziele schriftlich setzt</b> und Fortschritte teilt, erreicht diese um 33 bis 42 Prozent häufiger. Pathly lädt dich ein deine Ziele für heute zu setzen. Tippe direkt rein oder nutze Drag and Drop.",

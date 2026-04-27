@@ -1642,6 +1642,11 @@
     "master_kept_title": "Master CV unchanged",
     "master_kept_desc": "Click the refresh icon in your profile on the CV you want as the new master."
   },
+  "cv_migration_banner": {
+    "title": "We simplified your profile: one CV per account.",
+    "body": "Older CV versions were removed, your master stays. Delete and re-upload when you want to switch.",
+    "dismiss_label": "Dismiss notice"
+  },
   "tour": {
     "step1_title": "Your Daily Goals",
     "step1_body": "A study by Dr. Gail Matthews shows: People who <b>write down their goals</b> and share progress achieve them 33 to 42 percent more often. Pathly invites you to set your goals for today. Type directly or use drag and drop.",
