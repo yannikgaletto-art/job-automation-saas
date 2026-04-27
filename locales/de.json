@@ -1625,7 +1625,11 @@
     "cl_empty_hint": "Lade erfolgreiche Anschreiben hoch, damit Pathly deinen Schreibstil lernt.",
     "cv_uploaded_toast": "Lebenslauf hochgeladen",
     "cl_uploaded_toast": "Anschreiben hochgeladen",
-    "category_delete_title": "Kategorie löschen"
+    "category_delete_title": "Kategorie löschen",
+    "reparse_title": "Lebenslauf neu auswerten",
+    "reparse_in_progress": "Wird neu ausgewertet…",
+    "reparse_success": "Lebenslauf neu ausgewertet ✅",
+    "reparse_failed": "Neuauswertung fehlgeschlagen: {error}"
   },
   "tour": {
     "step1_title": "Deine Tagesziele",

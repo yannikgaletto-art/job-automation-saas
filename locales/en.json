@@ -1625,7 +1625,11 @@
     "cl_empty_hint": "Upload successful cover letters so Pathly can learn your writing style.",
     "cv_uploaded_toast": "CV uploaded",
     "cl_uploaded_toast": "Cover letter uploaded",
-    "category_delete_title": "Delete category"
+    "category_delete_title": "Delete category",
+    "reparse_title": "Re-parse this CV",
+    "reparse_in_progress": "Re-parsing…",
+    "reparse_success": "CV re-parsed successfully ✅",
+    "reparse_failed": "Re-parse failed: {error}"
   },
   "tour": {
     "step1_title": "Your Daily Goals",

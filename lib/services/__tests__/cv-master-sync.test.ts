@@ -242,4 +242,108 @@ describe('syncMasterCvFromDocument — Welle Re-1 LITE', () => {
             expect(result.status).toBe('synced');
         });
     });
+
+    // ──────────────────────────────────────────────────────────────────
+    // Welle C (2026-04-27) — force re-parse for the Re-Parse-Button flow.
+    // The button must always re-parse, even when the doc is already the
+    // master and PII looks fine.
+    // ──────────────────────────────────────────────────────────────────
+    describe('Welle C — force re-parse', () => {
+        it('force=true bypasses idempotency skip and re-parses anyway', async () => {
+            const state: MockState = {
+                user_profiles: {
+                    rows: [{
+                        id: USER_ID,
+                        cv_original_file_path: 'user-1/exxeta.pdf',
+                        full_name: 'Yannik Galetto',
+                        cv_structured_data: {
+                            personalInfo: {
+                                email: 'info@yannik-galetto.site',
+                                phone: '+49 1590...',
+                            },
+                        },
+                    }],
+                    updates: [],
+                },
+                documents: {
+                    rows: [{
+                        id: 'doc-exxeta',
+                        user_id: USER_ID,
+                        file_url_encrypted: 'user-1/exxeta.pdf',
+                        metadata: { extracted_text: 'long enough text here ' + 'x'.repeat(100) },
+                    }],
+                    updates: [],
+                },
+            };
+            const supabase = makeSupabaseMock(state);
+            const { parseCvTextToJson } = await import('@/lib/services/cv-parser');
+
+            const result = await syncMasterCvFromDocument(USER_ID, 'doc-exxeta', supabase, { force: true });
+
+            expect(result.status).toBe('synced');
+            expect(state.user_profiles.updates).toHaveLength(1);
+            expect(parseCvTextToJson).toHaveBeenCalled();
+        });
+
+        it('force=false (default) preserves idempotency skip when synced', async () => {
+            const state: MockState = {
+                user_profiles: {
+                    rows: [{
+                        id: USER_ID,
+                        cv_original_file_path: 'user-1/exxeta.pdf',
+                        full_name: 'Yannik Galetto',
+                        cv_structured_data: {
+                            personalInfo: {
+                                email: 'info@yannik-galetto.site',
+                                phone: '+49 1590...',
+                            },
+                        },
+                    }],
+                    updates: [],
+                },
+                documents: {
+                    rows: [{
+                        id: 'doc-exxeta',
+                        user_id: USER_ID,
+                        file_url_encrypted: 'user-1/exxeta.pdf',
+                        metadata: { extracted_text: 'long enough text here ' + 'x'.repeat(100) },
+                    }],
+                    updates: [],
+                },
+            };
+            const supabase = makeSupabaseMock(state);
+
+            const result = await syncMasterCvFromDocument(USER_ID, 'doc-exxeta', supabase);
+            expect(result.status).toBe('skipped');
+        });
+
+        it('force=true on a non-master document also rewrites cv_original_file_path', async () => {
+            // User picked CV-A as master earlier; now hits Re-Parse on CV-B.
+            // Expectation: CV-B becomes the master with fresh structuredData.
+            const state: MockState = {
+                user_profiles: {
+                    rows: [{
+                        id: USER_ID,
+                        cv_original_file_path: 'user-1/cv-a.pdf',
+                        full_name: 'Yannik Galetto',
+                    }],
+                    updates: [],
+                },
+                documents: {
+                    rows: [{
+                        id: 'doc-b',
+                        user_id: USER_ID,
+                        file_url_encrypted: 'user-1/cv-b.pdf',
+                        metadata: { extracted_text: 'B-doc text ' + 'x'.repeat(100) },
+                    }],
+                    updates: [],
+                },
+            };
+            const supabase = makeSupabaseMock(state);
+            const result = await syncMasterCvFromDocument(USER_ID, 'doc-b', supabase, { force: true });
+            expect(result.status).toBe('synced');
+            const patch = state.user_profiles.updates[0].patch;
+            expect(patch.cv_original_file_path).toBe('user-1/cv-b.pdf');
+        });
+    });
 });

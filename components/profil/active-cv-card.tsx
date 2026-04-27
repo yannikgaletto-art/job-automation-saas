@@ -17,7 +17,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useRouter } from "next/navigation";
-import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, ShieldCheck } from "lucide-react";
+import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, ShieldCheck, RefreshCw } from "lucide-react";
 import { Button } from "@/components/motion/button";
 import { useNotification } from "@/hooks/use-notification";
 import { useTranslations, useLocale } from "next-intl";
@@ -77,6 +77,9 @@ export function ActiveCVCard() {
     const [uploading, setUploading] = useState<string | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadStatus, setUploadStatus] = useState<string>('');
+    // Welle C (2026-04-27): Re-parse button state — track per-document so the
+    // user can hit re-parse on one CV while another is uploading.
+    const [reparsingId, setReparsingId] = useState<string | null>(null);
     const cvRef = useRef<HTMLInputElement>(null);
     const clRef = useRef<HTMLInputElement>(null);
     const searchParams = useSearchParams();
@@ -380,6 +383,30 @@ export function ActiveCVCard() {
         }
     };
 
+    // Welle C (2026-04-27): triggers /api/documents/reparse — re-parses extracted_text
+    // via parseCvTextToJson and rewrites user_profiles.cv_structured_data. The chosen
+    // document becomes the master (consistent with Welle B implicit contract).
+    const handleReparse = async (id: string) => {
+        setReparsingId(id);
+        try {
+            const res = await fetch('/api/documents/reparse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cvDocumentId: id }),
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body?.error || 'Re-Parse fehlgeschlagen');
+            }
+            notify(t('reparse_success'));
+        } catch (err) {
+            const errMsg = err instanceof Error ? err.message : 'Unbekannter Fehler';
+            notify(t('reparse_failed', { error: errMsg }));
+        } finally {
+            setReparsingId(null);
+        }
+    };
+
     // Category management
     const addCategory = () => {
         const name = newCategoryName.trim();
@@ -465,6 +492,16 @@ export function ActiveCVCard() {
                 </select>
             )}
             <div className="flex items-center gap-1">
+                {doc.type === 'cv' && (
+                    <button
+                        onClick={() => handleReparse(doc.id)}
+                        disabled={reparsingId === doc.id}
+                        className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={reparsingId === doc.id ? t('reparse_in_progress') : t('reparse_title')}
+                    >
+                        <RefreshCw className={`w-4 h-4 ${reparsingId === doc.id ? 'animate-spin' : ''}`} />
+                    </button>
+                )}
                 <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1" title={t('download_title')}>
                     <Download className="w-4 h-4" />
                 </button>

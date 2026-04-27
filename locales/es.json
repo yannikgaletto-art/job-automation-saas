@@ -1608,7 +1608,11 @@
     "cl_empty_hint": "Sube cartas de presentación exitosas para que Pathly aprenda tu estilo de escritura.",
     "cv_uploaded_toast": "CV subido",
     "cl_uploaded_toast": "Carta de presentación subida",
-    "category_delete_title": "Eliminar categoría"
+    "category_delete_title": "Eliminar categoría",
+    "reparse_title": "Volver a procesar el CV",
+    "reparse_in_progress": "Procesando de nuevo…",
+    "reparse_success": "CV procesado de nuevo ✅",
+    "reparse_failed": "Error al volver a procesar: {error}"
   },
   "tour": {
     "step1_title": "Tus objetivos del día",

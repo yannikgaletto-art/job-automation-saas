@@ -30,6 +30,19 @@ export interface SyncResult {
 }
 
 /**
+ * Options for the master CV sync.
+ */
+export interface SyncOptions {
+    /**
+     * Welle C (2026-04-27): when `true`, skip the idempotency / health-check
+     * pre-flight and always re-parse + re-write user_profiles. Used by the
+     * Re-Parse button in the Profil tab — the user explicitly asked for a
+     * fresh parse, so we honour it even if file paths match and PII looks fine.
+     */
+    force?: boolean;
+}
+
+/**
  * Sync the user's master CV (`user_profiles.cv_structured_data`) to reflect
  * the document the user explicitly chose at match time.
  *
@@ -40,7 +53,9 @@ export async function syncMasterCvFromDocument(
     userId: string,
     cvDocumentId: string,
     supabaseAdmin: SupabaseClient,
+    opts: SyncOptions = {},
 ): Promise<SyncResult> {
+    const force = opts.force === true;
     try {
         const [{ data: profile }, { data: doc }] = await Promise.all([
             supabaseAdmin
@@ -66,7 +81,7 @@ export async function syncMasterCvFromDocument(
         // re-parse when the master's personalInfo is suspicious (email/phone null
         // BUT raw text clearly contains them). This recovers users who uploaded
         // before the Tier-1 PII fallback was wired in.
-        if (profile && profile.cv_original_file_path === doc.file_url_encrypted) {
+        if (!force && profile && profile.cv_original_file_path === doc.file_url_encrypted) {
             const masterPi = (profile.cv_structured_data as { personalInfo?: { email?: string | null; phone?: string | null } } | null)?.personalInfo;
             const rawHasEmail = !!extractedText && /\S+@\S+\.\S+/.test(extractedText);
             const rawHasPhone = !!extractedText && /(?:\+?\d[\d\s\-./()]{8,}\d)/.test(extractedText);
