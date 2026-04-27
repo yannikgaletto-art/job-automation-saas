@@ -1103,11 +1103,22 @@ export function validateDescriptionsAgainstRawText<
   T extends { description?: string | null; [k: string]: any }
 >(items: T[], rawText: string): T[] {
   if (rawText.length < 50) return items;
-  const lowerRaw = rawText.toLowerCase();
+  // Welle F (2026-04-27): normalise whitespace + bullet-prefixes on BOTH sides
+  // before substring match. Education description recovery (Phase 5.2) writes
+  // the text WITH bullet prefixes; raw OCR text uses newlines as separators.
+  // Without normalisation, "- module a - module b" never matches "module a\n
+  // module b" verbatim, and the validator falsely drops legitimate recoveries.
+  const normaliseForMatch = (s: string) => s
+    .toLowerCase()
+    .replace(/[\-•*–]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const lowerRaw = normaliseForMatch(rawText);
   return items.map((item) => {
     const desc = (item.description || '').trim();
     if (desc.length === 0) return item;
-    const words = desc.toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+    const stripped = normaliseForMatch(desc);
+    const words = stripped.split(/\s+/).filter((w) => w.length > 1);
     const windowSize = words.length >= 5 ? 5 : words.length >= 3 ? 3 : 0;
     if (windowSize === 0) return item; // too short to validate
     for (let i = 0; i <= words.length - windowSize; i++) {

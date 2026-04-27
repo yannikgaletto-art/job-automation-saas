@@ -568,6 +568,59 @@ describe('validateDescriptionsAgainstRawText', () => {
         expect(validateDescriptionsAgainstRawText([], 'some raw text')).toEqual([]);
     });
 
+    // ──────────────────────────────────────────────────────────────────
+    // Welle F (2026-04-27) — bullet-prefix stripping before validation.
+    // Education recovery (Phase 5.2) writes descriptions WITH bullet
+    // prefixes ("- Module A\n- Module B"), but raw OCR text only has the
+    // newlines. Without stripping, the 5-word-window match would fail and
+    // the validator would falsely drop a legitimate recovery.
+    // ──────────────────────────────────────────────────────────────────
+
+    test('Welle F: bullet-prefix description (realistic edu bullets) matches multi-line raw text', () => {
+        // Mirrors the Yannik Phase-5.2 flow: recovery wrote bullets WITH "- " prefix,
+        // raw OCR text has them on separate lines. Pre-Welle-F the validator dropped
+        // legitimate recoveries because newline-separated raw never matches space-joined window.
+        const rawText = `## Bildungsweg
+
+Bachelor (B.A.) Universität Potsdam
+2020 - 2023
+
+Konzeption und Durchführung von zwölf Usability-Tests
+Analyse qualitativer Daten und Erstellung von Handlungsempfehlungen
+Reduktion der Fehlerquote durch iteratives Prototyping`;
+        const recovered = [{
+            id: 'edu-1',
+            description:
+                '- Konzeption und Durchführung von zwölf Usability-Tests\n- Analyse qualitativer Daten und Erstellung von Handlungsempfehlungen\n- Reduktion der Fehlerquote durch iteratives Prototyping',
+        }];
+        const out = validateDescriptionsAgainstRawText(recovered, rawText);
+        expect(out[0].description).toContain('Konzeption');
+        expect(out[0].description).toContain('Reduktion');
+    });
+
+    test('Welle F: in-line dash separator ("A - B - C") still matches plain raw', () => {
+        const rawText =
+            'Bachelor at Some University covering konzeption qualitativer daten reduktion durch iteratives prototyping in 2020-2023';
+        const recovered = [{
+            id: 'edu-1',
+            description: 'Konzeption qualitativer Daten - Reduktion durch iteratives Prototyping',
+        }];
+        const out = validateDescriptionsAgainstRawText(recovered, rawText);
+        // Normalised, "konzeption qualitativer daten reduktion durch" 5-word window matches raw.
+        expect(out[0].description).toContain('Konzeption');
+    });
+
+    test('Welle F: hallucinated bulleted description still gets dropped', () => {
+        const rawText =
+            'Bachelor at Universität Potsdam covering general philosophy and applied logic in two thousand and twenty.';
+        const fabricated = [{
+            id: 'edu-1',
+            description: '- Quantum Mechanics Advanced Theory\n- Cryptography Hardware Security\n- Astrophysics Field Studies',
+        }];
+        const out = validateDescriptionsAgainstRawText(fabricated, rawText);
+        expect(out[0].description).toBeNull();
+    });
+
     // Short description (3 words) — uses 3-word window, keeps when matching.
     test('keeps short 3-word description when matching rawText', () => {
         const rawText = 'TEDx Coaching Zertifikat erhalten 2021';

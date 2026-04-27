@@ -541,8 +541,12 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
         );
     }
 
+    // Welle D (2026-04-27): user-facing label changed from "Valley" → "ATS".
+    // Internal id stays 'valley' for backward compat (DB rows, config, persisted state);
+    // only the display label is updated since "ATS" describes the template's purpose
+    // (ATS-optimized layout) more honestly than the codename.
     const TEMPLATES = [
-        { id: 'valley', label: 'Valley', icon: <Layout className="w-4 h-4" /> },
+        { id: 'valley', label: 'ATS', icon: <Layout className="w-4 h-4" /> },
         { id: 'tech', label: 'Tech', icon: <Settings className="w-4 h-4" /> },
     ];
 
