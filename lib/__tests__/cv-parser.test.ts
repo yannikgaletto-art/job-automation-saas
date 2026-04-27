@@ -2,6 +2,7 @@ import {
     parseCvTextToJson,
     recoverMissingExperienceCompany,
     recoverMissingEducationInstitution,
+    recoverMissingEducationDescription,
     recoverMissingLanguages,
     cleanSkillCategories,
     cleanCertificationNames,
@@ -11,6 +12,7 @@ import {
     splitMergedSkillGroups,
     dropProjectLikeCerts,
     truncateCertDescriptionAtNewline,
+    rolesAreFuzzyEqual,
 } from '../services/cv-parser';
 import { complete } from '@/lib/ai/model-router';
 
@@ -920,5 +922,155 @@ describe('truncateCertDescriptionAtNewline', () => {
 
     test('handles empty array', () => {
         expect(truncateCertDescriptionAtNewline([])).toEqual([]);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Phase 5 — AI TI CV regression (2026-04-27)
+// ═══════════════════════════════════════════════════════════════════
+
+const aiTiRawText = `AI Transformation Institute
+Yannik Galetto
+04.08.1996 in Berlin
+
+## Berufserfahrung
+
+09.2025
+Ingrano Solutions I Sales & Business Development Manager
+02.2026
+Vertriebsautomatisierung: Konzeption und Implementierung automatisierter Workflows
+11.2023
+Fraunhofer I Innovation Management Consultant
+09.2025
+KI-GTM-Beratung: Steuerung von Transformationsprojekten
+07.2022
+Co-Founder & Product Owner - Xorder Menues
+08.2024
+Strategie: Aufbau digitaler Prozesse
+
+## Bildungsweg
+
+2018 Europäische Medienwissenschaften (B.A.) Universität Potsdam
+2022
+Abschlussnote: 1,3
+- Medienrecht und Kulturökonomie
+- Medienanalyse- und Evaluation
+- Interkulturelle Kompetenz`;
+
+describe('rolesAreFuzzyEqual — fuzzy role token matching', () => {
+    test('exact match returns true', () => {
+        expect(rolesAreFuzzyEqual('Sales Manager', 'Sales Manager')).toBe(true);
+    });
+
+    test('truncated role matches longer candidate (Yannik AI TI repro)', () => {
+        expect(rolesAreFuzzyEqual('Sales & Manager', 'Sales & Business Development Manager')).toBe(true);
+    });
+
+    test('Innovation Consultant matches Innovation Management Consultant', () => {
+        expect(rolesAreFuzzyEqual('Innovation Consultant', 'Innovation Management Consultant')).toBe(true);
+    });
+
+    test('Co-Founder matches Co-Founder & Product Owner', () => {
+        expect(rolesAreFuzzyEqual('Co-Founder', 'Co-Founder & Product Owner')).toBe(true);
+    });
+
+    test('totally different roles return false', () => {
+        expect(rolesAreFuzzyEqual('Designer', 'Manager')).toBe(false);
+    });
+
+    test('empty inputs return false', () => {
+        expect(rolesAreFuzzyEqual('', 'Manager')).toBe(false);
+        expect(rolesAreFuzzyEqual('Manager', '')).toBe(false);
+        expect(rolesAreFuzzyEqual('', '')).toBe(false);
+    });
+
+    test('case-insensitive', () => {
+        expect(rolesAreFuzzyEqual('SALES MANAGER', 'sales manager')).toBe(true);
+    });
+});
+
+describe('recoverMissingExperienceCompany — Phase 5.1 fuzzy match (Yannik AI TI 2026-04-27)', () => {
+    test('LLM-truncated role + missing company → restores both from rawText', () => {
+        const exp = [{ id: 'e1', role: 'Sales & Manager', company: null }];
+        const out = recoverMissingExperienceCompany(exp, aiTiRawText);
+        expect(out[0].company).toBe('Ingrano Solutions');
+        expect(out[0].role).toBe('Sales & Business Development Manager');
+    });
+
+    test('Truncated "Innovation Consultant" recovers full role from "Innovation Management Consultant"', () => {
+        const exp = [{ id: 'e2', role: 'Innovation Consultant', company: 'Fraunhofer' }];
+        const out = recoverMissingExperienceCompany(exp, aiTiRawText);
+        expect(out[0].role).toBe('Innovation Management Consultant');
+    });
+
+    test('Co-Founder dash pattern with "& Product Owner" suffix → company recovered', () => {
+        const exp = [{ id: 'e3', role: 'Co-Founder', company: null }];
+        const out = recoverMissingExperienceCompany(exp, aiTiRawText);
+        expect(out[0].company).toBe('Xorder Menues');
+        expect(out[0].role).toBe('Co-Founder & Product Owner');
+    });
+
+    test('Idempotent: entry already has both → no mutation', () => {
+        const exp = [{ id: 'e1', role: 'Sales & Business Development Manager', company: 'Ingrano Solutions' }];
+        const out = recoverMissingExperienceCompany(exp, aiTiRawText);
+        expect(out[0].company).toBe('Ingrano Solutions');
+        expect(out[0].role).toBe('Sales & Business Development Manager');
+    });
+});
+
+describe('recoverMissingEducationDescription — Phase 5.2 (Yannik AI TI 2026-04-27)', () => {
+    test('Bullet list under Bachelor degree is recovered', () => {
+        const edu = [{
+            id: 'edu-1',
+            degree: 'Europäische Medienwissenschaften (B.A.)',
+            description: null,
+        }];
+        const out = recoverMissingEducationDescription(edu, aiTiRawText);
+        expect(out[0].description).toContain('Medienrecht und Kulturökonomie');
+        expect(out[0].description).toContain('Medienanalyse');
+        expect(out[0].description).toContain('Interkulturelle Kompetenz');
+    });
+
+    test('Idempotent: existing description is untouched', () => {
+        const edu = [{
+            id: 'edu-1',
+            degree: 'Europäische Medienwissenschaften (B.A.)',
+            description: 'Already filled in by user',
+        }];
+        const out = recoverMissingEducationDescription(edu, aiTiRawText);
+        expect(out[0].description).toBe('Already filled in by user');
+    });
+
+    test('Returns null when degree not found in raw text', () => {
+        const edu = [{ id: 'edu-1', degree: 'Mythical Studies (M.A.)', description: null }];
+        const out = recoverMissingEducationDescription(edu, aiTiRawText);
+        expect(out[0].description).toBeNull();
+    });
+
+    test('Returns null when no bullets follow the degree line', () => {
+        const noBullets = `## Bildungsweg
+
+Europäische Medienwissenschaften (B.A.) Universität Potsdam
+Abschlussnote: 1,3`;
+        const edu = [{ id: 'edu-1', degree: 'Europäische Medienwissenschaften (B.A.)', description: null }];
+        const out = recoverMissingEducationDescription(edu, noBullets);
+        expect(out[0].description).toBeNull();
+    });
+
+    test('Handles empty array', () => {
+        expect(recoverMissingEducationDescription([], aiTiRawText)).toEqual([]);
+    });
+
+    test('Multiple bullet styles (-, •, –) are all recognized', () => {
+        const text = `Bachelor (B.A.) Test University
+
+- Module A
+• Module B
+– Module C`;
+        const edu = [{ id: 'edu-1', degree: 'Bachelor (B.A.)', description: null }];
+        const out = recoverMissingEducationDescription(edu, text);
+        expect(out[0].description).toContain('Module A');
+        expect(out[0].description).toContain('Module B');
+        expect(out[0].description).toContain('Module C');
     });
 });

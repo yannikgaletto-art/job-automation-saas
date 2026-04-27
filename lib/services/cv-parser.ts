@@ -59,7 +59,7 @@ export const cvStructuredDataSchema = z.object({
 
 export async function parseCvTextToJson(text: string): Promise<CvStructuredData> {
   // ═══ DSGVO Phase 2: Sanitize PII before AI call ═══
-  const { sanitized, restoreJson, warningFlags } = sanitizeForAI(text);
+  const { sanitized, restoreJson, warningFlags, tokenMap } = sanitizeForAI(text);
   console.log(`🛡️ [cv-parser] PII sanitized before AI call. Found: [${warningFlags.join(', ')}]`);
 
   const prompt = `
@@ -92,6 +92,7 @@ PASS 2: Ordne sie logisch zu — welche Firma gehört zu welchem Datumsbereich? 
 7. **DATE-COMPANY MATCHING**: Lies den gesamten CV-Text zuerst vollständig, bevor du die Zuordnung machst. Stelle sicher, dass jede Firma/Rolle mit dem korrekten Datumsbereich (Start - Ende) verknüpft wird. Bei OCR-extrahiertem Text kann die Textreihenfolge FALSCH sein — prüfe die logische Konsistenz.
 8. **SECTION MARKERS**: Der Text kann Markdown-artige Abschnittsmarkierungen enthalten (z.B. "## Berufserfahrung"). Nutze diese als Hilfe, um die CV-Sektionen zu unterscheiden.
 9. **PIPE-SEPARATOR "I" IN ERFAHRUNG UND SPRACHEN:**
+   - **WÖRTLICHE ÜBERNAHME — KEIN KÜRZEN:** Der Wert von \`role\` MUSS exakt der Berufsbezeichnung im CV-Text entsprechen. Wenn der Text "Sales & Business Development Manager" sagt, MUSS role = "Sales & Business Development Manager" — NIEMALS abkürzen zu "Sales & Manager", "BD Manager", "Manager" oder ähnlichen Vereinfachungen. Der gleiche Grundsatz gilt für \`company\`: vollständiger Firmenname aus dem Text, nicht selbst-verkürzt.
    - 2-Teile-Pattern: "Ingrano Solutions I AI Business Development Manager"
      → company: "Ingrano Solutions", role: "AI Business Development Manager"
    - 3-Teile-Pattern (Anstellungsart-Suffix): "Fraunhofer FOKUS I Innovation Consultant I Werkstudent"
@@ -128,7 +129,9 @@ PASS 2: Ordne sie logisch zu — welche Firma gehört zu welchem Datumsbereich? 
    - Zeile 1: Zertifikatsname, ggf. mit Aussteller in Klammern oder nach "I"-Separator (z.B. "Design Thinking Coach (Hasso-Plattner-Institut)")
    - Zeile 2+: Komma-getrennte Kompetenzbereiche → das ist das "description"-Feld des Zertifikats
    - GRUPPIERTE INSTITUTION: Eine Zeile nur mit Institutionsname (z.B. "Universität Potsdam") gefolgt von mehreren Einzel-Einträgen mit Jahreszahl → ALLE sind separate Zertifikate mit issuer: "Universität Potsdam"
-   - VOLLSTÄNDIGKEIT: Erfasse JEDES Zertifikat einzeln — keines darf fehlen oder übersprungen werden.
+   - VOLLSTÄNDIGKEIT: Erfasse JEDES Zertifikat einzeln — keines darf fehlen oder übersprungen werden. Wenn die Zertifikate-Sektion 7 Einträge zeigt, MÜSSEN 7 Einträge im JSON erscheinen.
+   - **KEIN VERSCHMELZEN:** Wenn zwei aufeinanderfolgende Zeilen wie "Cert A (Issuer X)" und "Cert B (Issuer Y)" auftreten, sind das ZWEI separate Zertifikate — nicht eines mit zusammengezogenem Namen.
+   - **NAMEN WÖRTLICH:** cert.name wird wörtlich aus dem Text übernommen. Keine Vereinfachung, keine Umformulierung.
 13. **RAUSCHEN IGNORIEREN:**
    - "Sprachen", "Zertifikate", "Certifications", "Niveau", "Level", "Muttersprache" allein sind KEINE eigenständigen Einträge.
    - Abschnittsüberschriften wie "Weitere Kompetenzen", "Berufserfahrung", "Bildungsweg" sind KEINE Daten, sondern Strukturmarkierungen — ignorieren.
@@ -207,6 +210,35 @@ ${sanitized}
     // ═══ DSGVO Phase 2: Restore PII tokens in JSON before parsing ═══
     const restoredJsonString = restoreJson(jsonMatch[0]);
     const rawJson = JSON.parse(restoredJsonString);
+
+    // Phase 5.4 + 5.7 (2026-04-27): Tier-1 name fallback. If the LLM ignored
+    // the __NAME_0__ token and emitted personalInfo.name=null directly, recover
+    // from tokenMap. Heuristic: pick the FIRST candidate that looks like a
+    // realistic person name (TitleCase + TitleCase, both ≥3 chars, no
+    // institutional suffix). Avoids picking "AI Transformation Institute" or
+    // "Ingrano Solutions" etc. that the sanitizer over-flagged as NAME tokens.
+    if (!rawJson.personalInfo) rawJson.personalInfo = {};
+    if (!rawJson.personalInfo.name) {
+      const INSTITUTIONAL_SUFFIX = /\b(institute|institut|gmbh|ag|kg|se|inc|ltd|llc|corp|company|consulting|solutions|group|technologies|systems|labs|studios|partners|holdings|university|universität|hochschule|fachhochschule|akademie|college|school)\b/i;
+      const PERSON_NAME_RE = /^[A-ZÄÖÜ][a-zäöüß]{2,}\s+[A-ZÄÖÜ][a-zäöüß]{2,}(\s+[A-ZÄÖÜ][a-zäöüß]+)*$/;
+
+      const candidates = Array.from(tokenMap.entries())
+        .filter(([k]) => k.startsWith('__NAME_'))
+        .map(([, v]) => v)
+        .filter((v) => PERSON_NAME_RE.test(v.trim()) && !INSTITUTIONAL_SUFFIX.test(v));
+
+      if (candidates.length > 0) {
+        rawJson.personalInfo.name = candidates[0];
+        console.log(`🔧 [cv-parser] Tier-1 name fallback (smart) → "${rawJson.personalInfo.name}"`);
+      } else {
+        // No realistic candidate — last-resort: first NAME token (legacy behavior)
+        const firstNameToken = Array.from(tokenMap.keys()).find((k) => k.startsWith('__NAME_'));
+        if (firstNameToken) {
+          rawJson.personalInfo.name = tokenMap.get(firstNameToken) ?? null;
+          console.log(`🔧 [cv-parser] Tier-1 name fallback (last-resort) → "${rawJson.personalInfo.name}"`);
+        }
+      }
+    }
     console.log(`🔐 [cv-parser] PII restored in structured JSON. Name: ${rawJson.personalInfo?.name ? '✅' : '⚠️ null'}`);
     console.log('🔍 Parsed raw JSON from Claude successfully');
 
@@ -287,9 +319,14 @@ ${sanitized}
       ),
       // Same drop pattern for education.institution when "Studiengang (X.Y.) Universität ..." sits on one line.
       // validateDescriptionsAgainstRawText drops fully-fabricated descriptions.
+      // Phase 5.2 (2026-04-27): recoverMissingEducationDescription restores bullet
+      // lists that the LLM dropped when present in the raw text.
       education: validateDescriptionsAgainstRawText(
-        recoverMissingEducationInstitution(
-          (validated.education ?? []) as Array<{ degree?: string | null; institution?: string | null; [k: string]: any }>,
+        recoverMissingEducationDescription(
+          recoverMissingEducationInstitution(
+            (validated.education ?? []) as Array<{ degree?: string | null; institution?: string | null; description?: string | null; [k: string]: any }>,
+            text
+          ) as Array<{ degree?: string | null; description?: string | null; [k: string]: any }>,
           text
         ) as Array<{ description?: string | null; [k: string]: any }>,
         text
@@ -489,21 +526,61 @@ export const KNOWN_LANGUAGES = new Set<string>([
 ]);
 
 /**
- * If the LLM dropped `experience[].company` (it does this even with explicit
- * prompt rules — observed for "Ingrano Solutions I Innovation Manager" and
- * "Co-Founder - Xorder Menues" on Yannik's Exxeta CV), search the original
- * extracted text for "Firma I role" or "JobTitle - Firma" patterns and recover
- * the missing token deterministically.
+ * Fuzzy role-token check: returns true if all "content tokens" (≥3 chars) of
+ * `role` appear in `candidate` (case-insensitive substring). This handles
+ * the LLM-truncation case where parser shortened "Sales & Business Development
+ * Manager" → "Sales & Manager" and the exact-match recovery missed it.
  *
- * Idempotent: experience entries that already have a non-empty company are untouched.
+ * Examples (true):
+ *   role="Sales & Manager", candidate="Sales & Business Development Manager"
+ *   role="Innovation Consultant", candidate="Innovation Management Consultant"
+ *   role="Co-Founder", candidate="Co-Founder & Product Owner"
+ * Examples (false):
+ *   role="Designer", candidate="Manager"  — zero token overlap
+ */
+export function rolesAreFuzzyEqual(role: string, candidate: string): boolean {
+  const tokenize = (s: string) =>
+    s.toLowerCase().split(/[\s,/&|]+/).filter((t) => t.replace(/[^a-z0-9-]/g, '').length >= 3);
+  const roleTokens = tokenize(role);
+  const candTokens = tokenize(candidate);
+  if (roleTokens.length === 0 || candTokens.length === 0) return false;
+  if (role.trim().toLowerCase() === candidate.trim().toLowerCase()) return true;
+  const candLower = candidate.toLowerCase();
+  const matched = roleTokens.filter((t) => candLower.includes(t)).length;
+
+  // Phase 5.6 (2026-04-27): Job-prefix bonus. If both role and candidate start
+  // with the same job-title prefix (Co-Founder, CEO, Manager etc.), accept the
+  // match even at lower token-overlap — the LLM can hallucinate suffixes
+  // ("Co-Founder & Product Owner" vs "Co-Founder & CEO") but the canonical
+  // role identity is encoded in the prefix.
+  const JOB_PREFIXES = ['co-founder', 'cofounder', 'founder', 'ceo', 'cto', 'cfo', 'coo', 'cmo'];
+  const roleLower = role.trim().toLowerCase();
+  const sharedPrefix = JOB_PREFIXES.find((p) => roleLower.startsWith(p) && candidate.trim().toLowerCase().startsWith(p));
+  if (sharedPrefix && matched >= 1) return true;
+
+  return roleTokens.length === 1
+    ? matched === 1
+    : matched >= Math.ceil(roleTokens.length * 0.75);
+}
+
+/**
+ * Welle A.5 + Phase 5.1 (2026-04-27): If the LLM dropped `experience[].company`
+ * OR truncated `experience[].role`, search the raw text for "Firma I role" or
+ * "JobTitle - Firma" patterns and restore both fields from the rawText.
+ *
+ * Phase 5.1 upgrade: matches roles by FUZZY token overlap (≥75%) instead of
+ * exact equality, so role-truncation no longer breaks recovery. Restores the
+ * FULL role string from rawText whenever fuzzy match is positive — the rawText
+ * is the source of truth.
+ *
+ * Idempotent: experience entries that already have BOTH role and company
+ * matching the rawText are untouched.
  * Exported for testing.
  */
 export function recoverMissingExperienceCompany<T extends { role?: string | null; company?: string | null }>(
   experience: T[],
   rawText: string
 ): T[] {
-  // Job-title prefixes that mean "this is a role, not a company" — used to
-  // disambiguate the dash pattern. Lowercased for comparison.
   const ROLE_PREFIXES = new Set([
     'co-founder', 'cofounder', 'founder', 'gründer', 'mitgründer',
     'ceo', 'cto', 'cfo', 'coo', 'cmo',
@@ -511,49 +588,112 @@ export function recoverMissingExperienceCompany<T extends { role?: string | null
     'consultant', 'berater', 'analyst', 'praktikant', 'intern',
   ]);
 
-  // Walk every non-empty line and try to recover company per pattern.
-  // Line-based is more robust than a monolithic regex against multi-line OCR text.
   const lines = rawText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
 
   return experience.map((entry) => {
     const role = (entry.role || '').trim();
     const company = (entry.company || '').trim();
-    if (company.length > 0 || role.length === 0) return entry;
+    if (role.length === 0) return entry;
+    // Fast-path: both fields present and exact-match in rawText → no-op.
+    if (company.length > 0 && rawText.toLowerCase().includes(role.toLowerCase())) return entry;
 
     for (const line of lines) {
-      // Pattern A: "<COMPANY> I <ROLE>" or "<COMPANY> | <ROLE>" — possibly with trailing " I <Status>".
-      // Capital I is how Azure DI represents the typographic pipe character in many CVs.
-      // Split on " I " (space-I-space) or " | " — case-sensitive, since lowercase "i" is just a letter.
+      // Pattern A: "<COMPANY> I <ROLE>" or "<COMPANY> | <ROLE>"
       const parts = line.split(/\s+[I|]\s+/);
       if (parts.length >= 2) {
-        // Find which part contains the role (case-insensitive contains).
-        const roleIdx = parts.findIndex((p) => p.toLowerCase() === role.toLowerCase());
+        const roleIdx = parts.findIndex((p) => rolesAreFuzzyEqual(role, p));
         if (roleIdx > 0) {
-          const candidate = parts[0].trim();
-          if (isPlausibleCompanyToken(candidate)) {
-            return { ...entry, company: candidate };
+          const companyCandidate = parts[0].trim();
+          const fullRole = parts[roleIdx].trim();
+          if (isPlausibleCompanyToken(companyCandidate)) {
+            const patched: T = { ...entry };
+            if (company.length === 0) (patched as { company?: string | null }).company = companyCandidate;
+            if (fullRole.length > role.length) (patched as { role?: string | null }).role = fullRole;
+            return patched;
           }
         }
       }
 
-      // Pattern B: "<JOBTITLE> - <COMPANY>" — role is a known job title.
-      // Optional date prefix is allowed (e.g. "07.2022 Co-Founder - Xorder Menues").
-      if (ROLE_PREFIXES.has(role.toLowerCase())) {
+      // Pattern B: "<JOBTITLE> - <COMPANY>" — role contains a known job-title prefix.
+      const roleLower = role.toLowerCase();
+      const startsWithRolePrefix = Array.from(ROLE_PREFIXES).some(
+        (p) => roleLower === p || roleLower.startsWith(p + ' ') || roleLower.startsWith(p + ' &') || roleLower.startsWith(p + '-')
+      );
+      if (startsWithRolePrefix) {
         const dashSplit = line.split(/\s+-\s+/);
         if (dashSplit.length >= 2) {
           const before = dashSplit[0].trim();
-          // Strip optional leading date "07.2022 " from the "before" part.
           const beforeNoDate = before.replace(/^\d{1,2}[./]\d{4}\s+/, '').trim();
-          if (beforeNoDate.toLowerCase() === role.toLowerCase()) {
-            const candidate = dashSplit[1].trim();
-            if (isPlausibleCompanyToken(candidate)) {
-              return { ...entry, company: candidate };
+          if (rolesAreFuzzyEqual(role, beforeNoDate)) {
+            const companyCandidate = dashSplit[1].trim();
+            if (isPlausibleCompanyToken(companyCandidate)) {
+              const patched: T = { ...entry };
+              if (company.length === 0) (patched as { company?: string | null }).company = companyCandidate;
+              if (beforeNoDate.length > role.length) (patched as { role?: string | null }).role = beforeNoDate;
+              return patched;
             }
           }
         }
       }
     }
     return entry;
+  });
+}
+
+/**
+ * Phase 5.2 (2026-04-27): If `education[].description` is null/empty BUT the
+ * raw text shows a bullet list directly under the degree line, restore those
+ * bullets as the description. Yannik's AI TI CV regression: Bachelor entry
+ * had "- Medienrecht und Kulturökonomie / - Medienanalyse... / - Interkulturelle Kompetenz"
+ * in the raw text but description was null in the parser output.
+ *
+ * Strategy: locate degree in raw text; walk forward; collect consecutive lines
+ * starting with bullet markers ("- ", "• ", "– ", "* "); stop on next heading
+ * line, blank line + non-bullet, or after 8 bullets max. Returns trimmed multi-line
+ * string. Conservative — does NOT add prose paragraphs, only bullet lists.
+ *
+ * Idempotent: education entries with non-empty description are untouched.
+ * Exported for testing.
+ */
+export function recoverMissingEducationDescription<T extends { degree?: string | null; description?: string | null }>(
+  education: T[],
+  rawText: string
+): T[] {
+  const BULLET_RE = /^\s*[-•–*]\s+(.+?)\s*$/;
+  const lines = rawText.split('\n');
+
+  return education.map((entry) => {
+    const degree = (entry.degree || '').trim();
+    const desc = typeof entry.description === 'string' ? entry.description.trim() : '';
+    if (desc.length > 0 || degree.length === 0) return entry;
+
+    // Find the line containing the degree. Use case-insensitive substring on first 30 chars
+    // to tolerate minor LLM normalization (e.g. trailing whitespace differences).
+    const degreeKey = degree.slice(0, 30).toLowerCase();
+    const degreeLineIdx = lines.findIndex((l) => l.toLowerCase().includes(degreeKey));
+    if (degreeLineIdx === -1) return entry;
+
+    // Walk forward up to 12 lines, collecting consecutive bullets.
+    // Non-bullet lines are tolerated BEFORE bullets are seen (e.g. "Abschlussnote: 1,3"
+    // sits between degree line and the bullet list). Once bullets start, a non-bullet
+    // line ends the collection. Hard-stop at the next markdown section header.
+    const collected: string[] = [];
+    let sawBullet = false;
+    for (let i = degreeLineIdx + 1; i < Math.min(lines.length, degreeLineIdx + 13); i++) {
+      const line = lines[i];
+      if (line.trim().startsWith('##')) break; // markdown section change
+      const m = line.match(BULLET_RE);
+      if (m) {
+        collected.push(m[1].trim());
+        sawBullet = true;
+        if (collected.length >= 8) break;
+        continue;
+      }
+      if (sawBullet) break;
+    }
+
+    if (collected.length === 0) return entry;
+    return { ...entry, description: collected.join('\n') };
   });
 }
 
