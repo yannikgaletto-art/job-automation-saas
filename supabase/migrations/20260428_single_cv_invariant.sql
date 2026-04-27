@@ -36,8 +36,27 @@ CREATE TABLE IF NOT EXISTS user_profiles_cv_backup_pre_singlecv AS
     FROM user_profiles;
 
 -- ─── Phase 11 prep: banner-seen tracker ──────────────────────────────
+-- Strategy: existing non-impacted users + every future user is auto-seen
+-- (cv_migration_seen_at = NOW()), so only the impacted users with >1 CV
+-- pre-migration get a NULL value and see the banner.
 ALTER TABLE user_profiles
     ADD COLUMN IF NOT EXISTS cv_migration_seen_at TIMESTAMPTZ;
+
+-- Backfill all non-impacted users so they don't see the banner.
+UPDATE user_profiles
+SET cv_migration_seen_at = NOW()
+WHERE cv_migration_seen_at IS NULL
+  AND id NOT IN (
+      SELECT user_id
+      FROM documents_backup_pre_singlecv
+      WHERE document_type = 'cv'
+      GROUP BY user_id
+      HAVING COUNT(*) > 1
+  );
+
+-- Future inserts auto-mark as seen (no banner).
+ALTER TABLE user_profiles
+    ALTER COLUMN cv_migration_seen_at SET DEFAULT NOW();
 
 -- ─── Phase 1 core: drop non-master CV documents ──────────────────────
 -- Defensive design: only delete rows for users whose master pointer

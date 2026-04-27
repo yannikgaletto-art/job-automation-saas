@@ -1591,6 +1591,11 @@
     "cl_uploaded_toast": "Carta de presentación subida",
     "category_delete_title": "Eliminar categoría"
   },
+  "cv_migration_banner": {
+    "title": "Hemos simplificado tu perfil: un CV por cuenta.",
+    "body": "Se eliminaron versiones anteriores; tu CV principal se mantiene. Elimina y vuelve a subir si quieres cambiar.",
+    "dismiss_label": "Cerrar aviso"
+  },
   "tour": {
     "step1_title": "Tus objetivos del día",
     "step1_body": "Un estudio de la Dra. Gail Matthews muestra: Quienes <b>escriben sus objetivos</b> y comparten su progreso los alcanzan un 33 a 42 por ciento más. Pathly te invita a establecer tus objetivos de hoy. Escríbelos directamente o usa arrastrar y soltar.",
