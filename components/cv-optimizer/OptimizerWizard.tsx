@@ -744,13 +744,23 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                                 </button>
                                             </div>
 
-                                            {/* Welle E (2026-04-27): page-count target */}
+                                            {/* Welle E (2026-04-27) + Phase 9 (1-page): page-count target */}
                                             <div className="pt-2 border-t border-gray-200">
                                                 <div className="flex items-center justify-between mb-1.5">
                                                     <span className="text-sm text-gray-700">{t('page_mode_label')}</span>
                                                 </div>
                                                 <p className="text-xs text-gray-500 mb-2">{t('page_mode_desc')}</p>
-                                                <div className="flex gap-3">
+                                                <div className="flex gap-3 flex-wrap">
+                                                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name="pageMode"
+                                                            checked={cvOptSettings.pageMode === '1-page'}
+                                                            onChange={() => setCvOptSettings(s => ({ ...s, pageMode: '1-page' }))}
+                                                            className="accent-[#012e7a]"
+                                                        />
+                                                        {t('page_mode_1')}
+                                                    </label>
                                                     <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
                                                         <input
                                                             type="radio"

@@ -1059,9 +1059,10 @@
     "inline_editor_delete_cert": "Eliminar certificado",
     "error_network": "Conexión al servidor fallida. Verifica tu conexión a internet o reinicia el servidor de desarrollo si trabajas en local.",
     "page_mode_label": "Número de páginas",
-    "page_mode_desc": "2 páginas es lo estándar. 3 páginas conserva más detalle en puestos antiguos.",
+    "page_mode_desc": "1 página para resumen compacto. 2 páginas es lo estándar. 3 páginas conserva más detalle.",
     "page_mode_2": "2 páginas",
-    "page_mode_3": "3 páginas"
+    "page_mode_3": "3 páginas",
+    "page_mode_1": "1 página"
   },
   "diff_review": {
     "section_experience": "Experiencia",

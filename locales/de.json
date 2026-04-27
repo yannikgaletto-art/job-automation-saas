@@ -1061,9 +1061,10 @@
     "inline_editor_delete_cert": "Zertifikat löschen",
     "error_network": "Verbindung zum Server fehlgeschlagen. Bitte prüfe deine Internetverbindung oder starte den Dev-Server neu, falls du lokal arbeitest.",
     "page_mode_label": "Seitenanzahl",
-    "page_mode_desc": "2 Seiten ist Bewerbungs-Standard. 3 Seiten erhält mehr Detail bei älteren Stationen.",
+    "page_mode_desc": "1 Seite für kompakten Überblick. 2 Seiten ist Bewerbungs-Standard. 3 Seiten erhält mehr Detail bei älteren Stationen.",
     "page_mode_2": "2 Seiten",
-    "page_mode_3": "3 Seiten"
+    "page_mode_3": "3 Seiten",
+    "page_mode_1": "1 Seite"
   },
   "diff_review": {
     "section_experience": "Erfahrung",

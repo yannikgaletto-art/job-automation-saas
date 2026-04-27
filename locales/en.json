@@ -1061,9 +1061,10 @@
     "inline_editor_delete_cert": "Delete certificate",
     "error_network": "Connection to server failed. Check your internet connection, or restart the dev server if you're working locally.",
     "page_mode_label": "Page count",
-    "page_mode_desc": "2 pages is the standard. 3 pages preserves more detail across older roles.",
+    "page_mode_desc": "1 page for a compact summary. 2 pages is the standard. 3 pages preserves more detail across older roles.",
     "page_mode_2": "2 pages",
-    "page_mode_3": "3 pages"
+    "page_mode_3": "3 pages",
+    "page_mode_1": "1 page"
   },
   "diff_review": {
     "section_experience": "Experience",
