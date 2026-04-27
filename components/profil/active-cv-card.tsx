@@ -33,8 +33,7 @@ type CategoryMap = Record<string, string[]>; // categoryName → [documentId, ..
 
 const STORAGE_KEY = 'pathly_cl_categories';
 const COLLAPSED_KEY = 'pathly_cl_collapsed';
-// ✅ User-scoped keys — prevents one account's dismissed state leaking to another account on same browser
-const cvHintKey = (uid: string) => `pathly_cv_hint_dismissed_${uid}`;
+// User-scoped key — prevents one account's dismissed state leaking to another account on same browser
 const clHintKey = (uid: string) => `pathly_cl_hint_dismissed_${uid}`;
 
 function formatDate(dateStr: string, locale: string) {
@@ -94,12 +93,9 @@ export function ActiveCVCard() {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [showAddCategory, setShowAddCategory] = useState(false);
 
-    // CV upload hint dialog
-    const [showCvHint, setShowCvHint] = useState(false);
-    const [isDismissing, setIsDismissing] = useState(false);
-    const [pendingCvFile, setPendingCvFile] = useState<File | null>(null);
-    const cvHintDismissedRef = useRef(false);
-    const cvHintSeenRef = useRef(false); // true once popup has been shown this session
+    // CV delete confirm dialog (Phase 4 — Single-CV invariant)
+    const [confirmDeleteCvId, setConfirmDeleteCvId] = useState<string | null>(null);
+    const [isDeletingCv, setIsDeletingCv] = useState(false);
 
     // CL upload hint dialog
     const [showClHint, setShowClHint] = useState(false);
@@ -109,7 +105,7 @@ export function ActiveCVCard() {
     const clHintSeenRef = useRef(false); // true once popup has been shown this session
 
     useEffect(() => {
-        // Load user ID first, then read user-scoped dismissed flags
+        // Load user ID first, then read user-scoped dismissed flag for the CL hint.
         import('@/lib/supabase/client').then(({ createClient }) => {
             const supabase = createClient();
             supabase.auth.getUser().then(({ data }) => {
@@ -117,61 +113,11 @@ export function ActiveCVCard() {
                 setUserId(uid);
                 if (!uid) return;
                 try {
-                    cvHintDismissedRef.current = localStorage.getItem(cvHintKey(uid)) === 'true';
                     clHintDismissedRef.current = localStorage.getItem(clHintKey(uid)) === 'true';
                 } catch {}
             });
         });
     }, []);
-
-    const handleCvUploadClick = () => {
-        if (cvHintDismissedRef.current || cvHintSeenRef.current) {
-            cvRef.current?.click();
-        } else {
-            cvHintSeenRef.current = true; // mark seen so file-select doesn't re-trigger
-            setShowCvHint(true);
-        }
-    };
-
-    const handleCvHintContinue = () => {
-        setShowCvHint(false);
-        if (pendingCvFile) {
-            handleUpload(pendingCvFile, 'cv');
-            setPendingCvFile(null);
-        } else {
-            cvRef.current?.click();
-        }
-    };
-
-    const handleCvHintDismissForever = () => {
-        if (isDismissing) return; // prevent double-click
-        setIsDismissing(true);
-        try { if (userId) localStorage.setItem(cvHintKey(userId), 'true'); } catch {}
-        cvHintDismissedRef.current = true;
-        const pending = pendingCvFile;
-        setPendingCvFile(null);
-        // 1s delay so the toggle animation is visible before closing
-        setTimeout(() => {
-            setShowCvHint(false);
-            setIsDismissing(false);
-            if (pending) {
-                handleUpload(pending, 'cv');
-            } else {
-                cvRef.current?.click();
-            }
-        }, 1000);
-    };
-
-    const handleCvFileSelect = (file: File) => {
-        // Skip popup if: user dismissed forever OR already saw it this session
-        if (cvHintDismissedRef.current || cvHintSeenRef.current) {
-            handleUpload(file, 'cv');
-        } else {
-            cvHintSeenRef.current = true;
-            setPendingCvFile(file);
-            setShowCvHint(true);
-        }
-    };
 
     // ── CL Hint handlers ──────────────────────────────────────────────────────
     const handleClUploadClick = () => {
@@ -270,11 +216,6 @@ export function ActiveCVCard() {
             return false;
         };
 
-        // Welle 1 (2026-04-27): captures master_action from upload response so the
-        // frontend can show a hint when the master CV was kept (subsequent upload).
-        // Null when xhr.onerror -> verifySilentSuccess fallback fires (no body to parse).
-        let masterActionFromResponse: 'set' | 'kept' | null = null;
-
         try {
             const fd = new FormData();
             fd.append('file', file);
@@ -296,13 +237,6 @@ export function ActiveCVCard() {
 
                 xhr.onload = () => {
                     if (xhr.status >= 200 && xhr.status < 300) {
-                        try {
-                            const body = JSON.parse(xhr.responseText);
-                            const action = body?.data?.master_action;
-                            if (action === 'set' || action === 'kept') {
-                                masterActionFromResponse = action;
-                            }
-                        } catch { /* response parse failed; hint stays null */ }
                         setUploadProgress(100);
                         setUploadStatus(t('status_done'));
                         resolve();
@@ -335,18 +269,7 @@ export function ActiveCVCard() {
                 xhr.send(fd);
             });
 
-            // Welle 1 (refined 2026-04-27): on 2nd+ CV upload, show only the
-            // master-kept hint as the single notification. Stacking two toasts
-            // back-to-back made the second one easy to miss (user reported it
-            // flashed for ~1ms). Single, longer message stays visible across
-            // the full 3.5s cycle. Status box mirrors the hint so it lingers
-            // for 3s after the toast fades.
-            if (type === 'cv' && masterActionFromResponse === 'kept') {
-                notify(`${t('master_kept_title')}: ${t('master_kept_desc')}`);
-                setUploadStatus(t('master_kept_title'));
-            } else {
-                notify(type === 'cv' ? t('cv_uploaded_toast') : t('cl_uploaded_toast'));
-            }
+            notify(type === 'cv' ? t('cv_uploaded_toast') : t('cl_uploaded_toast'));
             await loadDocs();
 
             // QA Integration: If user came from a feature via DocumentsRequiredDialog,
@@ -369,14 +292,15 @@ export function ActiveCVCard() {
         }
     };
 
-    const handleDelete = async (id: string) => {
+    // Performs the actual delete request. CV deletes are routed through the
+    // confirm dialog (executeDeleteCv); CL deletes call this directly.
+    const performDelete = async (id: string) => {
         try {
             const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Löschen fehlgeschlagen');
             notify('Dokument gelöscht');
             setDocs(prev => prev.filter(d => d.id !== id));
-            // Also remove from categories
             const updated = { ...categories };
             for (const cat of Object.keys(updated)) {
                 updated[cat] = updated[cat].filter(docId => docId !== id);
@@ -385,6 +309,26 @@ export function ActiveCVCard() {
             saveCategories(updated);
         } catch (err: unknown) {
             const errMsg = err instanceof Error ? err.message : 'Löschen fehlgeschlagen';
+            notify(t('delete_failed_toast', { error: errMsg }));
+        }
+    };
+
+    const requestDelete = (doc: DocumentEntry) => {
+        if (doc.type === 'cv') {
+            setConfirmDeleteCvId(doc.id);
+        } else {
+            performDelete(doc.id);
+        }
+    };
+
+    const executeDeleteCv = async () => {
+        if (!confirmDeleteCvId || isDeletingCv) return;
+        setIsDeletingCv(true);
+        try {
+            await performDelete(confirmDeleteCvId);
+        } finally {
+            setIsDeletingCv(false);
+            setConfirmDeleteCvId(null);
         }
     };
 
@@ -528,7 +472,7 @@ export function ActiveCVCard() {
                 <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1" title={t('download_title')}>
                     <Download className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(doc.id)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1" title={t('delete_title')}>
+                <button onClick={() => requestDelete(doc)} className="text-[#A8A29E] hover:text-red-500 transition-colors p-1" title={t('delete_title')}>
                     <Trash2 className="w-4 h-4" />
                 </button>
             </div>
@@ -566,7 +510,7 @@ export function ActiveCVCard() {
                 </div>
             )}
 
-            {/* CV Section */}
+            {/* CV Section — Single-CV invariant: max 1 per user */}
             <div>
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-[#37352F] flex items-center gap-2">
@@ -576,12 +520,12 @@ export function ActiveCVCard() {
                     <Button
                         variant="secondary"
                         className="text-xs h-8"
-                        onClick={handleCvUploadClick}
-                        disabled={!!uploading || cvDocs.length >= 3}
-                        title={cvDocs.length >= 3 ? t('cv_max_reached') : undefined}
+                        onClick={() => cvRef.current?.click()}
+                        disabled={!!uploading || cvDocs.length >= 1}
+                        title={cvDocs.length >= 1 ? t('cv_max_reached') : undefined}
                     >
                         <Upload className="w-3 h-3 mr-1.5" />
-                        {uploading === 'cv' ? `${uploadProgress}%` : t('upload_button', { current: cvDocs.length, max: 3 })}
+                        {uploading === 'cv' ? `${uploadProgress}%` : t('upload_button', { current: cvDocs.length, max: 1 })}
                     </Button>
                 </div>
 
@@ -590,7 +534,7 @@ export function ActiveCVCard() {
                 ) : cvDocs.length === 0 ? (
                     <div
                         className="border-2 border-dashed border-[#E7E7E5] rounded-lg p-5 text-center cursor-pointer hover:border-[#012e7a]/40 hover:bg-[#F0F7FF]/30 transition-all"
-                        onClick={handleCvUploadClick}
+                        onClick={() => cvRef.current?.click()}
                     >
                         <Plus className="w-5 h-5 text-[#A8A29E] mx-auto mb-1" />
                         <p className="text-sm text-[#73726E]">{t('no_cv_uploaded')}</p>
@@ -601,7 +545,7 @@ export function ActiveCVCard() {
                     </ul>
                 )}
                 <input ref={cvRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) { handleCvFileSelect(f); e.target.value = ''; } }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { handleUpload(f, 'cv'); e.target.value = ''; } }}
                 />
             </div>
 
@@ -818,87 +762,42 @@ export function ActiveCVCard() {
                 </div>,
                 document.body
             )}
-            {/* CV Upload Hint Dialog */}
-            {showCvHint && createPortal(
+            {/* CV Delete Confirm Dialog (Phase 4) */}
+            {confirmDeleteCvId && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-                    {/* Backdrop — rendered via portal at document.body, escaping any transform stacking context */}
                     <div
                         className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-                        onClick={() => { if (!isDismissing) { setShowCvHint(false); setPendingCvFile(null); } }}
+                        onClick={() => { if (!isDeletingCv) setConfirmDeleteCvId(null); }}
                     />
-                    {/* Dialog */}
                     <div className="relative bg-white rounded-2xl shadow-2xl border border-[#E7E7E5] w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-
                         <div className="p-6">
-                            {/* Icon + Title */}
                             <div className="flex items-start gap-3 mb-4">
-                                <div className="p-2 bg-[#012e7a]/10 rounded-xl shrink-0">
-                                    <FileText className="w-5 h-5 text-[#012e7a]" />
+                                <div className="p-2 bg-red-50 rounded-xl shrink-0">
+                                    <Trash2 className="w-5 h-5 text-red-500" />
                                 </div>
                                 <div>
                                     <h3 className="text-base font-semibold text-[#37352F] leading-snug">
-                                        {t('cv_hint_title')}
+                                        {t('confirm_delete_cv_title')}
                                     </h3>
                                     <p className="text-sm text-[#73726E] mt-1">
-                                        {t('cv_hint_description')}
+                                        {t('confirm_delete_cv_body')}
                                     </p>
                                 </div>
                             </div>
-
-                            {/* Example */}
-                            <div className="bg-[#FAFAF9] border border-[#E7E7E5] rounded-xl p-4 mb-5">
-                                <p className="text-xs font-semibold text-[#37352F] mb-2 uppercase tracking-wide">
-                                    {t('cv_hint_example_label')}
-                                </p>
-                                <div className="space-y-2.5">
-                                    <div>
-                                        <p className="text-sm font-medium text-[#37352F]">
-                                            Fraunhofer IGD — UX Researcher
-                                        </p>
-                                        <ul className="mt-1 space-y-0.5">
-                                            <li className="text-xs text-[#73726E] flex items-start gap-1.5">
-                                                <span className="text-[#012e7a] mt-0.5">•</span>
-                                                {t('cv_hint_bullet_1')}
-                                            </li>
-                                            <li className="text-xs text-[#73726E] flex items-start gap-1.5">
-                                                <span className="text-[#012e7a] mt-0.5">•</span>
-                                                {t('cv_hint_bullet_2')}
-                                            </li>
-                                            <li className="text-xs text-[#73726E] flex items-start gap-1.5">
-                                                <span className="text-[#012e7a] mt-0.5">•</span>
-                                                {t('cv_hint_bullet_3')}
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex flex-col gap-3">
+                            <div className="flex gap-3">
                                 <button
-                                    onClick={handleCvHintContinue}
-                                    className="w-full px-4 py-2.5 bg-[#012e7a] text-white text-sm font-medium rounded-lg hover:bg-[#011f5e] transition-colors"
+                                    onClick={() => setConfirmDeleteCvId(null)}
+                                    disabled={isDeletingCv}
+                                    className="flex-1 px-4 py-2.5 border border-[#E7E7E5] text-[#37352F] text-sm font-medium rounded-lg hover:bg-[#F7F7F5] transition-colors disabled:opacity-50"
                                 >
-                                    {t('cv_hint_continue')}
+                                    {t('confirm_delete_cv_cancel')}
                                 </button>
-                                {/* State-driven toggle — thumb slides right when clicked */}
                                 <button
-                                    onClick={handleCvHintDismissForever}
-                                    className="flex items-center justify-center gap-2 w-full py-1"
-                                    disabled={isDismissing}
+                                    onClick={executeDeleteCv}
+                                    disabled={isDeletingCv}
+                                    className="flex-1 px-4 py-2.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
                                 >
-                                    <span className={`relative w-7 h-4 rounded-full flex-shrink-0 transition-colors duration-300 ${
-                                        isDismissing ? 'bg-[#012e7a]' : 'bg-[#E7E7E5]'
-                                    }`}>
-                                        <span className={`absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300 ${
-                                            isDismissing ? 'left-3.5 bg-white' : 'left-0.5 bg-[#A8A29E]'
-                                        }`} />
-                                    </span>
-                                    <span className={`text-xs transition-colors duration-300 ${
-                                        isDismissing ? 'text-[#012e7a] font-medium' : 'text-[#A8A29E]'
-                                    }`}>
-                                        {t('cv_hint_dismiss')}
-                                    </span>
+                                    {t('confirm_delete_cv_confirm')}
                                 </button>
                             </div>
                         </div>
