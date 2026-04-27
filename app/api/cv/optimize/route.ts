@@ -9,7 +9,7 @@ import { logger } from '@/lib/logging';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { translateCvIfNeeded } from '@/lib/services/cv-translator';
 import { sanitizeCv } from '@/lib/services/cv-data-sanitizer';
-import { sanitizeOptimizerChanges } from '@/lib/services/cv-optimizer-sanitizer';
+import { sanitizeOptimizerChanges, sanitizeBeforeText } from '@/lib/services/cv-optimizer-sanitizer';
 import { pruneForOptimizer } from '@/lib/utils/cv-payload-pruner';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
@@ -527,80 +527,11 @@ Must conform to the following Zod schema:
         // Replace AI-generated 'before' values with ground-truth from the CV.
         // Runs unconditionally — LLMs hallucinate 'before' regardless of language.
         // Changes where path lookup fails are DROPPED to prevent misleading diffs.
-        interface LookupFailure { changeId: string; reason: string; path: string; }
-        const lookupFailures: LookupFailure[] = [];
-        const verifiedChanges: typeof rawJson.changes = [];
-
-        for (const change of rawJson.changes) {
-            // ADD changes have no 'before' — always pass through
-            if (change.type === 'add') {
-                verifiedChanges.push(change);
-                continue;
-            }
-
-            const { section, entityId, field, bulletId } = change.target;
-
-            // personalInfo — flat object, no arrays
-            if (section === 'personalInfo' && field) {
-                const realBefore = (translatedCv.personalInfo as any)?.[field];
-                // Empty-string guard: an empty before with a non-empty after looks
-                // like a hallucinated "added new content" diff in the UI.
-                if (realBefore != null && String(realBefore).trim().length > 0) {
-                    change.before = String(realBefore);
-                    verifiedChanges.push(change);
-                } else {
-                    lookupFailures.push({ changeId: change.id, reason: 'personalInfo field empty or missing', path: `personalInfo.${field}` });
-                }
-                continue;
-            }
-
-            // Array sections — experience, education, skills, languages, certifications
-            const sectionArray = (translatedCv as any)?.[section];
-            if (!Array.isArray(sectionArray) || !entityId) {
-                lookupFailures.push({ changeId: change.id, reason: 'section not array or entityId missing', path: `${section}.${entityId}` });
-                continue;
-            }
-
-            const entity = sectionArray.find((e: any) => e.id === entityId);
-            if (!entity) {
-                lookupFailures.push({ changeId: change.id, reason: 'entityId not found', path: `${section}.${entityId}` });
-                continue;
-            }
-
-            // Bullet-level lookup (experience.description)
-            if (bulletId && Array.isArray(entity.description)) {
-                const bullet = entity.description.find((b: any) => b.id === bulletId);
-                if (bullet) {
-                    change.before = bullet.text;
-                    verifiedChanges.push(change);
-                } else {
-                    lookupFailures.push({ changeId: change.id, reason: 'bulletId not found', path: `${section}.${entityId}.description.${bulletId}` });
-                }
-                continue;
-            }
-
-            // Field-level lookup
-            if (field) {
-                const realValue = entity[field];
-                // Empty-value guard: empty string / empty array would render as a
-                // "from nothing" diff which looks hallucinated to the user.
-                const beforeText = realValue == null
-                    ? ''
-                    : Array.isArray(realValue)
-                        ? realValue.map((x: any) => typeof x === 'string' ? x : x.text).filter(Boolean).join(', ')
-                        : String(realValue);
-                if (beforeText.trim().length > 0) {
-                    change.before = beforeText;
-                    verifiedChanges.push(change);
-                } else {
-                    lookupFailures.push({ changeId: change.id, reason: 'field empty or missing', path: `${section}.${entityId}.${field}` });
-                }
-            } else {
-                lookupFailures.push({ changeId: change.id, reason: 'no field or bulletId specified', path: `${section}.${entityId}` });
-            }
-        }
-
-        // Replace with verified-only changes
+        // Phase 7 (2026-04-27): empty personalInfo field + non-empty proposal is
+        // now treated as ADD instead of being dropped (e.g. summary on a CV that has none).
+        const beforeSanitize = sanitizeBeforeText(rawJson.changes, translatedCv as any);
+        const verifiedChanges = beforeSanitize.verified;
+        const lookupFailures = beforeSanitize.failures;
         const droppedCount = rawJson.changes.length - verifiedChanges.length;
         // Em-dash post-processing: strip any — or – that escaped the prompt rule
         rawJson.changes = verifiedChanges.map((c: any) => ({

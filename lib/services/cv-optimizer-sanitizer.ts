@@ -65,6 +65,170 @@ export function isMissingSection(c: RawChangeLike): boolean {
 /** Drop reason for telemetry/logging. */
 export type DropReason = 'missing_section' | 'identity_field' | 'protected_entity_remove';
 
+/** Lookup failure record for the before-text sanitizer (telemetry). */
+export interface BeforeTextLookupFailure {
+    changeId: string;
+    reason: string;
+    path: string;
+}
+
+/** Result of the before-text sanitizer pass. */
+export interface BeforeTextSanitizeResult<T> {
+    verified: T[];
+    failures: BeforeTextLookupFailure[];
+}
+
+/** Loose shape of a change that has been triaged and may carry before/after text. */
+export interface ChangeWithText extends RawChangeLike {
+    id?: string;
+    type?: string;
+    before?: string;
+    after?: string;
+}
+
+/** Loose shape of the CV structure consumed by the sanitizer. Kept untyped to keep the test surface small. */
+export interface CvSanitizerInput {
+    personalInfo?: Record<string, unknown> | null;
+    experience?: Array<Record<string, any>> | null;
+    education?: Array<Record<string, any>> | null;
+    skills?: Array<Record<string, any>> | null;
+    languages?: Array<Record<string, any>> | null;
+    certifications?: Array<Record<string, any>> | null;
+    [key: string]: unknown;
+}
+
+function coerceArrayValueToText(realValue: unknown): string {
+    if (realValue == null) return '';
+    if (Array.isArray(realValue)) {
+        return realValue
+            .map((x: any) => (typeof x === 'string' ? x : x?.text))
+            .filter(Boolean)
+            .join(', ');
+    }
+    return String(realValue);
+}
+
+/**
+ * Replaces AI-hallucinated `before` values with ground-truth from the CV and
+ * drops changes whose target path cannot be resolved.
+ *
+ * Phase 7 fix (2026-04-27): when a `personalInfo` field is empty in the CV
+ * but the LLM proposes a non-empty `after`, we treat the change as a
+ * semantic ADD (regardless of what `change.type` says). This restores the
+ * "create the missing summary" flow which was silently dropped before.
+ *
+ * Pure function — no IO, deterministic. Mutates the input change objects in place
+ * (sets `change.before` and may upgrade `change.type` to 'add').
+ */
+export function sanitizeBeforeText<T extends ChangeWithText>(
+    changes: T[],
+    cv: CvSanitizerInput,
+): BeforeTextSanitizeResult<T> {
+    const verified: T[] = [];
+    const failures: BeforeTextLookupFailure[] = [];
+
+    for (const change of changes) {
+        // ADD changes have no 'before' — always pass through
+        if (change.type === 'add') {
+            verified.push(change);
+            continue;
+        }
+
+        const section = change.target?.section;
+        const entityId = change.target?.entityId ?? null;
+        const field = change.target?.field ?? null;
+        const bulletId = change.target?.bulletId ?? null;
+        const changeId = change.id ?? '';
+
+        // personalInfo — flat object, no arrays
+        if (section === 'personalInfo' && field) {
+            const realBefore = (cv?.personalInfo as any)?.[field];
+            const realBeforeText = realBefore == null ? '' : String(realBefore);
+            const afterText = typeof change.after === 'string' ? change.after : '';
+
+            if (realBeforeText.trim().length > 0) {
+                change.before = realBeforeText;
+                verified.push(change);
+            } else if (afterText.trim().length > 0) {
+                // PHASE 7: empty existing personalInfo field + non-empty proposal
+                // = effective ADD. LLM may have emitted type='modify' but
+                // semantically this is a create-from-nothing. Treating it as ADD
+                // avoids dropping legitimate "create the missing summary" diffs.
+                change.before = '';
+                change.type = 'add';
+                verified.push(change);
+            } else {
+                failures.push({
+                    changeId,
+                    reason: 'personalInfo field empty or missing',
+                    path: `personalInfo.${field}`,
+                });
+            }
+            continue;
+        }
+
+        // Array sections — experience, education, skills, languages, certifications
+        const sectionArray = section ? (cv as any)?.[section] : undefined;
+        if (!Array.isArray(sectionArray) || !entityId) {
+            failures.push({
+                changeId,
+                reason: 'section not array or entityId missing',
+                path: `${section ?? '?'}.${entityId ?? '?'}`,
+            });
+            continue;
+        }
+
+        const entity = sectionArray.find((e: any) => e?.id === entityId);
+        if (!entity) {
+            failures.push({
+                changeId,
+                reason: 'entityId not found',
+                path: `${section}.${entityId}`,
+            });
+            continue;
+        }
+
+        // Bullet-level lookup (experience.description)
+        if (bulletId && Array.isArray(entity.description)) {
+            const bullet = entity.description.find((b: any) => b?.id === bulletId);
+            if (bullet) {
+                change.before = bullet.text;
+                verified.push(change);
+            } else {
+                failures.push({
+                    changeId,
+                    reason: 'bulletId not found',
+                    path: `${section}.${entityId}.description.${bulletId}`,
+                });
+            }
+            continue;
+        }
+
+        // Field-level lookup
+        if (field) {
+            const beforeText = coerceArrayValueToText(entity[field]);
+            if (beforeText.trim().length > 0) {
+                change.before = beforeText;
+                verified.push(change);
+            } else {
+                failures.push({
+                    changeId,
+                    reason: 'field empty or missing',
+                    path: `${section}.${entityId}.${field}`,
+                });
+            }
+        } else {
+            failures.push({
+                changeId,
+                reason: 'no field or bulletId specified',
+                path: `${section}.${entityId}`,
+            });
+        }
+    }
+
+    return { verified, failures };
+}
+
 /**
  * Single-pass triage for the optimizer's raw change list.
  * Returns the surviving changes plus a parallel array of drop reasons (for logging).

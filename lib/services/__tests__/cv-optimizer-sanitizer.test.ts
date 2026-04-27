@@ -14,6 +14,7 @@ import {
     isProtectedEntityRemove,
     isMissingSection,
     sanitizeOptimizerChanges,
+    sanitizeBeforeText,
 } from '../cv-optimizer-sanitizer';
 
 const baseChange = (overrides: Partial<{
@@ -256,5 +257,258 @@ describe('sanitizeOptimizerChanges — end-to-end triage', () => {
         ];
         const result = sanitizeOptimizerChanges(changes);
         expect(result.kept.map(c => c.id)).toEqual(['a', 'b', 'c']);
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Phase 7 — sanitizeBeforeText (2026-04-27)
+// Bug: Optimizer dropped every personalInfo.summary ADD when the master CV
+// had summary === null. LLM emits type='modify' for what is semantically a
+// CREATE, the sanitizer treated empty before as a path-mismatch and dropped.
+// Fix: empty existing personalInfo + non-empty proposal is treated as ADD.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('sanitizeBeforeText — Phase 7 personalInfo empty-as-ADD', () => {
+    const cvWithSummaryNull = {
+        personalInfo: {
+            name: 'Yannik Galetto',
+            email: 'info@yannik-galetto.site',
+            phone: '+49 1590...',
+            summary: null,
+            targetRole: null,
+        },
+        experience: [],
+    };
+
+    const cvWithSummary = {
+        personalInfo: {
+            name: 'Yannik Galetto',
+            summary: 'Innovation Manager mit 5 Jahren Erfahrung.',
+        },
+        experience: [],
+    };
+
+    test('REGRESSION: summary modify with null master + non-empty after → upgraded to ADD', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'personalInfo', entityId: null, field: 'summary', bulletId: null },
+            before: 'Was hier auch immer LLM behauptet',
+            after: 'Innovation Manager mit Schwerpunkt auf KI-getriebener Transformation.',
+        };
+        const result = sanitizeBeforeText([change], cvWithSummaryNull);
+        expect(result.failures).toEqual([]);
+        expect(result.verified).toHaveLength(1);
+        expect(result.verified[0].type).toBe('add');
+        expect(result.verified[0].before).toBe('');
+        expect(result.verified[0].after).toContain('Innovation Manager');
+    });
+
+    test('summary modify with non-empty master → keeps modify, restores real before', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'personalInfo', entityId: null, field: 'summary', bulletId: null },
+            before: 'AI-hallucinated before',
+            after: 'New summary',
+        };
+        const result = sanitizeBeforeText([change], cvWithSummary);
+        expect(result.failures).toEqual([]);
+        expect(result.verified).toHaveLength(1);
+        expect(result.verified[0].type).toBe('modify');
+        expect(result.verified[0].before).toBe('Innovation Manager mit 5 Jahren Erfahrung.');
+    });
+
+    test('summary modify with empty master AND empty after → dropped (true mismatch)', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'personalInfo', entityId: null, field: 'summary', bulletId: null },
+            before: 'whatever',
+            after: '',
+        };
+        const result = sanitizeBeforeText([change], cvWithSummaryNull);
+        expect(result.verified).toHaveLength(0);
+        expect(result.failures).toHaveLength(1);
+        expect(result.failures[0].path).toBe('personalInfo.summary');
+        expect(result.failures[0].reason).toContain('empty or missing');
+    });
+
+    test('explicit add type passes through regardless of master state', () => {
+        const change = {
+            id: 'change-1',
+            type: 'add',
+            target: { section: 'personalInfo', entityId: null, field: 'summary', bulletId: null },
+            before: '',
+            after: 'New summary text',
+        };
+        const result = sanitizeBeforeText([change], cvWithSummaryNull);
+        expect(result.verified).toHaveLength(1);
+        expect(result.verified[0].type).toBe('add');
+    });
+
+    test('targetRole same fix path (other personalInfo field)', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'personalInfo', entityId: null, field: 'targetRole', bulletId: null },
+            before: '',
+            after: 'Senior Innovation Consultant',
+        };
+        const result = sanitizeBeforeText([change], cvWithSummaryNull);
+        expect(result.verified).toHaveLength(1);
+        expect(result.verified[0].type).toBe('add');
+        expect(result.verified[0].after).toBe('Senior Innovation Consultant');
+    });
+
+    test('whitespace-only after on empty master → dropped (treated as empty)', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'personalInfo', entityId: null, field: 'summary', bulletId: null },
+            before: '',
+            after: '   \n\t  ',
+        };
+        const result = sanitizeBeforeText([change], cvWithSummaryNull);
+        expect(result.verified).toHaveLength(0);
+        expect(result.failures).toHaveLength(1);
+    });
+});
+
+describe('sanitizeBeforeText — array sections (regression coverage)', () => {
+    const cv = {
+        personalInfo: { name: 'Y' },
+        experience: [
+            {
+                id: 'exp-1',
+                role: 'Innovation Manager',
+                company: 'Ingrano',
+                description: [
+                    { id: 'b-1', text: 'Original bullet text' },
+                    { id: 'b-2', text: 'Second bullet' },
+                ],
+            },
+        ],
+        education: [
+            { id: 'edu-1', degree: 'B.A.', institution: 'Universität Potsdam', description: 'Some plain string' },
+        ],
+        skills: [{ id: 's-1', category: 'Technical', items: ['React', 'TypeScript'] }],
+    };
+
+    test('bullet-level lookup restores real before from id', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'experience', entityId: 'exp-1', field: 'description', bulletId: 'b-1' },
+            before: 'AI-hallucinated',
+            after: 'New bullet',
+        };
+        const result = sanitizeBeforeText([change], cv);
+        expect(result.verified).toHaveLength(1);
+        expect(result.verified[0].before).toBe('Original bullet text');
+    });
+
+    test('field-level lookup on education plain string', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'education', entityId: 'edu-1', field: 'description', bulletId: null },
+            before: '',
+            after: 'New description',
+        };
+        const result = sanitizeBeforeText([change], cv);
+        expect(result.verified).toHaveLength(1);
+        expect(result.verified[0].before).toBe('Some plain string');
+    });
+
+    test('skills items array gets joined for before-text', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'skills', entityId: 's-1', field: 'items', bulletId: null },
+            before: '',
+            after: 'React, TypeScript, Vue',
+        };
+        const result = sanitizeBeforeText([change], cv);
+        expect(result.verified).toHaveLength(1);
+        expect(result.verified[0].before).toBe('React, TypeScript');
+    });
+
+    test('non-existent entityId is dropped with diagnostic path', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'experience', entityId: 'exp-XYZ', field: 'description', bulletId: null },
+            before: '',
+            after: 'New',
+        };
+        const result = sanitizeBeforeText([change], cv);
+        expect(result.verified).toHaveLength(0);
+        expect(result.failures).toHaveLength(1);
+        expect(result.failures[0].reason).toBe('entityId not found');
+        expect(result.failures[0].path).toBe('experience.exp-XYZ');
+    });
+
+    test('non-existent bulletId is dropped with diagnostic path', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'experience', entityId: 'exp-1', field: 'description', bulletId: 'b-99' },
+            before: '',
+            after: 'New',
+        };
+        const result = sanitizeBeforeText([change], cv);
+        expect(result.verified).toHaveLength(0);
+        expect(result.failures).toHaveLength(1);
+        expect(result.failures[0].reason).toBe('bulletId not found');
+    });
+
+    test('missing entityId on array section is dropped', () => {
+        const change = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'experience', entityId: null, field: 'role', bulletId: null },
+            before: '',
+            after: 'New',
+        };
+        const result = sanitizeBeforeText([change], cv);
+        expect(result.verified).toHaveLength(0);
+        expect(result.failures).toHaveLength(1);
+        expect(result.failures[0].reason).toContain('entityId missing');
+    });
+
+    test('idempotent: running twice yields same shape (after first pass)', () => {
+        const original = {
+            id: 'change-1',
+            type: 'modify',
+            target: { section: 'personalInfo', entityId: null, field: 'summary', bulletId: null },
+            before: 'whatever',
+            after: 'New summary',
+        };
+        const cvNullSummary = { personalInfo: { summary: null }, experience: [] };
+        const r1 = sanitizeBeforeText([{ ...original, target: { ...original.target } }], cvNullSummary);
+        const r2 = sanitizeBeforeText([{ ...r1.verified[0], target: { ...r1.verified[0].target } }], cvNullSummary);
+        expect(r2.verified).toHaveLength(1);
+        expect(r2.verified[0].type).toBe('add'); // already 'add', stays 'add'
+        expect(r2.verified[0].before).toBe('');
+    });
+
+    test('empty change array yields empty result, no errors', () => {
+        const result = sanitizeBeforeText([], cv);
+        expect(result.verified).toEqual([]);
+        expect(result.failures).toEqual([]);
+    });
+
+    test('add-type with array section just passes through (no before-lookup)', () => {
+        const change = {
+            id: 'change-1',
+            type: 'add',
+            target: { section: 'experience', entityId: 'exp-1', field: 'description', bulletId: null },
+            before: '',
+            after: 'New bullet',
+        };
+        const result = sanitizeBeforeText([change], cv);
+        expect(result.verified).toHaveLength(1);
+        expect(result.verified[0].type).toBe('add');
     });
 });
