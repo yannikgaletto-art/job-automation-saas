@@ -13,6 +13,9 @@ import {
     dropProjectLikeCerts,
     truncateCertDescriptionAtNewline,
     rolesAreFuzzyEqual,
+    recoverCertsFromRawSection,
+    extractCertSectionLines,
+    extractCertCandidates,
 } from '../services/cv-parser';
 import { complete } from '@/lib/ai/model-router';
 
@@ -1072,5 +1075,332 @@ Abschlussnote: 1,3`;
         expect(out[0].description).toContain('Module A');
         expect(out[0].description).toContain('Module B');
         expect(out[0].description).toContain('Module C');
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Phase 6 — Cert-Roundtrip-Recovery (2026-04-27)
+// Yannik's Exxeta CV showed:
+//   - "Managementberatung (Emory University)" present in raw, absent in output
+//   - "Universität Potsdam: Projektmanagement (2022) Mediation (2021) ..."
+//     present in raw with 4 sub-courses, only 3 made it to output
+//   - Output cert "HR-Transformation" had issuer "ZF Friedrichshafen AG"
+//     while raw said "ZF Getriebe Brandenburg GmbH"
+// ──────────────────────────────────────────────────────────────────────
+
+describe('extractCertSectionLines — section walker', () => {
+    test('finds Zertifikate section, walks until next major header', () => {
+        const text = `## Berufserfahrung
+
+Some role 2020 - 2022
+
+## Zertifikate
+
+Managementberatung (Emory University)
+Design Thinking Coach (Hasso-Plattner-Institut)
+
+## Sprachen
+
+Deutsch (C2)`;
+        const lines = extractCertSectionLines(text);
+        expect(lines).toContain('Managementberatung (Emory University)');
+        expect(lines).toContain('Design Thinking Coach (Hasso-Plattner-Institut)');
+        expect(lines).not.toContain('Deutsch (C2)');
+    });
+
+    test('returns empty array if no Zertifikate header found', () => {
+        const text = `## Berufserfahrung
+
+Some text only`;
+        expect(extractCertSectionLines(text)).toEqual([]);
+    });
+
+    test('20-line defensive cap protects against runaway sections', () => {
+        const lines = ['## Zertifikate', ...Array.from({ length: 50 }, (_, i) => `Cert ${i}`)].join('\n');
+        const out = extractCertSectionLines(lines);
+        expect(out.length).toBeLessThanOrEqual(30);
+    });
+
+    test('handles English "Certifications" header', () => {
+        const text = `## Certifications
+
+PMP (PMI)
+Scrum Master (Scrum.org)
+
+## Languages`;
+        const out = extractCertSectionLines(text);
+        expect(out).toContain('PMP (PMI)');
+        expect(out).toContain('Scrum Master (Scrum.org)');
+    });
+
+    test('rawText below 50 chars returns empty', () => {
+        expect(extractCertSectionLines('short')).toEqual([]);
+    });
+});
+
+describe('extractCertCandidates — pattern parsing', () => {
+    test('Pattern A: "Name (Issuer)" — Yannik regression', () => {
+        const out = extractCertCandidates(['Managementberatung (Emory University)']);
+        expect(out).toHaveLength(1);
+        expect(out[0]).toEqual({
+            name: 'Managementberatung',
+            issuer: 'Emory University',
+            dateText: null,
+        });
+    });
+
+    test('Pattern A: "Name (Year)" — pure date', () => {
+        const out = extractCertCandidates(['Old Cert (2019)']);
+        expect(out).toHaveLength(1);
+        expect(out[0]).toEqual({
+            name: 'Old Cert',
+            issuer: null,
+            dateText: '2019',
+        });
+    });
+
+    test('Pattern B: pipe-separated with date and issuer', () => {
+        const out = extractCertCandidates(['TEDx-Coach I seit 2022 I Ehrenamtliche Tätigkeit']);
+        expect(out).toHaveLength(1);
+        expect(out[0].name).toBe('TEDx-Coach');
+        expect(out[0].dateText).toContain('2022');
+        expect(out[0].issuer).toContain('Ehrenamtliche');
+    });
+
+    test('Pattern C: multi-subject "Issuer: Subj (Year) Subj (Year) ..."', () => {
+        const out = extractCertCandidates([
+            'Universität Potsdam: Projektmanagement (2022) Mediation (2021) Präsenzkurs (2020) Rhetorik (2020)',
+        ]);
+        expect(out).toHaveLength(4);
+        const names = out.map((c) => c.name);
+        expect(names).toContain('Projektmanagement');
+        expect(names).toContain('Mediation');
+        expect(names).toContain('Präsenzkurs');
+        expect(names).toContain('Rhetorik');
+        for (const c of out) {
+            expect(c.issuer).toBe('Universität Potsdam');
+        }
+        const projektmanagement = out.find((c) => c.name === 'Projektmanagement')!;
+        expect(projektmanagement.dateText).toBe('2022');
+    });
+
+    test('Pattern C does NOT trigger with only 1 (Year) — falls back to Pattern A', () => {
+        const out = extractCertCandidates(['Foo Bar: Baz (2022)']);
+        expect(out).toHaveLength(1);
+        // Falls into Pattern A (parens) — name="Foo Bar: Baz", dateText="2022"
+        expect(out[0].dateText).toBe('2022');
+    });
+
+    test('Pattern D: bare line as name only', () => {
+        const out = extractCertCandidates(['Just a Cert Name']);
+        expect(out).toHaveLength(1);
+        expect(out[0]).toEqual({
+            name: 'Just a Cert Name',
+            issuer: null,
+            dateText: null,
+        });
+    });
+
+    test('skips section-header noise', () => {
+        const out = extractCertCandidates(['Zertifikate', 'Real Cert (Real Issuer)']);
+        expect(out).toHaveLength(1);
+        expect(out[0].name).toBe('Real Cert');
+    });
+
+    test('skips ultra-short and pure-numeric lines', () => {
+        const out = extractCertCandidates(['ab', '2022', 'Real Cert (Issuer)']);
+        expect(out).toHaveLength(1);
+        expect(out[0].name).toBe('Real Cert');
+    });
+});
+
+describe('recoverCertsFromRawSection — end-to-end roundtrip', () => {
+    const exxetaRawText = `## Berufserfahrung
+
+Some experience entries here.
+
+## Zertifikate
+
+Managementberatung (Emory University)
+Design Thinking Coach (Hasso-Plattner-Institut)
+TEDx-Coach I seit 2022 I Ehrenamtliche Tätigkeit
+Universität Potsdam: Projektmanagement (2022) Mediation (2021) Präsenzkurs (2020) Rhetorik (2020)
+
+## Sprachen
+
+Deutsch (C2)
+`;
+
+    test('REGRESSION: Managementberatung missing from output → ADDED', () => {
+        const existing = [
+            { id: 'cert-1', name: 'Design Thinking Coach', issuer: 'Hasso-Plattner-Institut', dateText: null },
+            { id: 'cert-2', name: 'TEDx-Coach', issuer: null, dateText: '2022' },
+        ];
+        const out = recoverCertsFromRawSection(existing, exxetaRawText);
+        const names = out.map((c) => c.name);
+        expect(names).toContain('Managementberatung');
+        const managementberatung = out.find((c) => c.name === 'Managementberatung');
+        expect(managementberatung?.issuer).toBe('Emory University');
+    });
+
+    test('REGRESSION: Universität Potsdam Projektmanagement missing → ADDED with issuer', () => {
+        const existing = [
+            { id: 'cert-1', name: 'Mediation', issuer: 'Universität Potsdam', dateText: '2021' },
+            { id: 'cert-2', name: 'Präsenzkurs', issuer: 'Universität Potsdam', dateText: '2020' },
+            { id: 'cert-3', name: 'Rhetorik', issuer: 'Universität Potsdam', dateText: '2020' },
+        ];
+        const out = recoverCertsFromRawSection(existing, exxetaRawText);
+        const projektmanagement = out.find((c) => c.name === 'Projektmanagement');
+        expect(projektmanagement).toBeDefined();
+        expect(projektmanagement?.issuer).toBe('Universität Potsdam');
+        expect(projektmanagement?.dateText).toBe('2022');
+    });
+
+    test('Issuer-Correct: hallucinated issuer with zero token-overlap is replaced', () => {
+        const rawWithDifferentIssuer = `## Zertifikate
+
+Innovation Award (Brandenburg Institute)
+
+## Sprachen
+`;
+        const existing = [
+            { id: 'cert-1', name: 'Innovation Award', issuer: 'Friedrichshafen Group', dateText: null },
+        ];
+        const out = recoverCertsFromRawSection(existing, rawWithDifferentIssuer);
+        expect(out).toHaveLength(1);
+        expect(out[0].issuer).toBe('Brandenburg Institute');
+    });
+
+    test('Issuer-Correct: existing issuer null → filled from raw', () => {
+        const raw = `## Zertifikate
+
+Scrum Master (Scrum Alliance)
+
+## Sprachen
+`;
+        const existing = [
+            { id: 'cert-1', name: 'Scrum Master', issuer: null, dateText: null },
+        ];
+        const out = recoverCertsFromRawSection(existing, raw);
+        expect(out).toHaveLength(1);
+        expect(out[0].issuer).toBe('Scrum Alliance');
+    });
+
+    test('Issuer-Correct: existing issuer overlaps raw issuer → kept', () => {
+        const raw = `## Zertifikate
+
+PMP (PMI Institute)
+
+## Sprachen
+`;
+        const existing = [
+            { id: 'cert-1', name: 'PMP', issuer: 'PMI', dateText: null },
+        ];
+        const out = recoverCertsFromRawSection(existing, raw);
+        // "PMI" is a 3-char token, both share "pmi" stem → keep existing
+        expect(out[0].issuer).toBe('PMI');
+    });
+
+    test('Conservative: hallucinated cert with no raw match is KEPT (no drop)', () => {
+        const raw = `## Zertifikate
+
+Real Cert (Real Issuer)
+
+## Sprachen
+`;
+        const existing = [
+            { id: 'cert-1', name: 'Real Cert', issuer: 'Real Issuer', dateText: null },
+            { id: 'cert-2', name: 'Halluzinated Cert', issuer: 'Some Org', dateText: null },
+        ];
+        const out = recoverCertsFromRawSection(existing, raw);
+        expect(out).toHaveLength(2);
+        const names = out.map((c) => c.name);
+        expect(names).toContain('Halluzinated Cert');
+    });
+
+    test('Idempotent: running twice on the same input yields the same output', () => {
+        const existing = [
+            { id: 'cert-1', name: 'Design Thinking Coach', issuer: 'Hasso-Plattner-Institut', dateText: null },
+        ];
+        const r1 = recoverCertsFromRawSection(existing, exxetaRawText);
+        const r2 = recoverCertsFromRawSection(r1, exxetaRawText);
+        expect(r2.length).toBe(r1.length);
+        // Names set is identical
+        expect(new Set(r2.map((c) => c.name))).toEqual(new Set(r1.map((c) => c.name)));
+    });
+
+    test('Empty array + raw with certs → all candidates added', () => {
+        type CertShape = { id?: string; name?: string | null; issuer?: string | null; dateText?: string | null };
+        const out = recoverCertsFromRawSection<CertShape>([], exxetaRawText);
+        const names = out.map((c) => c.name);
+        expect(names).toContain('Managementberatung');
+        expect(names).toContain('Design Thinking Coach');
+        expect(names).toContain('Projektmanagement');
+    });
+
+    test('No cert section in raw → returns array unchanged', () => {
+        const out = recoverCertsFromRawSection(
+            [{ id: 'cert-1', name: 'X', issuer: null, dateText: null }],
+            'Some random text without a Zertifikate section',
+        );
+        expect(out).toHaveLength(1);
+        expect(out[0].name).toBe('X');
+    });
+
+    test('Skips "Projekt-" prefixed candidates (handled by dropProjectLikeCerts)', () => {
+        type CertShape = { id?: string; name?: string | null; issuer?: string | null; dateText?: string | null };
+        const raw = `## Zertifikate
+
+Projekt- ZF Getriebe Brandenburg GmbH HR-Transformation
+Real Cert (Real Issuer)
+
+## Sprachen
+`;
+        const out = recoverCertsFromRawSection<CertShape>([], raw);
+        const names = out.map((c) => (c.name ?? '').toString());
+        expect(names).toContain('Real Cert');
+        expect(names.some((n) => n.toLowerCase().includes('projekt'))).toBe(false);
+    });
+
+    test('Skips status-word names (Ehrenamtliche Tätigkeit etc.)', () => {
+        type CertShape = { id?: string; name?: string | null; issuer?: string | null; dateText?: string | null };
+        const raw = `## Zertifikate
+
+Ehrenamtliche Tätigkeit
+Real Cert (Real Issuer)
+
+## Sprachen
+`;
+        const out = recoverCertsFromRawSection<CertShape>([], raw);
+        const names = out.map((c) => (c.name ?? '').toString());
+        expect(names).toContain('Real Cert');
+        expect(names).not.toContain('Ehrenamtliche Tätigkeit');
+    });
+
+    test('No raw text → array returned unchanged', () => {
+        const existing = [{ id: 'cert-1', name: 'X', issuer: null, dateText: null }];
+        expect(recoverCertsFromRawSection(existing, '')).toEqual(existing);
+    });
+
+    test('Preserves all extra fields (description, credentialUrl) on existing certs', () => {
+        const raw = `## Zertifikate
+
+Real Cert (Real Issuer)
+
+## Sprachen
+`;
+        const existing = [
+            {
+                id: 'cert-1',
+                name: 'Real Cert',
+                issuer: 'Real Issuer',
+                dateText: null,
+                description: 'Some description',
+                credentialUrl: 'https://example.com',
+            },
+        ];
+        const out = recoverCertsFromRawSection(existing, raw);
+        expect(out[0].description).toBe('Some description');
+        expect(out[0].credentialUrl).toBe('https://example.com');
     });
 });

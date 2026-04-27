@@ -317,10 +317,14 @@ ${sanitized}
       return name.length > 0 && !CERT_NOISE.has(name);
     });
     const certsAfterProjectDrop = dropProjectLikeCerts(certsAfterNoise);
+    // Phase 6 (2026-04-27): roundtrip recovery against raw cert section.
+    // Adds raw-only candidates (e.g. "Managementberatung (Emory University)")
+    // and corrects hallucinated issuers when raw disagrees clearly.
+    const certsAfterRoundtrip = recoverCertsFromRawSection(certsAfterProjectDrop, text);
     const certifications = validateDescriptionsAgainstRawText(
       truncateCertDescriptionAtNewline(
         sanitizeCertIssuer(
-          certsAfterProjectDrop as Array<{ issuer?: string | null;[k: string]: any }>
+          certsAfterRoundtrip as Array<{ issuer?: string | null;[k: string]: any }>
         ) as Array<{ description?: string | null;[k: string]: any }>
       ),
       text
@@ -1130,4 +1134,225 @@ function isPlausibleCompanyToken(token: string): boolean {
   if (NOISE.has(lower)) return false;
   // Reject if token is JUST a job-status word
   return true;
+}
+
+/**
+ * Phase 6 (2026-04-27) — Cert-Roundtrip-Recovery
+ *
+ * The LLM-parsed certifications array is often incomplete or misattributed
+ * relative to the raw OCR text. Observed defects on Yannik's Exxeta CV:
+ *   - "Managementberatung (Emory University)" present in raw, absent in output
+ *   - "Universität Potsdam: Projektmanagement (2022) ..." present in raw,
+ *     only 3 of 4 sub-courses recovered into the array
+ *   - Output cert "HR-Transformation" had issuer "ZF Friedrichshafen AG"
+ *     while raw clearly said "ZF Getriebe Brandenburg GmbH"
+ *
+ * Strategy (CONSERVATIVE — false-positive drop is worse than false-negative keep):
+ *   1. Walk the cert section in raw text, extract candidate certs by 3 patterns:
+ *      A. "Name (Issuer)" — parens-style
+ *      B. "Name I Date I Issuer" — pipe-separated
+ *      C. "Issuer: Subj (Year) Subj (Year) ..." — multi-subject group
+ *   2. For each existing output cert, find the best raw candidate by token-overlap:
+ *      - High overlap (>=0.6) → keep cert; correct issuer if raw issuer differs and
+ *        the existing issuer has zero token overlap with the raw one (likely halluc).
+ *      - Low overlap → keep unchanged (we do NOT drop hallucinated certs here).
+ *   3. For each unmatched raw candidate, ADD it as a new cert.
+ *
+ * Idempotent. Pure function. Exported for testing.
+ */
+interface CertCandidate {
+  name: string;
+  issuer: string | null;
+  dateText: string | null;
+}
+
+function isCertSectionHeader(line: string): boolean {
+  return /^#{0,3}\s*(zertifikate|zertifizierungen|certifications|certificates|weiterbildungen|weiterbildung|fortbildungen|kurse|courses|cursos|certificados)\s*:?\s*$/i.test(line);
+}
+
+function isCertStopHeader(line: string): boolean {
+  return /^#{0,3}\s*(sprachen|languages|idiomas|sprachkenntnisse|berufserfahrung|experience|bildung|ausbildung|education|skills|kenntnisse|interessen|hobbys|hobbies|projekte|projects|references|referenzen|publikationen|publications|persönliche|personal)\s*:?\s*$/i.test(line);
+}
+
+export function extractCertSectionLines(rawText: string): string[] {
+  if (!rawText || rawText.length < 50) return [];
+  const lines = rawText.split('\n');
+  let startIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (isCertSectionHeader(lines[i].trim())) {
+      startIdx = i + 1;
+      break;
+    }
+  }
+  if (startIdx === -1) return [];
+  const out: string[] = [];
+  for (let i = startIdx; i < Math.min(lines.length, startIdx + 30); i++) {
+    const line = lines[i].trim();
+    if (line.length === 0) continue;
+    if (isCertStopHeader(line)) break;
+    out.push(line);
+  }
+  return out;
+}
+
+export function extractCertCandidates(lines: string[]): CertCandidate[] {
+  const out: CertCandidate[] = [];
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line.length < 4) continue;
+    if (/^\d+$/.test(line)) continue;
+
+    // Pattern C: Multi-subject "Issuer: Subj1 (Year1) Subj2 (Year2) ..."
+    // Only triggers when colon is followed by >=2 (Year)-units.
+    const colonMatch = line.match(/^([^:]+):\s*(.+)$/);
+    if (colonMatch) {
+      const issuer = colonMatch[1].trim();
+      const rest = colonMatch[2];
+      const yearMatches = [...rest.matchAll(/([^()]+?)\s*\((\d{4})\)/g)];
+      if (yearMatches.length >= 2) {
+        for (const m of yearMatches) {
+          const subjName = m[1].trim().replace(/^[,;]\s*/, '').trim();
+          if (subjName.length === 0) continue;
+          out.push({ name: subjName, issuer, dateText: m[2] });
+        }
+        continue;
+      }
+    }
+
+    // Pattern A: "Name (Issuer)" or "Name (Year)"
+    const parensMatch = line.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+    if (parensMatch) {
+      const name = parensMatch[1].trim();
+      const inside = parensMatch[2].trim();
+      if (/^\d{4}$/.test(inside)) {
+        out.push({ name, issuer: null, dateText: inside });
+      } else {
+        out.push({ name, issuer: inside, dateText: null });
+      }
+      continue;
+    }
+
+    // Pattern B: pipe-separated "Name I [Date] I [Issuer]"
+    // Capital "I" is Azure DI's pipe-replacement; pipe also possible.
+    const parts = line.split(/\s+[I|]\s+/);
+    if (parts.length >= 2) {
+      const name = parts[0].trim();
+      let issuer: string | null = null;
+      let dateText: string | null = null;
+      for (let i = 1; i < parts.length; i++) {
+        const p = parts[i].trim();
+        if (/\b\d{4}\b/.test(p) && !dateText) {
+          dateText = p;
+        } else if (!issuer) {
+          issuer = p;
+        }
+      }
+      if (name.length >= 3) out.push({ name, issuer, dateText });
+      continue;
+    }
+
+    // Pattern D: bare line — fallback. Skip section-header-noise entirely.
+    if (CERT_SECTION_HEADERS.has(line.toLowerCase())) continue;
+    if (line.length < 5) continue;
+    out.push({ name: line, issuer: null, dateText: null });
+  }
+  return out;
+}
+
+function tokenOverlapScore(a: string, b: string): number {
+  const tokenize = (s: string) =>
+    new Set(
+      s
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[̀-ͯ]/g, '')
+        .split(/[\s\-_/.,;:()]+/)
+        .filter((t) => t.length >= 3),
+    );
+  const tokensA = tokenize(a);
+  const tokensB = tokenize(b);
+  if (tokensA.size === 0 || tokensB.size === 0) return 0;
+  let overlap = 0;
+  for (const t of tokensA) if (tokensB.has(t)) overlap++;
+  return overlap / Math.min(tokensA.size, tokensB.size);
+}
+
+export function recoverCertsFromRawSection<
+  T extends { id?: string; name?: string | null; issuer?: string | null; dateText?: string | null; [k: string]: any }
+>(certifications: T[], rawText: string): T[] {
+  const sectionLines = extractCertSectionLines(rawText);
+  if (sectionLines.length === 0) return certifications;
+
+  const candidates = extractCertCandidates(sectionLines);
+  if (candidates.length === 0) return certifications;
+
+  const MATCH_THRESHOLD = 0.6;
+  const ISSUER_DIVERGENCE_THRESHOLD = 0.5;
+  const matchedCandidateIndices = new Set<number>();
+  const corrected: T[] = [];
+
+  for (const cert of certifications) {
+    const certName = (cert.name || '').toString();
+    if (certName.length === 0) {
+      corrected.push(cert);
+      continue;
+    }
+
+    let bestIdx = -1;
+    let bestScore = 0;
+    for (let i = 0; i < candidates.length; i++) {
+      if (matchedCandidateIndices.has(i)) continue;
+      const score = tokenOverlapScore(certName, candidates[i].name);
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+
+    if (bestIdx !== -1 && bestScore >= MATCH_THRESHOLD) {
+      matchedCandidateIndices.add(bestIdx);
+      const match = candidates[bestIdx];
+      // Issuer-Correct: replace existing issuer when raw clearly disagrees.
+      if (match.issuer && match.issuer.length > 0) {
+        const existingIssuer = (cert.issuer || '').trim();
+        if (existingIssuer.length === 0) {
+          corrected.push({ ...cert, issuer: match.issuer });
+          continue;
+        }
+        const issuerOverlap = tokenOverlapScore(existingIssuer, match.issuer);
+        if (issuerOverlap < ISSUER_DIVERGENCE_THRESHOLD) {
+          corrected.push({ ...cert, issuer: match.issuer });
+          continue;
+        }
+      }
+      corrected.push(cert);
+    } else {
+      // No raw match — keep unchanged. Conservative: we do not drop possible
+      // hallucinations here because false-positive drop is worse than keep.
+      corrected.push(cert);
+    }
+  }
+
+  // Add unmatched raw candidates as new certs. Skip noisy candidates.
+  let recoveredCount = 0;
+  for (let i = 0; i < candidates.length; i++) {
+    if (matchedCandidateIndices.has(i)) continue;
+    const candidate = candidates[i];
+    const lowerName = candidate.name.toLowerCase().trim();
+    if (CERT_SECTION_HEADERS.has(lowerName)) continue;
+    if (ISSUER_NOISE.has(lowerName)) continue;
+    // Reject "Projekt-" prefixed candidates (handled by dropProjectLikeCerts elsewhere).
+    if (/^projekt[\s\-:]/i.test(candidate.name)) continue;
+
+    recoveredCount++;
+    corrected.push({
+      id: `cert-recovered-${recoveredCount}`,
+      name: candidate.name,
+      issuer: candidate.issuer,
+      dateText: candidate.dateText,
+      description: null,
+    } as unknown as T);
+  }
+
+  return corrected;
 }
