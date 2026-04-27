@@ -16,6 +16,7 @@ import {
     recoverCertsFromRawSection,
     extractCertSectionLines,
     extractCertCandidates,
+    stripGradeFromEducationDescription,
 } from '../services/cv-parser';
 import { complete } from '@/lib/ai/model-router';
 
@@ -1455,5 +1456,208 @@ Real Cert (Real Issuer)
         const out = recoverCertsFromRawSection(existing, raw);
         expect(out[0].description).toBe('Some description');
         expect(out[0].credentialUrl).toBe('https://example.com');
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Phase 8 (2026-04-27) — stripGradeFromEducationDescription
+// Yannik's M.Sc. description had "- Abschlussnote: 1,3" as the first bullet
+// AND a separate bold "Abschlussnote: 1,3" line above. Render duplicated
+// the value visibly. The grade belongs in education[].grade, not in description.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('stripGradeFromEducationDescription — Phase 8', () => {
+    test('REGRESSION: extracts "Abschlussnote: 1,3" from description into grade', () => {
+        const edu = [{
+            id: 'edu-1',
+            degree: 'M.Sc.',
+            description: '- Abschlussnote: 1,3\n- Schwerpunkte: Medienrecht und Kulturökonomie\n- Masterthesis: Analyse von Nutzerbedürfnissen',
+            grade: null,
+        }];
+        const out = stripGradeFromEducationDescription(edu);
+        expect(out[0].grade).toBe('1,3');
+        expect(out[0].description).not.toContain('Abschlussnote');
+        expect(out[0].description).toContain('Schwerpunkte');
+        expect(out[0].description).toContain('Masterthesis');
+    });
+
+    test('does not overwrite existing grade', () => {
+        const edu = [{
+            id: 'edu-1',
+            degree: 'B.A.',
+            description: '- Abschlussnote: 2,0\n- Schwerpunkte: Medienanalyse',
+            grade: '1,3',
+        }];
+        const out = stripGradeFromEducationDescription(edu);
+        expect(out[0].grade).toBe('1,3'); // existing kept
+        expect(out[0].description).not.toContain('Abschlussnote');
+    });
+
+    test('handles bare grade line (no bullet prefix)', () => {
+        const edu = [{
+            id: 'edu-1',
+            degree: 'M.Sc.',
+            description: 'Abschlussnote: 1,7\n- Schwerpunkte: Strategy',
+            grade: null,
+        }];
+        const out = stripGradeFromEducationDescription(edu);
+        expect(out[0].grade).toBe('1,7');
+        expect(out[0].description).toBe('- Schwerpunkte: Strategy');
+    });
+
+    test('handles English "Grade:" / "GPA:" labels', () => {
+        const edu = [{
+            id: 'edu-1',
+            degree: 'B.Sc.',
+            description: '- Grade: 3.7\n- Focus: Computer Science',
+            grade: null,
+        }];
+        const out = stripGradeFromEducationDescription(edu);
+        expect(out[0].grade).toBe('3.7');
+    });
+
+    test('Idempotent — running twice yields same result', () => {
+        const edu = [{
+            id: 'edu-1',
+            degree: 'M.Sc.',
+            description: '- Abschlussnote: 1,3\n- Bullet B',
+            grade: null,
+        }];
+        const r1 = stripGradeFromEducationDescription(edu);
+        const r2 = stripGradeFromEducationDescription(r1);
+        expect(r2[0].grade).toBe(r1[0].grade);
+        expect(r2[0].description).toBe(r1[0].description);
+    });
+
+    test('description = null when only grade line was present', () => {
+        const edu = [{
+            id: 'edu-1',
+            degree: 'M.Sc.',
+            description: '- Abschlussnote: 1,3',
+            grade: null,
+        }];
+        const out = stripGradeFromEducationDescription(edu);
+        expect(out[0].grade).toBe('1,3');
+        expect(out[0].description).toBeNull();
+    });
+
+    test('preserves all other fields', () => {
+        const edu = [{
+            id: 'edu-1',
+            degree: 'M.Sc.',
+            institution: 'BSP',
+            dateRangeText: '2020 - 2022',
+            description: '- Abschlussnote: 1,3\n- Schwerpunkte',
+            grade: null,
+        }];
+        const out = stripGradeFromEducationDescription(edu);
+        expect(out[0].institution).toBe('BSP');
+        expect(out[0].dateRangeText).toBe('2020 - 2022');
+        expect(out[0].degree).toBe('M.Sc.');
+    });
+
+    test('handles empty array', () => {
+        expect(stripGradeFromEducationDescription([])).toEqual([]);
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Phase 8 (2026-04-27) — Tier-1 smart name fallback stop-list expansion.
+// Repro: extracted_text "Exxeta 04.08.1996 in Berlin   Familienstatus: ledig"
+// → Tier-1-fallback picked "Berlin Familienstatus" because both tokens are
+// TitleCase, ≥3 chars, and "Familienstatus" was not in INSTITUTIONAL_SUFFIX.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('parseCvTextToJson — Phase 8 Tier-1 smart name fallback stop-list', () => {
+    beforeEach(() => {
+        (complete as jest.Mock).mockReset();
+    });
+
+    test('REGRESSION: rejects "Berlin Familienstatus", picks real name later in tokens', async () => {
+        // Mock the LLM to return null name (worst-case forcing Tier-1 fallback).
+        // The PII sanitizer marks `Berlin`, `Familienstatus`, and `Yannik Galetto`
+        // as NAME tokens — we need to verify "Berlin Familienstatus" is rejected.
+        (complete as jest.Mock).mockResolvedValue({
+            text: JSON.stringify({
+                personalInfo: { name: null, email: null, phone: null, location: null, summary: null, targetRole: 'Innovation Manager' },
+                experience: [],
+                education: [],
+                skills: [],
+                certifications: [],
+                languages: [],
+            }),
+            model: 'claude-haiku-4-5',
+            tokensUsed: 100,
+            costCents: 1,
+            latencyMs: 100,
+        });
+
+        const rawText = `Exxeta 04.08.1996 in Berlin   Familienstatus: ledig
+Borsigstraße 12   10115 Berlin   +49 1590 136 24 18
+yannik.galetto@gmail.com   Yannik Galetto
+
+## Berufserfahrung
+
+Innovation Manager at Ingrano Solutions
+2025 - present
+
+Implemented optimizations using Python and Make
+Designed scalable B2B workflows for clients in DACH region
+`;
+        const result = await parseCvTextToJson(rawText);
+        // The picked name MUST NOT be "Berlin Familienstatus" or any city+noun combination.
+        expect(result.personalInfo?.name).not.toBe('Berlin Familienstatus');
+        expect(result.personalInfo?.name).not.toMatch(/Berlin\s+Familienstatus/i);
+        // Ideally it picks "Yannik Galetto" — but at minimum, it should not be the city+noun.
+        if (result.personalInfo?.name) {
+            const firstToken = result.personalInfo.name.split(/\s+/)[0].toLowerCase();
+            expect(firstToken).not.toBe('berlin');
+            expect(firstToken).not.toBe('münchen');
+            expect(firstToken).not.toBe('hamburg');
+        }
+    });
+
+    test('rejects "München Geburtstag" (Munich + birth-date label)', async () => {
+        (complete as jest.Mock).mockResolvedValue({
+            text: JSON.stringify({
+                personalInfo: { name: null, email: null, phone: null },
+                experience: [], education: [], skills: [], certifications: [], languages: [],
+            }),
+            model: 'claude-haiku-4-5', tokensUsed: 100, costCents: 1, latencyMs: 100,
+        });
+
+        const rawText = `München Geburtstag: 04.08.1996
+Maria Schmidt
+maria@example.com
+
+## Berufserfahrung
+Some role here.
+`;
+        const result = await parseCvTextToJson(rawText);
+        expect(result.personalInfo?.name).not.toMatch(/München\s+Geburtstag/i);
+    });
+
+    test('still picks valid TitleCase TitleCase name (Maria Schmidt)', async () => {
+        (complete as jest.Mock).mockResolvedValue({
+            text: JSON.stringify({
+                personalInfo: { name: null, email: null, phone: null },
+                experience: [], education: [], skills: [], certifications: [], languages: [],
+            }),
+            model: 'claude-haiku-4-5', tokensUsed: 100, costCents: 1, latencyMs: 100,
+        });
+
+        const rawText = `Maria Schmidt
+maria@example.com
++49 175 1234567
+
+## Berufserfahrung
+Project Manager at Some Company.
+2020 - 2023
+Led various initiatives.
+`;
+        const result = await parseCvTextToJson(rawText);
+        // Real name should be picked
+        expect(result.personalInfo?.name).toBeTruthy();
+        expect(result.personalInfo?.name).not.toMatch(/Berlin|München|Familienstatus/i);
     });
 });

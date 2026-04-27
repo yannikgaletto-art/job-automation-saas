@@ -27,6 +27,13 @@ export const FORBIDDEN_FIELDS: ReadonlySet<string> = new Set([
 /** Sections where entity-level removal is forbidden (work history must not be deleted by AI). */
 const ENTITY_REMOVE_PROTECTED_SECTIONS: ReadonlySet<string> = new Set(['experience', 'education']);
 
+/** Sections where entity-level ADDS are forbidden (AI must NEVER invent new work stations or degrees).
+ *  Phase 8 (2026-04-27): "KI-GTM-Beratung" Halluzinations-Bug — the LLM hallucinated
+ *  a whole experience entry that was nowhere in the source CV. Bullet-level adds
+ *  (entityId + bulletId + field='description') stay allowed — those are normal
+ *  "add a missing achievement bullet" optimizations. */
+const ENTITY_ADD_PROTECTED_SECTIONS: ReadonlySet<string> = new Set(['experience', 'education']);
+
 /** Minimal shape of an AI-emitted change, for predicate purposes. */
 interface RawChangeLike {
     id?: string;
@@ -57,13 +64,31 @@ export function isProtectedEntityRemove(c: RawChangeLike): boolean {
     return !c.target.field && !c.target.bulletId;
 }
 
+/**
+ * Phase 8 (2026-04-27): returns true when the change tries to ADD a whole experience
+ * or education entry — i.e. the LLM is inventing a new work station or degree.
+ * Repro: "KI-GTM-Beratung" appeared in the optimizer output for Yannik's Avenga
+ * job, but no such entry existed in his source CV.
+ *
+ * Bullet-level adds (entityId + field='description' + bulletId or no bulletId on
+ * an existing entity) stay allowed — those are legitimate "add a missing
+ * achievement" suggestions on a real station the user already has.
+ */
+export function isProtectedEntityAdd(c: RawChangeLike): boolean {
+    if (c.type !== 'add') return false;
+    if (!c.target?.section || !ENTITY_ADD_PROTECTED_SECTIONS.has(c.target.section)) return false;
+    // entity-level add = no entityId yet (LLM proposes a NEW entry).
+    // If entityId is present, the add targets a sub-field of an existing entry → allowed.
+    return !c.target.entityId;
+}
+
 /** Returns true when the change is missing the section field — silent misrouting risk. */
 export function isMissingSection(c: RawChangeLike): boolean {
     return !c.target?.section;
 }
 
 /** Drop reason for telemetry/logging. */
-export type DropReason = 'missing_section' | 'identity_field' | 'protected_entity_remove';
+export type DropReason = 'missing_section' | 'identity_field' | 'protected_entity_remove' | 'protected_entity_add';
 
 /** Lookup failure record for the before-text sanitizer (telemetry). */
 export interface BeforeTextLookupFailure {
@@ -252,6 +277,10 @@ export function sanitizeOptimizerChanges<T extends RawChangeLike>(
         }
         if (isProtectedEntityRemove(c)) {
             dropped.push({ change: c, reason: 'protected_entity_remove' });
+            continue;
+        }
+        if (isProtectedEntityAdd(c)) {
+            dropped.push({ change: c, reason: 'protected_entity_add' });
             continue;
         }
         kept.push(c);

@@ -224,15 +224,34 @@ ${sanitized}
       return key ? (tokenMap.get(key) ?? null) : null;
     };
 
-    // Name: smart fallback — filter realistic person names, avoid institutional tokens
+    // Name: smart fallback — filter realistic person names, avoid institutional tokens.
+    // Phase 8 (2026-04-27): expanded stop list to reject German common nouns and
+    // city names that pass the TitleCase + TitleCase pattern. Real-world repro:
+    // CV header "Exxeta 04.08.1996 in Berlin   Familienstatus: ledig" produced
+    // "Berlin Familienstatus" as the picked name — both tokens are TitleCase, both
+    // ≥3 chars, and the old INSTITUTIONAL_SUFFIX did not catch "Familienstatus".
     if (!rawJson.personalInfo.name) {
       const INSTITUTIONAL_SUFFIX = /\b(institute|institut|gmbh|ag|kg|se|inc|ltd|llc|corp|company|consulting|solutions|group|technologies|systems|labs|studios|partners|holdings|university|universität|hochschule|fachhochschule|akademie|college|school)\b/i;
+      // Phase 8: German common-nouns / form-labels that often sit next to the
+      // user's actual name in CV headers but aren't names themselves.
+      const GERMAN_COMMON_NOUN = /\b(familienstatus|familienstand|geburtsdatum|geburtstag|geburtsort|geburtsname|anschrift|adresse|wohnort|wohnsitz|telefon|mobil|kontakt|email|e-mail|alter|nationalität|staatsangehörigkeit|personalien|persönliche|profil|lebenslauf|berufserfahrung|ausbildung|kenntnisse|sprachen|zertifikate)\b/i;
+      // Phase 8: Major German cities (case-insensitive — "Berlin" alone is location not name).
+      const GERMAN_CITY = /^(berlin|münchen|munchen|hamburg|köln|koeln|frankfurt|stuttgart|düsseldorf|duesseldorf|leipzig|bremen|hannover|hanover|essen|dortmund|nürnberg|nuernberg|dresden|bonn|mannheim|karlsruhe|wiesbaden|münster|muenster|aachen|braunschweig|kiel|chemnitz|magdeburg|freiburg|krefeld|halle|mainz|lübeck|luebeck|erfurt|rostock|kassel|potsdam|wien|zürich|zurich|bern|basel|genf|geneva|salzburg|innsbruck|graz|linz)\b/i;
       const PERSON_NAME_RE = /^[A-ZÄÖÜ][a-zäöüß]{2,}\s+[A-ZÄÖÜ][a-zäöüß]{2,}(\s+[A-ZÄÖÜ][a-zäöüß]+)*$/;
 
       const candidates = Array.from(tokenMap.entries())
         .filter(([k]) => k.startsWith('__NAME_'))
         .map(([, v]) => v)
-        .filter((v) => PERSON_NAME_RE.test(v.trim()) && !INSTITUTIONAL_SUFFIX.test(v));
+        .filter((v) => {
+          const trimmed = v.trim();
+          if (!PERSON_NAME_RE.test(trimmed)) return false;
+          if (INSTITUTIONAL_SUFFIX.test(trimmed)) return false;
+          if (GERMAN_COMMON_NOUN.test(trimmed)) return false;
+          // Reject if the FIRST token is a major German city (e.g. "Berlin Familienstatus")
+          const firstToken = trimmed.split(/\s+/)[0];
+          if (GERMAN_CITY.test(firstToken)) return false;
+          return true;
+        });
 
       if (candidates.length > 0) {
         rawJson.personalInfo.name = candidates[0];
@@ -349,15 +368,19 @@ ${sanitized}
       // validateDescriptionsAgainstRawText drops fully-fabricated descriptions.
       // Phase 5.2 (2026-04-27): recoverMissingEducationDescription restores bullet
       // lists that the LLM dropped when present in the raw text.
-      education: validateDescriptionsAgainstRawText(
-        recoverMissingEducationDescription(
-          recoverMissingEducationInstitution(
-            (validated.education ?? []) as Array<{ degree?: string | null; institution?: string | null; description?: string | null; [k: string]: any }>,
+      // Phase 8 (2026-04-27): stripGradeFromEducationDescription cleans
+      // "Abschlussnote: X,Y" lines out of description (they belong in `grade`).
+      education: stripGradeFromEducationDescription(
+        validateDescriptionsAgainstRawText(
+          recoverMissingEducationDescription(
+            recoverMissingEducationInstitution(
+              (validated.education ?? []) as Array<{ degree?: string | null; institution?: string | null; description?: string | null; [k: string]: any }>,
+              text
+            ) as Array<{ degree?: string | null; description?: string | null; [k: string]: any }>,
             text
-          ) as Array<{ degree?: string | null; description?: string | null; [k: string]: any }>,
+          ) as Array<{ description?: string | null; [k: string]: any }>,
           text
-        ) as Array<{ description?: string | null; [k: string]: any }>,
-        text
+        )
       ),
       // Skills: strip literal `\n` artefacts from category — observed pattern
       // "IT-Kenntnisse\n\nProgrammierkenntnisse" after Phase-3.1 re-upload.
@@ -701,6 +724,12 @@ export function recoverMissingEducationDescription<T extends { degree?: string |
     const degreeLineIdx = lines.findIndex((l) => l.toLowerCase().includes(degreeKey));
     if (degreeLineIdx === -1) return entry;
 
+    // Phase 8 (2026-04-27): grade-line patterns that must NOT be absorbed as a bullet.
+    // Repro: Yannik's M.Sc. description ended up with "- Abschlussnote: 1,3" as the
+    // first bullet AND a separate bold grade line above — duplicate render. The grade
+    // belongs in education[].grade, not in description[].
+    const GRADE_LINE_RE = /^\s*[-•–*]?\s*(abschlussnote|note|grade|gpa|gesamtnote|durchschnittsnote)\s*:/i;
+
     // Walk forward up to 12 lines, collecting consecutive bullets.
     // Non-bullet lines are tolerated BEFORE bullets are seen (e.g. "Abschlussnote: 1,3"
     // sits between degree line and the bullet list). Once bullets start, a non-bullet
@@ -710,6 +739,8 @@ export function recoverMissingEducationDescription<T extends { degree?: string |
     for (let i = degreeLineIdx + 1; i < Math.min(lines.length, degreeLineIdx + 13); i++) {
       const line = lines[i];
       if (line.trim().startsWith('##')) break; // markdown section change
+      // Phase 8: skip grade lines whether they're bullet-prefixed or not.
+      if (GRADE_LINE_RE.test(line)) continue;
       const m = line.match(BULLET_RE);
       if (m) {
         collected.push(m[1].trim());
@@ -1145,6 +1176,43 @@ function isPlausibleCompanyToken(token: string): boolean {
   if (NOISE.has(lower)) return false;
   // Reject if token is JUST a job-status word
   return true;
+}
+
+/**
+ * Phase 8 (2026-04-27) — strip "Abschlussnote: X,Y" / "Note: X,Y" lines from
+ * education[].description AND extract them into education[].grade if grade is
+ * missing. Repro: Yannik's M.Sc. ended up with "Abschlussnote: 1,3" both as a
+ * bold prefix line AND as the first description bullet, while education[].grade
+ * was null — render duplicated the value visibly.
+ *
+ * Idempotent. Pure function. Exported for testing.
+ */
+export function stripGradeFromEducationDescription<
+  T extends { description?: string | null; grade?: string | null;[k: string]: any }
+>(education: T[]): T[] {
+  const GRADE_LINE_RE = /^\s*[-•–*]?\s*(?:abschlussnote|note|grade|gpa|gesamtnote|durchschnittsnote)\s*:\s*([^\n]+?)\s*$/i;
+  return education.map((entry) => {
+    const desc = typeof entry.description === 'string' ? entry.description : '';
+    if (desc.length === 0) return entry;
+    let extractedGrade: string | null = null;
+    const cleaned = desc
+      .split('\n')
+      .filter((line) => {
+        const m = line.match(GRADE_LINE_RE);
+        if (m) {
+          if (!extractedGrade) extractedGrade = m[1].trim();
+          return false; // drop the grade line
+        }
+        return true;
+      })
+      .join('\n')
+      .trim();
+    const next: T = { ...entry, description: cleaned.length > 0 ? cleaned : null };
+    if (extractedGrade && !((entry.grade || '').toString().trim().length > 0)) {
+      next.grade = extractedGrade;
+    }
+    return next;
+  });
 }
 
 /**

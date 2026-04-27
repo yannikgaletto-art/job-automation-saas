@@ -12,6 +12,7 @@ import {
     FORBIDDEN_FIELDS,
     isIdentityFieldChange,
     isProtectedEntityRemove,
+    isProtectedEntityAdd,
     isMissingSection,
     sanitizeOptimizerChanges,
     sanitizeBeforeText,
@@ -170,6 +171,113 @@ describe('isProtectedEntityRemove — protect work history from AI deletion', ()
 
     test('does NOT flag modify-type changes', () => {
         expect(isProtectedEntityRemove(baseChange({ type: 'modify' }))).toBe(false);
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Phase 8 (2026-04-27) — isProtectedEntityAdd
+// Yannik's Avenga optimizer output had a hallucinated "KI-GTM-Beratung"
+// experience entry that was nowhere in the source CV. The LLM emitted an
+// `add` change targeting experience section without an entityId — i.e.
+// proposing a NEW work station from training data. That must be dropped.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('isProtectedEntityAdd — Phase 8 hallucinated work station guard', () => {
+    test('REGRESSION: flags add-experience without entityId (KI-GTM-Beratung)', () => {
+        const change = {
+            id: 'bad-1',
+            type: 'add',
+            target: { section: 'experience', entityId: null, field: null, bulletId: null },
+            after: 'KI-GTM-Beratung at Fraunhofer, 11.2023 - 09.2025',
+        };
+        expect(isProtectedEntityAdd(change)).toBe(true);
+    });
+
+    test('flags add-education without entityId (hallucinated degree)', () => {
+        const change = {
+            id: 'bad-1',
+            type: 'add',
+            target: { section: 'education', entityId: null, field: null, bulletId: null },
+            after: 'PhD at Stanford',
+        };
+        expect(isProtectedEntityAdd(change)).toBe(true);
+    });
+
+    test('does NOT flag bullet-level add to existing experience entry', () => {
+        const change = {
+            id: 'good-1',
+            type: 'add',
+            target: { section: 'experience', entityId: 'exp-1', field: 'description', bulletId: null },
+            after: 'New achievement bullet',
+        };
+        expect(isProtectedEntityAdd(change)).toBe(false);
+    });
+
+    test('does NOT flag bullet-level add with bulletId', () => {
+        const change = {
+            id: 'good-1',
+            type: 'add',
+            target: { section: 'experience', entityId: 'exp-1', field: 'description', bulletId: 'b-new' },
+            after: 'New bullet',
+        };
+        expect(isProtectedEntityAdd(change)).toBe(false);
+    });
+
+    test('does NOT flag add to skills section (skills can grow)', () => {
+        const change = {
+            id: 'good-1',
+            type: 'add',
+            target: { section: 'skills', entityId: null, field: null, bulletId: null },
+            after: 'New skill category',
+        };
+        expect(isProtectedEntityAdd(change)).toBe(false);
+    });
+
+    test('does NOT flag add to certifications (certs can be added)', () => {
+        const change = {
+            id: 'good-1',
+            type: 'add',
+            target: { section: 'certifications', entityId: null, field: null, bulletId: null },
+            after: 'New cert',
+        };
+        expect(isProtectedEntityAdd(change)).toBe(false);
+    });
+
+    test('does NOT flag modify-type changes', () => {
+        const change = {
+            id: 'c-1',
+            type: 'modify',
+            target: { section: 'experience', entityId: null, field: null, bulletId: null },
+            after: 'whatever',
+        };
+        expect(isProtectedEntityAdd(change)).toBe(false);
+    });
+
+    test('does NOT flag remove-type changes', () => {
+        const change = {
+            id: 'c-1',
+            type: 'remove',
+            target: { section: 'experience', entityId: 'exp-1', field: null, bulletId: null },
+        };
+        expect(isProtectedEntityAdd(change)).toBe(false);
+    });
+
+    test('end-to-end: sanitizeOptimizerChanges drops the entity-add hallucination', () => {
+        const changes = [
+            {
+                id: 'good-1', type: 'add',
+                target: { section: 'experience', entityId: 'exp-1', field: 'description', bulletId: null },
+                after: 'New bullet on existing entry',
+            },
+            {
+                id: 'halluc-1', type: 'add',
+                target: { section: 'experience', entityId: null, field: null, bulletId: null },
+                after: 'Hallucinated whole new work station',
+            },
+        ];
+        const result = sanitizeOptimizerChanges(changes);
+        expect(result.kept.map(c => c.id)).toEqual(['good-1']);
+        expect(result.dropped.map(d => d.reason)).toEqual(['protected_entity_add']);
     });
 });
 
