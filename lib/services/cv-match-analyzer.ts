@@ -493,26 +493,8 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
             const minor = gapCensus.minorGaps ?? 0;
             const llmRawScore = firstResult.overallScore;
 
-            let deterministicScore: number;
-            if (major === 0 && minor === 0) {
-                deterministicScore = 92;
-            } else if (major === 0 && minor <= 2) {
-                deterministicScore = 77;
-            } else if (major === 0 && minor >= 3) {
-                deterministicScore = 72;
-            } else if (major === 1 && minor === 0) {
-                deterministicScore = 62;
-            } else if (major === 1 && minor >= 1) {
-                deterministicScore = 55;
-            } else if (major === 2 && minor === 0) {
-                deterministicScore = 45;
-            } else if (major === 2 && minor >= 1) {
-                deterministicScore = 38;
-            } else if (llmRawScore <= 19) {
-                deterministicScore = 15;
-            } else {
-                deterministicScore = 32;
-            }
+            const { computeDeterministicScoreFromGapCensus } = await import('./cv-match-scoring');
+            const deterministicScore = computeDeterministicScoreFromGapCensus({ major, minor, llmRawScore });
 
             if (deterministicScore !== llmRawScore) {
                 console.log(`📊 [CV Match] DETERMINISTIC OVERRIDE: LLM score ${llmRawScore} → ${deterministicScore} (majorGaps=${major}, minorGaps=${minor})`);
@@ -529,44 +511,24 @@ export async function runCVMatchAnalysis(req: CVMatchRequest): Promise<CVMatchRe
         const jobCategory = (firstResult as any)._jobCategory ?? 'N/A';
         console.log(`📊 [CV Match] Category: ${jobCategory}, Score: ${firstResult.overallScore}, MajorGaps: ${gapCensus?.majorGaps ?? 'n/a'}, MinorGaps: ${gapCensus?.minorGaps ?? 'n/a'}`);
 
-        // CHIPS-LEVEL CONSISTENCY GUARDRAIL
-        // If a requirement card has relevantChips (= evidence found) but level is "gap" (= no evidence),
-        // that's a logical contradiction. Force level to "solid" deterministically.
-        // DB proof: Card "KI-Tools, LLMs" had 2 chips but level "gap" — this guardrail fixes it.
-        let guardrailFixCount = 0;
-        if (Array.isArray(firstResult.requirementRows)) {
-            for (const row of firstResult.requirementRows) {
-                if (row.level === 'gap' && Array.isArray(row.relevantChips) && row.relevantChips.length > 0) {
-                    console.log(`🛡️ [CV Match] Chips-consistency fix: "${row.title}" had ${row.relevantChips.length} chips but level="gap" → upgraded to "solid"`);
-                    row.level = 'solid';
-                    guardrailFixCount++;
-                }
+        // CHIPS-LEVEL CONSISTENCY GUARDRAIL — log-only mode (Welle Re-1, 2026-04-27).
+        // Earlier "enforce" mode upgraded gap → solid whenever a card had ≥1 chip,
+        // which inflated scores on senior roles (PwC Senior Consultant BPM: 38 → 77
+        // because 2 cards had 3 weak-touchpoint chips from Werkstudent project).
+        // The LLM's "gap" label was correct; the guardrail overrode correctness.
+        // Now we only OBSERVE the inconsistency and warn — no mutation, no score change.
+        // See lib/services/cv-match-scoring.ts for both modes (enforce kept for rollback).
+        if (Array.isArray(firstResult.requirementRows) && gapCensus) {
+            const { applyChipsConsistencyGuardrail } = await import('./cv-match-scoring');
+            const guardrailResult = applyChipsConsistencyGuardrail(
+                firstResult.requirementRows,
+                { majorGaps: gapCensus.majorGaps ?? 0, minorGaps: gapCensus.minorGaps ?? 0 },
+                firstResult.overallScore,
+                { mode: 'log-only' },
+            );
+            for (const det of guardrailResult.detections) {
+                console.warn(`🛡️ [CV Match] Chips-consistency observation (LOG-ONLY): "${det.title}" has ${det.chipsCount} chips but level="gap" — LLM authority preserved, no upgrade`);
             }
-        }
-
-        // If guardrail changed any cards, recount gap census and recompute score
-        // so that the score matches the visible card levels in the UI.
-        if (guardrailFixCount > 0 && gapCensus) {
-            const newMajor = Math.max(0, gapCensus.majorGaps - guardrailFixCount);
-            const newMinor = gapCensus.minorGaps ?? 0;
-            console.log(`🛡️ [CV Match] Gap census corrected: majorGaps ${gapCensus.majorGaps} → ${newMajor} (${guardrailFixCount} cards upgraded)`);
-            gapCensus.majorGaps = newMajor;
-            (firstResult as any)._gapCensus = gapCensus;
-
-            // Recompute deterministic score with corrected gap census
-            // MUST mirror the primary scoring bands above (§DRY: keep in sync!)
-            let correctedScore: number;
-            if (newMajor === 0 && newMinor === 0) correctedScore = 92;
-            else if (newMajor === 0 && newMinor <= 2) correctedScore = 77;
-            else if (newMajor === 0 && newMinor >= 3) correctedScore = 72;
-            else if (newMajor === 1 && newMinor === 0) correctedScore = 62;
-            else if (newMajor === 1 && newMinor >= 1) correctedScore = 55;
-            else if (newMajor === 2 && newMinor === 0) correctedScore = 45;
-            else if (newMajor === 2 && newMinor >= 1) correctedScore = 38;
-            else correctedScore = 32;
-
-            console.log(`🛡️ [CV Match] Score corrected: ${firstResult.overallScore} → ${correctedScore}`);
-            firstResult.overallScore = correctedScore;
         }
 
         // SICHERHEITSARCHITEKTUR §Golden Rule — Defense-in-Depth: ATS Closed-Set Enforcement
