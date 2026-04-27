@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import type { SetupDataResponse, SelectedHook, TargetLanguage } from '@/types/cover-letter-setup';
 import { enrichCompany, linkEnrichmentToJob } from '@/lib/services/company-enrichment';
+import { resolveJobCv } from '@/lib/services/job-cv-snapshot';
 
 // Auto-enrichment (Jina scrape + Claude extraction) can take 15-25s
 export const maxDuration = 45;
@@ -210,26 +211,42 @@ export async function GET(req: NextRequest) {
         });
 
         // ─── CV Station Bullets Source (priority order) ────────────────
-        // 1. Optimiertes CV (finalCv aus cv_optimization_proposal) — wenn User Änderungen akzeptiert hat
-        // 2. job.metadata.cv_structured_data (direkter Upload / Legacy)
-        // 3. user_profiles.cv_structured_data (Standard-Onboarding)
-        // WHY: Cover Letter Wizard soll dieselben Bullets zeigen wie das generierte PDF.
+        // Single-CV invariant (2026-04-28): the master CV is now unique per user.
+        // Reading u.user_profiles.cv_structured_data unambiguously yields the one
+        // CV the user owns. Snapshot still wins for in-flight jobs whose CV-Match
+        // ran before a delete-then-re-upload.
+        //
+        //   1. Optimised CV (finalCv from cv_optimization_proposal) — user
+        //      accepted optimiser changes.
+        //   2. resolveJobCv → snapshot (Welle B) when present, else master.
+        //   3. job.metadata.cv_structured_data (legacy direct-upload path,
+        //      kept for backward compat with pre-Welle-B jobs).
+        // WHY: Cover Letter Wizard must show the same bullets as the PDF.
         let cvData: any[] = [];
 
         const optimizedFinalCv = (job as any).cv_optimization_proposal?.finalCv;
+
+        const masterCvData = profileRes.data?.cv_structured_data
+            ? (typeof profileRes.data.cv_structured_data === 'string'
+                ? JSON.parse(profileRes.data.cv_structured_data)
+                : profileRes.data.cv_structured_data)
+            : null;
+        const resolved = resolveJobCv<{ experience?: any[] }>(
+            (job.metadata as Record<string, unknown> | null | undefined),
+            masterCvData,
+        );
+
         if (optimizedFinalCv?.experience?.length > 0) {
-            // ✅ Nutze optimiertes CV (Bullets übereinstimmend mit dem generierten PDF)
             cvData = optimizedFinalCv.experience;
             console.log(`🔄 [SetupData] Using optimized finalCv for job ${jobId} (${cvData.length} stations)`);
+        } else if (resolved.cv?.experience && resolved.cv.experience.length > 0) {
+            cvData = resolved.cv.experience;
+            if (resolved.source === 'job_snapshot') {
+                console.log(`📌 [SetupData] Using job-pinned CV snapshot for job ${jobId} (${cvData.length} stations, pinned ${resolved.pinnedAt})`);
+            }
         } else if (job.metadata?.cv_structured_data?.experience?.length > 0) {
-            // Fallback: job-level upload
+            // Legacy path for pre-Welle-B jobs without a snapshot.
             cvData = job.metadata.cv_structured_data.experience;
-        } else if (profileRes.data?.cv_structured_data) {
-            // Fallback: user profile (standard onboarding)
-            const parsedCv = typeof profileRes.data.cv_structured_data === 'string'
-                ? JSON.parse(profileRes.data.cv_structured_data)
-                : profileRes.data.cv_structured_data;
-            cvData = parsedCv?.experience || [];
         }
 
         // ─── Map raw CV experience → SetupDataResponse.cvStations format ──────
