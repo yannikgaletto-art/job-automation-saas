@@ -124,7 +124,7 @@ describe('resolveJobCv — Single-CV invariant robustness', () => {
         };
         const result = resolveJobCv({ cv_snapshot: snapshot }, null);
         expect(result.source).toBe('job_snapshot');
-        expect((result.cv as { personalInfo: { name: string } })?.personalInfo.name).toBe('Yannik Galetto');
+        expect((result.cv as unknown as { personalInfo: { name: string } })?.personalInfo.name).toBe('Yannik Galetto');
         expect(result.documentName).toBe('cv-pre-delete.pdf');
     });
 
@@ -140,7 +140,7 @@ describe('resolveJobCv — Single-CV invariant robustness', () => {
         const newMaster = { personalInfo: { name: 'New' } };
         const result = resolveJobCv({ cv_snapshot: oldSnapshot }, newMaster);
         expect(result.source).toBe('job_snapshot');
-        expect((result.cv as { personalInfo: { name: string } })?.personalInfo.name).toBe('Old');
+        expect((result.cv as unknown as { personalInfo: { name: string } })?.personalInfo.name).toBe('Old');
     });
 
     test('post-delete fresh job (no snapshot, no master) returns null source=master', () => {
