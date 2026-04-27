@@ -226,6 +226,12 @@ export async function POST(request: NextRequest) {
         // Skipped if description_cache HIT — reuse prior extraction instead.
         // ================================================================
         let extractedData: any = cachedExtraction ?? {};
+        // Welle G (2026-04-27): capture sync-extraction failure reason for the UI.
+        // When the AI call fails (rate-limit, network, transient API), the catch
+        // block below falls through to an empty job — the user previously had
+        // no signal that anything went wrong. This string is later persisted
+        // into job_queue.metadata.extraction_error for diagnostics.
+        let extractionError: string | null = null;
 
         if (cachedExtraction) {
             console.log(`[${requestId}] route=jobs/ingest step=ai_parse_requirements SKIPPED — using cached extraction`);
@@ -310,9 +316,17 @@ Schema: ${JSON.stringify(extractionSchema)}`,
                 console.log(`[${requestId}] route=jobs/ingest step=ai_parse model=${response.model} cost_cents=${response.costCents}`);
             } else {
                 console.warn(`[${requestId}] route=jobs/ingest step=ai_parse no_api_key skipped`);
+                extractionError = 'AI extraction skipped: no API key configured';
             }
         } catch (aiError: any) {
-            console.warn(`[${requestId}] route=jobs/ingest step=ai_parse error=${aiError.message}`);
+            const errMsg = aiError?.message || String(aiError);
+            // Welle G (2026-04-27): elevate AI failures to console.error and capture
+            // the error string for downstream UI/diagnostic surface. The user reported
+            // landing on an empty job (requirements=null, buzzwords=null) without any
+            // visible reason — leaving extraction_error in metadata makes that case
+            // diagnosable from the DB without re-running the upload.
+            console.error(`[${requestId}] route=jobs/ingest step=ai_parse error=${errMsg}`);
+            extractionError = errMsg.slice(0, 500); // cap to keep metadata small
             // Proceed with empty extraction rather than failing the ingest
         }
         } // end if (!cachedExtraction)
@@ -438,7 +452,9 @@ Schema: ${JSON.stringify(extractionSchema)}`,
         try {
             // Only set the flag if we actually ran sync extraction successfully
             const hasSyncData = extractedData && Object.keys(extractedData).length > 0 && (extractedData.summary || cachedExtraction);
-            if (hasSyncData) {
+            // Welle G: persist extraction_error even when sync data is empty, so
+            // the UI/diagnostic queries can show why a job has no requirements.
+            if (hasSyncData || extractionError) {
                 // JSONB Read-Modify-Write: read current metadata first to avoid wiping other fields
                 const { data: currentJobMeta } = await supabaseAdmin
                     .from('job_queue')
@@ -448,19 +464,29 @@ Schema: ${JSON.stringify(extractionSchema)}`,
                     .single();
                 const existingMeta = (currentJobMeta?.metadata as Record<string, unknown>) || {};
 
+                const metadataUpdate: Record<string, unknown> = {
+                    ...existingMeta,
+                    description_hash: descriptionHash,
+                    description_cache_hit: !!cachedExtraction,
+                };
+                if (hasSyncData) {
+                    metadataUpdate.sync_extracted_at = new Date().toISOString();
+                }
+                if (extractionError) {
+                    metadataUpdate.extraction_error = extractionError;
+                    metadataUpdate.extraction_error_at = new Date().toISOString();
+                } else {
+                    // Clear stale error on successful re-run
+                    delete (metadataUpdate as any).extraction_error;
+                    delete (metadataUpdate as any).extraction_error_at;
+                }
+
                 await supabaseAdmin
                     .from('job_queue')
-                    .update({
-                        metadata: {
-                            ...existingMeta,
-                            sync_extracted_at: new Date().toISOString(),
-                            description_hash: descriptionHash,
-                            description_cache_hit: !!cachedExtraction,
-                        },
-                    })
+                    .update({ metadata: metadataUpdate })
                     .eq('id', job.id)
                     .eq('user_id', userId);
-                console.log(`[${requestId}] route=jobs/ingest step=set_sync_flag job_id=${job.id} description_hash=${descriptionHash.slice(0, 8)}… cache_hit=${!!cachedExtraction}`);
+                console.log(`[${requestId}] route=jobs/ingest step=set_sync_flag job_id=${job.id} description_hash=${descriptionHash.slice(0, 8)}… cache_hit=${!!cachedExtraction} extraction_error=${extractionError ? 'yes' : 'no'}`);
             }
 
             // ================================================================
