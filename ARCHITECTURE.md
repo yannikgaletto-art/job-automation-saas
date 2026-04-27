@@ -134,8 +134,12 @@ Last Updated: 2026-04-18
 - `/api/volunteering/scrape` (POST — Scraping Trigger)
 
 #### Documents & User
-- `/api/documents/upload` (POST — CV/Cover Letter Upload)
+- `/api/documents/upload` (POST — CV/Cover Letter Upload; CV upload returns 409 CV_ALREADY_EXISTS under the Single-CV invariant)
 - `/api/documents/download` (GET — PDF Download)
+- `/api/documents/list` (GET — list user's CVs and Cover Letters)
+- `/api/documents/[id]` (DELETE — remove a document; for CVs clears user_profiles.cv_* before row delete + best-effort storage cleanup)
+- `/api/documents/reparse` (POST — re-parses a CV's extracted_text via parseCvTextToJson, makes it the master)
+- `/api/profile/dismiss-cv-migration` (POST — sets user_profiles.cv_migration_seen_at = NOW(); used by the post-Single-CV banner)
 - `/api/onboarding/complete` (POST)
 - `/api/onboarding/status` (GET)
 - `/api/consent/record` (POST/GET)
@@ -241,10 +245,10 @@ proposal = { translated: safeTranslated, optimized, changes } → DB
 
 ### Kern-Tabellen:
 - `auth.users` (Supabase Auth)
-- `user_profiles` (PII-Verschlüsselung, CV Structured Data, Preferences, Mood Check-in: `checkin_skip_streak`, `show_checkin`)
+- `user_profiles` (PII-Verschlüsselung, CV Structured Data, Preferences, Mood Check-in: `checkin_skip_streak`, `show_checkin`; Single-CV-Migration 2026-04-28: + `cv_migration_seen_at` Spalte für Post-Migration-Banner)
 - `user_settings` (Onboarding Status, Active CV, Avatar, Sprache)
 - `consent_history` (DSGVO Art. 7 Zustimmungen)
-- `documents` (CVs & Anschreiben, PII als JSONB)
+- `documents` (CVs & Anschreiben, PII als JSONB; Single-CV-Migration 2026-04-28: partial UNIQUE INDEX `one_cv_per_user` auf `(user_id) WHERE document_type='cv'` macht "max 1 CV pro User" zur DB-Invariante)
 - `auto_search_configs` (Konfiguration für automatisierte Jobsuche)
 - `search_trigger_queue` (Inngest/Cron Steuerung)
 - `job_queue` (Zentrale Job-Tabelle: Steckbrief, Pipeline, Judge-Scores)
