@@ -1,8 +1,29 @@
 # Pathly V2.0 - DEVELOPER OPERATING MANUAL
 
 **Status:** MANDATORY FOR ALL AI AGENTS
-**Version:** 3.9
-**Last Updated:** 2026-04-18
+**Version:** 4.0
+**Last Updated:** 2026-04-28
+
+---
+
+## 🛑 RULE #0 (HÖCHSTE PRIORITÄT) — REDUCE COMPLEXITY
+
+**Vor jedem ersten Code-Edit Pflichtlektüre:**
+- `directives/LESSONS_LEARNED_2026-04-28.md`
+
+**Die 6 Stopp-Regeln aus den Lessons-Learned (verbindlich, keine Ausnahmen):**
+
+1. **3-Pflaster-Regel:** Wenn eine Datei in 7 Tagen 3+ Bug-Fix-Commits bekommen hat, ist die Architektur kaputt, nicht der Bug. Bevor Fix #4: User fragen ob Architektur-Reset.
+2. **LOC-Regel:** Kein Service-File darf in einer Woche um mehr als 50% wachsen. Bei Erreichen: was wird gestrichen?
+3. **Welle-Nomenklatur-Regel:** Sobald ein Fix "Welle X.Y" oder "Phase Z" heisst und Welle A bis Welle G bereits existieren: STOPP, Architektur-Frage.
+4. **Erfolgs-Frage:** Vor jedem Fix beantworten: "Wie messe ich deterministisch dass das Problem WIRKLICH weg ist?". Ohne Akzeptanzkriterium kein Fix.
+5. **User-Frust-Regel:** Wenn der User dreimal im selben Thema "klappt immer noch nicht" sagt: STOPP, Architektur-Frage. Nicht ein vierter Fix.
+6. **Reduce-Complexity sticht Bug-Fix.** Bei Konflikt zwischen "diesen Bug schnell fixen" und "Code einfacher halten" gewinnt immer die Einfachheit.
+
+**Beweis warum diese Regeln existieren:**
+`lib/services/cv-parser.ts` ist zwischen 21.04.2026 (419 Zeilen) und 28.04.2026 (1596 Zeilen) um 281% gewachsen. 18 Pflaster-Wellen wurden in 7 Tagen geliefert. Die Pipeline ist messbar instabiler geworden, nicht stabiler. Der User hat ein Wochenende verloren. Diese Regeln verhindern das Wiederholen.
+
+**Wenn du einen Fix machst, der Rule #0 verletzt:** STOPP. Schreibe einen Plan-Entwurf. Lege ihn dem User vor. Warte auf "Go". Die 30 Sekunden Pause sind das wert.
 
 ---
 
