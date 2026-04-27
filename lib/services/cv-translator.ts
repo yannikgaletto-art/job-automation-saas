@@ -27,53 +27,80 @@
 import { complete } from '@/lib/ai/model-router';
 import { CvStructuredData } from '@/types/cv';
 
+// ═══ Language-marker regexes (Welle Re-1, 2026-04-27) ═══
+// Exported so the Optimizer-output validator can reuse them without duplicating.
+// Markers are tuned to action verbs that LLMs emit in CV bullets — these are
+// far more reliable than function words for detecting CV-bullet language.
+export const EN_BULLET_MARKERS = /\b(the|and|for|with|from|through|including|achieving|enabling|built|developed|designed|managed|implemented|delivered|led|leading|developing|designing|managing|implementing|delivering|building|driving|owning|coordinating|establishing|conducting|collaborating|operating|optimising|optimizing|launching|scaling|orchestrated|orchestrating|reduced|reducing|increased|increasing|spearheaded|championed|streamlined|negotiated|presented|facilitated|mentored|onboarded|co-responsible|responsible)\b/gi;
+export const DE_BULLET_MARKERS = /\b(und|der|die|das|für|mit|von|zur|des|eine|einer|sowie|durch|über|bei|auf|nach|als|werden|wurde|erstellung|durchführung|aufbau|entwicklung|beratung|geleitet|entwickelt|aufgebaut|durchgeführt|begleitet|konzipiert|verantwortet|erstellt|optimiert|koordiniert|umgesetzt|eingeführt|betreut|verhandelt|präsentiert)\b/gi;
+export const ES_BULLET_MARKERS = /\b(los|las|del|para|con|por|una|sus|como|sobre|entre|desde|esta|estos|dirigí|desarrollé|implementé|gestioné|construí|liderado|implementado|gestionado|desarrollado|presenté|negocié|coordiné)\b/gi;
+
+/**
+ * Counts how many language-specific markers a piece of text contains.
+ * Lower-cased internally — caller does not need to normalize.
+ */
+export function countLanguageMarkers(text: string, lang: 'en' | 'de' | 'es'): number {
+    const lower = (text || '').toLowerCase();
+    const re = lang === 'en' ? EN_BULLET_MARKERS : lang === 'de' ? DE_BULLET_MARKERS : ES_BULLET_MARKERS;
+    return (lower.match(re) ?? []).length;
+}
+
+/**
+ * Detects whether a single string is in the wrong language for the target.
+ * Used by Optimizer-output validator to drop language-inconsistent changes.
+ *
+ * Returns:
+ *   "matches-target" — text contains markers of the target language (or no markers at all)
+ *   "wrong-language" — text contains ≥1 marker of a non-target language and ZERO target markers
+ *   "unknown"        — text too short or no markers in any language
+ */
+export function detectStringLanguage(
+    text: string,
+    targetLang: 'en' | 'de' | 'es',
+): 'matches-target' | 'wrong-language' | 'unknown' {
+    if (!text || text.trim().length < 10) return 'unknown';
+    const targetCount = countLanguageMarkers(text, targetLang);
+    const otherLangs: Array<'en' | 'de' | 'es'> = (['en', 'de', 'es'] as const).filter(l => l !== targetLang);
+    const otherCounts = otherLangs.map(l => countLanguageMarkers(text, l));
+    const maxOther = Math.max(...otherCounts);
+
+    if (targetCount === 0 && maxOther === 0) return 'unknown';
+    if (targetCount > 0) return 'matches-target';
+    if (maxOther >= 1) return 'wrong-language';
+    return 'unknown';
+}
+
 /**
  * Detects if the CV content is already in the target language.
- * Samples PROPORTIONALLY across all sections (not just experience) to catch
- * mixed-language CVs (e.g. German experience + English education) that previously
- * slipped through because the first 8 experience bullets dominated the sample
- * and starved education/skills detection.
+ * Welle Re-1 (2026-04-27): broader sampling (all bullets across first 5 roles
+ * instead of 3) plus richer marker sets (action verbs that dominate CV bullets).
+ * Fixes the Yannik-EN-CV mishmasch where mixed German company names hid a
+ * fully English bullet body and the old marker set missed it.
  */
 export function needsTranslation(cv: CvStructuredData, targetLang: string): boolean {
-    // Per-section caps prevent any one section from dominating the sample.
-    const MAX_EXP_BULLETS_SAMPLED = 3;     // first 3 bullets across first 3 entries
+    const MAX_EXP_ENTRIES_SAMPLED = 5;
+    const MAX_BULLETS_PER_ENTRY = 4;
     const MAX_SKILL_CATEGORIES_SAMPLED = 3;
 
     const samples: string[] = [];
 
-    // Experience: round-robin first bullet of each entry, then second bullet, etc.
-    // This guarantees coverage across multiple roles even if one role has many bullets.
-    let bulletsSampled = 0;
-    const experienceEntries = (cv.experience || []).slice(0, 3);
-    for (let bulletIdx = 0; bulletIdx < 3 && bulletsSampled < MAX_EXP_BULLETS_SAMPLED; bulletIdx++) {
-        for (const exp of experienceEntries) {
-            const b = exp.description?.[bulletIdx];
-            if (b?.text) {
-                samples.push(b.text);
-                bulletsSampled++;
-                if (bulletsSampled >= MAX_EXP_BULLETS_SAMPLED) break;
-            }
-        }
-    }
-
-    // Personal summary + targetRole — these are user-facing prose, often the giveaway
-    if (cv.personalInfo?.summary) samples.push(cv.personalInfo.summary);
-    if (cv.personalInfo?.targetRole) samples.push(cv.personalInfo.targetRole);
-
-    // Experience role titles — e.g. "Software Engineer" vs "Softwareentwickler"
+    const experienceEntries = (cv.experience || []).slice(0, MAX_EXP_ENTRIES_SAMPLED);
     for (const exp of experienceEntries) {
+        const bullets = (exp.description || []).slice(0, MAX_BULLETS_PER_ENTRY);
+        for (const b of bullets) {
+            if (b?.text) samples.push(b.text);
+        }
         if (exp.role) samples.push(exp.role);
     }
 
-    // Education: ALL descriptions + degrees — never starved by experience now.
-    // This is the field that broke before for users with German exp + English edu.
+    if (cv.personalInfo?.summary) samples.push(cv.personalInfo.summary);
+    if (cv.personalInfo?.targetRole) samples.push(cv.personalInfo.targetRole);
+
     for (const edu of cv.education || []) {
         if (typeof edu.description === 'string' && edu.description) samples.push(edu.description);
         if (edu.degree) samples.push(edu.degree);
     }
 
-    // Skills: first 3 category labels + first 3 items per category sampled.
-    // Items are usually language-neutral (Python, Jira) but categories aren't ("Kenntnisse" vs "Skills").
     for (const skill of (cv.skills || []).slice(0, MAX_SKILL_CATEGORIES_SAMPLED)) {
         if (skill.category) samples.push(skill.category);
         for (const item of (skill.items || []).slice(0, 3)) {
@@ -81,31 +108,26 @@ export function needsTranslation(cv: CvStructuredData, targetLang: string): bool
         }
     }
 
-    // No translatable text found → nothing to do
     if (samples.length === 0) return false;
 
     const sampleText = samples.join(' ').toLowerCase();
 
-    // If target is English, check if content has German/Spanish markers
     if (targetLang === 'English') {
-        const germanMarkers = /\b(und|der|die|das|für|mit|von|zur|des|eine|einer|sowie|durch|über|bei|auf|nach|als|werden|wurde|erstellung|durchführung|aufbau|entwicklung|beratung)\b/;
-        const spanishMarkers = /\b(los|las|del|para|con|por|una|sus|como|sobre|entre|desde|esta|estos)\b/;
-        return germanMarkers.test(sampleText) || spanishMarkers.test(sampleText);
+        const deCount = (sampleText.match(DE_BULLET_MARKERS) ?? []).length;
+        const esCount = (sampleText.match(ES_BULLET_MARKERS) ?? []).length;
+        return deCount >= 1 || esCount >= 1;
     }
 
-    // If target is German, check if content is in English.
-    // Require ≥2 matches to avoid false positives from single English company names
-    // (e.g. "The Boston Consulting Group" contributes "the" = 1 match → no false trigger).
     if (targetLang === 'German') {
-        const englishMarkers = /\b(the|and|for|with|from|through|including|achieving|enabling|built|developed|designed|managed|implemented|delivered|led)\b/g;
-        const matchCount = (sampleText.match(englishMarkers) ?? []).length;
-        return matchCount >= 2;
+        // Require ≥2 to avoid false-positive on single English company names.
+        const enCount = (sampleText.match(EN_BULLET_MARKERS) ?? []).length;
+        return enCount >= 2;
     }
 
-    // If target is Spanish, check for English/German
     if (targetLang === 'Spanish') {
-        const otherMarkers = /\b(the|and|for|und|der|die|das|für|mit)\b/;
-        return otherMarkers.test(sampleText);
+        const enCount = (sampleText.match(EN_BULLET_MARKERS) ?? []).length;
+        const deCount = (sampleText.match(DE_BULLET_MARKERS) ?? []).length;
+        return enCount >= 1 || deCount >= 1;
     }
 
     return false;

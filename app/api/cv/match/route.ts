@@ -138,6 +138,21 @@ export async function POST(req: NextRequest) {
                 if (cached?.result && typeof cached.result === 'object') {
                     console.log(`✅ [CV Match] Persistent cache HIT — restoring from cv_match_result_cache (hash: ${persistentHash.slice(0, 8)}…)`);
 
+                    // Welle Re-1 LITE (2026-04-27): cache-restore must also sync master
+                    // BEFORE building the snapshot. Without this, a user picking CV-A
+                    // after uploading CV-B would get a cache-restored job pinned to a
+                    // stale CV-B master snapshot. Same DEV/PROD-Drift pattern, fixed
+                    // here too via the shared helper (DRY).
+                    if (cvDocumentId) {
+                        try {
+                            const { syncMasterCvFromDocument } = await import('@/lib/services/cv-master-sync');
+                            const syncResult = await syncMasterCvFromDocument(user.id, cvDocumentId, supabaseAdmin);
+                            console.log(`[cv-match cache-restore] master sync: ${syncResult.status}${syncResult.message ? ` — ${syncResult.message}` : ''}`);
+                        } catch (syncErr: any) {
+                            console.warn(`⚠️ [CV Match] cache-restore master sync failed (non-blocking): ${syncErr?.message}`);
+                        }
+                    }
+
                     // Welle B: build a CV snapshot to pin alongside the restored
                     // match result so the Optimizer + Cover Letter use the same
                     // CV the user is currently viewing.
@@ -321,6 +336,20 @@ export async function POST(req: NextRequest) {
                             console.log(`✅ [CV Match] DEV result cached (hash: ${devInputHash.slice(0, 8)}…)`);
                         } catch (cacheWriteErr: any) {
                             console.warn(`⚠️ [CV Match] DEV cache write error (non-blocking): ${cacheWriteErr?.message}`);
+                        }
+
+                        // Welle Re-1 LITE (2026-04-27): sync master CV from chosen document
+                        // BEFORE pinning the snapshot. Mirrors Inngest Step 5 — eliminates
+                        // the DEV/PROD-Drift that caused the PwC E2E bug (master held stale
+                        // EN-CV data while picker chose Exxeta). DRY via shared helper.
+                        if (cvDocumentId) {
+                            try {
+                                const { syncMasterCvFromDocument } = await import('@/lib/services/cv-master-sync');
+                                const syncResult = await syncMasterCvFromDocument(user.id, cvDocumentId, supabaseAdmin);
+                                console.log(`[cv-match DEV] master sync: ${syncResult.status}${syncResult.message ? ` — ${syncResult.message}` : ''}`);
+                            } catch (syncErr: any) {
+                                console.warn(`⚠️ [CV Match] DEV master sync failed (non-blocking): ${syncErr?.message}`);
+                            }
                         }
 
                         // Welle B: Pin the matched CV snapshot to job_queue.metadata.cv_snapshot

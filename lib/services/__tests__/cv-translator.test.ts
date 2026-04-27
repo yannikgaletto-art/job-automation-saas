@@ -7,7 +7,7 @@
  * CVs (German experience + English education) were never flagged for translation.
  */
 
-import { needsTranslation, restoreImmutableFields } from '../cv-translator';
+import { needsTranslation, restoreImmutableFields, detectStringLanguage, countLanguageMarkers } from '../cv-translator';
 import type { CvStructuredData } from '@/types/cv';
 
 const baseCv: CvStructuredData = {
@@ -337,5 +337,138 @@ describe('restoreImmutableFields — Bug 3 regression (Medieninnovationszentrum 
         expect(translated.personalInfo.name).toBe('Yannik Galetto');
         expect(translated.personalInfo.email).toBe('yannik.galetto@gmail.com');
         expect(translated.personalInfo.location).toBe('Berlin');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Welle Re-1 (2026-04-27) — broader marker set + stress on EN-CV regression
+// ═══════════════════════════════════════════════════════════════════
+
+describe('needsTranslation — Welle Re-1 EN-CV regression (Yannik PwC mishmasch)', () => {
+    test('EN bullets with German company names → flags for German target (was missed pre-fix)', () => {
+        const cv: CvStructuredData = {
+            ...baseCv,
+            experience: [
+                {
+                    id: 'e1',
+                    role: 'Sales & Business Development Manager',
+                    company: 'Ingrano Solutions',
+                    description: [
+                        makeBullet('Leading a NIS2 cybersecurity project across multiple stakeholders, achieving compliance for critical infrastructures', 0),
+                        makeBullet('Established quantum-computing initiative and orchestrated cross-functional collaboration', 1),
+                    ],
+                } as any,
+                {
+                    id: 'e2',
+                    role: 'Innovation Manager',
+                    company: 'Fraunhofer',
+                    description: [
+                        makeBullet('Developed AR-based food-tech platform, reducing time-to-market by 30%', 0),
+                    ],
+                } as any,
+                {
+                    id: 'e3',
+                    role: 'Co-Founder',
+                    company: 'Xorder Menues',
+                    description: [
+                        makeBullet('Co-responsible for business model conceptualization; implementing revenue-boosting pricing models', 0),
+                    ],
+                } as any,
+            ],
+        };
+        expect(needsTranslation(cv, 'German')).toBe(true);
+    });
+
+    test('Single English action verb + many German company names → does NOT trigger (still ≥2 required)', () => {
+        const cv: CvStructuredData = {
+            ...baseCv,
+            experience: [
+                {
+                    id: 'e1',
+                    role: 'Berater',
+                    company: 'The Boston Consulting Group',
+                    description: [makeBullet('Beratung und Konzeption für Großkunden im Bereich Energie', 0)],
+                } as any,
+            ],
+        };
+        expect(needsTranslation(cv, 'German')).toBe(false);
+    });
+
+    test('All-German bullets across 5 entries → does NOT trigger', () => {
+        const cv: CvStructuredData = {
+            ...baseCv,
+            experience: Array.from({ length: 5 }, (_, i) => ({
+                id: `e${i}`,
+                role: `Beraterin ${i}`,
+                company: `Firma ${i}`,
+                description: [
+                    makeBullet('Geleitet Projekte zur Prozessoptimierung und Stakeholder-Koordination im Konzernumfeld', 0),
+                    makeBullet('Konzipiert und umgesetzt eine Migrationsstrategie für die Cloud-Infrastruktur', 1),
+                ],
+            } as any)),
+        };
+        expect(needsTranslation(cv, 'German')).toBe(false);
+    });
+});
+
+describe('detectStringLanguage — pure function for Optimizer output validator', () => {
+    test('clean English bullet → wrong-language for DE target', () => {
+        const txt = 'Led the cross-functional team and delivered the migration on time';
+        expect(detectStringLanguage(txt, 'de')).toBe('wrong-language');
+    });
+
+    test('clean German bullet → matches-target for DE target', () => {
+        const txt = 'Geleitet das Team und erfolgreich die Migration durchgeführt';
+        expect(detectStringLanguage(txt, 'de')).toBe('matches-target');
+    });
+
+    test('clean English bullet → matches-target for EN target', () => {
+        const txt = 'Implemented and managed the new pipeline with the engineering team';
+        expect(detectStringLanguage(txt, 'en')).toBe('matches-target');
+    });
+
+    test('mixed-language bullet (DE bullet with English company) → matches-target for DE', () => {
+        // Single English company name should NOT flip the verdict — DE markers dominate
+        const txt = 'Geleitet die Migration für The Boston Consulting Group im Konzern';
+        expect(detectStringLanguage(txt, 'de')).toBe('matches-target');
+    });
+
+    test('language-neutral string (proper nouns only) → unknown', () => {
+        expect(detectStringLanguage('Salesforce, HubSpot, Make.com', 'de')).toBe('unknown');
+    });
+
+    test('very short string → unknown', () => {
+        expect(detectStringLanguage('OK', 'de')).toBe('unknown');
+    });
+
+    test('empty / null defensive guards', () => {
+        expect(detectStringLanguage('', 'de')).toBe('unknown');
+        expect(detectStringLanguage(null as unknown as string, 'de')).toBe('unknown');
+        expect(detectStringLanguage(undefined as unknown as string, 'de')).toBe('unknown');
+    });
+
+    test('Spanish bullet → wrong-language for DE target', () => {
+        expect(detectStringLanguage('Implementé el sistema y gestioné el equipo entre los proyectos', 'de')).toBe('wrong-language');
+    });
+
+    test('the PwC repro: "Co-responsible for business model conceptualization; implementing revenue-boosting pricing models" → wrong-language for DE', () => {
+        const bullet = 'Co-responsible for business model conceptualization; implementing revenue-boosting pricing models';
+        expect(detectStringLanguage(bullet, 'de')).toBe('wrong-language');
+    });
+});
+
+describe('countLanguageMarkers — primitive used by detect', () => {
+    test('counts EN action verbs', () => {
+        const txt = 'led developed managed implemented delivered';
+        expect(countLanguageMarkers(txt, 'en')).toBe(5);
+    });
+
+    test('counts DE action verbs', () => {
+        const txt = 'geleitet entwickelt verantwortet umgesetzt';
+        expect(countLanguageMarkers(txt, 'de')).toBe(4);
+    });
+
+    test('case-insensitive', () => {
+        expect(countLanguageMarkers('LED Managed', 'en')).toBe(2);
     });
 });

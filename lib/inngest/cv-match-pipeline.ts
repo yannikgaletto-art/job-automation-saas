@@ -317,74 +317,14 @@ export const analyzeCVMatch = inngest.createFunction(
         });
 
         // Step 5: Sync user_profiles.cv_structured_data if user selected a specific CV
+        // (Welle Re-1 LITE — 2026-04-27: extracted to shared helper for DRY DEV/PROD parity.)
         // This prevents the desync bug where the Optimizer reads a different CV than the one matched.
         // Only runs when a specific cvDocumentId was provided (user selected via CVSelectDialog).
         if (cvDocumentId) {
             await step.run('sync-profile-cv', async () => {
-                try {
-                    // Check if the profile already references this document
-                    const { data: profile } = await supabaseAdmin
-                        .from('user_profiles')
-                        .select('cv_original_file_path, full_name')
-                        .eq('id', userId)
-                        .single();
-
-                    // Load the document's file path for comparison
-                    const { data: doc } = await supabaseAdmin
-                        .from('documents')
-                        .select('file_url_encrypted, metadata')
-                        .eq('id', cvDocumentId)
-                        .eq('user_id', userId)
-                        .single();
-
-                    if (!doc) {
-                        console.log(`[cv-match-pipeline] ℹ️ Document ${cvDocumentId} not found, skipping profile sync`);
-                        return;
-                    }
-
-                    // Skip if profile already points to this document
-                    if (profile?.cv_original_file_path === doc.file_url_encrypted) {
-                        console.log(`[cv-match-pipeline] ℹ️ Profile already synced with document ${cvDocumentId}`);
-                        return;
-                    }
-
-                    // Re-parse the document's extracted text to get structured data
-                    const extractedText = (doc.metadata as Record<string, unknown>)?.extracted_text as string;
-                    if (!extractedText || extractedText.trim().length < 50) {
-                        console.warn(`[cv-match-pipeline] ⚠️ Document ${cvDocumentId} has no extracted text, skipping profile sync`);
-                        return;
-                    }
-
-                    const { parseCvTextToJson } = await import('@/lib/services/cv-parser');
-                    const structuredCv = await parseCvTextToJson(extractedText);
-
-                    // Tier 1 name override: user_profiles.full_name is the confirmed name
-                    // (set by upload/route.ts integrity guard on every CV upload).
-                    // Prevents stale OCR-header names from leaking into re-parsed CVs.
-                    if (profile?.full_name) {
-                        if (!structuredCv.personalInfo) structuredCv.personalInfo = {} as any;
-                        structuredCv.personalInfo.name = profile.full_name;
-                        console.log(`[cv-match-pipeline] 🔧 Name override from full_name → "${profile.full_name}"`);
-                    }
-
-                    const { error: updateErr } = await supabaseAdmin
-                        .from('user_profiles')
-                        .update({
-                            cv_structured_data: structuredCv,
-                            cv_original_file_path: doc.file_url_encrypted,
-                        })
-                        .eq('id', userId);
-
-                    if (updateErr) {
-                        console.error(`[cv-match-pipeline] ⚠️ Profile sync failed (non-blocking):`, updateErr.message);
-                    } else {
-                        console.log(`[cv-match-pipeline] ✅ Profile cv_structured_data synced to document ${cvDocumentId}`);
-                    }
-                } catch (syncErr) {
-                    // Non-blocking — profile sync failure must never crash the match pipeline
-                    const errMsg = syncErr instanceof Error ? syncErr.message : String(syncErr);
-                    console.error(`[cv-match-pipeline] ⚠️ Profile sync error (non-blocking):`, errMsg);
-                }
+                const { syncMasterCvFromDocument } = await import('@/lib/services/cv-master-sync');
+                const result = await syncMasterCvFromDocument(userId, cvDocumentId, supabaseAdmin);
+                console.log(`[cv-match-pipeline] master sync: ${result.status}${result.message ? ` — ${result.message}` : ''}`);
             });
         }
 

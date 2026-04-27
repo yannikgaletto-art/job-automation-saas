@@ -311,8 +311,18 @@ AUTHENTIC KEYWORD WEAVING:
   1. Search the CV for REAL experience that relates to this keyword
   2. If found: reformulate the relevant bullet so the keyword appears naturally
   3. If NOT found: do NOT integrate it. Honesty > ATS score.
-- Example: keyword "Risk Management" + CV has "NIS-2 Compliance" → reformulate as "Led NIS-2 risk management and compliance processes"
-- Counter-example: keyword "Emergency Planning" + CV has nothing → do NOT insert.
+- Generic pattern (no concrete keyword names — never carry over examples from training data):
+  IF (the missing keyword X has a clear semantic match Y already documented in the CV)
+  THEN reformulate the bullet that contains Y to also surface X verbatim, keeping all factual content intact.
+  ELSE leave the bullet alone.
+- HARD RULE: Never invent keywords from prior tasks or training data. Only weave keywords that appear in input section 5 (MISSING ATS KEYWORDS).
+
+OUTPUT LANGUAGE CONSTRAINT (MANDATORY):
+- All "after" strings in your changes — and every string field of the adjusted CV — MUST be written in ${lang}.
+- If the input CV contains content in another language (e.g. English bullets in a German job context), you MUST translate ALL such content to ${lang} consistently.
+- Mixed-language output is FORBIDDEN. If even ONE bullet is left in the wrong language, the user sees a broken CV.
+- This rule applies to: experience[].description[], experience[].summary, education[].description, personalInfo.summary, personalInfo.targetRole, skills[].category/items, certifications[].description.
+- Do NOT translate identity-locked fields (role, company, institution, degree, names, dates) — those are factual record.
 
 SECTION DISTRIBUTION (MANDATORY):
 - Your changes MUST cover at least 2 different sections. Do NOT spend all 18 changes on experience alone.
@@ -474,6 +484,44 @@ Must conform to the following Zod schema:
             reason: c.reason || 'KI-Optimierung',
             requirementRef: c.requirementRef ?? null,
         }));
+
+        // ── LANGUAGE-CONSISTENCY GUARD (Welle Re-1, 2026-04-27) ─────────
+        // Optimizer prompt now has an OUTPUT LANGUAGE CONSTRAINT but LLMs
+        // can still drop a wrong-language bullet here and there. We DROP
+        // such changes deterministically rather than letting them poison
+        // the rendered CV. Identity-locked fields are already protected
+        // by sanitizeOptimizerChanges above — this guard only inspects
+        // free-text fields where translation is expected.
+        try {
+            const { detectStringLanguage } = await import('@/lib/services/cv-translator');
+            const targetLangCode: 'de' | 'en' | 'es' = locale === 'en' ? 'en' : locale === 'es' ? 'es' : 'de';
+            const langFiltered: typeof rawJson.changes = [];
+            let langDropped = 0;
+            for (const ch of rawJson.changes) {
+                const after = typeof ch.after === 'string' ? ch.after : '';
+                if (!after) {
+                    langFiltered.push(ch);
+                    continue;
+                }
+                const verdict = detectStringLanguage(after, targetLangCode);
+                if (verdict === 'wrong-language') {
+                    langDropped++;
+                    log.warn('Optimizer change dropped (language mismatch)', {
+                        changeId: ch.id,
+                        targetLang: targetLangCode,
+                        afterPreview: after.slice(0, 80),
+                    });
+                    continue;
+                }
+                langFiltered.push(ch);
+            }
+            if (langDropped > 0) {
+                console.warn(`🛡️ [CV Optimize] Language-guard dropped ${langDropped}/${rawJson.changes.length} changes (target=${targetLangCode})`);
+            }
+            rawJson.changes = langFiltered;
+        } catch (langErr: any) {
+            log.warn('Language-guard failed (non-blocking)', { error: langErr?.message });
+        }
 
         // ── Before-Text Sanitizer ──────────────────────────────────────
         // Replace AI-generated 'before' values with ground-truth from the CV.
