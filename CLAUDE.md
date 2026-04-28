@@ -25,6 +25,66 @@
 
 **Wenn du einen Fix machst, der Rule #0 verletzt:** STOPP. Schreibe einen Plan-Entwurf. Lege ihn dem User vor. Warte auf "Go". Die 30 Sekunden Pause sind das wert.
 
+### 🔴 LEBENDIGES NEGATIV-BEISPIEL — Das hier IST passiert
+
+`lib/services/cv-parser.ts` — 21.04.2026 bis 28.04.2026 (7 Tage):
+
+| Datum | Zeilen | Ereignis |
+|---|---|---|
+| 21.04.2026 | **419** | Antigravity-Stand. Pipeline lief stabil. Output "1000x perfekt" laut User. |
+| 28.04.2026 | **1596** | Nach 18 Pflaster-Wellen. Pipeline messbar instabiler. User verlor ein Wochenende. |
+
+**Wachstum: +281% in 7 Tagen. Funktionalitäts-Zuwachs: gegen null.**
+
+18 Wellen (Welle A, A.5, A.6, A.7, A.8, Phase 1-9, Welle 1-1.5-2, Welle B-G) wurden geliefert. Jede hatte einen plausiblen Grund. Das ist der Punkt. **Plausible Gründe sind nicht genug.** Der Kumulativeffekt war Instabilität.
+
+Was stattdessen richtig gewesen wäre: nach Welle 3 STOPP und Architektur-Frage. Nicht Welle 4.
+
+**Dieser Fehler DARF sich nicht wiederholen. Wenn du gerade an cv-parser.ts, cv-optimizer.ts oder einem ähnlichen Pipeline-Service arbeitest und einen "kleinen Fix" schreibst — lies diese Zeilen nochmal.**
+
+### ⚡ COMPLEXITY CHECKPOINT — Pflicht-Protokoll vor Komplexitäts-Erhöhung
+
+**Ein Complexity Checkpoint wird ausgelöst wenn EINER dieser Trigger zutrifft:**
+
+| Trigger | Schwelle |
+|---|---|
+| Datei-LOC-Wachstum | Edit fügt mehr als 20 Zeilen zu einem bestehenden Service-File hinzu |
+| Wiederholte Fixes | Datei hat in 7 Tagen bereits 2+ Bug-Fix-Commits bekommen |
+| Wellen-Nomenklatur | Fix-Name enthält "Welle", "Phase X" (X > 3), oder "Pflaster" |
+| LLM-Variance-Kompensation | Fix schreibt einen deterministischen Post-Processor um LLM-Output zu "korrigieren" |
+| Neue Pure-Function für Edge-Case | Neue Funktion in einem Service der schon > 400 Zeilen hat |
+
+**Bei ausgelöstem Checkpoint: SOFORT STOPP — kein Code schreiben, erst entscheiden.**
+
+Zeige dem User dieses Format, bevor du irgendetwas implementierst:
+
+```
+⚠️ COMPLEXITY CHECKPOINT
+
+Trigger: [welche Regel hat angeschlagen]
+Ich war im Begriff: [was ich tun wollte, 1 Satz]
+
+WAY A — Komplex (was ich ursprünglich plante):
+• Was: [kurze Beschreibung]
+• LOC-Delta: +X Zeilen in [Datei]
+• Vorteil: [konkreter Nutzen]
+• Risiko: [was schief gehen kann, inkl. zukünftige Pflaster-Wahrscheinlichkeit]
+• Aufwand: [Zeitschätzung]
+
+WAY B — Einfach (die schlankere Alternative):
+• Was: [kurze Beschreibung]
+• LOC-Delta: +X Zeilen (oder: keine Code-Änderung nötig)
+• Vorteil: [konkreter Nutzen]
+• Risiko: [was ggf. nicht abgedeckt wird]
+• Aufwand: [Zeitschätzung]
+
+Meine Empfehlung: Way B — weil Rule #0.
+
+Welchen Weg soll ich nehmen? (A / B / Alternativer Ansatz)
+```
+
+**Die Entscheidung gehört dem User, nicht dem Agent.** Der Agent liefert die Analyse. Der User wählt den Weg.
+
 ---
 
 ## ⚠️ PFLICHTLEKTÜRE VOR ANIMATIONEN

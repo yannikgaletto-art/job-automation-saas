@@ -2,7 +2,7 @@
 
 > **Lies mich ganz, bevor du Code schreibst.** ~10 Minuten. Dieser Guide ist der Einstiegspunkt für jeden neuen Claude-Agent in diesem Repo. Wenn du hier fertig bist, kennst du die Architektur, die Regeln, die Toolchain und die häufigsten Fehler anderer Agenten.
 
-**Stand:** 2026-04-24 · Phase 5.3 (Cover Letter Hardening deployed)
+**Stand:** 2026-04-28 · Single-CV Migration deployed + RESET PLAN aktiv (siehe directives/RESET_PLAN_2026-04-28.md)
 **Projekt-Owner:** Yannik Galetto · yannik.galetto@gmail.com
 
 ---
@@ -42,17 +42,19 @@ Model-IDs (niemals ändern ohne Freigabe):
 ```
 [10 min Pflicht]
 1. AGENT_ONBOARDING.md          ← du bist hier
-2. ARCHITECTURE.md (Root, V5.2+) ← Complete System Design (Tech Stack, Data Flow, Routes, DB)
-3. CLAUDE.md                     ← Developer Operating Manual (§RECENT FIXES zeigt Code-Stand)
-4. directives/FEATURE_COMPAT_MATRIX.md  ← Forbidden Files + Feature-Silos (Abschnitt 0)
+2. directives/LESSONS_LEARNED_2026-04-28.md  ← PFLICHT VOR ERSTEM CODE-EDIT (5 min)
+3. ARCHITECTURE.md (Root, V5.2+) ← Complete System Design (Tech Stack, Data Flow, Routes, DB)
+4. CLAUDE.md                     ← Developer Operating Manual (§RULE #0 + §RECENT FIXES)
+5. directives/FEATURE_COMPAT_MATRIX.md  ← Forbidden Files + Feature-Silos (Abschnitt 0)
 
 [Kontextspezifisch — nur für dein Feature]
-5a. Cover Letter → directives/QUALITY_CV_COVER_LETTER.md + lib/services/cover-letter-prompt-builder.ts
-5b. CV Pipeline → directives/cv_generation.md + Übergang/CV_PIPELINE_LEARNINGS.md
-5c. Security → docs/SICHERHEITSARCHITEKTUR.md (14 Contracts)
-5d. Design → docs/DESIGN_SYSTEM.md (Notion-Linear Hybrid, #FAFAF9, Inter)
-5e. Motion → docs/MOTION_PRINCIPLES.md (PFLICHT bei Framer Motion)
-5f. i18n → directives/i18n_protocol.md (de/en/es gleichzeitig, kein hardcoded Text)
+6a. Cover Letter → directives/QUALITY_CV_COVER_LETTER.md + lib/services/cover-letter-prompt-builder.ts
+6b. CV Pipeline → directives/cv_generation.md + Übergang/CV_PIPELINE_LEARNINGS.md
+6c. Security → docs/SICHERHEITSARCHITEKTUR.md (14 Contracts)
+6d. Design → docs/DESIGN_SYSTEM.md (Notion-Linear Hybrid, #FAFAF9, Inter)
+6e. Motion → docs/MOTION_PRINCIPLES.md (PFLICHT bei Framer Motion)
+6f. i18n → directives/i18n_protocol.md (de/en/es gleichzeitig, kein hardcoded Text)
+6g. Reset (wenn du der Reset-Agent bist) → directives/RESET_PLAN_2026-04-28.md + directives/AGENT_PROMPT_RESET_2026-04-28.md
 
 [Historisch — NICHT als Vorlage nutzen]
 - directives/AGENT_*.md  ← Phase-1-MVP-Docs aus Feb 2026, überholt
@@ -238,6 +240,56 @@ User gibt Task
 | `kill-fluff` oder `multi-agent-pipeline` aufgerufen | Archiviert, 0 Caller. Nicht reanimieren ohne Grund. |
 | Prompt-Änderung ohne Dev-Server-Restart | `rm -rf .next && npm run dev` — sonst läuft alter Code |
 | Neue Migration ohne `database/schema.sql` Update | Doku-Drift, siehe CLAUDE.md DOCUMENTATION SYNC |
+| **cv-parser.ts 18× gepflastert in 7 Tagen: 419 → 1596 Zeilen (+281%). Output wurde schlechter, nicht besser.** | **CLAUDE.md NEGATIV-BEISPIEL lesen. 3-Pflaster-Regel, LOC-Wachstums-Regel. Nach 3 Fixes an derselben Datei: STOPP, Architektur-Frage an User.** |
+
+### 🔴 Das konkrete Negativ-Beispiel — damit "Reduce Complexity" nicht abstrakt bleibt
+
+In der Woche vom 21.04.2026 bis 28.04.2026 hat ein Agent die CV-Pipeline in 7 Tagen 18 Mal gepatcht:
+
+```
+cv-parser.ts — 21.04.2026: 419 Zeilen (Antigravity-Stand, stabil, "1000x perfekt")
+cv-parser.ts — 28.04.2026: 1596 Zeilen (+281%)
+
+18 Wellen in 7 Tagen:
+Welle A, A.5, A.6, A.7, A.8 — Languages, Skills, Certs
+Phase 1, 2, 3, 3.1 — Anti-Halluzination, Identity-Lock
+Phase 4 — Mischmasch-Fix
+Phase 5, 5.8 — Fuzzy-Role, PII-Fallback
+Phase 6 — Cert-Roundtrip
+Phase 7 — Summary-Drop-Bug
+Phase 8 — Name-Stop-Liste, Entity-Add-Guard
+Phase 9 — 1-Page-Mode, master_action toast, fail-safe lookup
+Welle 1, 1.5, 2 — Optimizer-Length-Cap, Module-Grades-Strip, Toast
+Welle B — Snapshot-Pin
+Welle C — Re-Parse-Button mit force-Flag
+Welle D, F — Bullet-Validator
+Welle E — PageMode-Toggle 2-3 Seiten
+Welle G — Sync-Extraction-Failure-Diagnose
+```
+
+**Jede Welle hatte einen plausiblen Grund. Das ist der Punkt. Plausible Gründe sind nicht genug.**
+
+Was wäre richtig gewesen: Nach Welle 3 STOPP, Architektur-Frage stellen. Nicht Welle 4 schreiben.
+
+**Wenn du gerade das sechste Post-Processing-Objekt für LLM-Variance schreibst:** Das bist du auf dem Weg dorthin. Lies CLAUDE.md Rule #0. Frag den User: "Soll ich Fix #N schreiben, oder wollen wir die Architektur anschauen?"
+
+---
+
+## 9b · Complexity Checkpoint — wie du ihn anwendest
+
+Der Complexity Checkpoint aus CLAUDE.md Rule #0 ist kein Optional. Du MUSST ihn auslösen wenn einer dieser Trigger zutrifft:
+
+- Du willst mehr als 20 Zeilen zu einem bestehenden Service-File hinzufügen
+- Die Datei hat in 7 Tagen bereits 2+ Bug-Fix-Commits bekommen
+- Dein Fix-Name enthält "Welle", "Phase X" (X > 3), oder "Pflaster"
+- Du schreibst einen deterministischen Post-Processor um LLM-Output zu kompensieren
+- Du willst eine neue Funktion in einem Service hinzufügen der schon > 400 Zeilen hat
+
+**Bei Trigger: Zeige dem User das Checkpoint-Format aus CLAUDE.md bevor du Code schreibst.**
+
+Kurz: Weg A (was du geplant hattest) vs Weg B (einfachere Alternative) mit je Vorteil + Risiko + LOC-Delta. Warte auf Entscheidung des Users. Kein Code ohne Freigabe.
+
+**Das Wichtigste:** Der Agent liefert die Analyse. Der User trifft die Entscheidung. Nicht umgekehrt.
 
 ---
 
