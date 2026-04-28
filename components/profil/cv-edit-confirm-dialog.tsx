@@ -41,6 +41,27 @@ function newId(prefix: string) {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// Convert bullet array → newline-separated text for textarea editing.
+function bulletsToText(bullets: Array<{ id: string; text: string }> | undefined): string {
+    return (bullets ?? []).map((b) => b.text).join("\n");
+}
+
+// Convert textarea content → bullet array. Preserves existing IDs by index
+// where possible so React keys stay stable while typing.
+function textToBullets(
+    text: string,
+    existing: Array<{ id: string; text: string }> | undefined,
+): Array<{ id: string; text: string }> {
+    const lines = text.split("\n");
+    const prev = existing ?? [];
+    return lines
+        .map((line, i) => ({
+            id: prev[i]?.id ?? newId("bullet"),
+            text: line.trim(),
+        }))
+        .filter((b) => b.text.length > 0);
+}
+
 function emptyExperience(): Experience {
     return { id: newId("exp"), company: "", role: "", dateRangeText: "", description: [] };
 }
@@ -334,6 +355,17 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
+                                        <div className="space-y-1">
+                                            <span className={labelCls}>{t("field_bullets")}</span>
+                                            <textarea
+                                                className={`${inputCls} min-h-[80px] resize-y leading-relaxed font-mono text-[12.5px]`}
+                                                value={bulletsToText(exp.description)}
+                                                onChange={(e) => updateExperience(idx, { description: textToBullets(e.target.value, exp.description) })}
+                                                placeholder={t("placeholder_bullets")}
+                                                rows={Math.max(3, (exp.description?.length ?? 0) + 1)}
+                                            />
+                                            <p className="text-[10.5px] text-[#A8A29E] italic">{t("hint_bullets")}</p>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
@@ -375,12 +407,18 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                                                 placeholder={t("placeholder_institution")}
                                             />
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center">
                                             <input
                                                 className={inputCls}
                                                 value={edu.dateRangeText ?? ""}
                                                 onChange={(e) => updateEducation(idx, { dateRangeText: e.target.value })}
                                                 placeholder={t("placeholder_dates")}
+                                            />
+                                            <input
+                                                className={`${inputCls} sm:w-32`}
+                                                value={edu.grade ?? ""}
+                                                onChange={(e) => updateEducation(idx, { grade: e.target.value })}
+                                                placeholder={t("placeholder_grade")}
                                             />
                                             <button
                                                 onClick={() => removeEducation(idx)}
@@ -390,6 +428,13 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
+                                        <textarea
+                                            className={`${inputCls} min-h-[60px] resize-y leading-relaxed text-[12.5px]`}
+                                            value={edu.description ?? ""}
+                                            onChange={(e) => updateEducation(idx, { description: e.target.value })}
+                                            placeholder={t("placeholder_edu_description")}
+                                            rows={2}
+                                        />
                                     </li>
                                 ))}
                             </ul>
@@ -516,6 +561,13 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 </div>
+                                                <textarea
+                                                    className={`${inputCls} min-h-[50px] resize-y leading-relaxed text-[12.5px]`}
+                                                    value={c.description ?? ""}
+                                                    onChange={(e) => updateCert(idx, { description: e.target.value })}
+                                                    placeholder={t("placeholder_cert_description")}
+                                                    rows={2}
+                                                />
                                             </li>
                                         ))}
                                     </ul>

@@ -52,11 +52,19 @@ interface CertEntry {
 
 function CertItem({ cert }: { cert: CertEntry }) {
     const meta = [cert.issuer, cert.dateText].filter(Boolean).join(' · ');
+    // Cap at 2 to avoid layout overflow — matches AI prompt rule.
+    const descLines = (cert.description ?? '')
+        .split('\n')
+        .map(l => l.trim())
+        .filter(Boolean)
+        .slice(0, 2);
     return (
         <View style={s.item}>
             <Text style={s.name}>{truncate(cert.name || '', 80)}</Text>
             {meta ? <Text style={s.detail}>{meta}</Text> : null}
-            {cert.description ? <Text style={s.detail}>{cert.description}</Text> : null}
+            {descLines.map((line, i) => (
+                <Text key={i} style={s.detail}>{`• ${line}`}</Text>
+            ))}
             {cert.credentialUrl && (
                 <Link src={cert.credentialUrl} style={s.link}>
                     Verify →

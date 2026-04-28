@@ -29,7 +29,7 @@ Schema:
   "education":  [{ "id": "edu-1", "institution": "...", "degree": "...", "dateRangeText": "...", "description": "...", "grade": "..." }],
   "skills":     [{ "id": "skill-1", "category": "...", "items": ["..."] }],
   "languages":  [{ "id": "lang-1", "language": "...", "proficiency": "..." }],
-  "certifications": [{ "id": "cert-1", "name": "...", "issuer": "...", "dateText": "..." }]
+  "certifications": [{ "id": "cert-1", "name": "...", "issuer": "...", "dateText": "...", "description": "..." }]
 }
 
 Regeln:
@@ -41,6 +41,7 @@ Regeln:
 - Section-Header (z.B. "Zertifikate", "Sprachen", "Berufserfahrung") sind KEINE Einträge.
 - Pipe-Separator " I " oder " | ": linke Seite = Firma/Sprache, rechte = Rolle/Niveau.
 - Bullets gehören zu der Station ÜBER ihnen — niemals zur folgenden.
+- certifications[].description: wenn unter dem Zertifikatsnamen 1-2 Stichpunkte / Module / Inhalte stehen, übernimm sie als description (Plain-String, mehrere Punkte mit "\n" getrennt). Wenn nichts steht: null.
 
 OUTPUT: NUR das JSON-Objekt, kein Markdown, kein Kommentar.`;
 

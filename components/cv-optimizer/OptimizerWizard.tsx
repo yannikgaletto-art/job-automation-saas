@@ -525,7 +525,9 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     }
 
     const TEMPLATES = [
-        { id: 'valley', label: 'Valley', icon: <Layout className="w-4 h-4" /> },
+        // 'ATS' is the user-facing label; internal id stays 'valley' to keep
+        // download/persistence/switch-cases backward-compatible with stored prefs.
+        { id: 'valley', label: 'ATS', icon: <Layout className="w-4 h-4" /> },
         { id: 'tech', label: 'Tech', icon: <Settings className="w-4 h-4" /> },
     ];
 

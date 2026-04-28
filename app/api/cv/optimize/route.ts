@@ -279,6 +279,17 @@ QUALITY GATE (MANDATORY):
 - Pure shortening without adding substance is NOT a valid change. If the only improvement is fewer words, do NOT propose that change.
 - Removing concrete details (project names, technologies, metrics) to save words is FORBIDDEN.
 
+BULLET STYLE CONSISTENCY (MANDATORY for ALL experience description bullets):
+- EVERY experience bullet MUST follow the format: "<Label>: <Description sentence>"
+- Label = 2–4 words, Title-Case, naming the competency / theme of the bullet (e.g. "Workshop-Facilitation", "Stakeholder-Alignment", "Operations & Leadership", "End-to-End Verantwortung")
+- Colon after label, then a single concise sentence with the actual achievement.
+- The colon MUST appear within the first 40 characters — the renderer auto-bolds the label up to the colon, so a longer prefix breaks the bold.
+- If an existing bullet has no label → propose a "modify" change that prepends a fitting label.
+- If you "add" a new bullet → it MUST already follow this format.
+- Education and certification descriptions are FREE-FORM (no label rule); this rule applies to experience bullets only.
+- Counter-example (FORBIDDEN): "Digitale Geschäftsmodelle im B2B-Umfeld entwickelt; Kundenanforderungen in IT-Lösungen übersetzt."
+- Correct example: "Geschäftsmodell-Entwicklung: Digitale B2B-Modelle entworfen und Kundenanforderungen in IT-Lösungen übersetzt."
+
 AUTHENTIC KEYWORD WEAVING:
 - For each MISSING ATS KEYWORD listed in input section 5:
   1. Search the CV for REAL experience that relates to this keyword
