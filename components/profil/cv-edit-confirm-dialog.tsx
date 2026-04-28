@@ -424,6 +424,16 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                                         {t("add_language")}
                                     </button>
                                 </div>
+                                {/* Datalist for language autocomplete — browser shows suggestions but allows free text */}
+                                <datalist id="cv-dialog-language-list">
+                                    {["Deutsch","Englisch","Spanisch","Französisch","Italienisch","Portugiesisch",
+                                      "Russisch","Polnisch","Türkisch","Arabisch","Chinesisch","Japanisch",
+                                      "Niederländisch","Schwedisch","Dänisch","Norwegisch","Finnisch","Griechisch",
+                                      "German","English","Spanish","French","Italian","Portuguese","Russian",
+                                      "Polish","Turkish","Arabic","Chinese","Japanese","Dutch","Swedish"].map(l => (
+                                        <option key={l} value={l} />
+                                    ))}
+                                </datalist>
                                 {data.languages.length === 0 ? (
                                     <p className="text-xs text-[#A8A29E] italic">{t("empty_languages")}</p>
                                 ) : (
@@ -432,6 +442,7 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                                             <li key={lang.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-center">
                                                 <input
                                                     className={inputCls}
+                                                    list="cv-dialog-language-list"
                                                     value={lang.language ?? ""}
                                                     onChange={(e) => updateLanguage(idx, { language: e.target.value })}
                                                     placeholder={t("placeholder_language")}

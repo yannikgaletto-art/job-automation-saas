@@ -273,7 +273,13 @@ function extractTextFromResult(result: AzureAnalyzeResult): string {
             if (block.isHeading) {
                 textParts.push(`\n## ${block.text}\n`);
             } else {
-                textParts.push(block.text);
+                // Detect aggregated date-column blocks: these occur when a designer CV's
+                // left date-column is returned as one paragraph by Azure (all start/end dates
+                // for every station concatenated in a single text node).
+                // We split them into individual date-pair lines so the CV parser can
+                // match them to the station content that follows in text order.
+                const splitText = splitAggregatedDateColumn(block.text);
+                textParts.push(splitText ?? block.text);
             }
         }
 
@@ -288,6 +294,44 @@ function extractTextFromResult(result: AzureAnalyzeResult): string {
         .map((line: AzureLine) => line.content?.trim())
         .filter(Boolean)
         .join('\n');
+}
+
+/**
+ * Detects blocks that contain ONLY date tokens (MM.YYYY / YYYY / "Heute" / "heute")
+ * with whitespace between them — characteristic of designer CVs where Azure returns
+ * the entire date column (all start+end dates for all stations) as one paragraph.
+ *
+ * When detected, splits into one date-pair per line so the downstream CV parser can
+ * match pairs to stations by sequential order.
+ *
+ * Returns the reformatted string, or null if the block is NOT an aggregated date block.
+ */
+function splitAggregatedDateColumn(text: string): string | null {
+    // Extract all date tokens: MM.YYYY, YYYY (4-digit years 1950-2099), or "Heute"/"heute"
+    const DATE_TOKEN = /\b(\d{2}\.\d{4}|\b(?:19|20)\d{2}\b|[Hh]eute|[Pp]resent|[Aa]ctual)\b/g;
+    const matches = [...text.matchAll(DATE_TOKEN)];
+    if (matches.length < 4) return null; // Need at least 2 pairs
+
+    // After removing date tokens and separators, very little should remain
+    const residual = text
+        .replace(DATE_TOKEN, '')
+        .replace(/[\s\-–/,]+/g, '')
+        .trim();
+
+    // If there's significant non-date content, this is a normal mixed paragraph
+    if (residual.length > 15) return null;
+
+    // Group consecutive tokens into pairs (start – end) and put each pair on its own line
+    const tokens = matches.map(m => m[0]);
+    const lines: string[] = [];
+    for (let i = 0; i < tokens.length; i += 2) {
+        if (i + 1 < tokens.length) {
+            lines.push(`${tokens[i]} - ${tokens[i + 1]}`);
+        } else {
+            lines.push(tokens[i]);
+        }
+    }
+    return lines.join('\n');
 }
 
 function sleep(ms: number): Promise<void> {

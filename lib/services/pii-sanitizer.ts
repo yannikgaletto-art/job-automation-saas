@@ -131,6 +131,18 @@ const FIRST_WORD_STOPLIST = new Set([
     // Prevents "Deutsche Rentenversicherung", "Deutsche Bank", etc. from matching as names
     'Deutsche', 'DEUTSCHE', 'Deutschen', 'DEUTSCHEN',
     'Bundesagentur', 'BUNDESAGENTUR', 'Bundesministerium', 'BUNDESMINISTERIUM',
+    // Major German / Austrian / Swiss cities — prevent "Berlin Familienstatus" type false matches
+    // A city followed by a common noun (Familienstatus, Borsigstraße, etc.) looks like two
+    // TitleCase words and would be picked as the name if it appears before the real name.
+    'Berlin', 'München', 'Hamburg', 'Köln', 'Frankfurt', 'Stuttgart', 'Düsseldorf',
+    'Dortmund', 'Essen', 'Leipzig', 'Bremen', 'Dresden', 'Hannover', 'Nürnberg',
+    'Duisburg', 'Bochum', 'Wuppertal', 'Bielefeld', 'Bonn', 'Münster', 'Karlsruhe',
+    'Mannheim', 'Augsburg', 'Wiesbaden', 'Gelsenkirchen', 'Braunschweig', 'Kiel',
+    'Chemnitz', 'Halle', 'Magdeburg', 'Freiburg', 'Krefeld', 'Lübeck', 'Erfurt',
+    'Rostock', 'Mainz', 'Kassel', 'Saarbrücken', 'Potsdam', 'Oldenburg', 'Heidelberg',
+    'Darmstadt', 'Regensburg', 'Würzburg', 'Ulm', 'Heilbronn', 'Göttingen', 'Wolfsburg',
+    'Wien', 'Graz', 'Linz', 'Salzburg', 'Innsbruck',
+    'Zürich', 'Bern', 'Basel', 'Genf', 'Lausanne',
 ]);
 
 /**

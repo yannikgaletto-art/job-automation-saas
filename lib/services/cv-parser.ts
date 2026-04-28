@@ -9,8 +9,9 @@ import { sanitizeForAI } from './pii-sanitizer';
  *
  * User-Edit-First (2026-04-28): The parser is intentionally minimal — Claude
  * Haiku produces a draft structure and a Zod safeParse falls back to the raw
- * JSON if individual entries fail validation. NO post-processors anymore;
- * the user reviews and corrects the result via CvEditConfirmDialog.
+ * JSON if individual entries fail validation. Post-processors are limited to
+ * deterministic noise-filters (section headers, proficiency tokens) that an
+ * LLM reliably mis-classifies regardless of prompt quality.
  */
 export const cvStructuredDataSchema = z.object({
   version: z.string(),
@@ -64,25 +65,66 @@ export const cvStructuredDataSchema = z.object({
   })).nullish(),
 });
 
+// ─── Deterministic noise filters ─────────────────────────────────────────────
+// These are small Sets that catch systematic LLM mis-classifications regardless
+// of how well the prompt is written.
+
+// Language proficiency tokens that the LLM sometimes puts in `language` instead
+// of `proficiency`. Also catches section headers.
+const LANG_NOISE = new Set([
+  'sprachen', 'languages', 'idiomas', 'sprachkenntnisse', 'language skills',
+  'niveau', 'level', 'niveaus', 'levels',
+  'muttersprache', 'muttersprachler', 'muttersprachlich', 'native',
+  'fremdsprachen', 'weitere sprachen',
+  // Proficiency-level tokens used as language names
+  'a1', 'a2', 'b1', 'b2', 'c1', 'c2',
+  'grundkenntnisse', 'gute kenntnisse', 'sehr gute kenntnisse', 'verhandlungssicher', 'fließend',
+]);
+
+// Section-header tokens the LLM sometimes uses as a certification name.
+const CERT_NOISE = new Set([
+  'zertifikate', 'certificates', 'certifications', 'zertifizierungen',
+  'weiterbildung', 'weiterbildungen', 'kurse', 'kurs', 'zertifizierung',
+  'aus- und weiterbildung', 'further education',
+]);
+
 export async function parseCvTextToJson(text: string): Promise<CvStructuredData> {
   const { sanitized, restoreJson, warningFlags } = sanitizeForAI(text);
   console.log(`🛡️ [cv-parser] PII sanitized before AI call. Found: [${warningFlags.join(', ')}]`);
 
   const prompt = `Du bist ein präziser Daten-Extraktor für Lebensläufe. Übersetze den folgenden CV-Text in eine strikt strukturierte JSON-Repräsentation.
 
-WICHTIG: Der Text kommt von einem OCR-System. Bei zweispaltigen CVs können Datumsangaben und Firmen DURCHEINANDER stehen. Lies den Text vollständig und ordne SEMANTISCH zu — welche Firma gehört zu welchem Datum? Nutze inhaltliche Hinweise (Seniorität, Branche, Technologien).
+WICHTIG — OCR-BESONDERHEITEN: Der Text kommt von Azure Document Intelligence.
 
-REGELN:
-1. Erfinde keine Fakten. Wenn ein Feld nicht im Text steht, lass es null/leer.
-2. Übernimm die Informationen wörtlich — keine Umformulierung.
-3. Generiere für jedes Listen-Element eine eindeutige id (z.B. "exp-1", "edu-2", "skill-3").
-4. Generiere für jeden Bullet in experience[].description eine eindeutige id (z.B. "bullet-1-1").
-5. Setze "version" auf "2.0".
-6. Sortiere experience-Einträge absteigend nach Datum (neueste zuerst).
-7. Pipe-Separator " I ": "Firma I Rolle" → company + role getrennt extrahieren.
-8. Datumsspannen können auf zwei Zeilen stehen ("09.2025\\nHeute") — kombiniere zu "09.2025 - Heute".
-9. role-Feld enthält NIE Datumsangaben. "Heute", "Present", "seit 2023" gehören in dateRangeText.
-10. Zertifikate, Kurse, Lizenzen → certifications. NIEMALS in skills.
+REGEL 1 — AGGREGIERTE DATUMSSPALTE (häufig bei zweispaltigen CVs):
+Wenn mehrere Datumsangaben HINTEREINANDER am Anfang des Erfahrungsabschnitts stehen (z.B. "11.2023  09.2025 07.2022  08.2024 01.2023  03.2023"), sind das Start/End-Datum-PAARE für die Stationen, die danach im Text in DERSELBEN REIHENFOLGE erscheinen.
+→ 1. Paar = 1. Station, 2. Paar = 2. Station usw.
+→ Datumsangaben die ALLEINE ohne Firmenname/Rolle dastehen gehören IMMER in dateRangeText — NIEMALS als Firma oder Rolle.
+
+REGEL 2 — ROLLE ≠ BULLET-INHALT:
+Die Zeile nach "Firma I" enthält die Rolle. Zeilen die mit "Substantiv:" oder "Stichwort:" beginnen (z.B. "KI-Consulting: ...", "Beratung: ...") sind BULLET-PUNKTE in description[].text — NIEMALS die Rolle.
+
+REGEL 3 — PIPE-SEPARATOR " I " ODER " | ":
+"Firma I Rolle" oder "Firma | Rolle" → company und role getrennt extrahieren.
+Beispiel: "Fraunhofer I Innovation Management Consultant" → company: "Fraunhofer", role: "Innovation Management Consultant"
+
+REGEL 4 — SPRACHEN:
+Sprach-Einträge haben immer Name + Niveau. Format im OCR: "Deutsch I Muttersprache", "Englisch I C1 Niveau", "Spanisch I | B2 Niveau".
+→ language = Sprachname (z.B. "Deutsch"), proficiency = Niveau-Text (z.B. "Muttersprache", "C1")
+→ NIEMALS das Niveau-Token (C1, B2, Muttersprache) als Sprachname verwenden.
+
+REGEL 5 — ZERTIFIKATE:
+Zertifikate, Kurse, Lizenzen → certifications. NIEMALS in skills. Die Section-Header selbst ("Zertifikate", "Weiterbildungen") sind KEIN Zertifikatsname.
+
+WEITERE REGELN:
+6. Erfinde keine Fakten. Wenn ein Feld nicht im Text steht, lass es null/leer.
+7. Übernimm Informationen wörtlich — keine Umformulierung.
+8. Generiere für jedes Listen-Element eine eindeutige id (z.B. "exp-1", "edu-2", "skill-3").
+9. Generiere für jeden Bullet in experience[].description eine eindeutige id (z.B. "bullet-1-1").
+10. Setze "version" auf "2.0".
+11. Sortiere experience-Einträge absteigend nach Datum (neueste zuerst).
+12. Datumsspannen auf zwei Zeilen ("09.2025\\nHeute") → kombiniere zu "09.2025 - Heute".
+13. role enthält NIE Datumsangaben. "Heute", "Present", "seit 2023" gehören in dateRangeText.
 
 OUTPUT: NUR valides JSON, kein Markdown, keine Kommentare. Format:
 
@@ -117,6 +159,26 @@ ${sanitized}`;
   const restoredJsonString = restoreJson(jsonMatch[0]);
   const rawJson = JSON.parse(restoredJsonString);
   console.log(`🔐 [cv-parser] PII restored. Name: ${rawJson.personalInfo?.name ? '✅' : '⚠️ null'}`);
+
+  // ─── Deterministic post-processing ───────────────────────────────────────
+  // Applied before Zod validation so the schema sees clean data.
+
+  // Language noise filter: remove entries where `language` is a proficiency
+  // token or a section header (LLM systematically confuses these).
+  if (Array.isArray(rawJson.languages)) {
+    rawJson.languages = rawJson.languages.filter((l: { language?: string }) => {
+      const name = (l.language ?? '').trim().toLowerCase();
+      return name.length > 0 && !LANG_NOISE.has(name);
+    });
+  }
+
+  // Certification noise filter: remove entries whose name is a section header.
+  if (Array.isArray(rawJson.certifications)) {
+    rawJson.certifications = rawJson.certifications.filter((c: { name?: string }) => {
+      const name = (c.name ?? '').trim().toLowerCase();
+      return name.length > 0 && !CERT_NOISE.has(name);
+    });
+  }
 
   const parseResult = cvStructuredDataSchema.safeParse(rawJson);
   if (parseResult.success) {
