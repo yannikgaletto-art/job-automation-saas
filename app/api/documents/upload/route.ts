@@ -263,41 +263,55 @@ export async function POST(req: NextRequest) {
                     // returned in the response so the UI can show it for the
                     // user to confirm/correct, then /api/documents/confirm-parse
                     // performs the save.
-                    if (processedCv.extractedText) {
-                        try {
-                            console.log(`[${requestId}] route=documents/upload step=parse_cv_json...`);
-                            const { parseCvTextToJson } = await import('@/lib/services/cv-parser');
-                            const structuredCv = await parseCvTextToJson(processedCv.extractedText);
+                    try {
+                        console.log(`[${requestId}] route=documents/upload step=parse_cv_pdf...`);
+                        const { parseCvFromPdf } = await import('@/lib/services/cv-pdf-parser');
+                        const structuredCv = await parseCvFromPdf(cvBuffer);
 
-                            // PII integrity guard: Phase-1 dedicated PII extraction is
-                            // more reliable than cv-parser's general-purpose pass (which
-                            // can be misled by OCR headers like company logos).
-                            if (processedCv.encryptedPii) {
-                                const { decrypt } = await import('@/lib/utils/encryption');
-                                if (!structuredCv.personalInfo) structuredCv.personalInfo = {} as any;
-                                if (processedCv.encryptedPii.name) {
-                                    try {
-                                        structuredCv.personalInfo.name = decrypt(processedCv.encryptedPii.name as string);
-                                    } catch { /* decrypt failed — leave as-is */ }
-                                }
-                                if (!structuredCv.personalInfo.email && processedCv.encryptedPii.email) {
-                                    try {
-                                        structuredCv.personalInfo.email = decrypt(processedCv.encryptedPii.email as string);
-                                    } catch { /* decrypt failed */ }
-                                }
-                                if (!structuredCv.personalInfo.phone && processedCv.encryptedPii.phone) {
-                                    try {
-                                        structuredCv.personalInfo.phone = decrypt(processedCv.encryptedPii.phone as string);
-                                    } catch { /* decrypt failed */ }
-                                }
+                        // PII integrity guard: Phase-1 dedicated PII extraction is
+                        // more reliable than the parser's general-purpose pass (which
+                        // can be misled by OCR headers like company logos).
+                        if (processedCv.encryptedPii) {
+                            const { decrypt } = await import('@/lib/utils/encryption');
+                            if (!structuredCv.personalInfo) structuredCv.personalInfo = {} as any;
+                            if (processedCv.encryptedPii.name) {
+                                try {
+                                    structuredCv.personalInfo.name = decrypt(processedCv.encryptedPii.name as string);
+                                } catch { /* decrypt failed — leave as-is */ }
                             }
-
-                            cvParsedStructure = structuredCv;
-                            console.log(`[${requestId}] route=documents/upload step=parse_cv_json success`);
-                        } catch (parseError: unknown) {
-                            const msg = parseError instanceof Error ? parseError.message : String(parseError);
-                            console.error(`[${requestId}] route=documents/upload step=parse_cv_json error=${msg}`);
+                            if (!structuredCv.personalInfo.email && processedCv.encryptedPii.email) {
+                                try {
+                                    structuredCv.personalInfo.email = decrypt(processedCv.encryptedPii.email as string);
+                                } catch { /* decrypt failed */ }
+                            }
+                            if (!structuredCv.personalInfo.phone && processedCv.encryptedPii.phone) {
+                                try {
+                                    structuredCv.personalInfo.phone = decrypt(processedCv.encryptedPii.phone as string);
+                                } catch { /* decrypt failed */ }
+                            }
                         }
+
+                        cvParsedStructure = structuredCv;
+
+                        // Cache the parsed JSON in metadata so the inngest cv-match-pipeline
+                        // can consume it without re-running the parser. Legacy docs without
+                        // this key fall back to parseCvTextToJson(extracted_text).
+                        await supabaseAdmin
+                            .from('documents')
+                            .update({
+                                metadata: {
+                                    ...processedCv.metadata,
+                                    extracted_text: processedCv.extractedText,
+                                    original_name: cvFile.name,
+                                    cv_parsed_v2: structuredCv,
+                                },
+                            })
+                            .eq('id', cvDoc.id);
+
+                        console.log(`[${requestId}] route=documents/upload step=parse_cv_pdf success`);
+                    } catch (parseError: unknown) {
+                        const msg = parseError instanceof Error ? parseError.message : String(parseError);
+                        console.error(`[${requestId}] route=documents/upload step=parse_cv_pdf error=${msg}`);
                     }
                 }
 

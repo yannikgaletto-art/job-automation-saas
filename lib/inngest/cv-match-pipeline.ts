@@ -348,15 +348,21 @@ export const analyzeCVMatch = inngest.createFunction(
                         return;
                     }
 
-                    // Re-parse the document's extracted text to get structured data
-                    const extractedText = (doc.metadata as Record<string, unknown>)?.extracted_text as string;
-                    if (!extractedText || extractedText.trim().length < 50) {
-                        console.warn(`[cv-match-pipeline] ⚠️ Document ${cvDocumentId} has no extracted text, skipping profile sync`);
-                        return;
-                    }
+                    // Prefer the cached JSON from upload (cv_parsed_v2). Falls back
+                    // to legacy parseCvTextToJson on extracted_text for older docs
+                    // that pre-date the Mistral PDF-direct pipeline.
+                    const metadataObj = (doc.metadata as Record<string, unknown>) ?? {};
+                    let structuredCv = metadataObj.cv_parsed_v2 as import('@/types/cv').CvStructuredData | undefined;
 
-                    const { parseCvTextToJson } = await import('@/lib/services/cv-parser');
-                    const structuredCv = await parseCvTextToJson(extractedText);
+                    if (!structuredCv) {
+                        const extractedText = metadataObj.extracted_text as string;
+                        if (!extractedText || extractedText.trim().length < 50) {
+                            console.warn(`[cv-match-pipeline] ⚠️ Document ${cvDocumentId} has no parsed JSON or extracted text, skipping profile sync`);
+                            return;
+                        }
+                        const { parseCvTextToJson } = await import('@/lib/services/cv-parser');
+                        structuredCv = await parseCvTextToJson(extractedText);
+                    }
 
                     // Tier 1 name override: user_profiles.full_name is the confirmed name
                     // (set by upload/route.ts integrity guard on every CV upload).

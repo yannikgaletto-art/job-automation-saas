@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { parseCvTextToJson } from '@/lib/services/cv-parser';
+import { parseCvFromPdf } from '@/lib/services/cv-pdf-parser';
 import type { CvStructuredData } from '@/types/cv';
 
 /**
@@ -66,16 +66,26 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const metadata = (doc.metadata as Record<string, unknown>) || {};
-        const extractedText = metadata.extracted_text as string | undefined;
-        if (!extractedText) {
+        const filePath = doc.file_url_encrypted as string | undefined;
+        if (!filePath) {
             return NextResponse.json(
-                { success: false, error: 'Document has no extracted text — please re-upload the CV.' },
+                { success: false, error: 'Document has no storage path — please re-upload the CV.' },
                 { status: 422 },
             );
         }
 
-        const structured: CvStructuredData = await parseCvTextToJson(extractedText);
+        const { data: pdfBlob, error: dlErr } = await supabaseAdmin.storage
+            .from('cvs')
+            .download(filePath);
+        if (dlErr || !pdfBlob) {
+            return NextResponse.json(
+                { success: false, error: `Failed to download CV from storage: ${dlErr?.message ?? 'unknown'}` },
+                { status: 500 },
+            );
+        }
+        const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer());
+
+        const structured: CvStructuredData = await parseCvFromPdf(pdfBuffer);
 
         // PII integrity guard — same logic as upload route. Phase-1 PII
         // extraction is more reliable than the parser's general pass.
