@@ -137,10 +137,17 @@ export async function POST(req: NextRequest) {
 
         // ================================================================
         // CV Upload + Processing (only when a CV file is provided)
+        //
+        // USER-EDIT-FIRST (2026-04-28): The route uploads the file, runs
+        // Azure OCR + Claude parse, and RETURNS the parsed JSON in the
+        // response. It does NOT write user_profiles.cv_structured_data
+        // here anymore — that write happens in /api/documents/confirm-parse
+        // after the user has reviewed/edited the extracted fields.
         // ================================================================
         let processedCv: { encryptedPii: Record<string, unknown>; metadata: Record<string, unknown>; extractedText: string } | null = null;
         let cvDocId: string | null = null;
         let cvUploadPath: string | null = null;
+        let cvParsedStructure: import('@/types/cv').CvStructuredData | null = null;
 
         if (cvFile) {
             // Single-CV invariant: 409 if the user already has a CV. The DB has a
@@ -250,59 +257,43 @@ export async function POST(req: NextRequest) {
                     cvDocId = cvDoc.id;
                     console.log(`[${requestId}] route=documents/upload step=db_insert_cv success`);
 
-                    // 1.5 Parse the unstructured text to strict JSON SSoT immediately
+                    // 1.5 Parse the unstructured text to strict JSON for the
+                    // confirm dialog. NOTE: We do NOT write to user_profiles
+                    // here anymore (User-Edit-First). The parsed JSON is
+                    // returned in the response so the UI can show it for the
+                    // user to confirm/correct, then /api/documents/confirm-parse
+                    // performs the save.
                     if (processedCv.extractedText) {
                         try {
                             console.log(`[${requestId}] route=documents/upload step=parse_cv_json...`);
                             const { parseCvTextToJson } = await import('@/lib/services/cv-parser');
                             const structuredCv = await parseCvTextToJson(processedCv.extractedText);
 
-                            // ═══ INTEGRITY GUARD — Restore PII from Phase 1 encryption ═══
-                            // document-processor runs a dedicated Haiku PII-extraction call
-                            // on the raw CV text -> encryptedPii.name is more reliable than
-                            // cv-parser's general-purpose extraction (which can be misled by
-                            // OCR headers like "Deutsche Rentenversicherung").
-                            // Name is ALWAYS overridden; email/phone only when null.
-                            let resolvedName: string | null = null;
+                            // PII integrity guard: Phase-1 dedicated PII extraction is
+                            // more reliable than cv-parser's general-purpose pass (which
+                            // can be misled by OCR headers like company logos).
                             if (processedCv.encryptedPii) {
                                 const { decrypt } = await import('@/lib/utils/encryption');
                                 if (!structuredCv.personalInfo) structuredCv.personalInfo = {} as any;
                                 if (processedCv.encryptedPii.name) {
                                     try {
-                                        resolvedName = decrypt(processedCv.encryptedPii.name as string);
-                                        structuredCv.personalInfo.name = resolvedName;
-                                        console.log(`[integrity-guard] Name override from Phase 1 PII -> "${resolvedName}"`);
-
+                                        structuredCv.personalInfo.name = decrypt(processedCv.encryptedPii.name as string);
                                     } catch { /* decrypt failed — leave as-is */ }
                                 }
                                 if (!structuredCv.personalInfo.email && processedCv.encryptedPii.email) {
                                     try {
                                         structuredCv.personalInfo.email = decrypt(processedCv.encryptedPii.email as string);
-                                        console.log(`🔧 [integrity-guard] Restored email from Phase 1 encrypted PII`);
-                                    } catch { /* decrypt failed — leave as-is */ }
+                                    } catch { /* decrypt failed */ }
                                 }
                                 if (!structuredCv.personalInfo.phone && processedCv.encryptedPii.phone) {
                                     try {
                                         structuredCv.personalInfo.phone = decrypt(processedCv.encryptedPii.phone as string);
-                                        console.log(`🔧 [integrity-guard] Restored phone from Phase 1 encrypted PII`);
-                                    } catch { /* decrypt failed — leave as-is */ }
+                                    } catch { /* decrypt failed */ }
                                 }
                             }
 
-                            const { error: profileErr } = await supabaseAdmin
-                                .from('user_profiles')
-                                .update({
-                                    cv_structured_data: structuredCv,
-                                    cv_original_file_path: cvUploadData.path,
-                                    ...(resolvedName ? { full_name: resolvedName } : {}),
-                                })
-                                .eq('id', userId);
-
-                            if (profileErr) {
-                                console.error(`[${requestId}] route=documents/upload step=save_profile supabase_error=${profileErr.message}`);
-                            } else {
-                                console.log(`[${requestId}] route=documents/upload step=save_profile success`);
-                            }
+                            cvParsedStructure = structuredCv;
+                            console.log(`[${requestId}] route=documents/upload step=parse_cv_json success`);
                         } catch (parseError: unknown) {
                             const msg = parseError instanceof Error ? parseError.message : String(parseError);
                             console.error(`[${requestId}] route=documents/upload step=parse_cv_json error=${msg}`);
@@ -416,6 +407,10 @@ export async function POST(req: NextRequest) {
             message: 'Documents uploaded and verified',
             data: {
                 cv_url: cvUploadPath,
+                cv_storage_path: cvUploadPath, // confirm-parse needs this to set cv_original_file_path
+                // User-Edit-First: parsed structure for the confirm dialog.
+                // null when the file is a cover letter or when parsing failed.
+                cv_parsed: cvParsedStructure,
                 extracted: processedCv ? {
                     metadata: processedCv.metadata
                     // NOTE: not returning pii_encrypted in response (GDPR)

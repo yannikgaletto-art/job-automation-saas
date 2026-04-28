@@ -17,10 +17,12 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useRouter } from "next/navigation";
-import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, ShieldCheck } from "lucide-react";
+import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, ShieldCheck, RefreshCw } from "lucide-react";
 import { Button } from "@/components/motion/button";
 import { useNotification } from "@/hooks/use-notification";
 import { useTranslations, useLocale } from "next-intl";
+import { CvEditConfirmDialog } from "./cv-edit-confirm-dialog";
+import type { CvStructuredData } from "@/types/cv";
 
 type DocumentEntry = {
     id: string;
@@ -93,6 +95,10 @@ export function ActiveCVCard() {
     // CV delete confirm dialog (Phase 4 — Single-CV invariant)
     const [confirmDeleteCvId, setConfirmDeleteCvId] = useState<string | null>(null);
     const [isDeletingCv, setIsDeletingCv] = useState(false);
+
+    // User-Edit-First parse confirmation dialog
+    const [pendingConfirm, setPendingConfirm] = useState<{ documentId: string; parsedData: CvStructuredData } | null>(null);
+    const [reparsingId, setReparsingId] = useState<string | null>(null);
 
     // CL upload hint dialog
     const [showClHint, setShowClHint] = useState(false);
@@ -220,7 +226,7 @@ export function ActiveCVCard() {
             fd.append('type', type);
 
             // ✅ XHR for real upload progress (SICHERHEITSARCHITEKTUR.md Section 6)
-            await new Promise<void>((resolve, reject) => {
+            const responseBody = await new Promise<string>((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
 
                 xhr.upload.onprogress = (e) => {
@@ -237,7 +243,7 @@ export function ActiveCVCard() {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         setUploadProgress(100);
                         setUploadStatus(t('status_done'));
-                        resolve();
+                        resolve(xhr.responseText);
                     } else {
                         try {
                             const body = JSON.parse(xhr.responseText);
@@ -253,7 +259,26 @@ export function ActiveCVCard() {
                 xhr.send(fd);
             });
 
-            notify(type === 'cv' ? t('cv_uploaded_toast') : t('cl_uploaded_toast'));
+            // For CV uploads, open the user-edit-first confirmation dialog with
+            // the parsed structure. The profile is NOT yet updated — that
+            // happens in /api/documents/confirm-parse, triggered by the dialog.
+            if (type === 'cv') {
+                try {
+                    const parsed = JSON.parse(responseBody);
+                    const cvId = parsed?.data?.document_ids?.cv as string | null | undefined;
+                    const cvParsed = parsed?.data?.cv_parsed as CvStructuredData | null | undefined;
+                    if (cvId && cvParsed) {
+                        setPendingConfirm({ documentId: cvId, parsedData: cvParsed });
+                        notify(t('cv_review_pending_toast'));
+                    } else {
+                        notify(t('cv_uploaded_toast'));
+                    }
+                } catch {
+                    notify(t('cv_uploaded_toast'));
+                }
+            } else {
+                notify(t('cl_uploaded_toast'));
+            }
             await loadDocs();
 
             // QA Integration: If user came from a feature via DocumentsRequiredDialog,
@@ -273,6 +298,34 @@ export function ActiveCVCard() {
                 setUploadProgress(0);
                 setUploadStatus('');
             }, 3000);
+        }
+    };
+
+    const handleReparse = async (cvDocumentId: string) => {
+        if (reparsingId) return;
+        setReparsingId(cvDocumentId);
+        try {
+            const res = await fetch('/api/documents/reparse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cvDocumentId }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.success) {
+                throw new Error(data?.error || `HTTP ${res.status}`);
+            }
+            const parsed = data?.data?.cv_parsed as CvStructuredData | undefined;
+            if (parsed) {
+                setPendingConfirm({ documentId: cvDocumentId, parsedData: parsed });
+                notify(t('cv_review_pending_toast'));
+            } else {
+                throw new Error('Re-parse returned no data');
+            }
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : 'Re-parse failed';
+            notify(t('reparse_failed', { error: errMsg }));
+        } finally {
+            setReparsingId(null);
         }
     };
 
@@ -419,6 +472,16 @@ export function ActiveCVCard() {
                 </select>
             )}
             <div className="flex items-center gap-1">
+                {doc.type === 'cv' && (
+                    <button
+                        onClick={() => handleReparse(doc.id)}
+                        disabled={reparsingId === doc.id}
+                        className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1 disabled:opacity-50"
+                        title={reparsingId === doc.id ? t('reparse_in_progress') : t('reparse_title')}
+                    >
+                        <RefreshCw className={`w-4 h-4 ${reparsingId === doc.id ? 'animate-spin' : ''}`} />
+                    </button>
+                )}
                 <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1" title={t('download_title')}>
                     <Download className="w-4 h-4" />
                 </button>
@@ -712,6 +775,16 @@ export function ActiveCVCard() {
                 </div>,
                 document.body
             )}
+            {/* User-Edit-First parse confirmation dialog */}
+            {pendingConfirm && (
+                <CvEditConfirmDialog
+                    cvDocumentId={pendingConfirm.documentId}
+                    parsedData={pendingConfirm.parsedData}
+                    onClose={() => { setPendingConfirm(null); loadDocs(); }}
+                    onSaved={() => { setPendingConfirm(null); loadDocs(); }}
+                />
+            )}
+
             {/* CV Delete Confirm Dialog (Phase 4) */}
             {confirmDeleteCvId && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center">
