@@ -67,6 +67,7 @@ export type TaskType =
     | 'summarize_job_description'   // 2-3 sentence summary
     | 'classify_station_relevance'  // CV-station relevance scoring
     // Haiku tier (semantic understanding + ATS keyword extraction)
+    | 'extract_job_fields'          // job description parsing (promoted from Mistral 2026-04-26)
     | 'briefing_generate'
     | 'cv_match'
     | 'cv_parse'
@@ -93,6 +94,7 @@ export function selectModel(taskType: TaskType) {
         classify_job_board: 'MISTRAL_SMALL',
         summarize_job_description: 'MISTRAL_SMALL',
         classify_station_relevance: 'MISTRAL_SMALL',
+        extract_job_fields: 'CLAUDE_HAIKU',
         // Claude Haiku: Semantic analysis (needs deep understanding + reliable JSON)
         briefing_generate: 'CLAUDE_HAIKU',
         language_judge: 'CLAUDE_HAIKU',
