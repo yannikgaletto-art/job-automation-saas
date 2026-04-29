@@ -75,7 +75,7 @@ export async function getCVText(userId: string, documentId?: string, options?: {
             console.log(`⬇️ [Self-Healing] Downloaded ${fileData.size} bytes`);
 
             const buffer = Buffer.from(await fileData.arrayBuffer());
-            console.log(`🤖 [Self-Healing] Calling processDocument (Claude Haiku)...`);
+            console.log(`🤖 [Self-Healing] Calling processDocument (Azure DI OCR + regex PII)...`);
             const { processDocument } = await import('@/lib/services/document-processor');
             const processed = await processDocument(buffer, 'application/pdf');
 

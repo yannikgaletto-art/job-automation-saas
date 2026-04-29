@@ -6,8 +6,12 @@
  * Uses /api/documents/upload — full pipeline with Azure OCR + Claude CV parsing.
  *
  * Contract (SICHERHEITSARCHITEKTUR.md Section 6):
- * - XHR for real upload progress
- * - Status texts: 0-30% "Datei wird hochgeladen...", 30-80% "Wird gespeichert...", 80-100% "Fertig ✅"
+ * - Time-based simulated progress that mirrors real server timing.
+ *   File transfer is fast (~1s), but server-side OCR + Mistral parsing takes
+ *   20–45s. Stage timing was tuned to match the real pipeline.
+ * - Stages: 0→10% (1s upload) → 10→20% (8s analyse) → 20→40% (12s extract)
+ *           → 40→60% (20s save) → 60→90% (10s formulate) → cap
+ *   On server response: animate current → 100% over 5s.
  *
  * Cover Letter Categorization:
  * - User-created categories stored in localStorage
@@ -67,6 +71,35 @@ function loadCollapsed(): Record<string, boolean> {
 
 function saveCollapsed(map: Record<string, boolean>) {
     localStorage.setItem(COLLAPSED_KEY, JSON.stringify(map));
+}
+
+// Time-based simulated upload progress. Each stage holds (atSec, pct, statusKey)
+// where atSec is the cumulative second mark at which the bar should reach pct.
+// Bar fills smoothly between stages by linear interpolation.
+const SIMULATION_STAGES: { atSec: number; pct: number; statusKey: string }[] = [
+    { atSec: 0, pct: 0, statusKey: 'status_uploading' },
+    { atSec: 1, pct: 10, statusKey: 'status_uploading' },
+    { atSec: 9, pct: 20, statusKey: 'status_analyzing' },
+    { atSec: 21, pct: 40, statusKey: 'status_extracting' },
+    { atSec: 41, pct: 60, statusKey: 'status_saving' },
+    { atSec: 51, pct: 90, statusKey: 'status_formulating' },
+];
+
+function computeSimulatedProgress(elapsedMs: number): { pct: number; statusKey: string } {
+    const sec = elapsedMs / 1000;
+    for (let i = 0; i < SIMULATION_STAGES.length - 1; i++) {
+        const a = SIMULATION_STAGES[i];
+        const b = SIMULATION_STAGES[i + 1];
+        if (sec < b.atSec) {
+            const ratio = (sec - a.atSec) / (b.atSec - a.atSec);
+            return {
+                pct: Math.round(a.pct + ratio * (b.pct - a.pct)),
+                statusKey: b.statusKey,
+            };
+        }
+    }
+    const last = SIMULATION_STAGES[SIMULATION_STAGES.length - 1];
+    return { pct: last.pct, statusKey: last.statusKey };
 }
 
 export function ActiveCVCard() {
@@ -225,25 +258,42 @@ export function ActiveCVCard() {
             fd.append('file', file);
             fd.append('type', type);
 
-            // ✅ XHR for real upload progress (SICHERHEITSARCHITEKTUR.md Section 6)
+            // Time-based simulated progress: real server work takes 20–45s
+            // (OCR + Mistral parser), but the browser-to-server file transfer
+            // is fast (~1s). Tracking only XHR upload progress would leave the
+            // bar stuck at 80% for 20+ seconds, signalling failure to the user.
+            // Instead, we run a piecewise-linear timer matching real timing.
             const responseBody = await new Promise<string>((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
+                const startTime = Date.now();
 
-                xhr.upload.onprogress = (e) => {
-                    if (e.lengthComputable) {
-                        const pct = Math.round((e.loaded / e.total) * 80);
-                        setUploadProgress(pct);
-                        if (pct >= 50) setUploadStatus(t('status_analyzing'));
-                        else if (pct >= 20) setUploadStatus(t('status_reading'));
-                        else setUploadStatus(t('status_uploading'));
-                    }
+                let simInterval: ReturnType<typeof setInterval> | null = setInterval(() => {
+                    const elapsed = Date.now() - startTime;
+                    const { pct, statusKey } = computeSimulatedProgress(elapsed);
+                    setUploadProgress(pct);
+                    setUploadStatus(t(statusKey));
+                }, 200);
+
+                const stopSim = () => {
+                    if (simInterval) { clearInterval(simInterval); simInterval = null; }
                 };
 
                 xhr.onload = () => {
+                    stopSim();
                     if (xhr.status >= 200 && xhr.status < 300) {
-                        setUploadProgress(100);
-                        setUploadStatus(t('status_done'));
-                        resolve(xhr.responseText);
+                        // Smooth ramp from current pct → 100 over 5s, then resolve.
+                        const elapsedAtResp = Date.now() - startTime;
+                        const startPct = computeSimulatedProgress(elapsedAtResp).pct;
+                        const animStart = Date.now();
+                        const finishInterval = setInterval(() => {
+                            const ratio = Math.min(1, (Date.now() - animStart) / 5000);
+                            setUploadProgress(Math.round(startPct + ratio * (100 - startPct)));
+                            if (ratio >= 1) {
+                                clearInterval(finishInterval);
+                                setUploadStatus(t('status_done'));
+                                resolve(xhr.responseText);
+                            }
+                        }, 100);
                     } else {
                         try {
                             const body = JSON.parse(xhr.responseText);
@@ -254,7 +304,7 @@ export function ActiveCVCard() {
                     }
                 };
 
-                xhr.onerror = () => reject(new Error('Netzwerkfehler beim Upload'));
+                xhr.onerror = () => { stopSim(); reject(new Error('Netzwerkfehler beim Upload')); };
                 xhr.open('POST', '/api/documents/upload');
                 xhr.send(fd);
             });

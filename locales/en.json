@@ -1565,8 +1565,11 @@
   "upload": {
     "status_uploading": "Uploading file…",
     "status_reading": "Reading your CV…",
-    "status_analyzing": "AI analysis & saving in progress…",
-    "status_done": "Done ✅ — Analysis running in background",
+    "status_analyzing": "Analysing CV…",
+    "status_extracting": "Extracting bullets…",
+    "status_saving": "Saving bullets to the database…",
+    "status_formulating": "Formulating station bullets…",
+    "status_done": "Done ✅",
     "eu_privacy_note": "Your data is extracted and processed GDPR-compliantly on EU servers.",
     "cv_hint_title": "A quick note about your CV",
     "cv_hint_description": "To optimize your CV, we need 2-3 bullet points per position.",

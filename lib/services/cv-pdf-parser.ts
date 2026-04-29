@@ -41,7 +41,9 @@ Regeln:
 - Section-Header (z.B. "Zertifikate", "Sprachen", "Berufserfahrung") sind KEINE Einträge.
 - Pipe-Separator " I " oder " | ": linke Seite = Firma/Sprache, rechte = Rolle/Niveau.
 - Bullets gehören zu der Station ÜBER ihnen — niemals zur folgenden.
-- certifications[].description: wenn unter dem Zertifikatsnamen 1-2 Stichpunkte / Module / Inhalte stehen, übernimm sie als description (Plain-String, mehrere Punkte mit "\n" getrennt). Wenn nichts steht: null.
+- certifications[].description: ALLE nicht-leeren Zeilen direkt unter dem Zertifikatsnamen bis zur nächsten Zertifikats-Überschrift gehören in description (Plain-String, eine Zeile pro Zeilenumbruch "\n"). Auch wenn 3 oder mehr Stichpunkte stehen — alle übernehmen, niemals droppen. Section-Header wie "Zertifikate" sind KEINE Beschreibung.
+- certifications[].issuer: nur dann setzen, wenn der Issuer in Klammern hinter dem Namen steht ("Managementberatung (Emory University)" → issuer="Emory University") ODER per " I "-Pipe danach ("TEDx-Coach I seit 2022 I Ehrenamtliche Tätigkeit" → issuer null oder "Ehrenamtliche Tätigkeit"). Wenn weder Klammer noch Pipe: issuer=null. NIEMALS die erste Beschreibungs-Zeile als issuer einsortieren — sie gehört dann in description.
+- "Note: 1,3" oder "Note: X,Y" am Ende einer Cert-Beschreibung: behalte es in description. Nicht als eigenes Feld extrahieren.
 
 OUTPUT: NUR das JSON-Objekt, kein Markdown, kein Kommentar.`;
 

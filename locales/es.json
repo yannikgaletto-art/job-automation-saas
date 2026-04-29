@@ -1548,8 +1548,11 @@
   "upload": {
     "status_uploading": "Subiendo archivo…",
     "status_reading": "Leyendo tu CV…",
-    "status_analyzing": "Análisis de IA y guardado en curso…",
-    "status_done": "Listo ✅ — Análisis ejecutándose en segundo plano",
+    "status_analyzing": "Analizando CV…",
+    "status_extracting": "Extrayendo puntos clave…",
+    "status_saving": "Guardando puntos clave en la base de datos…",
+    "status_formulating": "Formulando puntos por estación…",
+    "status_done": "Listo ✅",
     "eu_privacy_note": "Tus datos se extraen y procesan en servidores de la UE conforme al RGPD.",
     "cv_hint_title": "Una nota rápida sobre tu CV",
     "cv_hint_description": "Para optimizar tu CV, necesitamos 2-3 puntos por puesto.",

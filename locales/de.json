@@ -1565,8 +1565,11 @@
   "upload": {
     "status_uploading": "Datei wird hochgeladen…",
     "status_reading": "Dein Lebenslauf wird ausgelesen…",
-    "status_analyzing": "KI-Analyse & Speicherung läuft…",
-    "status_done": "Fertig ✅ — Analyse läuft im Hintergrund",
+    "status_analyzing": "Lebenslauf wird analysiert…",
+    "status_extracting": "Stichpunkte werden extrahiert…",
+    "status_saving": "Stichpunkte werden in der Datenbank gespeichert…",
+    "status_formulating": "Stationsstichpunkte werden formuliert…",
+    "status_done": "Fertig ✅",
     "eu_privacy_note": "Deine Daten werden DSGVO-konform auf EU-Servern extrahiert und verarbeitet.",
     "cv_hint_title": "Kurzer Hinweis zu deinem Lebenslauf",
     "cv_hint_description": "Um deinen CV zu optimieren, benötigen wir 2-3 Stichpunkte pro Station.",
