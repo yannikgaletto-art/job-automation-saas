@@ -1,5 +1,11 @@
 import { create } from 'zustand';
 import type { CvStructuredData } from '@/types/cv';
+import {
+    getStagesForFile,
+    computeStageProgress,
+    computeFinishDurationMs,
+    type ProgressStage,
+} from '@/lib/upload/upload-stages';
 
 export type UploadStatus = 'idle' | 'uploading' | 'pending_review' | 'error';
 export type UploadType = 'cv' | 'cover_letter';
@@ -23,33 +29,6 @@ interface UploadState {
     closeReview: () => void;
     dismissError: () => void;
     reset: () => void;
-}
-
-// Mirrors active-cv-card.tsx — kept here so the store owns the simulation.
-const SIMULATION_STAGES: { atSec: number; pct: number; statusKey: string }[] = [
-    { atSec: 0, pct: 0, statusKey: 'status_uploading' },
-    { atSec: 1, pct: 10, statusKey: 'status_uploading' },
-    { atSec: 9, pct: 20, statusKey: 'status_analyzing' },
-    { atSec: 21, pct: 40, statusKey: 'status_extracting' },
-    { atSec: 41, pct: 60, statusKey: 'status_saving' },
-    { atSec: 51, pct: 90, statusKey: 'status_formulating' },
-];
-
-export function computeSimulatedProgress(elapsedMs: number): { pct: number; statusKey: string } {
-    const sec = elapsedMs / 1000;
-    for (let i = 0; i < SIMULATION_STAGES.length - 1; i++) {
-        const a = SIMULATION_STAGES[i];
-        const b = SIMULATION_STAGES[i + 1];
-        if (sec < b.atSec) {
-            const ratio = (sec - a.atSec) / (b.atSec - a.atSec);
-            return {
-                pct: Math.round(a.pct + ratio * (b.pct - a.pct)),
-                statusKey: b.statusKey,
-            };
-        }
-    }
-    const last = SIMULATION_STAGES[SIMULATION_STAGES.length - 1];
-    return { pct: last.pct, statusKey: last.statusKey };
 }
 
 const INITIAL: Pick<UploadState, 'status' | 'progress' | 'statusKey' | 'type' | 'fileName' | 'documentId' | 'parsedData' | 'errorMessage' | 'reviewRequested'> = {
@@ -82,13 +61,18 @@ export const useUploadStore = create<UploadState>((set, get) => ({
             fd.append('file', file);
             fd.append('type', type);
 
+            // Adaptive stages: simulation length scales with file size so small
+            // CVs don't crawl through 51s of fake stages and large CVs don't
+            // hit the 90% cap before the server is done.
+            const stages: ProgressStage[] = getStagesForFile(file.size);
+
             const responseBody = await new Promise<string>((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 const startTime = Date.now();
 
                 let simInterval: ReturnType<typeof setInterval> | null = setInterval(() => {
                     const elapsed = Date.now() - startTime;
-                    const { pct, statusKey } = computeSimulatedProgress(elapsed);
+                    const { pct, statusKey } = computeStageProgress(elapsed, stages);
                     set({ progress: pct, statusKey });
                 }, 200);
 
@@ -99,12 +83,13 @@ export const useUploadStore = create<UploadState>((set, get) => ({
                 xhr.onload = () => {
                     stopSim();
                     if (xhr.status >= 200 && xhr.status < 300) {
-                        // Smooth ramp from current pct → 100 over 5s, then resolve.
+                        // Ramp current → 100 with duration scaled by remaining distance.
                         const elapsedAtResp = Date.now() - startTime;
-                        const startPct = computeSimulatedProgress(elapsedAtResp).pct;
+                        const startPct = computeStageProgress(elapsedAtResp, stages).pct;
+                        const finishMs = computeFinishDurationMs(startPct);
                         const animStart = Date.now();
                         const finishInterval = setInterval(() => {
-                            const ratio = Math.min(1, (Date.now() - animStart) / 5000);
+                            const ratio = Math.min(1, (Date.now() - animStart) / finishMs);
                             set({ progress: Math.round(startPct + ratio * (100 - startPct)) });
                             if (ratio >= 1) {
                                 clearInterval(finishInterval);

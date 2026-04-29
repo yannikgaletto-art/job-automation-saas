@@ -308,6 +308,28 @@ export async function POST(req: NextRequest) {
                             })
                             .eq('id', cvDoc.id);
 
+                        // Optimistic profile-sync (Welle B.5, 2026-04-29):
+                        // Persist the parsed structure into user_profiles immediately so that
+                        // downstream features (CV match, cover letter, etc.) work even if the
+                        // user dismisses the review banner or refreshes the page mid-upload.
+                        // The /confirm-parse route still runs after user edits and overwrites
+                        // these values with corrected data — making this an idempotent first
+                        // write rather than the source of truth.
+                        const fullName = structuredCv.personalInfo?.name?.trim() || null;
+                        const { error: optimisticProfileErr } = await supabaseAdmin
+                            .from('user_profiles')
+                            .update({
+                                cv_structured_data: structuredCv,
+                                cv_original_file_path: cvUploadData.path,
+                                ...(fullName ? { full_name: fullName } : {}),
+                            })
+                            .eq('id', userId);
+                        if (optimisticProfileErr) {
+                            // Non-blocking: the upload still succeeds, the user just won't be
+                            // able to use CV-dependent features until they save the dialog.
+                            console.warn(`[${requestId}] route=documents/upload step=optimistic_profile_sync warn=${optimisticProfileErr.message}`);
+                        }
+
                         console.log(`[${requestId}] route=documents/upload step=parse_cv_pdf success`);
                     } catch (parseError: unknown) {
                         const msg = parseError instanceof Error ? parseError.message : String(parseError);
