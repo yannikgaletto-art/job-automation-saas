@@ -17,6 +17,7 @@ export function UploadBanner() {
     const statusKey = useUploadStore((s) => s.statusKey);
     const fileName = useUploadStore((s) => s.fileName);
     const errorMessage = useUploadStore((s) => s.errorMessage);
+    const reviewRequested = useUploadStore((s) => s.reviewRequested);
     const requestReview = useUploadStore((s) => s.requestReview);
     const dismissError = useUploadStore((s) => s.dismissError);
     const closeReview = useUploadStore((s) => s.closeReview);
@@ -26,7 +27,9 @@ export function UploadBanner() {
     const router = useRouter();
     const pathname = usePathname();
 
-    const visible = status !== 'idle';
+    // Hide the banner once the dialog is open — the CTA is redundant and the
+    // floating top-strip looks visually disconnected from the dialog container.
+    const visible = status !== 'idle' && !(status === 'pending_review' && reviewRequested);
 
     const handleReviewClick = () => {
         // If user isn't on the profile tab, navigate there first so the
