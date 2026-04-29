@@ -1883,8 +1883,9 @@
     "cta": "Zurück zur Startseite"
   },
   "cv_confirm_dialog": {
-    "title": "Lebenslauf erkannt — stimmt das?",
-    "subtitle": "Schau drüber und korrigiere, was die KI falsch verstanden hat. Du speicherst gleich, also lieber jetzt richtig stellen.",
+    "title": "Stimmen die Daten in deinem Lebenslauf?",
+    "subtitle": "",
+    "language_hint": "Wir speichern deinen Lebenslauf in der Originalsprache. Übersetzt wird pro Bewerbung.",
     "section_personal": "Persönliche Angaben",
     "section_experience": "Berufserfahrung",
     "section_education": "Bildung",
@@ -1933,8 +1934,7 @@
     "empty_languages": "Keine Sprachen erkannt.",
     "empty_certifications": "Keine Zertifikate erkannt.",
     "empty_skills": "Keine Skills erkannt.",
-    "looks_good_button": "Sieht gut aus — Speichern",
-    "looks_off_button": "Später bearbeiten",
+    "looks_good_button": "Speichern",
     "saving": "Speichere …",
     "save_failed": "Speichern fehlgeschlagen. Bitte erneut versuchen.",
     "close": "Schließen"

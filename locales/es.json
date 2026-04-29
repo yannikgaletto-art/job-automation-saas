@@ -1864,8 +1864,9 @@
     "cta": "Volver a la página principal"
   },
   "cv_confirm_dialog": {
-    "title": "CV detectado — ¿está correcto?",
-    "subtitle": "Revisa y corrige lo que la IA haya entendido mal. Guardarás en un momento, así que mejor corregirlo ahora.",
+    "title": "¿Son correctos los datos de tu CV?",
+    "subtitle": "",
+    "language_hint": "Mantenemos tu CV en su idioma original. La traducción se realiza para cada postulación.",
     "section_personal": "Datos personales",
     "section_experience": "Experiencia",
     "section_education": "Educación",
@@ -1914,8 +1915,7 @@
     "empty_languages": "No se detectaron idiomas.",
     "empty_certifications": "No se detectaron certificaciones.",
     "empty_skills": "No se detectaron habilidades.",
-    "looks_good_button": "Se ve bien — Guardar",
-    "looks_off_button": "Editar después",
+    "looks_good_button": "Guardar",
     "saving": "Guardando …",
     "save_failed": "Error al guardar. Inténtalo de nuevo.",
     "close": "Cerrar"

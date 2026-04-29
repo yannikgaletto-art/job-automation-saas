@@ -1883,8 +1883,9 @@
     "cta": "Back to Homepage"
   },
   "cv_confirm_dialog": {
-    "title": "CV detected — does this look right?",
-    "subtitle": "Review and fix anything the AI got wrong. You're saving in a moment, so it's worth correcting now.",
+    "title": "Are the details in your CV correct?",
+    "subtitle": "",
+    "language_hint": "We keep your CV in its original language. Translation happens per job application.",
     "section_personal": "Personal info",
     "section_experience": "Experience",
     "section_education": "Education",
@@ -1933,8 +1934,7 @@
     "empty_languages": "No languages detected.",
     "empty_certifications": "No certifications detected.",
     "empty_skills": "No skills detected.",
-    "looks_good_button": "Looks good — Save",
-    "looks_off_button": "Edit later",
+    "looks_good_button": "Save",
     "saving": "Saving …",
     "save_failed": "Save failed. Please try again.",
     "close": "Close"

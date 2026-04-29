@@ -18,11 +18,12 @@
  * corrections.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { X, Plus, Trash2, Briefcase, GraduationCap, Languages as LanguagesIcon, Award, Wrench, User as UserIcon, ChevronDown, ChevronUp } from "lucide-react";
 import type { CvStructuredData } from "@/types/cv";
+import { detectCvLocale } from "@/lib/services/cv-locale-detect";
 
 interface Props {
     parsedData: CvStructuredData;
@@ -80,6 +81,11 @@ function emptySkill(): SkillGroup {
 
 export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved }: Props) {
     const t = useTranslations("cv_confirm_dialog");
+    const uiLocale = useLocale();
+    // Detect from the LLM's first parse so the hint doesn't flicker as the user
+    // types corrections; CV language doesn't change while the dialog is open.
+    const cvLocale = useMemo(() => detectCvLocale(parsedData), [parsedData]);
+    const showLanguageHint = cvLocale !== 'unknown' && cvLocale !== uiLocale;
     const [data, setData] = useState<CvStructuredData>(() => ({
         ...parsedData,
         experience: parsedData.experience ?? [],
@@ -245,7 +251,9 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                 <div className="px-6 py-4 border-b border-[#E7E7E5] flex items-start justify-between gap-4">
                     <div>
                         <h2 className="text-lg font-semibold text-[#37352F]">{t("title")}</h2>
-                        <p className="text-xs text-[#73726E] mt-1 leading-relaxed">{t("subtitle")}</p>
+                        {showLanguageHint && (
+                            <p className="text-xs text-[#73726E] mt-1.5 leading-relaxed">{t("language_hint")}</p>
+                        )}
                     </div>
                     <button
                         onClick={handleClose}
@@ -632,14 +640,7 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-[#E7E7E5] flex flex-col sm:flex-row justify-end gap-3 bg-[#FAFAF9]">
-                    <button
-                        onClick={handleClose}
-                        disabled={submitting}
-                        className="px-4 py-2 text-sm text-[#73726E] hover:text-[#37352F] hover:bg-white rounded-lg transition-colors disabled:opacity-40"
-                    >
-                        {t("looks_off_button")}
-                    </button>
+                <div className="px-6 py-4 border-t border-[#E7E7E5] flex justify-end bg-[#FAFAF9]">
                     <button
                         onClick={handleSave}
                         disabled={submitting}
