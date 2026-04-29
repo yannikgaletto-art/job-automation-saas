@@ -46,7 +46,7 @@ export function UploadBanner() {
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: -80, opacity: 0 }}
                     transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-                    className="fixed top-0 inset-x-0 z-[60] flex justify-center pt-3 px-3 pointer-events-none"
+                    className="fixed top-0 inset-x-0 z-[60] flex justify-center pt-3 px-3 pointer-events-none pl-64"
                 >
                     <div className="pointer-events-auto w-full max-w-5xl">
                         {status === 'uploading' && (
