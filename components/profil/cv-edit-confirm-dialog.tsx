@@ -257,29 +257,7 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                 className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
                 onClick={handleClose}
             />
-            <div className="relative w-full max-w-3xl mx-4">
-                {/* Language-mismatch toast — sits above the dialog header, left-aligned. */}
-                <AnimatePresence>
-                    {showLanguageToast && (
-                        <motion.div
-                            key="lang-toast"
-                            initial={{ opacity: 0, y: -16, scale: 0.96 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -16, scale: 0.96 }}
-                            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-                            className="absolute -top-14 left-0 right-0 z-[10000] max-w-md pointer-events-none"
-                            role="status"
-                            aria-live="polite"
-                        >
-                            <div className="bg-white border border-[#012e7a]/30 rounded-xl shadow-2xl px-4 py-3 flex items-start gap-3 ring-1 ring-[#012e7a]/10">
-                                <div className="p-1.5 bg-[#F0F7FF] rounded-lg shrink-0">
-                                    <Globe className="w-4 h-4 text-[#012e7a]" />
-                                </div>
-                                <p className="text-sm text-[#37352F] leading-snug pr-1">{t("language_hint")}</p>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+            <div className="w-full max-w-3xl mx-4">
             <div className="bg-white rounded-2xl shadow-2xl border border-[#E7E7E5] max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-[#E7E7E5] flex items-start justify-between gap-4">
@@ -298,6 +276,30 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+                    {/* Language-mismatch toast — flows above Personal Info so the
+                        user spots it on first read; auto-dismisses after 4.5s. */}
+                    <AnimatePresence>
+                        {showLanguageToast && (
+                            <motion.div
+                                key="lang-toast"
+                                initial={{ opacity: 0, y: -8, height: 0 }}
+                                animate={{ opacity: 1, y: 0, height: 'auto' }}
+                                exit={{ opacity: 0, y: -8, height: 0 }}
+                                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                                role="status"
+                                aria-live="polite"
+                                className="overflow-hidden"
+                            >
+                                <div className="bg-[#F0F7FF] border border-[#012e7a]/30 rounded-xl px-4 py-3 flex items-start gap-3">
+                                    <div className="p-1.5 bg-white rounded-lg shrink-0">
+                                        <Globe className="w-4 h-4 text-[#012e7a]" />
+                                    </div>
+                                    <p className="text-sm text-[#37352F] leading-snug pr-1">{t("language_hint")}</p>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     {/* Personal Info */}
                     <section className="space-y-3">
                         <h3 className={sectionTitleCls}>

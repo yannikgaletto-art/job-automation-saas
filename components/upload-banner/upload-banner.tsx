@@ -6,6 +6,10 @@ import { ShieldCheck, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUploadStore } from '@/lib/upload/upload-store';
 
+// Banner has no dismiss for `pending_review`: the only way to clear it is to
+// open the review dialog, where closing silently persists the parsed data —
+// preventing "doc exists, profile empty" drift.
+
 /**
  * Sticky top-banner that surfaces an in-flight upload regardless of which
  * tab the user is on. At 100% it converts into a "Bitte prüfen" call-to-
@@ -20,7 +24,6 @@ export function UploadBanner() {
     const reviewRequested = useUploadStore((s) => s.reviewRequested);
     const requestReview = useUploadStore((s) => s.requestReview);
     const dismissError = useUploadStore((s) => s.dismissError);
-    const closeReview = useUploadStore((s) => s.closeReview);
 
     const t = useTranslations('upload');
     const locale = useLocale();
@@ -102,14 +105,6 @@ export function UploadBanner() {
                                     className="px-3 py-1.5 text-xs font-medium bg-[#012e7a] text-white rounded-lg hover:bg-[#011f5e] transition-colors shrink-0"
                                 >
                                     {t('banner_review_button')}
-                                </button>
-                                <button
-                                    onClick={closeReview}
-                                    className="text-[#A8A29E] hover:text-[#37352F] transition-colors p-1 shrink-0"
-                                    title={t('banner_dismiss')}
-                                    aria-label={t('banner_dismiss')}
-                                >
-                                    <X className="w-4 h-4" />
                                 </button>
                             </div>
                         )}

@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/motion/badge'
 import { Progress } from '@/components/ui/progress'
 import { ImprovementCard } from './improvement-card'
-import type { CVOptimizationResult } from '@/lib/services/cv-optimizer'
+import type { CVOptimizationResult } from '@/types/cv'
 
 interface CVComparisonProps {
     optimizationResult: CVOptimizationResult

@@ -157,3 +157,18 @@ export interface UserDecisions {
     choices: Record<string, 'accepted' | 'rejected' | 'edited'>;
     appliedChanges: CvChange[]; // Audit list of exactly what was accepted/edited
 }
+
+/**
+ * Legacy markdown-optimizer result shape. Kept here so the two remaining UI
+ * call sites (job-queue page + cv-comparison) compile while the production
+ * Optimizer uses the diff-based proposal type above.
+ */
+export interface CVOptimizationResult {
+    optimizedCV: string;
+    changesLog: {
+        added_keywords: string[];
+        reordered_bullets: number;
+        quantifications_added: number;
+    };
+    atsScore: number;
+}

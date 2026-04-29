@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { AddJobDialog } from '@/components/dashboard/add-job-dialog';
 import { CustomDialog } from '@/components/ui/custom-dialog';
 import { CVComparison } from '@/components/cv/cv-comparison';
-import type { CVOptimizationResult } from '@/lib/services/cv-optimizer';
+import type { CVOptimizationResult } from '@/types/cv';
 import { useNotification } from '@/hooks/use-notification';
 import { ApplicationHistory } from '@/app/[locale]/dashboard/components/application-history';
 import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
