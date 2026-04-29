@@ -19,6 +19,8 @@ import { createClient } from '@/lib/supabase/client';
 import { CreditExhaustedProvider, useCreditExhausted } from './hooks/credit-exhausted-context';
 import { PaywallModal } from '@/components/dashboard/paywall-modal';
 import { ReferralNotificationOverlay } from '@/components/dashboard/referral-notification-overlay';
+import { UploadBanner } from '@/components/upload-banner/upload-banner';
+import { GlobalCvConfirmBridge } from '@/components/upload-banner/global-cv-confirm-bridge';
 // ReConsentBanner removed — v2.0 consent info handled via Security page
 
 const ADMIN_EMAILS = ['galettoyannik7@gmail.com', 'yannik.galetto@gmail.com'];
@@ -292,6 +294,12 @@ function DashboardLayoutInner({
 
             {/* Global Paywall Modal — triggered from any component via useCreditExhausted() */}
             <PaywallModalBridge />
+
+            {/* Persistent upload banner — surfaces upload progress across tab switches */}
+            <UploadBanner />
+
+            {/* Global CV review dialog — auto-opens on /profil, manual elsewhere */}
+            <GlobalCvConfirmBridge />
 
             {/* Referral Notification — hidden during Free Trial testing phase */}
             {process.env.NEXT_PUBLIC_BONUSES_ENABLED === 'true' && (

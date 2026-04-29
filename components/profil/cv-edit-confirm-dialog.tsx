@@ -20,8 +20,9 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTranslations, useLocale } from "next-intl";
-import { X, Plus, Trash2, Briefcase, GraduationCap, Languages as LanguagesIcon, Award, Wrench, User as UserIcon, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Plus, Trash2, Briefcase, GraduationCap, Languages as LanguagesIcon, Award, Wrench, User as UserIcon, ChevronDown, ChevronUp, Globe } from "lucide-react";
 import type { CvStructuredData } from "@/types/cv";
 import { detectCvLocale } from "@/lib/services/cv-locale-detect";
 
@@ -86,6 +87,7 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
     // types corrections; CV language doesn't change while the dialog is open.
     const cvLocale = useMemo(() => detectCvLocale(parsedData), [parsedData]);
     const showLanguageHint = cvLocale !== 'unknown' && cvLocale !== uiLocale;
+    const [showLanguageToast, setShowLanguageToast] = useState(showLanguageHint);
     const [data, setData] = useState<CvStructuredData>(() => ({
         ...parsedData,
         experience: parsedData.experience ?? [],
@@ -233,6 +235,15 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
         return () => { document.body.style.overflow = original; };
     }, []);
 
+    // Auto-dismiss the language toast after 4.5s — long enough to read,
+    // short enough not to obstruct the form. Only schedules when the toast
+    // actually shows (mismatched CV locale).
+    useEffect(() => {
+        if (!showLanguageToast) return;
+        const t = setTimeout(() => setShowLanguageToast(false), 4500);
+        return () => clearTimeout(t);
+    }, [showLanguageToast]);
+
     const personalInfo = data.personalInfo ?? {};
     const certifications = data.certifications ?? [];
 
@@ -241,6 +252,29 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
     const sectionTitleCls = "text-sm font-semibold text-[#37352F] flex items-center gap-2";
 
     return createPortal(
+        <>
+        {/* Language-mismatch toast — animates in above the dialog, auto-dismisses */}
+        <AnimatePresence>
+            {showLanguageToast && (
+                <motion.div
+                    key="lang-toast"
+                    initial={{ opacity: 0, y: -24, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -24, scale: 0.95 }}
+                    transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                    className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[min(92vw,28rem)] pointer-events-none"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <div className="bg-white border border-[#012e7a]/30 rounded-xl shadow-2xl px-4 py-3 flex items-start gap-3 ring-1 ring-[#012e7a]/10">
+                        <div className="p-1.5 bg-[#F0F7FF] rounded-lg shrink-0">
+                            <Globe className="w-4 h-4 text-[#012e7a]" />
+                        </div>
+                        <p className="text-sm text-[#37352F] leading-snug pr-1">{t("language_hint")}</p>
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
             <div
                 className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
@@ -251,9 +285,6 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                 <div className="px-6 py-4 border-b border-[#E7E7E5] flex items-start justify-between gap-4">
                     <div>
                         <h2 className="text-lg font-semibold text-[#37352F]">{t("title")}</h2>
-                        {showLanguageHint && (
-                            <p className="text-xs text-[#73726E] mt-1.5 leading-relaxed">{t("language_hint")}</p>
-                        )}
                     </div>
                     <button
                         onClick={handleClose}
@@ -650,7 +681,8 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
                     </button>
                 </div>
             </div>
-        </div>,
+        </div>
+        </>,
         document.body,
     );
 }

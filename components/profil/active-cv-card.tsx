@@ -3,15 +3,12 @@
 /**
  * Active CV Card — Shows all uploaded documents in Settings.
  * Reads from /api/documents/list (same source as onboarding).
- * Uses /api/documents/upload — full pipeline with Azure OCR + Claude CV parsing.
  *
- * Contract (SICHERHEITSARCHITEKTUR.md Section 6):
- * - Time-based simulated progress that mirrors real server timing.
- *   File transfer is fast (~1s), but server-side OCR + Mistral parsing takes
- *   20–45s. Stage timing was tuned to match the real pipeline.
- * - Stages: 0→10% (1s upload) → 10→20% (8s analyse) → 20→40% (12s extract)
- *           → 40→60% (20s save) → 60→90% (10s formulate) → cap
- *   On server response: animate current → 100% over 5s.
+ * Upload progress + the user-edit-first review dialog now live globally:
+ * the upload is owned by `lib/upload/upload-store.ts` (so progress survives
+ * tab switches via the persistent banner), and `GlobalCvConfirmBridge` in
+ * the dashboard layout renders the review dialog. This component is only
+ * responsible for triggering uploads and rendering the document list.
  *
  * Cover Letter Categorization:
  * - User-created categories stored in localStorage
@@ -21,10 +18,11 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useRouter } from "next/navigation";
-import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, ShieldCheck, RefreshCw } from "lucide-react";
+import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, RefreshCw } from "lucide-react";
 import { Button } from "@/components/motion/button";
 import { useNotification } from "@/hooks/use-notification";
 import { useTranslations, useLocale } from "next-intl";
+import { useUploadStore } from "@/lib/upload/upload-store";
 import { CvEditConfirmDialog } from "./cv-edit-confirm-dialog";
 import type { CvStructuredData } from "@/types/cv";
 
@@ -73,44 +71,12 @@ function saveCollapsed(map: Record<string, boolean>) {
     localStorage.setItem(COLLAPSED_KEY, JSON.stringify(map));
 }
 
-// Time-based simulated upload progress. Each stage holds (atSec, pct, statusKey)
-// where atSec is the cumulative second mark at which the bar should reach pct.
-// Bar fills smoothly between stages by linear interpolation.
-const SIMULATION_STAGES: { atSec: number; pct: number; statusKey: string }[] = [
-    { atSec: 0, pct: 0, statusKey: 'status_uploading' },
-    { atSec: 1, pct: 10, statusKey: 'status_uploading' },
-    { atSec: 9, pct: 20, statusKey: 'status_analyzing' },
-    { atSec: 21, pct: 40, statusKey: 'status_extracting' },
-    { atSec: 41, pct: 60, statusKey: 'status_saving' },
-    { atSec: 51, pct: 90, statusKey: 'status_formulating' },
-];
-
-function computeSimulatedProgress(elapsedMs: number): { pct: number; statusKey: string } {
-    const sec = elapsedMs / 1000;
-    for (let i = 0; i < SIMULATION_STAGES.length - 1; i++) {
-        const a = SIMULATION_STAGES[i];
-        const b = SIMULATION_STAGES[i + 1];
-        if (sec < b.atSec) {
-            const ratio = (sec - a.atSec) / (b.atSec - a.atSec);
-            return {
-                pct: Math.round(a.pct + ratio * (b.pct - a.pct)),
-                statusKey: b.statusKey,
-            };
-        }
-    }
-    const last = SIMULATION_STAGES[SIMULATION_STAGES.length - 1];
-    return { pct: last.pct, statusKey: last.statusKey };
-}
-
 export function ActiveCVCard() {
     const [docs, setDocs] = useState<DocumentEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const notify = useNotification();
     const t = useTranslations('upload');
     const locale = useLocale();
-    const [uploading, setUploading] = useState<string | null>(null);
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [uploadStatus, setUploadStatus] = useState<string>('');
     const cvRef = useRef<HTMLInputElement>(null);
     const clRef = useRef<HTMLInputElement>(null);
     const searchParams = useSearchParams();
@@ -118,6 +84,14 @@ export function ActiveCVCard() {
     const returnTo = searchParams.get('returnTo');
     // ✅ User ID for scoped localStorage keys — loaded async, empty string until resolved
     const [userId, setUserId] = useState<string>('');
+
+    // Upload state lives in the global store so the banner can keep tracking
+    // progress when the user navigates away from this tab.
+    const uploadStatus = useUploadStore((s) => s.status);
+    const uploadProgress = useUploadStore((s) => s.progress);
+    const uploadType = useUploadStore((s) => s.type);
+    const startUpload = useUploadStore((s) => s.startUpload);
+    const isUploading = uploadStatus === 'uploading';
 
     // Category state
     const [categories, setCategories] = useState<CategoryMap>({});
@@ -129,7 +103,8 @@ export function ActiveCVCard() {
     const [confirmDeleteCvId, setConfirmDeleteCvId] = useState<string | null>(null);
     const [isDeletingCv, setIsDeletingCv] = useState(false);
 
-    // User-Edit-First parse confirmation dialog
+    // Re-parse uses its own local dialog state because it bypasses the upload
+    // pipeline (parses an existing document) — no banner involvement.
     const [pendingConfirm, setPendingConfirm] = useState<{ documentId: string; parsedData: CvStructuredData } | null>(null);
     const [reparsingId, setReparsingId] = useState<string | null>(null);
 
@@ -223,132 +198,28 @@ export function ActiveCVCard() {
     }, []);
 
     const handleUpload = async (file: File, type: 'cv' | 'cover_letter') => {
-        setUploading(type);
-        setUploadProgress(0);
-        setUploadStatus(t('status_uploading'));
-
-        // Snapshot the current doc IDs of this type so we can detect a silent
-        // server-side success even if the XHR connection drops mid-response
-        // (Next.js dev/Turbopack occasionally closes long-running connections
-        // after the route has already finished its work). See verifySuccess().
-        const initialIds = new Set(docs.filter(d => d.type === type).map(d => d.id));
-
-        // Poll /api/documents/list for up to 60s — if a new doc of `type`
-        // appears, the upload silently succeeded and we treat it as success.
-        const verifySilentSuccess = async (): Promise<boolean> => {
-            for (let i = 0; i < 30; i++) {
-                await new Promise(r => setTimeout(r, 2000));
-                try {
-                    const res = await fetch('/api/documents/list');
-                    if (!res.ok) continue;
-                    const data = await res.json();
-                    if (!data.success) continue;
-                    const found = (data.documents as DocumentEntry[]).some(
-                        d => d.type === type && !initialIds.has(d.id)
-                    );
-                    if (found) return true;
-                } catch { /* keep polling */ }
-            }
-            return false;
-        };
-
-
-        try {
-            const fd = new FormData();
-            fd.append('file', file);
-            fd.append('type', type);
-
-            // Time-based simulated progress: real server work takes 20–45s
-            // (OCR + Mistral parser), but the browser-to-server file transfer
-            // is fast (~1s). Tracking only XHR upload progress would leave the
-            // bar stuck at 80% for 20+ seconds, signalling failure to the user.
-            // Instead, we run a piecewise-linear timer matching real timing.
-            const responseBody = await new Promise<string>((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                const startTime = Date.now();
-
-                let simInterval: ReturnType<typeof setInterval> | null = setInterval(() => {
-                    const elapsed = Date.now() - startTime;
-                    const { pct, statusKey } = computeSimulatedProgress(elapsed);
-                    setUploadProgress(pct);
-                    setUploadStatus(t(statusKey));
-                }, 200);
-
-                const stopSim = () => {
-                    if (simInterval) { clearInterval(simInterval); simInterval = null; }
-                };
-
-                xhr.onload = () => {
-                    stopSim();
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        // Smooth ramp from current pct → 100 over 5s, then resolve.
-                        const elapsedAtResp = Date.now() - startTime;
-                        const startPct = computeSimulatedProgress(elapsedAtResp).pct;
-                        const animStart = Date.now();
-                        const finishInterval = setInterval(() => {
-                            const ratio = Math.min(1, (Date.now() - animStart) / 5000);
-                            setUploadProgress(Math.round(startPct + ratio * (100 - startPct)));
-                            if (ratio >= 1) {
-                                clearInterval(finishInterval);
-                                setUploadStatus(t('status_done'));
-                                resolve(xhr.responseText);
-                            }
-                        }, 100);
-                    } else {
-                        try {
-                            const body = JSON.parse(xhr.responseText);
-                            reject(new Error(body.error || 'Upload fehlgeschlagen'));
-                        } catch {
-                            reject(new Error('Upload fehlgeschlagen'));
-                        }
-                    }
-                };
-
-                xhr.onerror = () => { stopSim(); reject(new Error('Netzwerkfehler beim Upload')); };
-                xhr.open('POST', '/api/documents/upload');
-                xhr.send(fd);
-            });
-
-            // For CV uploads, open the user-edit-first confirmation dialog with
-            // the parsed structure. The profile is NOT yet updated — that
-            // happens in /api/documents/confirm-parse, triggered by the dialog.
-            if (type === 'cv') {
-                try {
-                    const parsed = JSON.parse(responseBody);
-                    const cvId = parsed?.data?.document_ids?.cv as string | null | undefined;
-                    const cvParsed = parsed?.data?.cv_parsed as CvStructuredData | null | undefined;
-                    if (cvId && cvParsed) {
-                        setPendingConfirm({ documentId: cvId, parsedData: cvParsed });
-                        notify(t('cv_review_pending_toast'));
-                    } else {
-                        notify(t('cv_uploaded_toast'));
-                    }
-                } catch {
-                    notify(t('cv_uploaded_toast'));
+        await startUpload(file, type, {
+            onSuccess: async ({ parsedData }) => {
+                if (type === 'cv') {
+                    notify(parsedData ? t('cv_review_pending_toast') : t('cv_uploaded_toast'));
                 }
-            } else {
+                await loadDocs();
+                if (returnTo) {
+                    setTimeout(() => {
+                        router.push(decodeURIComponent(returnTo));
+                    }, 1500);
+                }
+            },
+            onClUploaded: async () => {
                 notify(t('cl_uploaded_toast'));
-            }
-            await loadDocs();
-
-            // QA Integration: If user came from a feature via DocumentsRequiredDialog,
-            // redirect them back after successful upload
-            if (returnTo) {
-                setTimeout(() => {
-                    router.push(decodeURIComponent(returnTo));
-                }, 1500); // Short delay so user sees "Fertig ✅" status
-            }
-        } catch (err: unknown) {
-            const errMsg = err instanceof Error ? err.message : 'Upload fehlgeschlagen';
-            notify(errMsg);
-            console.error('[ActiveCVCard] Upload failed:', errMsg);
-        } finally {
-            setUploading(null);
-            setTimeout(() => {
-                setUploadProgress(0);
-                setUploadStatus('');
-            }, 3000);
-        }
+                await loadDocs();
+                if (returnTo) {
+                    setTimeout(() => {
+                        router.push(decodeURIComponent(returnTo));
+                    }, 1500);
+                }
+            },
+        });
     };
 
     const handleReparse = async (cvDocumentId: string) => {
@@ -544,35 +415,6 @@ export function ActiveCVCard() {
 
     return (
         <div className="space-y-6">
-            {/* Upload Progress Bar */}
-            {uploading && (
-                <div className="space-y-1.5">
-                    <div className="flex justify-between items-center text-xs">
-                        <span className="text-[#73726E]">{uploadStatus || t('status_uploading')}</span>
-                        <div className="flex items-center gap-2">
-                            {uploadProgress >= 20 && uploadProgress < 100 && (
-                                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 font-medium">
-                                    <ShieldCheck className="w-3 h-3" />
-                                    EU
-                                </span>
-                            )}
-                            <span className="font-mono text-[#73726E]">{uploadProgress}%</span>
-                        </div>
-                    </div>
-                    <div className="w-full bg-[#F7F7F5] rounded-full h-1.5">
-                        <div
-                            className="bg-[#012e7a] h-1.5 rounded-full transition-all duration-300"
-                            style={{ width: `${uploadProgress}%` }}
-                        />
-                    </div>
-                    {uploadProgress >= 20 && uploadProgress < 100 && (
-                        <p className="text-[10px] text-slate-400">
-                            {t('eu_privacy_note')}
-                        </p>
-                    )}
-                </div>
-            )}
-
             {/* CV Section — Single-CV invariant: max 1 per user */}
             <div>
                 <div className="flex items-center justify-between mb-3">
@@ -584,11 +426,11 @@ export function ActiveCVCard() {
                         variant="secondary"
                         className="text-xs h-8"
                         onClick={() => cvRef.current?.click()}
-                        disabled={!!uploading || cvDocs.length >= 1}
+                        disabled={isUploading || cvDocs.length >= 1}
                         title={cvDocs.length >= 1 ? t('cv_max_reached') : undefined}
                     >
                         <Upload className="w-3 h-3 mr-1.5" />
-                        {uploading === 'cv' ? `${uploadProgress}%` : t('upload_button', { current: cvDocs.length, max: 1 })}
+                        {uploadType === 'cv' && isUploading ? `${uploadProgress}%` : t('upload_button', { current: cvDocs.length, max: 1 })}
                     </Button>
                 </div>
 
@@ -635,11 +477,11 @@ export function ActiveCVCard() {
                             variant="secondary"
                             className="text-xs h-8"
                             onClick={handleClUploadClick}
-                            disabled={!!uploading || clDocs.length >= 3}
+                            disabled={isUploading || clDocs.length >= 3}
                             title={clDocs.length >= 3 ? t('cl_max_reached') : undefined}
                         >
                             <Upload className="w-3 h-3 mr-1.5" />
-                            {uploading === 'cover_letter' ? `${uploadProgress}%` : t('upload_button', { current: clDocs.length, max: 3 })}
+                            {uploadType === 'cover_letter' && isUploading ? `${uploadProgress}%` : t('upload_button', { current: clDocs.length, max: 3 })}
                         </Button>
                     </div>
                 </div>
