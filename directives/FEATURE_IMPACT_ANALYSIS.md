@@ -32,7 +32,7 @@ erzeugen inkonsistente Seitenlayouts: manche CVs haben 1.5 Seiten, andere 4+ Sei
 │  └─ Authentic Keyword Weaving (ATS-Keywords)       │
 ├──────────────────────────────────────────────────┤
 │  Layer 2: Template Page Structure                 │
-│  (ValleyTemplate.tsx / TechTemplate.tsx)           │
+│  (ATSTemplate.tsx / TechTemplate.tsx)              │
 │                                                   │
 │  ├─ Page 1: Header + Summary + Experience + Edu   │
 │  ├─ Page 2: Skills + Languages + Certifications   │
@@ -55,7 +55,7 @@ erzeugen inkonsistente Seitenlayouts: manche CVs haben 1.5 Seiten, andere 4+ Sei
 | Layer | Status | Datei |
 |-------|--------|-------|
 | Layer 1 (AI Guardrails) | ✅ Implementiert | `app/api/cv/optimize/route.ts` |
-| Layer 2 (Template Structure) | ✅ Implementiert | `ValleyTemplate.tsx`, `TechTemplate.tsx` |
+| Layer 2 (Template Structure) | ✅ Implementiert | `ATSTemplate.tsx`, `TechTemplate.tsx` |
 | Layer 3 (AI Layout Judge) | ⏸ Deferred | Nur bei User-Feedback zu >2-Seiten-CVs |
 
 ---

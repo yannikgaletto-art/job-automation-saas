@@ -183,7 +183,7 @@ Nach der Umstrukturierung zu `app/[locale]/layout.tsx` wird `lang={locale}` dyna
 | `dashboard.nav` | `sidebar.tsx`, `layout.tsx` | ~30 | ✅ Vollständig (frühere Phase) |
 | `dashboard.job_search` | `JobSwipeView.tsx` | ~15 | ⚠️ Offen — Tier 2 |
 | `mood_checkin` | `useMoodCheckIn.tsx`, `MoodCheckInOverlay`, `CheckinSettingsCard` | ~15 | ✅ Vollständig (de/en/es) |
-| `cv_templates` | `ValleyTemplate`, `TechTemplate` | ? | ⏳ Deferred — kein useTranslations in PDF-Render |
+| `cv_templates` | `ATSTemplate`, `TechTemplate` | ? | ⏳ Deferred — kein useTranslations in PDF-Render |
 
 ---
 

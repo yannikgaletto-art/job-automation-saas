@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { pdf, usePDF } from '@react-pdf/renderer';
 import { CvStructuredData } from '@/types/cv';
 import { TechTemplate } from './TechTemplate';
-import { ValleyTemplate } from './ValleyTemplate';
+import { ATSTemplate } from './ATSTemplate';
 import { Download, Loader2, RefreshCw } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { getCvTemplateLabels, CvTemplateLabels } from '@/lib/utils/cv-template-labels';
@@ -23,10 +23,10 @@ function resolveTemplate(data: CvStructuredData, templateId: string, qrBase64: s
         case 'tech':
             return <TechTemplate data={data} qrBase64={qrBase64} labels={labels} />;
         case 'valley':
-        case 'classic':  // deprecated — fallback to Valley
-        case 'modern':   // deprecated — fallback to Valley
+        case 'classic':  // deprecated — fallback to ATS
+        case 'modern':   // deprecated — fallback to ATS
         default:
-            return <ValleyTemplate data={data} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} />;
+            return <ATSTemplate data={data} qrBase64={qrBase64} labels={labels} layoutMode={layoutMode} />;
     }
 }
 

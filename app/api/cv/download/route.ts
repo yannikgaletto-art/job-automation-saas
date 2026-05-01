@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { TechTemplate } from '@/components/cv-templates/TechTemplate';
-import { ValleyTemplate } from '@/components/cv-templates/ValleyTemplate';
+import { ATSTemplate } from '@/components/cv-templates/ATSTemplate';
 import { CvStructuredData } from '@/types/cv';
 import { Font, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import React from 'react';
@@ -50,9 +50,9 @@ function resolveTemplate(templateId: string, data: CvStructuredData, labels: CvT
     switch (templateId) {
         case 'tech': return React.createElement(TechTemplate, { data, labels });
         case 'valley':
-        case 'classic':  // deprecated → Valley
-        case 'modern':   // deprecated → Valley
-        default: return React.createElement(ValleyTemplate, { data, labels });
+        case 'classic':  // deprecated → ATS
+        case 'modern':   // deprecated → ATS
+        default: return React.createElement(ATSTemplate, { data, labels });
     }
 }
 

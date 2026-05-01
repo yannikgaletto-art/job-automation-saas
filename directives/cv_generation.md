@@ -642,7 +642,7 @@ Phase 3 (Parser & Polish) ─── 0.5 Arbeitstag
 - [ ] `ClassicTemplate.tsx` — `gap` → `marginRight` (1 Stelle, vor Deprecation)
 
 ### Phase 2 — Templates
-- [ ] `ValleyTemplate.tsx` — Skills: comma → tags, Languages: text → dots, Certs: bullet → grid, Page Budget
+- [ ] `ATSTemplate.tsx` — Skills: comma → tags, Languages: text → dots, Certs: bullet → grid, Page Budget
 - [ ] `ModernTemplate.tsx` — Skills sidebar: text → tags, Accent: `#2563EB` → `#012e7a`
 - [ ] `TechTemplate.tsx` — Language-Dots, Page Budget
 - [ ] `ClassicTemplate.tsx` — Delete file

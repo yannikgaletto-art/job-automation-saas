@@ -10,7 +10,7 @@ import { CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 import { LayoutMode } from '@/types/cv-opt-settings';
 
 /**
- * ValleyTemplate — FAANG-optimized, single-column, black & white CV.
+ * ATSTemplate — ATS-optimized, single-column, black & white CV.
  * V4: Hard 2-page guardrails, bidirectional layoutMode (compact/default).
  *
  * HARD CAPS (always enforced, regardless of AI output):
@@ -100,7 +100,7 @@ const RenderBullet = ({ text }: { text: string }) => {
 };
 
 
-export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels; layoutMode?: LayoutMode }) {
+export function ATSTemplate({ data, qrBase64, labels, layoutMode = 'default' }: { data: CvStructuredData; qrBase64?: string; labels: CvTemplateLabels; layoutMode?: LayoutMode }) {
     const pi = data.personalInfo;
     const hasSkills = data.skills.length > 0;
     const hasLanguages = data.languages.length > 0;
