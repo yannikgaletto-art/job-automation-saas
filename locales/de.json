@@ -243,13 +243,10 @@
       "max_jobs": "Max. 5 aktive Jobs erreicht",
       "current_jobs": "Aktuelle Jobs",
       "application_history": "Bewerbungs-Journey",
-      "review_cv": "Optimierten CV prüfen",
       "notify_added": "Job zur Queue hinzugefügt",
       "notify_steckbrief": "Steckbrief erstellt",
       "notify_confirmed": "Steckbrief bestätigt",
       "notify_deleted": "Job entfernt",
-      "notify_cv_optimized": "CV optimiert",
-      "optimizing": "CV wird optimiert…",
       "notify_applied": "Bewerbung gespeichert! 🎉",
       "error_mark_applied": "Fehler – bitte erneut versuchen"
     },

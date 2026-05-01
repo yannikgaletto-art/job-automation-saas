@@ -9,13 +9,11 @@ import { EmptyJobQueue } from '@/components/empty-states/empty-job-queue';
 interface JobQueueTableProps {
     jobs: Job[];
     className?: string;
-    onOptimize?: (jobId: string) => void;
     onReanalyze?: (jobId: string) => void;
     onConfirm?: (jobId: string) => void;
     onDelete?: (jobId: string) => void;
     onMarkApplied?: (jobId: string) => void;
     loading?: boolean;
-    optimizingJobId?: string | null;
     /** Controlled expand state — lifted from parent */
     expandedId: string | null;
     /** Toggle callback — lifted from parent */
@@ -23,8 +21,8 @@ interface JobQueueTableProps {
 }
 
 export function JobQueueTable({
-    jobs, className, onOptimize, onReanalyze, onConfirm, onDelete, onMarkApplied,
-    loading, optimizingJobId, expandedId, onToggle,
+    jobs, className, onReanalyze, onConfirm, onDelete, onMarkApplied,
+    loading, expandedId, onToggle,
 }: JobQueueTableProps) {
     if (loading) {
         return <TableSkeleton rows={5} columns={5} />;
@@ -47,12 +45,10 @@ export function JobQueueTable({
                         job={job}
                         expanded={expandedId === job.id}
                         onToggle={() => onToggle(job.id)}
-                        onOptimize={onOptimize}
                         onReanalyze={onReanalyze}
                         onConfirm={onConfirm}
                         onDelete={onDelete}
                         onMarkApplied={onMarkApplied}
-                        isOptimizing={optimizingJobId === job.id}
                     />
                 ))}
             </div>

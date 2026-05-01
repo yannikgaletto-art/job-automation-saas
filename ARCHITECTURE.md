@@ -134,11 +134,12 @@ Last Updated: 2026-04-18
 - `/api/volunteering/scrape` (POST — Scraping Trigger)
 
 #### Documents & User
-- `/api/documents/upload` (POST — CV/Cover Letter Upload; CV upload returns 409 CV_ALREADY_EXISTS under the Single-CV invariant)
+- `/api/documents/upload` (POST — CV/Cover Letter Upload; CV-Pfad parst via Mistral OCR + Mistral parse und gibt die Draft-Struktur zurück, schreibt aber NICHT user_profiles. Returns 409 CV_ALREADY_EXISTS under the Single-CV invariant)
+- `/api/documents/confirm-parse` (POST — User-Edit-First (2026-04-28): einziger Schreibpfad für `user_profiles.cv_structured_data` + `full_name`; nimmt die vom User bestätigte/korrigierte CvStructuredData und persistiert sie nach Validation)
+- `/api/documents/reparse` (POST — re-runs Mistral OCR + parse on a CV PDF, returns the new structured draft; same User-Edit-First contract — caller flow expects confirm-parse afterward)
 - `/api/documents/download` (GET — PDF Download)
 - `/api/documents/list` (GET — list user's CVs and Cover Letters)
 - `/api/documents/[id]` (DELETE — remove a document; for CVs clears user_profiles.cv_* before row delete + best-effort storage cleanup)
-- `/api/documents/reparse` (POST — re-parses a CV's extracted_text via parseCvTextToJson, makes it the master)
 - `/api/profile/dismiss-cv-migration` (POST — sets user_profiles.cv_migration_seen_at = NOW(); used by the post-Single-CV banner)
 - `/api/onboarding/complete` (POST)
 - `/api/onboarding/status` (GET)

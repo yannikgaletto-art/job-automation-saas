@@ -1,4 +1,4 @@
-import { scanForFluff, BLACKLIST_PATTERNS, buildBlacklistPromptSection } from '../anti-fluff-blacklist';
+import { scanForFluff, buildLeanBlacklistSection, BLACKLIST_PATTERNS } from '../anti-fluff-blacklist';
 
 describe('Anti-Fluff Blacklist', () => {
 
@@ -58,22 +58,15 @@ describe('Anti-Fluff Blacklist', () => {
         });
     });
 
-    describe('buildBlacklistPromptSection', () => {
+    describe('buildLeanBlacklistSection', () => {
         it('should return a non-empty string', () => {
-            const section = buildBlacklistPromptSection();
+            const section = buildLeanBlacklistSection();
             expect(section.length).toBeGreaterThan(100);
         });
 
         it('should contain VERBOTENE PHRASEN header', () => {
-            const section = buildBlacklistPromptSection();
+            const section = buildLeanBlacklistSection();
             expect(section).toContain('VERBOTENE PHRASEN');
-        });
-
-        it('should include all patterns', () => {
-            const section = buildBlacklistPromptSection();
-            BLACKLIST_PATTERNS.forEach(p => {
-                expect(section).toContain(p.pattern);
-            });
         });
     });
 });

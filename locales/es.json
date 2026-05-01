@@ -242,13 +242,10 @@
       "max_jobs": "Máximo de 5 empleos activos alcanzado",
       "current_jobs": "Empleos actuales",
       "application_history": "Mi Journey",
-      "review_cv": "Revisar CV optimizado",
       "notify_added": "Empleo añadido a la cola",
       "notify_steckbrief": "Perfil creado",
       "notify_confirmed": "Perfil confirmado",
       "notify_deleted": "Empleo eliminado",
-      "notify_cv_optimized": "CV optimizado",
-      "optimizing": "Optimizando CV…",
       "notify_applied": "¡Solicitud guardada! 🎉",
       "error_mark_applied": "Error — inténtalo de nuevo"
     },

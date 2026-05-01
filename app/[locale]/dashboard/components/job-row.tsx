@@ -40,12 +40,10 @@ interface JobRowProps {
     job: Job;
     expanded: boolean;
     onToggle: () => void;
-    onOptimize?: (jobId: string) => void;
     onReanalyze?: (jobId: string) => void;
     onConfirm?: (jobId: string) => void;
     onDelete?: (jobId: string) => void;
     onMarkApplied?: (jobId: string) => void;
-    isOptimizing?: boolean;
 }
 
 // --- Helpers ---
@@ -230,7 +228,7 @@ function BenefitsGrid({ benefits }: { benefits: string[] }) {
 // Main Component
 // ---------------------------------------------------------------
 
-export function JobRow({ job, expanded, onToggle, onOptimize, onReanalyze, onConfirm, onDelete, onMarkApplied, isOptimizing }: JobRowProps) {
+export function JobRow({ job, expanded, onToggle, onReanalyze, onConfirm, onDelete, onMarkApplied }: JobRowProps) {
     const t = useTranslations('job_queue');
     const tCvMatch = useTranslations('cv_match');
     const [activeTab, setActiveTab] = useState<number | null>(null);

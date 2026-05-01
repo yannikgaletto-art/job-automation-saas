@@ -62,6 +62,9 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   -- Onboarding Goals (added Migration 20260320)
   onboarding_goals TEXT[] DEFAULT '{}',
 
+  -- Single-CV Migration banner (added Migration 20260428_single_cv_invariant)
+  cv_migration_seen_at TIMESTAMPTZ DEFAULT NOW(),
+
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -142,6 +145,11 @@ CREATE TABLE IF NOT EXISTS documents (
 
 CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
 CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(document_type);
+
+-- Single-CV invariant: max one CV row per user (Migration 20260428_single_cv_invariant)
+CREATE UNIQUE INDEX IF NOT EXISTS one_cv_per_user
+  ON documents(user_id)
+  WHERE document_type = 'cv';
 
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 

@@ -9,14 +9,10 @@ import { Job } from '../components/job-row';
 import { Button } from '@/components/motion/button';
 import { cn } from '@/lib/utils';
 import { AddJobDialog } from '@/components/dashboard/add-job-dialog';
-import { CustomDialog } from '@/components/ui/custom-dialog';
-import { CVComparison } from '@/components/cv/cv-comparison';
-import type { CVOptimizationResult } from '@/types/cv';
 import { useNotification } from '@/hooks/use-notification';
 import { ApplicationHistory } from '@/app/[locale]/dashboard/components/application-history';
 import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
 import { useDashboardTour, type TourStep } from '../hooks/useDashboardTour';
-import { useCreditExhausted } from '../hooks/credit-exhausted-context';
 
 // ─── Toggle Section (Notion-style accordion) ───────────────────────────
 function ToggleSection({ title, count, defaultOpen = false, children }: {
@@ -215,14 +211,8 @@ export default function JobQueuePage() {
         }
     }, [tour.isActive, tour.currentStep, jobs]);
 
-    // Optimization State
     const notify = useNotification();
     const t = useTranslations('dashboard.job_queue');
-    const { showPaywall } = useCreditExhausted();
-    const [showOptimization, setShowOptimization] = useState(false);
-    const [optimizationResult, setOptimizationResult] = useState<CVOptimizationResult | null>(null);
-    const [isOptimizing, setIsOptimizing] = useState(false);
-    const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
     // ✅ Canonical UI Status mapping (SICHERHEITSARCHITEKTUR.md Section 9)
     const mapDbStatusToUi = (dbStatus: string): Job['status'] => {
@@ -396,34 +386,6 @@ export default function JobQueuePage() {
         }
     };
 
-    const handleOptimizeCV = async (jobId: string) => {
-        setIsOptimizing(true);
-        setCurrentJobId(jobId);
-        try {
-            const response = await fetch('/api/cv/optimize', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId })
-            });
-            if (!response.ok) {
-                const err = await response.json();
-                if (response.status === 402 && err.error === 'CREDITS_EXHAUSTED') {
-                    showPaywall('credits', { remaining: err.remaining ?? 0 });
-                    return;
-                }
-                throw new Error(err.error || 'Optimization failed');
-            }
-            const result = await response.json();
-            setOptimizationResult(result);
-            setShowOptimization(true);
-            setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'CV_OPTIMIZED', workflowStep: 60 } : j));
-            notify(t('notify_cv_optimized'));
-        } catch (error) {
-        } finally {
-            setIsOptimizing(false);
-        }
-    };
-
     return (
         <div className="space-y-8 max-w-7xl mx-auto">
             <AddJobDialog
@@ -478,16 +440,13 @@ export default function JobQueuePage() {
                 defaultOpen={true}
             >
                 <div className="space-y-2">
-                    {isOptimizing && <span className="text-sm text-blue-600 animate-pulse px-5">{t('optimizing')}</span>}
                     <JobQueueTable
                         jobs={jobs}
-                        onOptimize={handleOptimizeCV}
                         onReanalyze={handleReanalyze}
                         onConfirm={handleConfirm}
                         onDelete={handleDelete}
                         onMarkApplied={handleMarkApplied}
                         loading={isLoading}
-                        optimizingJobId={isOptimizing ? currentJobId : null}
                         expandedId={expandedId}
                         onToggle={handleToggle}
                     />
@@ -501,42 +460,6 @@ export default function JobQueuePage() {
             >
                 <ApplicationHistory refreshKey={historyRefreshKey} />
             </ToggleSection>
-
-            {/* Optimization Modal */}
-            <CustomDialog
-                isOpen={showOptimization}
-                onClose={() => setShowOptimization(false)}
-                title={t('review_cv')}
-                maxWidth="max-w-6xl"
-                className="h-[90vh] overflow-hidden flex flex-col"
-            >
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#FAFAF9]">
-                    {optimizationResult && (
-                        <CVComparison
-                            optimizationResult={optimizationResult}
-                            onAcceptAll={async () => { setShowOptimization(false); }}
-                            onRejectAll={() => setShowOptimization(false)}
-                            onDownload={async () => {
-                                try {
-                                    const res = await fetch(`/api/cv/download?jobId=${currentJobId}&type=cv`);
-                                    if (!res.ok) throw new Error('PDF-Generierung fehlgeschlagen');
-                                    const blob = await res.blob();
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    const company = jobs.find(j => j.id === currentJobId)?.company?.replace(/[^a-z0-9]/gi, '_') || 'Pathly';
-                                    a.download = `CV_${company}.pdf`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                } catch {
-                                }
-                            }}
-                        />
-                    )}
-                </div>
-            </CustomDialog>
 
             {/* Job Queue Guided Tour */}
             {tour.isActive && tour.step && (

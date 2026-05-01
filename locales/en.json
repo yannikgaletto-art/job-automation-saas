@@ -243,13 +243,10 @@
       "max_jobs": "Maximum of 5 active jobs reached",
       "current_jobs": "Current Jobs",
       "application_history": "Application Journey",
-      "review_cv": "Review Optimized CV",
       "notify_added": "Job added to queue",
       "notify_steckbrief": "Profile created",
       "notify_confirmed": "Profile confirmed",
       "notify_deleted": "Job removed",
-      "notify_cv_optimized": "CV optimized",
-      "optimizing": "Optimizing CV…",
       "notify_applied": "Application saved! 🎉",
       "error_mark_applied": "Error — please try again"
     },

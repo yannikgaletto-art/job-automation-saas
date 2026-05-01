@@ -11,7 +11,7 @@
  * Reference: QUALITY_CV_COVER_LETTER.md B1.2
  *
  * 3 Consumers:
- *   1. Prompt Builder: buildBlacklistPromptSection() → System Prompt
+ *   1. Prompt Builder: buildLeanBlacklistSection() → System Prompt
  *   2. Validator: Regex scan → errors before Judge
  *   3. Judge: buildJudgeBlacklistSection(lang) → Haiku Judge Prompt
  */
@@ -625,14 +625,6 @@ ${T1_TIER_PATTERNS.map(p => `- "${p}"`).join('\n')}
 - Sätze über 30 Wörter ohne Komma
 - Sätze die bei einem Leser den Gedanken auslösen: "Das hat ChatGPT geschrieben"
 - Aussagen die für jede Firma 1:1 kopierbar wären`;
-}
-
-/**
- * @deprecated Use buildLeanBlacklistSection() — full pattern list is wasteful in system prompt.
- * Kept for backward compatibility with tests.
- */
-export function buildBlacklistPromptSection(): string {
-    return buildLeanBlacklistSection();
 }
 
 /**
