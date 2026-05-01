@@ -31,6 +31,14 @@ interface Props {
     cvDocumentId: string;
     onClose: () => void;
     onSaved: () => void;
+    /**
+     * 'reparse' (default): closing without Save still persists data — needed
+     *   so a fresh Mistral parse never leaves the profile orphaned.
+     * 'edit': closing discards changes silently — the underlying
+     *   user_profiles.cv_structured_data is already authoritative; the user
+     *   opted to edit, didn't, and Cancel must be non-destructive.
+     */
+    mode?: 'reparse' | 'edit';
 }
 
 type Experience = CvStructuredData["experience"][number];
@@ -80,7 +88,7 @@ function emptySkill(): SkillGroup {
     return { id: newId("skill"), category: "", items: [] };
 }
 
-export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved }: Props) {
+export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved, mode = 'reparse' }: Props) {
     const t = useTranslations("cv_confirm_dialog");
     const uiLocale = useLocale();
     // Detect from the LLM's first parse so the hint doesn't flicker as the user
@@ -132,10 +140,16 @@ export function CvEditConfirmDialog({ parsedData, cvDocumentId, onClose, onSaved
         }
     };
 
-    // Silent fallback: closing without Save still persists the parse so the
+    // Reparse mode: closing without Save still persists the parse so the
     // profile is never out of sync with the stored CV document.
+    // Edit mode: closing discards changes — the existing cv_structured_data
+    // is already the source of truth and must not be mutated by a Cancel.
     const handleClose = async () => {
         if (submitting) return;
+        if (mode === 'edit') {
+            onClose();
+            return;
+        }
         setSubmitting(true);
         await persist(data);
         setSubmitting(false);

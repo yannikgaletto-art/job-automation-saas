@@ -105,7 +105,7 @@ export function ActiveCVCard() {
 
     // Re-parse uses its own local dialog state because it bypasses the upload
     // pipeline (parses an existing document) — no banner involvement.
-    const [pendingConfirm, setPendingConfirm] = useState<{ documentId: string; parsedData: CvStructuredData } | null>(null);
+    const [pendingConfirm, setPendingConfirm] = useState<{ documentId: string; parsedData: CvStructuredData; mode: 'reparse' | 'edit' } | null>(null);
     const [reparsingId, setReparsingId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -238,7 +238,7 @@ export function ActiveCVCard() {
             }
             const parsed = data?.data?.cv_parsed as CvStructuredData | undefined;
             if (parsed) {
-                setPendingConfirm({ documentId: cvDocumentId, parsedData: parsed });
+                setPendingConfirm({ documentId: cvDocumentId, parsedData: parsed, mode: 'reparse' });
                 notify(t('cv_review_pending_toast'));
             } else {
                 throw new Error('Re-parse returned no data');
@@ -262,7 +262,7 @@ export function ActiveCVCard() {
             }
             const parsed = data?.data as CvStructuredData | undefined;
             if (parsed) {
-                setPendingConfirm({ documentId: cvDocumentId, parsedData: parsed });
+                setPendingConfirm({ documentId: cvDocumentId, parsedData: parsed, mode: 'edit' });
             } else {
                 throw new Error('No CV data returned');
             }
@@ -708,6 +708,7 @@ export function ActiveCVCard() {
                 <CvEditConfirmDialog
                     cvDocumentId={pendingConfirm.documentId}
                     parsedData={pendingConfirm.parsedData}
+                    mode={pendingConfirm.mode}
                     onClose={() => { setPendingConfirm(null); loadDocs(); }}
                     onSaved={() => { setPendingConfirm(null); loadDocs(); }}
                 />
