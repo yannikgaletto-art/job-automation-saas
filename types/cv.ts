@@ -104,6 +104,7 @@ export const cvStructuredDataSchema = z.object({
         dateText: z.string().nullish(),
         credentialUrl: z.string().nullish(),
         expiryDate: z.string().nullish(),
+        description: z.string().nullish(),
     })).nullish(),
 });
 
