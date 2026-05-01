@@ -18,7 +18,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useRouter } from "next/navigation";
-import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, RefreshCw } from "lucide-react";
+import { FileText, Upload, Trash2, Plus, Download, ChevronDown, ChevronRight, Tag, X, RefreshCw, Pencil } from "lucide-react";
 import { Button } from "@/components/motion/button";
 import { useNotification } from "@/hooks/use-notification";
 import { useTranslations, useLocale } from "next-intl";
@@ -107,6 +107,7 @@ export function ActiveCVCard() {
     // pipeline (parses an existing document) — no banner involvement.
     const [pendingConfirm, setPendingConfirm] = useState<{ documentId: string; parsedData: CvStructuredData } | null>(null);
     const [reparsingId, setReparsingId] = useState<string | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     // CL upload hint dialog
     const [showClHint, setShowClHint] = useState(false);
@@ -247,6 +248,29 @@ export function ActiveCVCard() {
             notify(t('reparse_failed', { error: errMsg }));
         } finally {
             setReparsingId(null);
+        }
+    };
+
+    const handleEdit = async (cvDocumentId: string) => {
+        if (editingId) return;
+        setEditingId(cvDocumentId);
+        try {
+            const res = await fetch('/api/cv/structured-data');
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.success) {
+                throw new Error(data?.error || `HTTP ${res.status}`);
+            }
+            const parsed = data?.data as CvStructuredData | undefined;
+            if (parsed) {
+                setPendingConfirm({ documentId: cvDocumentId, parsedData: parsed });
+            } else {
+                throw new Error('No CV data returned');
+            }
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : 'Edit failed';
+            notify(t('edit_failed', { error: errMsg }));
+        } finally {
+            setEditingId(null);
         }
     };
 
@@ -396,14 +420,24 @@ export function ActiveCVCard() {
             )}
             <div className="flex items-center gap-1">
                 {doc.type === 'cv' && (
-                    <button
-                        onClick={() => handleReparse(doc.id)}
-                        disabled={reparsingId === doc.id}
-                        className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1 disabled:opacity-50"
-                        title={reparsingId === doc.id ? t('reparse_in_progress') : t('reparse_title')}
-                    >
-                        <RefreshCw className={`w-4 h-4 ${reparsingId === doc.id ? 'animate-spin' : ''}`} />
-                    </button>
+                    <>
+                        <button
+                            onClick={() => handleEdit(doc.id)}
+                            disabled={editingId === doc.id || reparsingId === doc.id}
+                            className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1 disabled:opacity-50"
+                            title={editingId === doc.id ? t('edit_loading') : t('edit_title')}
+                        >
+                            <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => handleReparse(doc.id)}
+                            disabled={reparsingId === doc.id || editingId === doc.id}
+                            className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1 disabled:opacity-50"
+                            title={reparsingId === doc.id ? t('reparse_in_progress') : t('reparse_title')}
+                        >
+                            <RefreshCw className={`w-4 h-4 ${reparsingId === doc.id ? 'animate-spin' : ''}`} />
+                        </button>
+                    </>
                 )}
                 <button onClick={() => handleDownload(doc.id, doc.name)} className="text-[#A8A29E] hover:text-[#012e7a] transition-colors p-1" title={t('download_title')}>
                     <Download className="w-4 h-4" />
