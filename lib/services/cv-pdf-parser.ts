@@ -42,6 +42,14 @@ Regeln:
 - Pipe-Separator " I " oder " | ": linke Seite = Firma/Sprache, rechte = Rolle/Niveau.
 - Bullets gehören zu der Station ÜBER ihnen — niemals zur folgenden.
 - certifications[].description: ALLE nicht-leeren Zeilen direkt unter dem Zertifikatsnamen bis zur nächsten Zertifikats-Überschrift gehören in description (Plain-String, eine Zeile pro Zeilenumbruch "\n"). Auch wenn 3 oder mehr Stichpunkte stehen — alle übernehmen, niemals droppen. Section-Header wie "Zertifikate" sind KEINE Beschreibung.
+- KONKRETES BEISPIEL für certifications[].description:
+  Input:
+    Managementberatung (Emory University)
+    - Datenanalyse für unternehmerische Entscheidungen
+    - Führung & Management
+    - Strategisches und kritisches Denken
+  Output: { "name": "Managementberatung", "issuer": "Emory University", "description": "Datenanalyse für unternehmerische Entscheidungen\nFührung & Management\nStrategisches und kritisches Denken" }
+  ⚠️ description=null bei vorhandenen Bullets ist ein FEHLER.
 - certifications[].issuer: nur dann setzen, wenn der Issuer in Klammern hinter dem Namen steht ("Managementberatung (Emory University)" → issuer="Emory University") ODER per " I "-Pipe danach ("TEDx-Coach I seit 2022 I Ehrenamtliche Tätigkeit" → issuer null oder "Ehrenamtliche Tätigkeit"). Wenn weder Klammer noch Pipe: issuer=null. NIEMALS die erste Beschreibungs-Zeile als issuer einsortieren — sie gehört dann in description.
 - "Note: 1,3" oder "Note: X,Y" am Ende einer Cert-Beschreibung: behalte es in description. Nicht als eigenes Feld extrahieren.
 
