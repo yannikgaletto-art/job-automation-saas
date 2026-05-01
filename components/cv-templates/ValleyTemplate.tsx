@@ -26,8 +26,6 @@ const DIVIDER = '#CCCCCC';
 /** Max bullets per experience entry — HARD CAP, matches AI prompt rule */
 const MAX_BULLETS_DEFAULT = 3;
 const MAX_BULLETS_COMPACT = 3;
-/** Max certifications — HARD CAP, matches AI prompt rule */
-const MAX_CERTS = 6;
 
 /**
  * Build styles dynamically based on layoutMode.
@@ -110,9 +108,8 @@ export function ValleyTemplate({ data, qrBase64, labels, layoutMode = 'default' 
 
     const s = buildStyles(layoutMode);
 
-    // HARD CAPS — prevent 3-page overflow regardless of AI output
     const maxBullets = layoutMode === 'compact' ? MAX_BULLETS_COMPACT : MAX_BULLETS_DEFAULT;
-    const cappedCerts = hasCerts ? data.certifications!.slice(0, MAX_CERTS) : [];
+    const cappedCerts = hasCerts ? data.certifications! : [];
 
 
     return (
