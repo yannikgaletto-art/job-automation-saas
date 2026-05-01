@@ -1,5 +1,5 @@
-// Vercel timeout: Claude Haiku CV parse can take 15-25s.
-export const maxDuration = 60;
+// Vercel timeout: Mistral OCR + Parse pipeline can take 47-75s.
+export const maxDuration = 120;
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
