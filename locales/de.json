@@ -1618,6 +1618,10 @@
     "reparse_title": "Lebenslauf neu auswerten",
     "reparse_in_progress": "Wird neu ausgewertet …",
     "reparse_failed": "Re-Parse fehlgeschlagen: {error}",
+    "preview_title": "Vorschau im neuen Tab öffnen",
+    "preview_failed_toast": "Vorschau fehlgeschlagen: {error}",
+    "preview_popup_blocked": "Popup blockiert. Erlaube Popups für diese Seite, um die Vorschau zu öffnen.",
+    "download_failed_toast": "Download fehlgeschlagen: {error}",
     "cv_review_pending_toast": "Bitte prüfe den ausgelesenen Lebenslauf"
   },
   "cv_migration_banner": {

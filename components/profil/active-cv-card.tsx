@@ -305,6 +305,29 @@ export function ActiveCVCard() {
             URL.revokeObjectURL(url);
         } catch (err: unknown) {
             const errMsg = err instanceof Error ? err.message : 'Unbekannter Fehler';
+            notify(t('download_failed_toast', { error: errMsg }));
+        }
+    };
+
+    const handlePreview = async (id: string) => {
+        // Open the tab synchronously to preserve the user-gesture for popup blockers,
+        // then navigate it once the blob is ready.
+        const newTab = window.open('about:blank', '_blank');
+        if (!newTab) {
+            notify(t('preview_popup_blocked'));
+            return;
+        }
+        try {
+            const res = await fetch(`/api/documents/download?id=${id}`);
+            if (!res.ok) throw new Error('Preview fehlgeschlagen');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            newTab.location.href = url;
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        } catch (err: unknown) {
+            newTab.close();
+            const errMsg = err instanceof Error ? err.message : 'Unbekannter Fehler';
+            notify(t('preview_failed_toast', { error: errMsg }));
         }
     };
 
@@ -374,10 +397,15 @@ export function ActiveCVCard() {
     const renderDocRow = (doc: DocumentEntry, highlight: boolean = false) => (
         <li key={doc.id} className={`flex items-center gap-3 p-3 rounded-lg ${highlight ? 'bg-[#F0F7FF] border border-[#012e7a]/20' : 'bg-white border border-[#E7E7E5]'}`}>
             <FileText className={`w-4 h-4 shrink-0 ${highlight ? 'text-[#012e7a]' : 'text-[#73726E]'}`} />
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#37352F] truncate">{doc.name}</p>
+            <button
+                type="button"
+                onClick={() => handlePreview(doc.id)}
+                className="flex-1 min-w-0 text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#012e7a]/40 rounded"
+                title={t('preview_title')}
+            >
+                <p className="text-sm font-medium text-[#37352F] truncate group-hover:underline">{doc.name}</p>
                 <p className="text-xs text-[#73726E]">{t('uploaded_at')}: {formatDate(doc.createdAt, locale)}</p>
-            </div>
+            </button>
             {/* Category selector for cover letters */}
             {doc.type === 'cover_letter' && categoryNames.length > 0 && (
                 <select

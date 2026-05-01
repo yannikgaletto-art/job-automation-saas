@@ -1601,6 +1601,10 @@
     "reparse_title": "Volver a analizar el CV",
     "reparse_in_progress": "Reanalizando …",
     "reparse_failed": "El reanálisis falló: {error}",
+    "preview_title": "Abrir vista previa en nueva pestaña",
+    "preview_failed_toast": "Vista previa falló: {error}",
+    "preview_popup_blocked": "Ventana emergente bloqueada. Permite las ventanas emergentes en este sitio para abrir la vista previa.",
+    "download_failed_toast": "Descarga falló: {error}",
     "cv_review_pending_toast": "Revisa el CV analizado"
   },
   "cv_migration_banner": {

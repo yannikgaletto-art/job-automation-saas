@@ -65,3 +65,6 @@ Job_Search_Pre.mp4
 tmp/test-*.ts
 scripts/cfo-*.ts
 scripts/migrate_*.ts
+
+# Local handover notes + user test PDFs (never commit, contains PII)
+Übergang/

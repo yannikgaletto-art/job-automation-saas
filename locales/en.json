@@ -1618,6 +1618,10 @@
     "reparse_title": "Re-parse CV",
     "reparse_in_progress": "Re-parsing …",
     "reparse_failed": "Re-parse failed: {error}",
+    "preview_title": "Open preview in new tab",
+    "preview_failed_toast": "Preview failed: {error}",
+    "preview_popup_blocked": "Popup blocked. Allow popups for this site to open the preview.",
+    "download_failed_toast": "Download failed: {error}",
     "cv_review_pending_toast": "Please review the parsed CV"
   },
   "cv_migration_banner": {
