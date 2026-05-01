@@ -144,7 +144,6 @@ export async function POST(req: NextRequest) {
         // here anymore — that write happens in /api/documents/confirm-parse
         // after the user has reviewed/edited the extracted fields.
         // ================================================================
-        let processedCv: { encryptedPii: Record<string, unknown>; metadata: Record<string, unknown>; extractedText: string } | null = null;
         let cvDocId: string | null = null;
         let cvUploadPath: string | null = null;
         let cvParsedStructure: import('@/types/cv').CvStructuredData | null = null;
@@ -202,12 +201,25 @@ export async function POST(req: NextRequest) {
 
             cvUploadPath = cvUploadData.path;
 
-            // 1. Process CV immediately (Sync) to get Metadata/PII
-            console.log(`[${requestId}] route=documents/upload step=process_cv`);
+            // Mistral-only pipeline (EU/DSGVO): one OCR + one parse pass.
+            // Replaces previous Azure-DI + Claude-Haiku pre-pass that doubled
+            // the latency and pushed real-world PDFs over the 60s budget.
+            console.log(`[${requestId}] route=documents/upload step=parse_cv_pdf...`);
 
             try {
                 const cvBuffer = Buffer.from(cvBytes);
-                processedCv = await processDocument(cvBuffer, cvFile.type);
+                const { parseCvFromPdf } = await import('@/lib/services/cv-pdf-parser');
+                const { encrypt } = await import('@/lib/utils/encryption');
+                const { structured: structuredCv, markdown } = await parseCvFromPdf(cvBuffer);
+
+                // Encrypt PII straight from the parser output. Mistral reads the PDF
+                // natively so name/email/phone are extracted alongside the structured
+                // CV; we never need a second model just to surface them.
+                const piiEncrypted: Record<string, string> = {};
+                const pi = structuredCv.personalInfo ?? {};
+                if (pi.name) piiEncrypted.name = encrypt(pi.name);
+                if (pi.email) piiEncrypted.email = encrypt(pi.email);
+                if (pi.phone) piiEncrypted.phone = encrypt(pi.phone);
 
                 const { data: cvDoc, error: cvDbError } = await supabaseAdmin
                     .from('documents')
@@ -216,21 +228,20 @@ export async function POST(req: NextRequest) {
                         document_type: 'cv',
                         file_url_encrypted: cvUploadData.path,
                         metadata: {
-                            ...processedCv.metadata,
-                            extracted_text: processedCv.extractedText,
-                            original_name: cvFile.name // ✅ SICHERHEITSARCHITEKTUR.md Section 2
+                            extracted_text: markdown,
+                            original_name: cvFile.name,
+                            cv_parsed_v2: structuredCv,
                         },
-                        pii_encrypted: processedCv.encryptedPii
+                        pii_encrypted: piiEncrypted,
                     })
                     .select()
                     .single();
 
                 if (cvDbError) {
                     console.error(`[${requestId}] route=documents/upload step=db_insert_cv supabase_error=${cvDbError.message} code=${cvDbError.code}`);
-                    // 23505 = unique_violation. Hits when a concurrent upload won
-                    // the race and the one_cv_per_user partial index now blocks
-                    // this row. Compensate the orphan storage upload, return 409.
                     if (cvDbError.code === '23505') {
+                        // Lost the race vs one_cv_per_user partial index — compensate the
+                        // orphan storage upload and signal 409.
                         await supabaseAdmin.storage.from('cvs').remove([cvUploadData.path]).catch(() => null);
                         return NextResponse.json(
                             {
@@ -241,84 +252,28 @@ export async function POST(req: NextRequest) {
                             { status: 409 }
                         );
                     }
-                } else {
-                    // ✅ READ-BACK: Verify DB insert was successful (SICHERHEITSARCHITEKTUR.md Section 2)
-                    const { data: verify, error: vErr } = await supabaseAdmin
-                        .from('documents')
-                        .select('id')
-                        .eq('id', cvDoc.id)
-                        .single();
-
-                    if (vErr || !verify) {
-                        console.error(`[${requestId}] route=documents/upload step=db_insert_cv_verify failed`);
-                        return NextResponse.json({ error: 'CV verification failed' }, { status: 500 });
-                    }
-
-                    cvDocId = cvDoc.id;
-                    console.log(`[${requestId}] route=documents/upload step=db_insert_cv success`);
-
-                    // 1.5 Parse the unstructured text to strict JSON for the
-                    // confirm dialog. NOTE: We do NOT write to user_profiles
-                    // here anymore (User-Edit-First). The parsed JSON is
-                    // returned in the response so the UI can show it for the
-                    // user to confirm/correct, then /api/documents/confirm-parse
-                    // performs the save.
-                    try {
-                        console.log(`[${requestId}] route=documents/upload step=parse_cv_pdf...`);
-                        const { parseCvFromPdf } = await import('@/lib/services/cv-pdf-parser');
-                        const structuredCv = await parseCvFromPdf(cvBuffer);
-
-                        // PII integrity guard: Phase-1 dedicated PII extraction is
-                        // more reliable than the parser's general-purpose pass (which
-                        // can be misled by OCR headers like company logos).
-                        if (processedCv.encryptedPii) {
-                            const { decrypt } = await import('@/lib/utils/encryption');
-                            if (!structuredCv.personalInfo) structuredCv.personalInfo = {} as any;
-                            if (processedCv.encryptedPii.name) {
-                                try {
-                                    structuredCv.personalInfo.name = decrypt(processedCv.encryptedPii.name as string);
-                                } catch { /* decrypt failed — leave as-is */ }
-                            }
-                            if (!structuredCv.personalInfo.email && processedCv.encryptedPii.email) {
-                                try {
-                                    structuredCv.personalInfo.email = decrypt(processedCv.encryptedPii.email as string);
-                                } catch { /* decrypt failed */ }
-                            }
-                            if (!structuredCv.personalInfo.phone && processedCv.encryptedPii.phone) {
-                                try {
-                                    structuredCv.personalInfo.phone = decrypt(processedCv.encryptedPii.phone as string);
-                                } catch { /* decrypt failed */ }
-                            }
-                        }
-
-                        cvParsedStructure = structuredCv;
-
-                        // Cache the parsed JSON in metadata so the inngest cv-match-pipeline
-                        // can consume it without re-running the parser. Legacy docs without
-                        // this key fall back to parseCvTextToJson(extracted_text).
-                        await supabaseAdmin
-                            .from('documents')
-                            .update({
-                                metadata: {
-                                    ...processedCv.metadata,
-                                    extracted_text: processedCv.extractedText,
-                                    original_name: cvFile.name,
-                                    cv_parsed_v2: structuredCv,
-                                },
-                            })
-                            .eq('id', cvDoc.id);
-
-                        console.log(`[${requestId}] route=documents/upload step=parse_cv_pdf success`);
-                    } catch (parseError: unknown) {
-                        const msg = parseError instanceof Error ? parseError.message : String(parseError);
-                        console.error(`[${requestId}] route=documents/upload step=parse_cv_pdf error=${msg}`);
-                    }
+                    return NextResponse.json({ error: 'Failed to persist CV', details: cvDbError.message, requestId }, { status: 500 });
                 }
 
-            } catch (procError) {
-                const errMsg = procError instanceof Error ? procError.message : String(procError);
-                console.error(`[${requestId}] route=documents/upload step=process_cv extraction_failed_non_blocking error=${errMsg}`);
-                // Non-blocking: save the file without extracted text rather than failing the whole upload
+                // ✅ READ-BACK guard (SICHERHEITSARCHITEKTUR.md §2)
+                const { data: verify, error: vErr } = await supabaseAdmin
+                    .from('documents')
+                    .select('id')
+                    .eq('id', cvDoc.id)
+                    .single();
+                if (vErr || !verify) {
+                    console.error(`[${requestId}] route=documents/upload step=db_insert_cv_verify failed`);
+                    return NextResponse.json({ error: 'CV verification failed' }, { status: 500 });
+                }
+
+                cvDocId = cvDoc.id;
+                cvParsedStructure = structuredCv;
+                console.log(`[${requestId}] route=documents/upload step=parse_cv_pdf success`);
+            } catch (parseError) {
+                const errMsg = parseError instanceof Error ? parseError.message : String(parseError);
+                console.error(`[${requestId}] route=documents/upload step=parse_cv_pdf failed error=${errMsg}`);
+                // Non-blocking: persist the document with error metadata so the user
+                // can retry via Re-Parse rather than losing the upload entirely.
                 const { data: cvDoc, error: cvDbError } = await supabaseAdmin
                     .from('documents')
                     .insert({
@@ -326,7 +281,7 @@ export async function POST(req: NextRequest) {
                         document_type: 'cv',
                         file_url_encrypted: cvUploadData.path,
                         metadata: { extracted_text: null, extraction_error: errMsg, original_name: cvFile.name },
-                        pii_encrypted: {}
+                        pii_encrypted: {},
                     })
                     .select()
                     .single();
@@ -334,7 +289,6 @@ export async function POST(req: NextRequest) {
                     cvDocId = cvDoc.id;
                     console.log(`[${requestId}] route=documents/upload step=db_insert_cv_fallback success`);
                 } else if (cvDbError?.code === '23505') {
-                    // Race lost against unique index; clean up storage and signal 409.
                     await supabaseAdmin.storage.from('cvs').remove([cvUploadData.path]).catch(() => null);
                     return NextResponse.json(
                         {
@@ -425,10 +379,6 @@ export async function POST(req: NextRequest) {
                 // User-Edit-First: parsed structure for the confirm dialog.
                 // null when the file is a cover letter or when parsing failed.
                 cv_parsed: cvParsedStructure,
-                extracted: processedCv ? {
-                    metadata: processedCv.metadata
-                    // NOTE: not returning pii_encrypted in response (GDPR)
-                } : null,
                 document_ids: {
                     cv: cvDocId,
                     coverLetters: coverLetterIds

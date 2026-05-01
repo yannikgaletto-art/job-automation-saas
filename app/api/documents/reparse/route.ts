@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
         }
         const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer());
 
-        const structured: CvStructuredData = await parseCvFromPdf(pdfBuffer);
+        const { structured } = await parseCvFromPdf(pdfBuffer);
 
         // PII integrity guard — same logic as upload route. Phase-1 PII
         // extraction is more reliable than the parser's general pass.

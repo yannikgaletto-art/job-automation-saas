@@ -47,7 +47,13 @@ Regeln:
 
 OUTPUT: NUR das JSON-Objekt, kein Markdown, kein Kommentar.`;
 
-export async function parseCvFromPdf(pdfBuffer: Buffer): Promise<CvStructuredData> {
+export interface CvParseResult {
+    structured: CvStructuredData;
+    /** Mistral OCR markdown — used as extracted_text cache by callers. */
+    markdown: string;
+}
+
+export async function parseCvFromPdf(pdfBuffer: Buffer): Promise<CvParseResult> {
     if (!MISTRAL_KEY) throw new Error('MISTRAL_API_KEY is not configured');
 
     const base64 = pdfBuffer.toString('base64');
@@ -102,11 +108,11 @@ export async function parseCvFromPdf(pdfBuffer: Buffer): Promise<CvStructuredDat
     // shouldn't kill the whole upload — the user reviews everything in the
     // confirm dialog anyway.
     const parseResult = cvStructuredDataSchema.safeParse(rawJson);
-    if (parseResult.success) return parseResult.data as CvStructuredData;
+    if (parseResult.success) return { structured: parseResult.data as CvStructuredData, markdown };
 
     const issues = parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
     console.warn(`⚠️ [cv-pdf-parser] Zod partial validation — using raw JSON. Issues: ${issues}`);
-    return {
+    const fallback = {
         version: rawJson.version ?? '2.0',
         personalInfo: rawJson.personalInfo ?? {},
         experience: Array.isArray(rawJson.experience) ? rawJson.experience : [],
@@ -115,4 +121,5 @@ export async function parseCvFromPdf(pdfBuffer: Buffer): Promise<CvStructuredDat
         languages: Array.isArray(rawJson.languages) ? rawJson.languages : [],
         certifications: Array.isArray(rawJson.certifications) ? rawJson.certifications : [],
     } as CvStructuredData;
+    return { structured: fallback, markdown };
 }
