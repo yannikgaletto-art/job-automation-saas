@@ -1,6 +1,6 @@
-// Vercel timeout: Azure Document Intelligence + Claude CV parsing can take 20-40s.
-// Without this, Vercel defaults to 10s (Hobby) causing silent production timeouts.
-export const maxDuration = 60;
+// Vercel timeout: pipeline runs Azure DI + Claude (PII) AND Mistral (parse) sequentially,
+// which exceeds 60s on real-world PDFs. 120s is the Pro-plan budget; matches cv/optimize.
+export const maxDuration = 120;
 
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
