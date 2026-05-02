@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { cleanAtsKeywords } from '@/lib/services/ats-keyword-filter';
+import { cleanJobBenefits } from '@/lib/services/job-benefit-filter';
 
 // Admin client for bypassing RLS
 const supabaseAdmin = createAdminClient(
@@ -61,7 +63,20 @@ export async function GET() {
             return NextResponse.json({ success: false, error: error.message }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true, jobs: jobs || [] });
+        const sanitizedJobs = (jobs || []).map((job) => {
+            const cleanedBuzzwords = cleanAtsKeywords(
+                Array.isArray(job.buzzwords) ? job.buzzwords : [],
+                job.description || null
+            );
+
+            return {
+                ...job,
+                buzzwords: cleanedBuzzwords.kept.length > 0 ? cleanedBuzzwords.kept : null,
+                benefits: cleanJobBenefits(Array.isArray(job.benefits) ? job.benefits : []),
+            };
+        });
+
+        return NextResponse.json({ success: true, jobs: sanitizedJobs });
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
         return NextResponse.json({ success: false, error: errMsg }, { status: 500 });
