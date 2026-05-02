@@ -7,6 +7,7 @@ import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import { getAnthropicClient } from '@/lib/ai/model-router';
 import { withCreditGate, handleBillingError } from '@/lib/middleware/credit-gate';
 import { CREDIT_COSTS } from '@/lib/services/credit-types';
+import { buildVideoKeywordList, constrainCategorizedVideoKeywords } from '@/lib/services/video-keyword-source';
 
 const supabaseAdmin = getSupabaseAdmin();
 
@@ -149,13 +150,7 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Collect all raw keywords
-        const allKeywords = [
-            ...(job.ats_keywords || []),
-            ...(job.buzzwords || []),
-            ...(job.hard_requirements || []),
-        ];
-        const uniqueKeywords = [...new Set(allKeywords.map((k: string) => k.trim()).filter(Boolean))];
+        const uniqueKeywords = buildVideoKeywordList(job);
 
         // --- 3-Tier Applicant Context Fallback ---
         // Tier 1: Cover Letter for THIS specific job
@@ -254,7 +249,7 @@ export async function POST(request: NextRequest) {
             const jsonMatch = aiText.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 const parsed = JSON.parse(jsonMatch[0]);
-                categorizedKeywords = parsed.keywords || categorizedKeywords;
+                categorizedKeywords = constrainCategorizedVideoKeywords(parsed.keywords || categorizedKeywords, uniqueKeywords);
                 aiBlocks = parsed.blocks || [];
                 mirrorPhrases = parsed.mirror_phrases || [];
             }
@@ -614,4 +609,3 @@ Antworte NUR mit JSON:
 }`,
     };
 }
-
