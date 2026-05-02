@@ -8,6 +8,7 @@ import { inngest } from '@/lib/inngest/client';
 import { getLanguageName, getUserLocale } from '@/lib/i18n/get-user-locale';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import { buildAtsKeywordPrompt, cleanAtsKeywords } from '@/lib/services/ats-keyword-filter';
+import { cleanJobBenefits } from '@/lib/services/job-benefit-filter';
 
 /**
  * POST /api/jobs/extract — Smart Trigger
@@ -100,14 +101,17 @@ export async function POST(request: NextRequest) {
                 taskType: 'extract_job_fields',
                 systemPrompt: `Extrahiere aus der Stellenbeschreibung diese JSON-Struktur. NUR JSON zurückgeben, kein Markdown, keine Erklärungen.
 
-WICHTIG für Listen (responsibilities, qualifications, benefits):
+WICHTIG für Listen (responsibilities, qualifications):
 - Schreibe verdichtete, vollständige Sätze — ca. 20% kürzer als das Original.
 - Erhalte die Kernaussage jedes Punktes. Kein Abkürzen auf bloße Stichworte.
 - KEIN Copy-Paste des Originals, sondern eine informierte Verdichtung.
 - Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
 - Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
 
-{"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben als verdichtete vollständige Sätze"],"qualifications":["max 8 Anforderungen als verdichtete vollständige Sätze"],"benefits":["max 5"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":[${JSON.stringify(buildAtsKeywordPrompt(languageName))}]}`,
+WICHTIG für benefits:
+- Extrahiere nur die 5-6 wichtigsten Benefits.
+
+{"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben als verdichtete vollständige Sätze"],"qualifications":["max 8 Anforderungen als verdichtete vollständige Sätze"],"benefits":["TOP 6"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":[${JSON.stringify(buildAtsKeywordPrompt(languageName))}]}`,
                 prompt: job.description,
                 temperature: 0,
                 maxTokens: 2000,
@@ -124,7 +128,7 @@ WICHTIG für Listen (responsibilities, qualifications, benefits):
                 summary: (extracted.summary as string) || null,
                 responsibilities: Array.isArray(extracted.responsibilities) && extracted.responsibilities.length > 0 ? extracted.responsibilities : null,
                 requirements: Array.isArray(extracted.qualifications) && extracted.qualifications.length > 0 ? extracted.qualifications : null,
-                benefits: Array.isArray(extracted.benefits) ? extracted.benefits : [],
+                benefits: cleanJobBenefits(extracted.benefits as string[]),
                 location: (extracted.location as string) || null,
                 seniority: (extracted.seniority as string) || 'unknown',
                 buzzwords: cleanedBuzzwords.kept.length > 0 ? cleanedBuzzwords.kept : null,

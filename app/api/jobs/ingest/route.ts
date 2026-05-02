@@ -11,6 +11,7 @@ import { complete } from '@/lib/ai/model-router';
 import { getUserLocale, getLanguageName } from '@/lib/i18n/get-user-locale';
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
 import { buildAtsKeywordPrompt, cleanAtsKeywords } from '@/lib/services/ats-keyword-filter';
+import { cleanJobBenefits } from '@/lib/services/job-benefit-filter';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = createAdminClient(
@@ -199,7 +200,7 @@ export async function POST(request: NextRequest) {
                     summary: cached.summary || null,
                     qualifications: Array.isArray(cached.requirements) ? cached.requirements : [],
                     responsibilities: Array.isArray(cached.responsibilities) ? cached.responsibilities : [],
-                    benefits: Array.isArray(cached.benefits) ? cached.benefits : [],
+                    benefits: cleanJobBenefits(Array.isArray(cached.benefits) ? cached.benefits : []),
                     seniority: cached.seniority || 'unknown',
                     location: cached.location || null,
                 };
@@ -240,7 +241,7 @@ export async function POST(request: NextRequest) {
                     summary: `string — 2-3 sentence summary of the role in ${languageName}`,
                     responsibilities: `string[] — responsibilities as bullet points (max 8), in ${languageName}`,
                     qualifications: `string[] — qualifications (max 8), in ${languageName}`,
-                    benefits: `string[] — TOP 6 most important benefits, max 3 words each (e.g. "30 Tage Urlaub", "Remote Work", "Betriebliche Altersvorsorge"). No full sentences. No copy-paste.`,
+                    benefits: `string[] — TOP 6 most important benefits (5-6 total), compact labels preferred (e.g. "30 Tage Urlaub", "Remote Work", "Betriebliche Altersvorsorge"). No copy-paste lists beyond 6 items.`,
                     seniority: "'junior' | 'mid' | 'senior' | 'lead' | 'unknown'",
                     buzzwords: buildAtsKeywordPrompt(languageName)
                 };
@@ -258,7 +259,7 @@ IMPORTANT for lists (responsibilities, qualifications):
 - Start each bullet with **key phrase** (max 4 words, the core action or concept), followed by the detail. Example: "**Leitet Executive-Workshops** zur Identifikation von Kundenschmerzen."
 
 IMPORTANT for benefits:
-- Extract ONLY the 6 most standout benefits, max 3 words each.
+- Extract ONLY the 5-6 most standout benefits.
 - Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
 Schema: ${JSON.stringify(extractionSchema)}`,
@@ -341,6 +342,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
             extractedData.qualifications = normalizeSortDedup(extractedData.qualifications);
             console.log(`[${requestId}] route=jobs/ingest step=normalize_requirements count=${extractedData.qualifications.length}`);
         }
+        extractedData.benefits = cleanJobBenefits(extractedData.benefits);
 
         // ================================================================
         // STEP 4: Insert job into queue
@@ -364,7 +366,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
                 responsibilities: extractedData.responsibilities?.length > 0 ? extractedData.responsibilities : null,
                 summary: extractedData.summary || null,
                 seniority: extractedData.seniority || 'unknown',
-                benefits: extractedData.benefits || [],
+                benefits: extractedData.benefits,
                 buzzwords: Array.isArray(extractedData.buzzwords) && extractedData.buzzwords.length > 0 ? extractedData.buzzwords : null,
                 platform: 'unknown',
                 snapshot_at: new Date().toISOString(),
@@ -468,7 +470,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
                             buzzwords: extractedData.buzzwords || [],
                             requirements: extractedData.qualifications || [],
                             responsibilities: extractedData.responsibilities || [],
-                            benefits: extractedData.benefits || [],
+                            benefits: cleanJobBenefits(extractedData.benefits),
                             summary: extractedData.summary || null,
                             seniority: extractedData.seniority || 'unknown',
                             location: extractedData.location || null,

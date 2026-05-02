@@ -11,6 +11,7 @@ import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash'
 import { complete } from '@/lib/ai/model-router'
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer'
 import { buildAtsKeywordPrompt, cleanAtsKeywords } from '@/lib/services/ats-keyword-filter'
+import { cleanJobBenefits } from '@/lib/services/job-benefit-filter'
 
 // ================================================================
 // CORS Headers — required for Browser Extension (chrome-extension:// origin)
@@ -266,10 +267,10 @@ IMPORTANT for lists (responsibilities, qualifications):
 - Start each bullet with **key phrase** (max 4 words, the core action or concept), followed by the detail. Example: "**Leitet Executive-Workshops** zur Identifikation von Kundenschmerzen."
 
 IMPORTANT for benefits:
-- Extract ONLY the 6 most standout benefits, max 3 words each.
+- Extract ONLY the 5-6 most standout benefits.
 - Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
-Schema: {"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8"],"qualifications":["max 8"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":[${JSON.stringify(buildAtsKeywordPrompt(languageName))}]}`,
+Schema: {"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8"],"qualifications":["max 8"],"benefits":["TOP 6"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":[${JSON.stringify(buildAtsKeywordPrompt(languageName))}]}`,
                     prompt: sanitizeForAI(description).sanitized,
                     temperature: 0,
                     maxTokens: 2000,
@@ -310,7 +311,7 @@ Schema: {"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8
                                 ? extracted.responsibilities : null,
                             requirements: Array.isArray(extracted.qualifications) && (extracted.qualifications as unknown[]).length > 0
                                 ? extracted.qualifications : null,
-                            benefits: Array.isArray(extracted.benefits) ? extracted.benefits : [],
+                            benefits: cleanJobBenefits(extracted.benefits as string[]),
                             location: (extracted.location as string) || location || null,
                             seniority: (extracted.seniority as string) || 'unknown',
                             buzzwords: buzzwords,

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { cleanAtsKeywords } from '@/lib/services/ats-keyword-filter';
+import { cleanJobBenefits } from '@/lib/services/job-benefit-filter';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
             const cleaned = cleanAtsKeywords(edits.ats_keywords, jobForFilter?.description || null);
             safeEdits.buzzwords = cleaned.kept.length > 0 ? cleaned.kept : null;
         }
-        if (edits?.benefits) safeEdits.benefits = edits.benefits;
+        if (edits?.benefits) safeEdits.benefits = cleanJobBenefits(edits.benefits);
 
         // Guard: Accept jobs in pre-confirmed states (pending, pending_review, processing)
         const { data: updated, error } = await supabaseAdmin

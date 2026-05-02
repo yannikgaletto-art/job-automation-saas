@@ -22,6 +22,7 @@ import {
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import { getLanguageName, getUserLocale } from '@/lib/i18n/get-user-locale';
 import { isSameCompanyName } from '@/lib/services/company-name-match';
+import { cleanJobBenefits } from '@/lib/services/job-benefit-filter';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -160,6 +161,7 @@ export async function POST(request: NextRequest) {
         }
 
         const judgeResult = harvested ? await judgeJob(harvested, userValues) : null;
+        const benefits = cleanJobBenefits(harvested?.benefits_and_perks);
 
         // ─── Step 4: Ensure user_profiles exists ────────────────────
         const { data: profile } = await supabaseAdmin
@@ -206,7 +208,7 @@ export async function POST(request: NextRequest) {
             tasks: harvested?.tasks || null,
             requirements: harvested?.hard_requirements || null,
             responsibilities: harvested?.tasks || null,
-            benefits: harvested?.benefits_and_perks || [],
+            benefits,
             buzzwords: harvested?.ats_keywords || null,
             about_company_raw: harvested?.about_company_raw || null,
             mission_statement_raw: harvested?.mission_statement_raw || null,
@@ -253,7 +255,7 @@ export async function POST(request: NextRequest) {
                 tasks: harvested?.tasks || [],
                 hard_requirements: harvested?.hard_requirements || [],
                 soft_requirements: harvested?.soft_requirements || [],
-                benefits: harvested?.benefits_and_perks || [],
+                benefits,
                 ats_keywords: harvested?.ats_keywords || [],
                 score_breakdown: judgeResult?.score_breakdown || null,
                 judge_reasoning: judgeResult?.judge_reasoning || null,

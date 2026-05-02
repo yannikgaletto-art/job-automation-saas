@@ -478,6 +478,7 @@ FORMATREGEL für hard_requirements, soft_requirements und tasks:
 - Danach folgt der konkrete Satzinhalt.
 
 FORMATREGEL für benefits_and_perks:
+- Extrahiere nur die 5-6 wichtigsten Benefits.
 - Nur kompakte Benefit-Labels, keine ganzen Sätze.
 - Maximal 6 Wörter pro Benefit.
 - Beispiel GUT: "Hybrides Arbeiten", "Weiterbildungsbudget", "Mentoring-Programm".`;
@@ -499,7 +500,7 @@ JSON-Schema:
   "hard_requirements": ["string"],
   "soft_requirements": ["string"],
   "tasks": ["string"],
-  "benefits_and_perks": ["string"],
+  "benefits_and_perks": ["TOP 6 string"],
   "about_company_raw": "string | null",
   "mission_statement_raw": "string | null",
   "diversity_section_raw": "string | null",

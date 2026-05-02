@@ -14,6 +14,7 @@ import { CustomDialog } from "@/components/ui/custom-dialog";
 import { CVMatchTab } from './cv-match/cv-match-tab';
 import { OptimizerWizard } from '@/components/cv-optimizer/OptimizerWizard';
 import { Step5Video } from './workflow-steps/step-5-video';
+import { cleanJobBenefits } from '@/lib/services/job-benefit-filter';
 
 export interface Job {
     id: string;
@@ -210,14 +211,12 @@ function ATSKeywords({ buzzwords }: { buzzwords: string[] }) {
 
 /** Benefits compact grid — all items, font matches ATS Keywords pills */
 function BenefitsGrid({ benefits }: { benefits: string[] }) {
+    const shownBenefits = cleanJobBenefits(benefits);
+
     return (
         <div className="flex flex-wrap gap-2 mt-2">
-            {benefits.map((b, i) => (
-                <span
-                    key={i}
-                    title={b}
-                    className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 max-w-[260px] truncate"
-                >
+            {shownBenefits.map((b, i) => (
+                <span key={i} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
                     {b}
                 </span>
             ))}

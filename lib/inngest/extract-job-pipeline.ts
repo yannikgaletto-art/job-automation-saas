@@ -15,6 +15,7 @@ import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-local
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
 import { deepScrapeJob } from '@/lib/services/job-search-pipeline';
 import { buildAtsKeywordPrompt, cleanAtsKeywords } from '@/lib/services/ats-keyword-filter';
+import { cleanJobBenefits } from '@/lib/services/job-benefit-filter';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -194,10 +195,10 @@ IMPORTANT for lists (responsibilities, qualifications):
 - Start each bullet with **key phrase** (max 4 words, the core action or concept), followed by the detail. Example: "**Leitet Executive-Workshops** zur Identifikation von Kundenschmerzen."
 
 IMPORTANT for benefits:
-- Extract ONLY the 6 most standout benefits, max 3 words each.
+- Extract ONLY the 5-6 most standout benefits.
 - Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
-{"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8 responsibilities"],"qualifications":["max 8 qualifications"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":[${JSON.stringify(buildAtsKeywordPrompt(languageName))}]}`,
+{"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8 responsibilities"],"qualifications":["max 8 qualifications"],"benefits":["TOP 6"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":[${JSON.stringify(buildAtsKeywordPrompt(languageName))}]}`,
                 prompt: sanitizeForAI(job.description).sanitized,
                 temperature: 0,
                 maxTokens: 2000,
@@ -245,7 +246,7 @@ IMPORTANT for benefits:
                         ? extracted.responsibilities : null,
                     requirements: Array.isArray(extracted.qualifications) && (extracted.qualifications as unknown[]).length > 0
                         ? extracted.qualifications : null,
-                    benefits: Array.isArray((extracted as any).benefits) ? (extracted as any).benefits : [],
+                    benefits: cleanJobBenefits((extracted as any).benefits),
                     location: ((extracted as any).location as string) || null,
                     seniority: ((extracted as any).seniority as string) || 'unknown',
                     // JSONB Merge: preserve existing metadata, clear extract_error

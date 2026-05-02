@@ -48,6 +48,7 @@ describe('ATS keyword prompt and write-path regression guard', () => {
         const content = read('lib/services/job-search-pipeline.ts');
 
         expect(content).toContain('Jeder Punkt beginnt mit **Schlüsselphrase**');
+        expect(content).toContain('Extrahiere nur die 5-6 wichtigsten Benefits');
         expect(content).toContain('Maximal 6 Wörter pro Benefit');
     });
 });
