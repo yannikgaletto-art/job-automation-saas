@@ -81,3 +81,22 @@ export async function waitForBanner(
     return false;
   }
 }
+
+export async function waitForCvReviewEntry(
+  page: Page,
+  timeoutMs = 60_000
+): Promise<'banner' | 'dialog' | null> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (await ui.cvConfirmDialog(page).isVisible({ timeout: 500 }).catch(() => false)) {
+      return 'dialog';
+    }
+
+    if (await ui.cvBannerReview(page).isVisible({ timeout: 500 }).catch(() => false)) {
+      return 'banner';
+    }
+  }
+
+  return null;
+}

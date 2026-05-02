@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { createTestUser, deleteTestUser, TestUser } from '../helpers/test-user';
 import { getProfile, getDocuments } from '../helpers/supabase-readonly';
-import { ui, waitForDashboard, waitForBanner } from '../helpers/selectors';
+import { ui, waitForCvReviewEntry, waitForDashboard } from '../helpers/selectors';
 
 /**
  * Phase 1 — Q3 Name-Regression (KRITISCH)
@@ -46,13 +46,10 @@ test.describe('Phase 1A — Q3 Name-Regression', () => {
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(REAL_CV_PATH);
 
-    const bannerAppeared = await waitForBanner(page, 90_000);
-    expect(bannerAppeared, 'CV-Upload-Banner ist nach 90s nicht erschienen').toBe(true);
+    const reviewEntry = await waitForCvReviewEntry(page, 90_000);
+    expect(reviewEntry, 'CV-Review ist nach 90s nicht erreichbar').not.toBeNull();
 
-    const dialogAlreadyOpen = await ui.cvConfirmDialog(page)
-      .isVisible({ timeout: 1_000 })
-      .catch(() => false);
-    if (!dialogAlreadyOpen) {
+    if (reviewEntry === 'banner') {
       await ui.cvBannerReview(page).click({ force: true });
     }
     await ui.cvConfirmDialog(page).waitFor({ state: 'visible' });

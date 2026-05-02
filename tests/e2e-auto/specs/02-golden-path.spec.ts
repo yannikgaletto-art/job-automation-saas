@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { createTestUser, deleteTestUser, TestUser } from '../helpers/test-user';
 import { getProfile, getDocuments, getJobQueue } from '../helpers/supabase-readonly';
-import { ui, waitForDashboard, waitForBanner } from '../helpers/selectors';
+import { ui, waitForCvReviewEntry, waitForDashboard } from '../helpers/selectors';
 
 /**
  * Phase 2 — Golden Path
@@ -53,10 +53,12 @@ test.describe('Phase 2 — Golden Path', () => {
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(SYNTHETIC_CV_PDF);
 
-    const bannerAppeared = await waitForBanner(page, 90_000);
-    expect(bannerAppeared, 'CV-Upload-Banner nach 90s nicht erschienen').toBe(true);
+    const reviewEntry = await waitForCvReviewEntry(page, 90_000);
+    expect(reviewEntry, 'CV-Review nach 90s nicht erreichbar').not.toBeNull();
 
-    await ui.cvBannerReview(page).click();
+    if (reviewEntry === 'banner') {
+      await ui.cvBannerReview(page).click();
+    }
     await ui.cvConfirmDialog(page).waitFor({ state: 'visible' });
 
     const nameValue = await ui.cvNameInput(page).inputValue();

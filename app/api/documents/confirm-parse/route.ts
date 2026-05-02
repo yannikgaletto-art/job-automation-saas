@@ -70,19 +70,41 @@ export async function POST(request: NextRequest) {
 
         const fullName = confirmedStructure.personalInfo?.name?.trim() || null;
 
-        const { error: profileErr } = await supabaseAdmin
+        const { error: ensureProfileErr } = await supabaseAdmin
+            .from('user_profiles')
+            .upsert(
+                {
+                    id: user.id,
+                    pii_encrypted: {},
+                    onboarding_completed: false,
+                },
+                { onConflict: 'id', ignoreDuplicates: true },
+            );
+
+        if (ensureProfileErr) {
+            console.error('[confirm-parse] ensure profile failed:', ensureProfileErr.message);
+            return NextResponse.json(
+                { success: false, error: 'Failed to prepare profile: ' + ensureProfileErr.message },
+                { status: 500 },
+            );
+        }
+
+        const { data: updatedProfile, error: profileErr } = await supabaseAdmin
             .from('user_profiles')
             .update({
                 cv_structured_data: confirmedStructure,
                 cv_original_file_path: doc.file_url_encrypted,
                 ...(fullName ? { full_name: fullName } : {}),
             })
-            .eq('id', user.id);
+            .eq('id', user.id)
+            .select('id')
+            .maybeSingle();
 
-        if (profileErr) {
-            console.error('[confirm-parse] profile update failed:', profileErr.message);
+        if (profileErr || !updatedProfile) {
+            const message = profileErr?.message || 'profile row was not updated';
+            console.error('[confirm-parse] profile update failed:', message);
             return NextResponse.json(
-                { success: false, error: 'Failed to save CV: ' + profileErr.message },
+                { success: false, error: 'Failed to save CV: ' + message },
                 { status: 500 },
             );
         }
