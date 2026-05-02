@@ -34,8 +34,14 @@ export async function POST(request: NextRequest) {
         // §12.5: Whitelist-spread — only allowed fields from edits
         // Transition: pending_review → pending (confirmed, enters queue)
         const safeEdits: Record<string, any> = { status: 'pending' };
-        if (edits?.tasks) safeEdits.tasks = edits.tasks;
-        if (edits?.hard_requirements) safeEdits.requirements = edits.hard_requirements;
+        if (edits?.tasks) {
+            safeEdits.tasks = edits.tasks;
+            safeEdits.responsibilities = edits.tasks;
+        }
+        if (edits?.hard_requirements) {
+            safeEdits.hard_requirements = edits.hard_requirements;
+            safeEdits.requirements = edits.hard_requirements;
+        }
         if (edits?.ats_keywords) {
             const { data: jobForFilter } = await supabaseAdmin
                 .from('job_queue')

@@ -43,4 +43,11 @@ describe('ATS keyword prompt and write-path regression guard', () => {
         expect(content).not.toMatch(/max 12 ATS Keywords/);
         expect(content).not.toMatch(/"ats_keywords": \["string"\]/);
     });
+
+    it('Job Search harvester keeps Steckbrief bullets and benefits in the canonical format', () => {
+        const content = read('lib/services/job-search-pipeline.ts');
+
+        expect(content).toContain('Jeder Punkt beginnt mit **Schlüsselphrase**');
+        expect(content).toContain('Maximal 6 Wörter pro Benefit');
+    });
 });

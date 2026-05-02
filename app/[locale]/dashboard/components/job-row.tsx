@@ -213,7 +213,11 @@ function BenefitsGrid({ benefits }: { benefits: string[] }) {
     return (
         <div className="flex flex-wrap gap-2 mt-2">
             {benefits.map((b, i) => (
-                <span key={i} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                <span
+                    key={i}
+                    title={b}
+                    className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 max-w-[260px] truncate"
+                >
                     {b}
                 </span>
             ))}

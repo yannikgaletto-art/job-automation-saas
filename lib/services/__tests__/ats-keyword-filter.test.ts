@@ -13,6 +13,8 @@ describe('ats-keyword-filter', () => {
             const prompt = buildAtsKeywordPrompt('German');
 
             expect(prompt).toMatch(/HARD RULE/);
+            expect(prompt).toMatch(/TARGET 14-18/);
+            expect(prompt).toMatch(/MAXIMUM 18/);
             expect(prompt).toMatch(/MUST appear verbatim/);
             expect(prompt).toMatch(/MUST NOT include/);
             expect(prompt).toMatch(/Project Management/);

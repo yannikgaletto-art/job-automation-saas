@@ -470,7 +470,17 @@ WICHTIG für Listen (hard_requirements, soft_requirements, tasks, benefits_and_p
 - Erhalte die Kernaussage jedes Punktes. Kein Abkürzen auf bloße Stichworte.
 - KEIN Copy-Paste des Originals, sondern eine informierte Verdichtung.
 - Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
-- Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."`;
+- Beispiel GUT: "**Verantwortest Sales-Funnel** von Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
+
+FORMATREGEL für hard_requirements, soft_requirements und tasks:
+- Jeder Punkt beginnt mit **Schlüsselphrase** in Markdown-Fettung.
+- Die Schlüsselphrase hat maximal 4 Wörter.
+- Danach folgt der konkrete Satzinhalt.
+
+FORMATREGEL für benefits_and_perks:
+- Nur kompakte Benefit-Labels, keine ganzen Sätze.
+- Maximal 6 Wörter pro Benefit.
+- Beispiel GUT: "Hybrides Arbeiten", "Weiterbildungsbudget", "Mentoring-Programm".`;
 
     const userPrompt = `Extrahiere aus diesem Stellenanzeigen-Text:
 

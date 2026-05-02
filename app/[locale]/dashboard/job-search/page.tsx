@@ -43,6 +43,17 @@ const WERTE_FILTER_KEYS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
+function renderBoldMarkdown(text: string): React.ReactNode {
+    const match = text.match(/^\*\*(.+?)\*\*\s*(.*)/s);
+    if (!match) return text;
+    return (
+        <>
+            <strong className="font-semibold text-slate-900">{match[1]}</strong>
+            {match[2] ? ` ${match[2]}` : null}
+        </>
+    );
+}
+
 function timeAgo(dateStr: string, t: ReturnType<typeof useTranslations<'dashboard.job_search'>>): string {
     const diff = Date.now() - new Date(dateStr).getTime();
     const minutes = Math.floor(diff / 60000);
@@ -119,7 +130,7 @@ export default function JobSearchPage() {
 
     // Search state
     const [query, setQuery] = useState('');
-    const [location, setLocation] = useState('Berlin');
+    const [location, setLocation] = useState('Deutschland');
     const [isSearching, setIsSearching] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -1723,7 +1734,7 @@ function SteckbriefPreviewModal({
                                             {tasks.map((item, i) => (
                                                 <div key={i} className="flex items-start gap-2 text-sm text-slate-700 group">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-[#002e7a] mt-1.5 shrink-0 opacity-40" />
-                                                    <span className="flex-1">{item}</span>
+                                                    <span className="flex-1">{renderBoldMarkdown(item)}</span>
                                                     <button
                                                         onClick={() => removeItem(tasks, setTasks, i)}
                                                         className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
@@ -1789,7 +1800,7 @@ function SteckbriefPreviewModal({
                                             {requirements.map((item, i) => (
                                                 <div key={i} className="flex items-start gap-2 text-sm text-slate-700 group">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-[#002e7a] mt-1.5 shrink-0 opacity-40" />
-                                                    <span className="flex-1">{item}</span>
+                                                    <span className="flex-1">{renderBoldMarkdown(item)}</span>
                                                     <button
                                                         onClick={() => removeItem(requirements, setRequirements, i)}
                                                         className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
@@ -1861,4 +1872,3 @@ function SteckbriefPreviewModal({
         </AnimatePresence>
     );
 }
-

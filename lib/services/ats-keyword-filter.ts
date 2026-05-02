@@ -160,7 +160,7 @@ const HALLUCINATION_EQUIVALENCE_GROUPS = [
 ];
 
 export function buildAtsKeywordPrompt(languageName: string): string {
-    return `string[] - ATS keywords: MAXIMUM 15, extracted EXCLUSIVELY from the job description text below.
+    return `string[] - ATS keywords: TARGET 14-18 strong keywords when enough grounded terms exist; MAXIMUM 18. Extract EXCLUSIVELY from the job description text below.
 
 HARD RULE: Each keyword MUST appear verbatim, as a direct translation, or as a clear semantic match in the job description. If a keyword is not grounded in the job description, you MUST NOT include it. Never invent keywords from training data or prior tasks. When in doubt, leave it out.
 
@@ -170,7 +170,7 @@ EXCLUDE: generic verbs, language names, generic soft-skill phrases, benefits, wo
 
 DACH RULE: Prefer indexable base terms over compounds when appropriate, e.g. "Projektleitungserfahrung" becomes "Projektleitung".
 
-LANGUAGE: write language-dependent keywords in ${languageName}, e.g. Project Management becomes Projektmanagement for German. Keep proper nouns, product names, tool names, acronyms, and certifications in their original form. Quality over quantity: 8-12 strong keywords beats 20 weak ones.`;
+LANGUAGE: write language-dependent keywords in ${languageName}, e.g. Project Management becomes Projektmanagement for German. Keep proper nouns, product names, tool names, acronyms, and certifications in their original form. Quality over quantity: use fewer than 14 only when the job text truly does not contain enough grounded hard keywords.`;
 }
 
 function normalizeForComparison(value: string): string {

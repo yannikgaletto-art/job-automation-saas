@@ -21,6 +21,7 @@ import {
 } from '@/lib/services/job-search-pipeline';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 import { getLanguageName, getUserLocale } from '@/lib/i18n/get-user-locale';
+import { isSameCompanyName } from '@/lib/services/company-name-match';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -123,13 +124,10 @@ export async function POST(request: NextRequest) {
         );
 
         // ─── §12.3 Verification Guard: Company Mismatch ─────────────
-        // Simple substring check (no Levenshtein — "Reduce Complexity")
+        // Country/local-entity variants like "PwC Germany" vs "PwC Deutschland"
+        // are the same employer and must not block the queue handoff.
         if (harvested?.company_name) {
-            const expected = serpApiJob.company_name.toLowerCase().trim();
-            const actual = harvested.company_name.toLowerCase().trim();
-            // Neither contains the other → completely different company
-            const isMatch = expected.includes(actual) || actual.includes(expected);
-            if (!isMatch) {
+            if (!isSameCompanyName(serpApiJob.company_name, harvested.company_name)) {
                 console.warn(`⚠️ [Process] Company mismatch: expected "${serpApiJob.company_name}", got "${harvested.company_name}"`);
                 return NextResponse.json({
                     success: false,
