@@ -20,6 +20,7 @@ import {
     type UserValues,
 } from '@/lib/services/job-search-pipeline';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
+import { getLanguageName, getUserLocale } from '@/lib/i18n/get-user-locale';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -113,9 +114,12 @@ export async function POST(request: NextRequest) {
         // ─── §12.5 Step 2: Claude Haiku Harvester ────────────────────
         // SerpAPI = Ground Truth, Jina = Enrichment
         const primaryDescription = serpApiFullDesc || serpApiJob.description;
+        const locale = await getUserLocale(user.id);
+        const languageName = getLanguageName(locale);
         const harvested = await harvestJobData(
             jinaMarkdown || '',
             primaryDescription,
+            languageName,
         );
 
         // ─── §12.3 Verification Guard: Company Mismatch ─────────────

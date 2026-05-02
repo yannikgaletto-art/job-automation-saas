@@ -6,6 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { buildAtsKeywordPrompt, cleanAtsKeywords } from '@/lib/services/ats-keyword-filter';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -417,6 +418,7 @@ async function scrapeWithJina(url: string): Promise<string | null> {
 export async function harvestJobData(
     markdown: string,
     fallbackDescription: string,
+    languageName = 'German',
 ): Promise<HarvestedData | null> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -494,7 +496,7 @@ JSON-Schema:
   "sustainability_section_raw": "string | null",
   "leadership_signals_raw": "string | null",
   "tech_stack_mentioned": ["string"],
-  "ats_keywords": ["string"],
+  "ats_keywords": [${JSON.stringify(buildAtsKeywordPrompt(languageName))}],
   "salary_range": "string | null",
   "application_deadline": "string | null"
 }`;
@@ -519,6 +521,13 @@ JSON-Schema:
         const text = jsonMatch ? jsonMatch[0] : raw;
 
         const parsed = JSON.parse(text) as HarvestedData;
+        if (Array.isArray(parsed.ats_keywords) && parsed.ats_keywords.length > 0) {
+            const cleaned = cleanAtsKeywords(parsed.ats_keywords, textToAnalyze);
+            parsed.ats_keywords = cleaned.kept;
+            if (cleaned.removed.length > 0) {
+                console.log(`✅ [Pipeline] Harvester: central ATS filter removed ${cleaned.removed.length} keywords`);
+            }
+        }
         console.log(`✅ [Pipeline] Harvester: extracted ${Object.keys(parsed).filter(k => (parsed as any)[k] !== null).length} fields`);
         return parsed;
     } catch (error) {

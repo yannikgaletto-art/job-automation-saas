@@ -10,6 +10,7 @@ import { inngest } from '@/lib/inngest/client';
 import { complete } from '@/lib/ai/model-router';
 import { getUserLocale, getLanguageName } from '@/lib/i18n/get-user-locale';
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
+import { buildAtsKeywordPrompt, cleanAtsKeywords } from '@/lib/services/ats-keyword-filter';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
 
 const supabaseAdmin = createAdminClient(
@@ -192,8 +193,9 @@ export async function POST(request: NextRequest) {
                 .maybeSingle();
 
             if (!cacheErr && cached && Array.isArray(cached.buzzwords) && cached.buzzwords.length > 0) {
+                const cleanedCache = cleanAtsKeywords(cached.buzzwords, enrichedDescription);
                 cachedExtraction = {
-                    buzzwords: cached.buzzwords,
+                    buzzwords: cleanedCache.kept,
                     summary: cached.summary || null,
                     qualifications: Array.isArray(cached.requirements) ? cached.requirements : [],
                     responsibilities: Array.isArray(cached.responsibilities) ? cached.responsibilities : [],
@@ -201,7 +203,10 @@ export async function POST(request: NextRequest) {
                     seniority: cached.seniority || 'unknown',
                     location: cached.location || null,
                 };
-                console.log(`[${requestId}] route=jobs/ingest step=extraction_cache HIT — reusing ${cached.buzzwords.length} buzzwords (hash: ${descriptionHash.slice(0, 8)}…)`);
+                console.log(`[${requestId}] route=jobs/ingest step=extraction_cache HIT — reusing ${cleanedCache.kept.length}/${cached.buzzwords.length} buzzwords after central filter (hash: ${descriptionHash.slice(0, 8)}…)`);
+                if (cleanedCache.removed.length > 0) {
+                    console.log(`[${requestId}] route=jobs/ingest step=extraction_cache_filter removed=${cleanedCache.removed.slice(0, 5).join(', ')}${cleanedCache.removed.length > 5 ? '...' : ''}`);
+                }
             }
         } catch (cacheErr: any) {
             // Non-blocking — cache failure falls through to LLM extraction
@@ -237,10 +242,7 @@ export async function POST(request: NextRequest) {
                     qualifications: `string[] — qualifications (max 8), in ${languageName}`,
                     benefits: `string[] — TOP 6 most important benefits, max 3 words each (e.g. "30 Tage Urlaub", "Remote Work", "Betriebliche Altersvorsorge"). No full sentences. No copy-paste.`,
                     seniority: "'junior' | 'mid' | 'senior' | 'lead' | 'unknown'",
-                    buzzwords: `string[] — ATS keywords: MAXIMUM 15. ONLY include: software tools, frameworks, platforms, technical standards, certifications, and specific domain/methodology terms that an ATS robot would scan for.
-  ✅ INCLUDE: Python, Salesforce, SAP, Jira, ISO 26262, SCRUM, OKR, MEDDPICC, Machine Learning, M&A, Kartellrecht, IFRS, Power BI, ROI, ARR
-  ❌ EXCLUDE: generic verbs ("Implementierung", "Schulungen", "Analyse"), language names ("Deutsch", "Englisch", "Fließend"), company/product names that are the job focus ("Odoo"-role = not a keyword), adjectives ("Agile"), soft skills ("Kommunikation"), job titles ("Business Consultant")
-  Quality over quantity. 8–12 high-signal keywords is better than 20 weak ones.`
+                    buzzwords: buildAtsKeywordPrompt(languageName)
                 };
 
                 for (let attempt = 1; attempt <= 2; attempt++) {
@@ -325,8 +327,15 @@ Schema: ${JSON.stringify(extractionSchema)}`,
         // Sort + dedup ensures identical descriptions produce identical keyword lists.
         // ================================================================
         if (Array.isArray(extractedData.buzzwords) && extractedData.buzzwords.length > 0) {
-            extractedData.buzzwords = normalizeSortDedup(extractedData.buzzwords);
-            console.log(`[${requestId}] route=jobs/ingest step=normalize_buzzwords count=${extractedData.buzzwords.length}`);
+            const cleaned = cleanAtsKeywords(extractedData.buzzwords, enrichedDescription);
+            extractedData.buzzwords = cleaned.kept;
+            console.log(`[${requestId}] route=jobs/ingest step=clean_buzzwords count=${cleaned.kept.length} filtered=${cleaned.removed.length}`);
+            if (cleaned.removed.length > 0) {
+                console.log(`[${requestId}] route=jobs/ingest step=clean_buzzwords removed=${cleaned.removed.slice(0, 5).join(', ')}${cleaned.removed.length > 5 ? '...' : ''}`);
+            }
+            if (cleaned.rewritten?.length) {
+                console.log(`[${requestId}] route=jobs/ingest step=clean_buzzwords rewritten=${cleaned.rewritten.slice(0, 3).map(r => `${r.from}->${r.to}`).join(', ')}`);
+            }
         }
         if (Array.isArray(extractedData.qualifications) && extractedData.qualifications.length > 0) {
             extractedData.qualifications = normalizeSortDedup(extractedData.qualifications);
@@ -356,7 +365,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
                 summary: extractedData.summary || null,
                 seniority: extractedData.seniority || 'unknown',
                 benefits: extractedData.benefits || [],
-                buzzwords: extractedData.buzzwords || null,
+                buzzwords: Array.isArray(extractedData.buzzwords) && extractedData.buzzwords.length > 0 ? extractedData.buzzwords : null,
                 platform: 'unknown',
                 snapshot_at: new Date().toISOString(),
                 status: 'pending',

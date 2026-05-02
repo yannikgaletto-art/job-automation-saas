@@ -14,6 +14,7 @@ import { complete } from '@/lib/ai/model-router';
 import { getLanguageName, type SupportedLocale } from '@/lib/i18n/get-user-locale';
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer';
 import { deepScrapeJob } from '@/lib/services/job-search-pipeline';
+import { buildAtsKeywordPrompt, cleanAtsKeywords } from '@/lib/services/ats-keyword-filter';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -196,7 +197,7 @@ IMPORTANT for benefits:
 - Extract ONLY the 6 most standout benefits, max 3 words each.
 - Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
-{"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8 responsibilities"],"qualifications":["max 8 qualifications"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["MAXIMUM 15 ATS keywords. ONLY: software tools, frameworks, platforms, technical standards, certifications, specific domain/methodology terms. INCLUDE: Python, SAP, Jira, ISO 26262, SCRUM, OKR, MEDDPICC, M&A, IFRS, Power BI, ROI. EXCLUDE: generic verbs (Implementierung, Schulungen), language names (Deutsch, Englisch, Fluent), company names that are the job subject, adjectives (Agile), soft skills, job titles. Quality over quantity — 8-12 strong keywords beats 20 weak ones."]}`,
+{"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8 responsibilities"],"qualifications":["max 8 qualifications"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":[${JSON.stringify(buildAtsKeywordPrompt(languageName))}]}`,
                 prompt: sanitizeForAI(job.description).sanitized,
                 temperature: 0,
                 maxTokens: 2000,
@@ -222,18 +223,13 @@ IMPORTANT for benefits:
                 const existingBuzzwords = Array.isArray(currentJob?.buzzwords) && currentJob.buzzwords.length > 0;
                 let newBuzzwords = Array.isArray((extracted as any).buzzwords) ? (extracted as any).buzzwords as string[] : null;
 
-                // Normalize buzzwords: sort + dedup (mirrors ingest/route.ts STEP 3.5)
+                // Central ATS hygiene: sort, dedup, stop-list and hallucination filtering.
                 if (newBuzzwords && newBuzzwords.length > 0) {
-                    const seen = new Set<string>();
-                    const normalized: string[] = [];
-                    for (const kw of newBuzzwords) {
-                        const key = kw.trim().toLowerCase();
-                        if (key.length >= 2 && !seen.has(key)) {
-                            seen.add(key);
-                            normalized.push(kw.trim());
-                        }
+                    const cleaned = cleanAtsKeywords(newBuzzwords, job.description);
+                    newBuzzwords = cleaned.kept;
+                    if (cleaned.removed.length > 0) {
+                        console.log(`[Extract] Job ${jobId} clean_buzzwords removed=${cleaned.removed.slice(0, 5).join(', ')}${cleaned.removed.length > 5 ? '...' : ''}`);
                     }
-                    newBuzzwords = normalized.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
                 }
 
                 // Buzzword-Schutz: Only write if DB has no buzzwords yet.

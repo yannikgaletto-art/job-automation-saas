@@ -10,6 +10,7 @@ import { getUserLocale, getLanguageName, type SupportedLocale } from '@/lib/i18n
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash'
 import { complete } from '@/lib/ai/model-router'
 import { sanitizeForAI } from '@/lib/services/pii-sanitizer'
+import { buildAtsKeywordPrompt, cleanAtsKeywords } from '@/lib/services/ats-keyword-filter'
 
 // ================================================================
 // CORS Headers — required for Browser Extension (chrome-extension:// origin)
@@ -268,7 +269,7 @@ IMPORTANT for benefits:
 - Extract ONLY the 6 most standout benefits, max 3 words each.
 - Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
-Schema: {"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8"],"qualifications":["max 8"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["MAXIMUM 15 ATS keywords. ONLY: tools, frameworks, platforms, certifications, domain terms. EXCLUDE: generic verbs, language names, soft skills, adjectives."]}`,
+Schema: {"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8"],"qualifications":["max 8"],"benefits":["TOP 6, max 3 words each"],"location":"string or null","seniority":"junior|mid|senior|lead|unknown","buzzwords":[${JSON.stringify(buildAtsKeywordPrompt(languageName))}]}`,
                     prompt: sanitizeForAI(description).sanitized,
                     temperature: 0,
                     maxTokens: 2000,
@@ -292,19 +293,13 @@ Schema: {"summary":"2-3 sentences in ${languageName}","responsibilities":["max 8
 
                 // Write extracted fields + sync flag
                 if (extracted.summary || extracted.buzzwords) {
-                    // Normalize buzzwords
                     let buzzwords: string[] | null = null
                     if (Array.isArray(extracted.buzzwords) && extracted.buzzwords.length > 0) {
-                        const seen = new Set<string>()
-                        buzzwords = []
-                        for (const kw of extracted.buzzwords as string[]) {
-                            const key = kw.trim().toLowerCase()
-                            if (key.length >= 2 && !seen.has(key)) {
-                                seen.add(key)
-                                buzzwords.push(kw.trim())
-                            }
+                        const cleaned = cleanAtsKeywords(extracted.buzzwords as string[], description)
+                        buzzwords = cleaned.kept.length > 0 ? cleaned.kept : null
+                        if (cleaned.removed.length > 0) {
+                            console.log(`[${requestId}] route=jobs/import step=clean_buzzwords removed=${cleaned.removed.slice(0, 5).join(', ')}${cleaned.removed.length > 5 ? '...' : ''}`)
                         }
-                        buzzwords.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
                     }
 
                     await supabaseAdmin

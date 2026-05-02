@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { inngest } from '@/lib/inngest/client';
-import { getUserLocale } from '@/lib/i18n/get-user-locale';
+import { getLanguageName, getUserLocale } from '@/lib/i18n/get-user-locale';
 import { rateLimiters, checkUpstashLimit } from '@/lib/api/rate-limit-upstash';
+import { buildAtsKeywordPrompt, cleanAtsKeywords } from '@/lib/services/ats-keyword-filter';
 
 /**
  * POST /api/jobs/extract — Smart Trigger
@@ -86,6 +87,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, error: 'KI nicht konfiguriert' }, { status: 503 });
         }
 
+        const locale = await getUserLocale(user.id);
+        const languageName = getLanguageName(locale);
         const isDev = process.env.NODE_ENV === 'development';
 
         if (isDev) {
@@ -104,7 +107,7 @@ WICHTIG für Listen (responsibilities, qualifications, benefits):
 - Beispiel SCHLECHT: "Aktive Gewinnung neuer Partner, innen"
 - Beispiel GUT: "Du verantwortest den kompletten Sales-Funnel — von der Lead-Identifikation über Kaltakquise und Demo bis zum Vertragsabschluss."
 
-{"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben als verdichtete vollständige Sätze"],"qualifications":["max 8 Anforderungen als verdichtete vollständige Sätze"],"benefits":["max 5"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":["max 12 ATS Keywords"]}`,
+{"summary":"2-3 Sätze auf Deutsch","responsibilities":["max 8 Aufgaben als verdichtete vollständige Sätze"],"qualifications":["max 8 Anforderungen als verdichtete vollständige Sätze"],"benefits":["max 5"],"location":"string oder null","seniority":"junior|mid|senior|lead|unknown","buzzwords":[${JSON.stringify(buildAtsKeywordPrompt(languageName))}]}`,
                 prompt: job.description,
                 temperature: 0,
                 maxTokens: 2000,
@@ -112,6 +115,10 @@ WICHTIG für Listen (responsibilities, qualifications, benefits):
 
             const extracted = safeParseJSON(response.text);
             const currentMetadata = (job.metadata as Record<string, unknown>) || {};
+            const cleanedBuzzwords = cleanAtsKeywords(
+                Array.isArray(extracted.buzzwords) ? extracted.buzzwords as string[] : [],
+                job.description
+            );
 
             await supabaseAdmin.from('job_queue').update({
                 summary: (extracted.summary as string) || null,
@@ -120,7 +127,7 @@ WICHTIG für Listen (responsibilities, qualifications, benefits):
                 benefits: Array.isArray(extracted.benefits) ? extracted.benefits : [],
                 location: (extracted.location as string) || null,
                 seniority: (extracted.seniority as string) || 'unknown',
-                buzzwords: Array.isArray(extracted.buzzwords) ? extracted.buzzwords : null,
+                buzzwords: cleanedBuzzwords.kept.length > 0 ? cleanedBuzzwords.kept : null,
                 metadata: { ...currentMetadata, extract_error: null, extract_completed_at: new Date().toISOString() },
             }).eq('id', jobId).eq('user_id', user.id);
 
@@ -132,7 +139,7 @@ WICHTIG für Listen (responsibilities, qualifications, benefits):
             console.log('🚀 [Extract] PROD MODE — sending to Inngest');
             await inngest.send({
                 name: 'job/extract',
-                data: { jobId, userId: user.id, locale: await getUserLocale(user.id) },
+                data: { jobId, userId: user.id, locale },
             });
             return NextResponse.json({ success: true, status: 'processing' });
         }

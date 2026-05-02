@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { cleanAtsKeywords } from '@/lib/services/ats-keyword-filter';
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,7 +36,16 @@ export async function POST(request: NextRequest) {
         const safeEdits: Record<string, any> = { status: 'pending' };
         if (edits?.tasks) safeEdits.tasks = edits.tasks;
         if (edits?.hard_requirements) safeEdits.requirements = edits.hard_requirements;
-        if (edits?.ats_keywords) safeEdits.buzzwords = edits.ats_keywords;
+        if (edits?.ats_keywords) {
+            const { data: jobForFilter } = await supabaseAdmin
+                .from('job_queue')
+                .select('description')
+                .eq('id', jobId)
+                .eq('user_id', user.id)
+                .single();
+            const cleaned = cleanAtsKeywords(edits.ats_keywords, jobForFilter?.description || null);
+            safeEdits.buzzwords = cleaned.kept.length > 0 ? cleaned.kept : null;
+        }
         if (edits?.benefits) safeEdits.benefits = edits.benefits;
 
         // Guard: Accept jobs in pre-confirmed states (pending, pending_review, processing)
