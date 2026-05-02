@@ -269,6 +269,7 @@ export function JobRow({ job, expanded, onToggle, onReanalyze, onConfirm, onDele
     };
 
     const nextAction = getNextAction(job.dbStatus, onToggle, setActiveTab, t);
+    const hasExtractionError = typeof job.metadata?.extraction_error === 'string' && job.metadata.extraction_error.length > 0;
 
     return (
         <motion.div className="border-b border-[#d6d6d6] last:border-b-0" data-tour="job-row-container">
@@ -516,9 +517,27 @@ export function JobRow({ job, expanded, onToggle, onReanalyze, onConfirm, onDele
 
                                 {(!job.responsibilities || job.responsibilities.length === 0) &&
                                     (!job.qualifications || job.qualifications.length === 0) && (
-                                        <div className="text-center py-6 space-y-3 bg-white/50 rounded-lg border border-dashed border-slate-300">
-                                            <Info className="w-5 h-5 mx-auto text-slate-400" />
-                                            <p className="text-sm text-slate-500">{t('empty_no_data')}</p>
+                                        <div className={cn(
+                                            "text-center py-6 space-y-3 rounded-lg border border-dashed",
+                                            hasExtractionError
+                                                ? "bg-amber-50/70 border-amber-200"
+                                                : "bg-white/50 border-slate-300"
+                                        )}>
+                                            <Info className={cn(
+                                                "w-5 h-5 mx-auto",
+                                                hasExtractionError ? "text-amber-500" : "text-slate-400"
+                                            )} />
+                                            <p className={cn(
+                                                "text-sm",
+                                                hasExtractionError ? "font-medium text-amber-900" : "text-slate-500"
+                                            )}>
+                                                {hasExtractionError ? t('empty_extraction_failed_title') : t('empty_no_data')}
+                                            </p>
+                                            {hasExtractionError && (
+                                                <p className="text-xs text-amber-800 max-w-lg mx-auto">
+                                                    {t('empty_extraction_failed_body')}
+                                                </p>
+                                            )}
                                             {job.summary && <p className="text-sm text-[#37352F] max-w-lg mx-auto">{job.summary}</p>}
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onReanalyze?.(job.id); }}

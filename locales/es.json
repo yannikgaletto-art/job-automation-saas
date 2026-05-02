@@ -1135,6 +1135,8 @@
     "toggle_show_less": "Mostrar menos",
     "toggle_more_items": "+{n} más",
     "empty_no_data": "No hay datos estructurados disponibles.",
+    "empty_extraction_failed_title": "La extracción falló.",
+    "empty_extraction_failed_body": "Pathly no pudo leer automáticamente el perfil del puesto. Vuelve a iniciar el análisis.",
     "btn_analyze_now": "Analizar ahora",
     "delete_title": "Eliminar solicitud",
     "delete_confirm": "¿Estás seguro de que deseas eliminar permanentemente la solicitud en <b>{company}</b> para el puesto <b>{jobTitle}</b>?",

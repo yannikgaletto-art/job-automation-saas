@@ -1137,6 +1137,8 @@
     "toggle_show_less": "Weniger anzeigen",
     "toggle_more_items": "+{n} mehr",
     "empty_no_data": "Keine strukturierten Daten vorhanden.",
+    "empty_extraction_failed_title": "Extraktion fehlgeschlagen.",
+    "empty_extraction_failed_body": "Pathly konnte den Steckbrief nicht automatisch auslesen. Starte die Analyse erneut.",
     "btn_analyze_now": "Jetzt analysieren",
     "delete_title": "Bewerbung löschen",
     "delete_confirm": "Bist du sicher, dass du die Bewerbung bei <b>{company}</b> für die Position <b>{jobTitle}</b> endgültig löschen möchtest?",

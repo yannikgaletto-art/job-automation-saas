@@ -35,6 +35,15 @@ function normalizeSortDedup(items: string[]): string[] {
     return out.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 }
 
+function capExtractionError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.slice(0, 500);
+}
+
+function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 const IngestRequestSchema = z.object({
     company: z.string().min(2, 'Company name must be at least 2 characters'),
     jobTitle: z.string().min(2, 'Job title must be at least 2 characters'),
@@ -204,6 +213,7 @@ export async function POST(request: NextRequest) {
         // Skipped if description_cache HIT — reuse prior extraction instead.
         // ================================================================
         let extractedData: any = cachedExtraction ?? {};
+        let extractionError: string | null = null;
 
         if (cachedExtraction) {
             console.log(`[${requestId}] route=jobs/ingest step=ai_parse_requirements SKIPPED — using cached extraction`);
@@ -233,9 +243,11 @@ export async function POST(request: NextRequest) {
   Quality over quantity. 8–12 high-signal keywords is better than 20 weak ones.`
                 };
 
-                const response = await complete({
-                    taskType: 'extract_job_fields',
-                    systemPrompt: `Extract the following information from the job description as JSON. All text fields (summary, responsibilities, qualifications, benefits) MUST be written in ${languageName}. If a field is not identifiable, use null or empty array. Return ONLY valid JSON, no markdown.
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    try {
+                        const response = await complete({
+                            taskType: 'extract_job_fields',
+                            systemPrompt: `Extract the following information from the job description as JSON. All text fields (summary, responsibilities, qualifications, benefits) MUST be written in ${languageName}. If a field is not identifiable, use null or empty array. Return ONLY valid JSON, no markdown.
 
 IMPORTANT for lists (responsibilities, qualifications):
 - Write condensed, complete sentences — approximately 20% shorter than the original.
@@ -248,33 +260,45 @@ IMPORTANT for benefits:
 - Example GOOD: ["30 Tage Urlaub", "Remote Work"] — Example BAD: ["Flexibles Arbeiten: Wir arbeiten in einem ausgewogenen hybriden Mix..."]
 
 Schema: ${JSON.stringify(extractionSchema)}`,
-                    prompt: sanitizeForAI(enrichedDescription).sanitized,
-                    temperature: 0,
-                    maxTokens: 2000,
-                });
+                            prompt: sanitizeForAI(enrichedDescription).sanitized,
+                            temperature: 0,
+                            maxTokens: 2000,
+                        });
 
-                const text = response.text.trim();
-                try {
-                    extractedData = JSON.parse(text);
-                } catch (parseError) {
-                    const jsonMatch = text.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
+                        const text = response.text.trim();
                         try {
-                            extractedData = JSON.parse(jsonMatch[0]);
-                        } catch (e) {
-                            console.warn(`[${requestId}] route=jobs/ingest step=ai_parse JSON fallback parse failed`);
+                            extractedData = JSON.parse(text);
+                        } catch (parseError) {
+                            const jsonMatch = text.match(/\{[\s\S]*\}/);
+                            if (jsonMatch) {
+                                try {
+                                    extractedData = JSON.parse(jsonMatch[0]);
+                                } catch (fallbackError) {
+                                    throw new Error('AI extraction returned invalid JSON after fallback parse');
+                                }
+                            } else {
+                                throw new Error(`AI extraction returned invalid JSON: ${text.substring(0, 50)}...`);
+                            }
                         }
-                    } else {
-                        console.warn(`[${requestId}] route=jobs/ingest step=ai_parse JSON parse failed, text=${text.substring(0, 50)}...`);
+                        console.log(`[${requestId}] route=jobs/ingest step=ai_parse model=${response.model} cost_cents=${response.costCents} attempt=${attempt}`);
+                        break;
+                    } catch (attemptError) {
+                        if (attempt === 1) {
+                            console.warn(`[${requestId}] route=jobs/ingest step=ai_parse retry_after_error error=${capExtractionError(attemptError)}`);
+                            await wait(2000);
+                            continue;
+                        }
+                        throw attemptError;
                     }
                 }
-                console.log(`[${requestId}] route=jobs/ingest step=ai_parse model=${response.model} cost_cents=${response.costCents}`);
             } else {
                 console.warn(`[${requestId}] route=jobs/ingest step=ai_parse no_api_key skipped`);
+                extractionError = 'AI extraction skipped: missing API key';
             }
         } catch (aiError: any) {
-            console.warn(`[${requestId}] route=jobs/ingest step=ai_parse error=${aiError.message}`);
-            // Proceed with empty extraction rather than failing the ingest
+            extractionError = capExtractionError(aiError);
+            console.error(`[${requestId}] route=jobs/ingest step=ai_parse error=${extractionError}`);
+            // Proceed with empty extraction; metadata below records the failure so the UI can recover.
         }
         } // end if (!cachedExtraction)
 
@@ -380,7 +404,7 @@ Schema: ${JSON.stringify(extractionSchema)}`,
         try {
             // Only set the flag if we actually ran sync extraction successfully
             const hasSyncData = extractedData && Object.keys(extractedData).length > 0 && (extractedData.summary || cachedExtraction);
-            if (hasSyncData) {
+            if (hasSyncData || extractionError) {
                 // JSONB Read-Modify-Write: read current metadata first to avoid wiping other fields
                 const { data: currentJobMeta } = await supabaseAdmin
                     .from('job_queue')
@@ -389,20 +413,33 @@ Schema: ${JSON.stringify(extractionSchema)}`,
                     .eq('user_id', userId)
                     .single();
                 const existingMeta = (currentJobMeta?.metadata as Record<string, unknown>) || {};
+                const metadataPatch = {
+                    ...(hasSyncData
+                        ? {
+                            sync_extracted_at: new Date().toISOString(),
+                            description_hash: descriptionHash,
+                            description_cache_hit: !!cachedExtraction,
+                        }
+                        : {}),
+                    ...(extractionError
+                        ? {
+                            extraction_error: extractionError,
+                            extraction_error_at: new Date().toISOString(),
+                        }
+                        : {}),
+                };
 
                 await supabaseAdmin
                     .from('job_queue')
                     .update({
                         metadata: {
                             ...existingMeta,
-                            sync_extracted_at: new Date().toISOString(),
-                            description_hash: descriptionHash,
-                            description_cache_hit: !!cachedExtraction,
+                            ...metadataPatch,
                         },
                     })
                     .eq('id', job.id)
                     .eq('user_id', userId);
-                console.log(`[${requestId}] route=jobs/ingest step=set_sync_flag job_id=${job.id} description_hash=${descriptionHash.slice(0, 8)}… cache_hit=${!!cachedExtraction}`);
+                console.log(`[${requestId}] route=jobs/ingest step=set_sync_metadata job_id=${job.id} has_sync_data=${hasSyncData} has_extraction_error=${!!extractionError}`);
             }
 
             // ================================================================

@@ -1137,6 +1137,8 @@
     "toggle_show_less": "Show less",
     "toggle_more_items": "+{n} more",
     "empty_no_data": "No structured data available.",
+    "empty_extraction_failed_title": "Extraction failed.",
+    "empty_extraction_failed_body": "Pathly could not automatically read the job profile. Run the analysis again.",
     "btn_analyze_now": "Analyze Now",
     "delete_title": "Delete Application",
     "delete_confirm": "Are you sure you want to permanently delete the application at <b>{company}</b> for the position <b>{jobTitle}</b>?",
