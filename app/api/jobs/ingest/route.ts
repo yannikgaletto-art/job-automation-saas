@@ -241,6 +241,7 @@ IMPORTANT for lists (responsibilities, qualifications):
 - Write condensed, complete sentences — approximately 20% shorter than the original.
 - Preserve the core message of each point. No abbreviating to mere keywords.
 - NO copy-paste of the original, but an informed condensation.
+- Start each bullet with **key phrase** (max 4 words, the core action or concept), followed by the detail. Example: "**Leitet Executive-Workshops** zur Identifikation von Kundenschmerzen."
 
 IMPORTANT for benefits:
 - Extract ONLY the 6 most standout benefits, max 3 words each.

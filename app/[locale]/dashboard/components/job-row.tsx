@@ -92,14 +92,11 @@ function getNextAction(
     }
 }
 
-/**
- * Bold the first noun/verb phrase of a bullet point.
- * Heuristic: bold everything before the first comma, colon, or dash.
- */
+/** Renders LLM-emitted **bold** markdown in bullet text. Graceful fallback to plain text. */
 function boldFirstPhrase(text: string): React.ReactNode {
-    const match = text.match(/^([^,:\-–]+)[,:\-–]\s*(.*)/);
+    const match = text.match(/^\*\*(.+?)\*\*\s*(.*)/s);
     if (match) {
-        return <><strong className="font-semibold text-[#37352F]">{match[1]}</strong>{', '}{match[2]}</>;
+        return <><strong className="font-semibold text-[#37352F]">{match[1]}</strong>{' '}{match[2]}</>;
     }
     return text;
 }
