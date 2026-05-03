@@ -15,10 +15,11 @@ import { ProgressLoadingPanel } from './ProgressLoadingPanel';
 interface Props {
     jobId: string;
     companyName: string;
+    companyWebsite?: string | null;
     onComplete: (context: CoverLetterSetupContext) => void;
 }
 
-export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
+export function CoverLetterWizard({ jobId, companyName, companyWebsite, onComplete }: Props) {
     const t = useTranslations('cover_letter');
     const { currentStep, setStep, initForJob, buildContext } =
         useCoverLetterSetupStore();
@@ -38,7 +39,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
     const optimisticSetupData = useMemo<SetupDataResponse>(() => ({
         hooks: [],
         hasPerplexityData: false,
-        companyWebsite: null,
+        companyWebsite: companyWebsite ?? null,
         jobTitle: null,
         cvStations: [],
         jobRequirements: [],
@@ -47,7 +48,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
         detectedJobLanguage: 'de',
         availableStyleDocs: [],
         isReturningUser: false,
-    }), []);
+    }), [companyWebsite]);
 
     // ─── Sync maxReachedStep from currentStep (single source of truth) ───
     // WHY: Previously onNext() called both setStep() AND setMaxReachedStep()
@@ -79,9 +80,11 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
             return;
         }
 
-        const timer = setTimeout(() => setShowSetupLoader(true), 1200);
+        if (!companyWebsite) return;
+
+        const timer = setTimeout(() => setShowSetupLoader(true), 400);
         return () => clearTimeout(timer);
-    }, [setupData, loadError, jobId]);
+    }, [setupData, loadError, jobId, companyWebsite]);
 
     useEffect(() => {
         if (!showSetupLoader) return;

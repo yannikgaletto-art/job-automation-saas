@@ -30,6 +30,7 @@ export async function GET() {
                 id, 
                 job_url, 
                 source_url,
+                company_website,
                 job_title, 
                 company_name, 
                 location, 

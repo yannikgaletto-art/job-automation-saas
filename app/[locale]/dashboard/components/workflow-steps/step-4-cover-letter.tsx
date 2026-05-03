@@ -17,6 +17,7 @@ interface Step4CoverLetterProps {
     jobId: string
     companyName: string
     jobTitle: string
+    companyWebsite?: string | null
     onComplete?: () => void
     onJobApplied?: () => void
     initialData?: GenerationResult | null
@@ -154,6 +155,7 @@ export function Step4CoverLetter({
     jobId,
     companyName,
     jobTitle,
+    companyWebsite,
     onComplete,
     onJobApplied,
     initialData
@@ -400,6 +402,7 @@ export function Step4CoverLetter({
             <CoverLetterWizard
                 jobId={jobId}
                 companyName={companyName}
+                companyWebsite={companyWebsite ?? null}
                 onComplete={handleWizardComplete}
             />
         )

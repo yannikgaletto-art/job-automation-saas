@@ -273,6 +273,7 @@ export default function JobQueuePage() {
                     status: mapDbStatusToUi(j.status as string),
                     metadata: (j.metadata as Record<string, unknown>) || null,
                     source_url: (j.source_url as string) || null,
+                    companyWebsite: (j.company_website as string) || null,
                     source: (j.source as string) || null,
                 }));
                 setJobs(dbJobs);

@@ -29,6 +29,7 @@ export interface Job {
     buzzwords?: string[] | null;
     metadata?: any;
     source_url?: string | null;
+    companyWebsite?: string | null;
     source?: string | null;
     matchScore: number;
     workflowStep: number; // 0-4
@@ -590,6 +591,7 @@ export function JobRow({ job, expanded, onToggle, onReanalyze, onConfirm, onDele
                                 jobId={job.id}
                                 companyName={job.company}
                                 jobTitle={job.jobTitle}
+                                companyWebsite={job.companyWebsite ?? null}
                                 onComplete={() => {
                                     setOptimisticStep(prev => Math.max(prev ?? job.workflowStep, 100));
                                 }}
