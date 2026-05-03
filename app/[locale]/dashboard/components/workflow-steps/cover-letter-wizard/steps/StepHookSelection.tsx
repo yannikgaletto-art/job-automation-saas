@@ -6,11 +6,26 @@ import { useTranslations, useLocale } from 'next-intl';
 import { HookCard } from '../cards/HookCard';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import type { SetupDataResponse, SelectedHook, SelectedQuote } from '@/types/cover-letter-setup';
+import { ProgressLoadingPanel } from '../ProgressLoadingPanel';
 
 import { Sparkles, ChevronRight, ChevronDown, Search, SkipForward, RefreshCw, Quote, Globe } from 'lucide-react';
 
 // ─── State Machine ─────────────────────────────────────────────────
 type Phase = 'idle' | 'analyzing' | 'results' | 'quotePrompt' | 'quoteSearching' | 'quoteResults';
+
+const QUOTE_CATEGORIES: { key: string; labelKey: string; keywords: string[] }[] = [
+    { key: 'Beratung_Business_Management_Strategie', labelKey: 'quote_cat_consulting', keywords: ['berater', 'consultant', 'strategy', 'strategie', 'management', 'business', 'projektmanager', 'project manager'] },
+    { key: 'Engineering_Produktion_Industrie_Operations', labelKey: 'quote_cat_engineering', keywords: ['engineer', 'ingenieur', 'produktion', 'operations', 'supply chain', 'logistik'] },
+    { key: 'Finanzen_Banking_Investment_Controlling', labelKey: 'quote_cat_finance', keywords: ['finance', 'finanz', 'banking', 'controlling', 'accountant', 'audit'] },
+    { key: 'HR_People_Culture_Leadership', labelKey: 'quote_cat_hr', keywords: ['hr', 'human resources', 'people', 'recruiter', 'personal', 'leadership', 'training'] },
+    { key: 'Healthcare_Medizin_Pflege_PublicHealth', labelKey: 'quote_cat_healthcare', keywords: ['health', 'medizin', 'pflege', 'pharma', 'biotech', 'medical'] },
+    { key: 'IT_Tech_Software_SaaS', labelKey: 'quote_cat_it', keywords: ['software', 'developer', 'entwickler', 'tech', 'saas', 'devops', 'frontend', 'backend', 'cloud', 'data engineer'] },
+    { key: 'Kreativbranche_Design_Medien_Kommunikation', labelKey: 'quote_cat_creative', keywords: ['design', 'kreativ', 'creative', 'medien', 'content', 'ux', 'ui', 'brand', 'video'] },
+    { key: 'Nachhaltigkeit_SocialImpact_CSR_ESG', labelKey: 'quote_cat_sustainability', keywords: ['nachhaltigkeit', 'sustainability', 'esg', 'csr', 'umwelt', 'energie'] },
+    { key: 'Politik_PublicSector_NGO_InternationaleZusammenarbeit', labelKey: 'quote_cat_politics', keywords: ['politik', 'political', 'ngo', 'verwaltung', 'government'] },
+    { key: 'Sales_Vertrieb_Customersuccess_Marketing', labelKey: 'quote_cat_sales', keywords: ['sales', 'vertrieb', 'marketing', 'customer success', 'account manager', 'business development', 'e-commerce'] },
+    { key: 'Wissenschaft_Forschung_Data_Bildung', labelKey: 'quote_cat_science', keywords: ['wissenschaft', 'research', 'forschung', 'data', 'bildung', 'education', 'analytics', 'data scientist', 'ai '] },
+];
 
 interface Props {
     jobId: string;
@@ -33,21 +48,6 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     const [validationWarning, setValidationWarning] = useState<string | null>(null);
     const [quoteRefreshCount, setQuoteRefreshCount] = useState(0);
 
-    // ─── Quote Category Picker ────────────────────────────────────
-    const QUOTE_CATEGORIES: { key: string; labelKey: string; keywords: string[] }[] = [
-        { key: 'Beratung_Business_Management_Strategie', labelKey: 'quote_cat_consulting', keywords: ['berater', 'consultant', 'strategy', 'strategie', 'management', 'business', 'projektmanager', 'project manager'] },
-        { key: 'Engineering_Produktion_Industrie_Operations', labelKey: 'quote_cat_engineering', keywords: ['engineer', 'ingenieur', 'produktion', 'operations', 'supply chain', 'logistik'] },
-        { key: 'Finanzen_Banking_Investment_Controlling', labelKey: 'quote_cat_finance', keywords: ['finance', 'finanz', 'banking', 'controlling', 'accountant', 'audit'] },
-        { key: 'HR_People_Culture_Leadership', labelKey: 'quote_cat_hr', keywords: ['hr', 'human resources', 'people', 'recruiter', 'personal', 'leadership', 'training'] },
-        { key: 'Healthcare_Medizin_Pflege_PublicHealth', labelKey: 'quote_cat_healthcare', keywords: ['health', 'medizin', 'pflege', 'pharma', 'biotech', 'medical'] },
-        { key: 'IT_Tech_Software_SaaS', labelKey: 'quote_cat_it', keywords: ['software', 'developer', 'entwickler', 'tech', 'saas', 'devops', 'frontend', 'backend', 'cloud', 'data engineer'] },
-        { key: 'Kreativbranche_Design_Medien_Kommunikation', labelKey: 'quote_cat_creative', keywords: ['design', 'kreativ', 'creative', 'medien', 'content', 'ux', 'ui', 'brand', 'video'] },
-        { key: 'Nachhaltigkeit_SocialImpact_CSR_ESG', labelKey: 'quote_cat_sustainability', keywords: ['nachhaltigkeit', 'sustainability', 'esg', 'csr', 'umwelt', 'energie'] },
-        { key: 'Politik_PublicSector_NGO_InternationaleZusammenarbeit', labelKey: 'quote_cat_politics', keywords: ['politik', 'political', 'ngo', 'verwaltung', 'government'] },
-        { key: 'Sales_Vertrieb_Customersuccess_Marketing', labelKey: 'quote_cat_sales', keywords: ['sales', 'vertrieb', 'marketing', 'customer success', 'account manager', 'business development', 'e-commerce'] },
-        { key: 'Wissenschaft_Forschung_Data_Bildung', labelKey: 'quote_cat_science', keywords: ['wissenschaft', 'research', 'forschung', 'data', 'bildung', 'education', 'analytics', 'data scientist', 'ai '] },
-    ];
-
     // Auto-detect category from job title (mirrors quote-service.ts CATEGORY_KEYWORDS)
     const autoDetectedCategory = useMemo(() => {
         const title = (setupData.jobTitle || '').toLowerCase();
@@ -66,6 +66,10 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
 
     const [selectedQuoteCategory, setSelectedQuoteCategory] = useState<string | null>(autoDetectedCategory);
 
+    useEffect(() => {
+        setSelectedQuoteCategory(prev => prev ?? autoDetectedCategory);
+    }, [autoDetectedCategory]);
+
     // ─── State Machine: resume at correct phase ────────────────────
     const getInitialPhase = (): Phase => {
         // If user already selected a hook (returning from Step 2), show results
@@ -77,6 +81,22 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
 
     const [phase, setPhase] = useState<Phase>(getInitialPhase);
     const [analysisStep, setAnalysisStep] = useState(0);
+    const analysisSteps = useMemo(() => [
+        t('step_reading_website'),
+        t('step_analyzing_vision'),
+        t('step_checking_values'),
+        t('step_preparing_results'),
+    ], [t]);
+
+    useEffect(() => {
+        setWebsiteInput(prev => prev || setupData.companyWebsite || '');
+    }, [setupData.companyWebsite]);
+
+    useEffect(() => {
+        if (phase === 'idle' && !selectedHook && setupData.hasPerplexityData) {
+            setPhase('results');
+        }
+    }, [phase, selectedHook, setupData.hasPerplexityData]);
 
     // i18n-translated typeLabel for HookCard badges
     const hookTypeLabel = useMemo(() => ({
@@ -219,10 +239,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
     // ─── Phase A: IDLE ─────────────────────────────────────────────
     if (phase === 'idle') {
         return (
-            <div className="px-1 py-8 flex flex-col items-center justify-center text-center">
-                <div className="bg-white p-4 rounded-full shadow-sm mb-4 border border-[#e7e7e5]">
-                    <Sparkles className="w-8 h-8 text-[#002e7a]" />
-                </div>
+            <div className="px-1 py-6 flex flex-col items-center justify-center text-center">
                 <h3 className="text-xl font-semibold text-[#37352F] mb-2">
                     {t('analysis_title', { company: companyName })}
                 </h3>
@@ -275,39 +292,14 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
 
     // ─── Phase A: ANALYZING ────────────────────────────────────────
     if (phase === 'analyzing') {
-        const steps = [
-            t('step_reading_website'),
-            t('step_analyzing_vision'),
-            t('step_checking_values'),
-            t('step_preparing_results'),
-        ];
-        const progress = analysisStep === 1 ? '20%' : analysisStep === 2 ? '50%' : analysisStep === 3 ? '80%' : '95%';
-
         return (
-            <div className="px-1 py-12 flex flex-col items-center justify-center text-center">
-                <div className="w-10 h-10 border-3 border-[#002e7a]/20 border-t-[#002e7a] rounded-full animate-spin mb-6" />
-                <h3 className="text-lg font-medium text-[#37352F] mb-4">
-                    <AnimatePresence mode="popLayout">
-                        <motion.span
-                            key={analysisStep}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.4 }}
-                            className="inline-block"
-                        >
-                            {steps[analysisStep - 1] || steps[0]}
-                        </motion.span>
-                    </AnimatePresence>
-                </h3>
-                <div className="w-64 h-1.5 bg-[#e7e7e5] rounded-full overflow-hidden">
-                    <motion.div
-                        className="h-full bg-[#002e7a]"
-                        initial={{ width: '0%' }}
-                        animate={{ width: progress }}
-                        transition={{ duration: 0.5 }}
-                    />
-                </div>
+            <div className="px-1 py-4">
+                <ProgressLoadingPanel
+                    title={t('analysis_loading_title')}
+                    duration={t('analysis_loading_duration')}
+                    steps={analysisSteps}
+                    activeStep={Math.max(analysisStep - 1, 0)}
+                />
             </div>
         );
     }
@@ -329,7 +321,7 @@ export function StepHookSelection({ jobId, companyName, setupData, onNext, onRel
                     type="button"
                     onClick={() => handleAnalyze()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium transition-colors border border-[#E7E7E5] text-[#73726E] hover:bg-gray-50 shrink-0"
-                    title="Analyse wiederholen"
+                    title={t('btn_refresh')}
                 >
                     <RefreshCw className="w-3 h-3" /> {t('btn_refresh')}
                 </button>

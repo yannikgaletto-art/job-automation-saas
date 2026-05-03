@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useCoverLetterSetupStore } from '@/store/useCoverLetterSetupStore';
 import { WizardProgressBar } from './WizardProgressBar';
@@ -8,6 +8,7 @@ import { StepHookSelection } from './steps/StepHookSelection';
 import { StepStationMapping } from './steps/StepStationMapping';
 import { StepToneConfig } from './steps/StepToneConfig';
 import type { CoverLetterSetupContext, SetupDataResponse } from '@/types/cover-letter-setup';
+import { ProgressLoadingPanel } from './ProgressLoadingPanel';
 
 
 
@@ -24,8 +25,29 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
 
     const [setupData, setSetupData] = useState<SetupDataResponse | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [showSetupLoader, setShowSetupLoader] = useState(false);
+    const [setupLoadingStep, setSetupLoadingStep] = useState(0);
     // Track the highest step reached so completed circles become clickable
     const [maxReachedStep, setMaxReachedStep] = useState<1 | 2 | 3>(1);
+    const setupLoadingSteps = useMemo(() => [
+        t('step_reading_website'),
+        t('step_analyzing_vision'),
+        t('step_checking_values'),
+        t('step_preparing_results'),
+    ], [t]);
+    const optimisticSetupData = useMemo<SetupDataResponse>(() => ({
+        hooks: [],
+        hasPerplexityData: false,
+        companyWebsite: null,
+        jobTitle: null,
+        cvStations: [],
+        jobRequirements: [],
+        hasStyleSample: false,
+        styleAnalysisSummary: '',
+        detectedJobLanguage: 'de',
+        availableStyleDocs: [],
+        isReturningUser: false,
+    }), []);
 
     // ─── Sync maxReachedStep from currentStep (single source of truth) ───
     // WHY: Previously onNext() called both setStep() AND setMaxReachedStep()
@@ -37,6 +59,10 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
 
     useEffect(() => {
         initForJob(jobId);
+        setSetupData(null);
+        setLoadError(null);
+        setShowSetupLoader(false);
+        setSetupLoadingStep(0);
         // Always reset to step 1 on mount — prevents "stuck on Step 2 with disabled button"
         // WHY: initForJob() only resets the store when jobId CHANGES. If the same job is
         // reopened, currentStep stays persisted (e.g. 2) but cvStations may be empty,
@@ -46,6 +72,29 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
         setStep(1);
         fetchSetupData();
     }, [jobId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (setupData || loadError) {
+            setShowSetupLoader(false);
+            return;
+        }
+
+        const timer = setTimeout(() => setShowSetupLoader(true), 1200);
+        return () => clearTimeout(timer);
+    }, [setupData, loadError, jobId]);
+
+    useEffect(() => {
+        if (!showSetupLoader) return;
+        setSetupLoadingStep(0);
+        const t1 = setTimeout(() => setSetupLoadingStep(1), 3000);
+        const t2 = setTimeout(() => setSetupLoadingStep(2), 7000);
+        const t3 = setTimeout(() => setSetupLoadingStep(3), 12000);
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+            clearTimeout(t3);
+        };
+    }, [showSetupLoader]);
 
     const fetchSetupData = async () => {
         try {
@@ -85,21 +134,21 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
     };
 
     // Loading state
-    if (!setupData && !loadError) {
+    if (!setupData && !loadError && showSetupLoader) {
         return (
-            <div className="px-5 py-8 space-y-3">
-                <div className="animate-pulse space-y-3">
-                    <div className="h-3 bg-[#E7E7E5] rounded w-2/3" />
-                    <div className="h-20 bg-[#E7E7E5] rounded" />
-                    <div className="h-20 bg-[#E7E7E5] rounded" />
-                </div>
-                <p className="text-xs text-[#73726E] text-center">{t('loading_wizard')}</p>
+            <div className="px-5 py-4 bg-[#FAFAF9] min-h-[360px]">
+                <ProgressLoadingPanel
+                    title={t('setup_loading_title')}
+                    duration={t('setup_loading_duration')}
+                    steps={setupLoadingSteps}
+                    activeStep={setupLoadingStep}
+                />
             </div>
         );
     }
 
     // Error state
-    if (loadError || !setupData) {
+    if (loadError) {
         return (
             <div className="px-5 py-8 text-center space-y-3">
                 <p className="text-xs text-red-600">⚠️ {loadError || t('error_data_load')}</p>
@@ -112,6 +161,8 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
             </div>
         );
     }
+
+    const visibleSetupData = setupData ?? optimisticSetupData;
 
     return (
         <div className="px-5 py-4 bg-[#FAFAF9] space-y-4 min-h-[360px]">
@@ -141,13 +192,13 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
                 <StepHookSelection
                     jobId={jobId}
                     companyName={companyName}
-                    setupData={setupData}
+                    setupData={visibleSetupData}
                     onNext={() => setStep(2)}
                     onReloadData={fetchSetupData}
                 />
             )}
 
-            {currentStep === 2 && (
+            {currentStep === 2 && setupData && (
                 <StepStationMapping
                     setupData={setupData}
                     onBack={() => setStep(1)}
@@ -155,7 +206,7 @@ export function CoverLetterWizard({ jobId, companyName, onComplete }: Props) {
                 />
             )}
 
-            {currentStep === 3 && (
+            {currentStep === 3 && setupData && (
                 <StepToneConfig
                     setupData={setupData}
                     onBack={() => setStep(2)}
