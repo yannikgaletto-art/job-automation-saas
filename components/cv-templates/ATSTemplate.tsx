@@ -5,7 +5,7 @@ import { SkillTagGroup } from './shared/SkillTag';
 // ProficiencyDots removed from Valley (2026-03-30 ATS fix) — still used by TechTemplate
 import { CertGrid } from './shared/CertGrid';
 import { RenderMarkdownText } from './shared/RenderMarkdownText';
-import { truncateDescription, normalizeDateRangeText } from '@/lib/utils/cv-template-helpers';
+import { normalizeDateRangeText, splitBulletLeadIn } from '@/lib/utils/cv-template-helpers';
 import { CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 import { LayoutMode } from '@/types/cv-opt-settings';
 
@@ -87,12 +87,12 @@ function buildStyles(mode: LayoutMode) {
 }
 
 const RenderBullet = ({ text }: { text: string }) => {
-    const idx = text.indexOf(':');
-    if (idx !== -1 && idx < 40) {
+    const leadIn = splitBulletLeadIn(text);
+    if (leadIn) {
         return (
             <Text style={{ flex: 1, fontSize: 9, color: DARK, lineHeight: 1.4 }}>
-                <Text style={{ fontWeight: 700 }}>{text.slice(0, idx + 1)}</Text>
-                {text.slice(idx + 1)}
+                <Text style={{ fontWeight: 700 }}>{leadIn.leadIn}</Text>
+                {leadIn.rest}
             </Text>
         );
     }

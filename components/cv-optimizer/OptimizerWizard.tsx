@@ -20,6 +20,7 @@ import { applyOptimizations, stripTodoItems } from '@/lib/utils/cv-merger';
 import { cn } from '@/lib/utils';
 import QRCode from 'qrcode';
 import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
+import { sanitizeCvPreviewDrafts } from '@/lib/utils/cv-inline-editor-helpers';
 
 
 const DynamicPdfViewer = dynamic(
@@ -483,11 +484,24 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     };
 
     // Compute clean PDF data from finalCv + decisions + CVOptSettings
+    const { showSummary, summaryMode, showCertificates, showLanguages } = cvOptSettings;
     const pdfData = useMemo(() => {
         if (!finalCv) return null;
         const stripped = stripTodoItems(finalCv);
-        return applyCVOptSettings(stripped, cvOptSettings);
-    }, [finalCv, cvOptSettings]);
+        return applyCVOptSettings(stripped, {
+            ...DEFAULT_CV_OPT_SETTINGS,
+            showSummary,
+            summaryMode,
+            showCertificates,
+            showLanguages,
+        });
+    }, [
+        finalCv,
+        showSummary,
+        summaryMode,
+        showCertificates,
+        showLanguages,
+    ]);
 
     // Sync editablePdfData when pdfData changes
     useEffect(() => {
@@ -496,6 +510,10 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
 
     // Active render data (editor overrides pdfData)
     const activePdfData = editablePdfData ?? pdfData;
+    const renderedPdfData = useMemo(
+        () => activePdfData ? sanitizeCvPreviewDrafts(activePdfData) : null,
+        [activePdfData],
+    );
 
     if (isLoading) {
         return <div className="p-10 flex justify-center"><LoadingSpinner className="w-8 h-8 text-[#012e7a]" /></div>;
@@ -814,7 +832,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                 )}
 
                 {/* ===== STEP 2: PREVIEW ===== */}
-                {step === 2 && activePdfData && (
+                {step === 2 && activePdfData && renderedPdfData && (
                     <div className="space-y-4 px-4">
                         {/* Template Switcher + Bearbeiten */}
                         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-3">
@@ -890,7 +908,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                         {/* PDF Preview + optional editor panel */}
                         {isEditing ? (
                             <div className="grid grid-cols-[1fr_480px] gap-4 items-start">
-                                <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
+                                <DynamicPdfViewer data={renderedPdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
                                 <div className="sticky top-4 bg-white rounded-xl border border-slate-200 p-4 h-[800px]">
                                     <InlineCvEditor
                                         data={activePdfData}
@@ -900,7 +918,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                 </div>
                             </div>
                         ) : (
-                            <DynamicPdfViewer data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
+                            <DynamicPdfViewer data={renderedPdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
                         )}
 
                         <div className="flex flex-col sm:flex-row justify-between items-center py-4 border-t border-gray-100 mt-6 mb-8 gap-4 pb-4">
@@ -913,7 +931,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
 
                             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                                 <div className="w-full sm:w-auto">
-                                    <DynamicDownloadButton data={activePdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
+                                    <DynamicDownloadButton data={renderedPdfData} templateId={templateId} qrBase64={qrBase64} layoutMode={cvOptSettings.layoutMode} />
                                 </div>
                                 <button
                                     onClick={() => onGoToCoverLetter?.()}

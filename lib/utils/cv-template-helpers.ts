@@ -57,3 +57,22 @@ export function normalizeDateRangeText(
     );
 }
 
+export const BULLET_LEAD_IN_MAX_CHARS = 80;
+
+export function splitBulletLeadIn(
+    text: string,
+    maxChars = BULLET_LEAD_IN_MAX_CHARS,
+): { leadIn: string; rest: string } | null {
+    const markdownMatch = text.match(/^\*\*([^*\n:][^*\n]{0,80}:)\*\*(.*)$/);
+    if (markdownMatch) {
+        return { leadIn: markdownMatch[1], rest: markdownMatch[2] };
+    }
+
+    const idx = text.indexOf(':');
+    if (idx <= 0 || idx > maxChars) return null;
+
+    const leadIn = text.slice(0, idx + 1);
+    if (leadIn.includes('\n')) return null;
+
+    return { leadIn, rest: text.slice(idx + 1) };
+}

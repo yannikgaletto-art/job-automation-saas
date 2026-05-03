@@ -4,7 +4,7 @@ import { registerPdfFonts } from '@/lib/utils/pdf-fonts';
 import { CvStructuredData } from '@/types/cv';
 import { CertGrid } from './shared/CertGrid';
 import { RenderMarkdownText } from './shared/RenderMarkdownText';
-import { inferLanguageLevel, normalizeDateRangeText } from '@/lib/utils/cv-template-helpers';
+import { inferLanguageLevel, normalizeDateRangeText, splitBulletLeadIn } from '@/lib/utils/cv-template-helpers';
 import { CvTemplateLabels } from '@/lib/utils/cv-template-labels';
 
 registerPdfFonts();
@@ -165,14 +165,12 @@ const s = StyleSheet.create({
 });
 
 const RenderBullet = ({ text }: { text: string }) => {
-    const parts = text.split(':');
-    if (parts.length > 1) {
-        const before = parts[0];
-        const after = parts.slice(1).join(':');
+    const leadIn = splitBulletLeadIn(text);
+    if (leadIn) {
         return (
             <Text style={s.bulletText}>
-                <Text style={{ fontWeight: 700, color: DARK }}>{before}:</Text>
-                {after}
+                <Text style={{ fontWeight: 700, color: DARK }}>{leadIn.leadIn}</Text>
+                {leadIn.rest}
             </Text>
         );
     }
