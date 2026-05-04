@@ -109,6 +109,88 @@ async function checkCache(
 // If Perplexity is needed again in the future, restore from git history:
 //   git log --all -p -- lib/services/company-enrichment.ts
 
+function normalizeWebsiteUrl(websiteUrl: string): string {
+    return websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
+}
+
+async function scrapeWithJinaReader(url: string, timeoutMs: number): Promise<string | null> {
+    const jinaUrl = `https://r.jina.ai/${url}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const jinaRes = await fetch(jinaUrl, {
+            headers: {
+                'Accept': 'text/plain',
+                'X-Return-Format': 'markdown',
+            },
+            signal: controller.signal,
+        });
+
+        if (!jinaRes.ok) {
+            console.warn(`⚠️ [Enrichment] Jina HTTP ${jinaRes.status} for ${jinaUrl}`);
+            return null;
+        }
+
+        const markdown = await jinaRes.text();
+        return markdown.length >= 100 ? markdown : null;
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.warn(`⚠️ [Enrichment] Jina error for ${url}:`, errMsg);
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+function extractRelevantInternalLinks(markdown: string, baseUrl: string): string[] {
+    const relevantTerms = [
+        'about', 'company', 'mission', 'vision', 'values', 'culture',
+        'product', 'products', 'solution', 'solutions', 'services',
+        'project', 'projects', 'sustainability', 'impact', 'innovation',
+        'career', 'careers', 'jobs', 'team',
+    ];
+
+    let base: URL;
+    try {
+        base = new URL(baseUrl);
+    } catch {
+        return [];
+    }
+
+    const links = new Map<string, number>();
+    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = linkRegex.exec(markdown)) !== null) {
+        const label = match[1].toLowerCase();
+        const href = match[2];
+        if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) continue;
+
+        let url: URL;
+        try {
+            url = new URL(href, base);
+        } catch {
+            continue;
+        }
+
+        if (url.hostname.replace(/^www\./, '') !== base.hostname.replace(/^www\./, '')) continue;
+
+        const haystack = `${label} ${url.pathname.toLowerCase()}`;
+        const score = relevantTerms.reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0);
+        if (score === 0) continue;
+
+        url.hash = '';
+        links.set(url.toString(), Math.max(links.get(url.toString()) || 0, score));
+    }
+
+    return [...links.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([url]) => url)
+        .filter(url => url !== base.toString())
+        .slice(0, 2);
+}
+
 /**
  * STEP 3: Save to cache
  */
@@ -168,35 +250,30 @@ async function fetchViaJinaAndClaude(
     // ── Step 1: Jina AI Reader scrape ─────────────────────────────────────
     let scrapedMarkdown = '';
     try {
-        const normalizedUrl = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
-        const jinaUrl = `https://r.jina.ai/${normalizedUrl}`;
-        console.log(`🔍 [Fallback] Jina AI scraping: ${jinaUrl}`);
+        const normalizedUrl = normalizeWebsiteUrl(websiteUrl);
+        console.log(`🔍 [Fallback] Jina AI scraping: ${normalizedUrl}`);
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
+        const homeMarkdown = await scrapeWithJinaReader(normalizedUrl, 20000);
+        if (!homeMarkdown) return null;
 
-        const jinaRes = await fetch(jinaUrl, {
-            headers: {
-                'Accept': 'text/plain',
-                'X-Return-Format': 'markdown',
-            },
-            signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
+        const relatedUrls = extractRelevantInternalLinks(homeMarkdown, normalizedUrl);
+        const relatedPages: string[] = [];
 
-        if (!jinaRes.ok) {
-            console.warn(`⚠️ [Fallback] Jina HTTP ${jinaRes.status} for ${jinaUrl}`);
-            return null;
+        for (const relatedUrl of relatedUrls) {
+            const relatedMarkdown = await scrapeWithJinaReader(relatedUrl, 8000);
+            if (relatedMarkdown && relatedMarkdown.length >= 200) {
+                relatedPages.push(`\n\n--- RELEVANTE UNTERSEITE: ${relatedUrl} ---\n\n${relatedMarkdown}`);
+            }
         }
 
-        scrapedMarkdown = await jinaRes.text();
+        scrapedMarkdown = [homeMarkdown, ...relatedPages].join('\n\n');
 
         if (scrapedMarkdown.length < 100) {
             console.warn(`⚠️ [Fallback] Jina returned too little content (${scrapedMarkdown.length} chars)`);
             return null;
         }
 
-        console.log(`✅ [Fallback] Jina scraped ${scrapedMarkdown.length} chars from ${websiteUrl}`);
+        console.log(`✅ [Fallback] Jina scraped ${scrapedMarkdown.length} chars from ${websiteUrl} (${relatedPages.length} related pages)`);
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
         console.error(`❌ [Fallback] Jina error for ${websiteUrl}:`, errMsg);
@@ -235,12 +312,12 @@ async function fetchViaJinaAndClaude(
             .replace(/\n{3,}/g, '\n\n')                           // Collapse blank lines
             .trim();
 
-        // Haiku has 200K context — 15K chars ≈ 4K tokens, well within budget.
+        // Haiku has 200K context — 24K chars leaves room for homepage + 1-2 relevant subpages.
         // IMPORTANT: Do NOT use sanitizeForAI() here. Company websites are 100% public.
         // The aggressive name regex masks company names/products ("Smart Infrastructure"
         // → __NAME_1__) which destroys Claude's ability to extract meaningful intel.
         // Only strip emails/phones (light sanitization for employee contact info).
-        const truncatedRaw = cleaned.substring(0, 15000);
+        const truncatedRaw = cleaned.substring(0, 24000);
         const truncatedContent = truncatedRaw
             .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[EMAIL]')
             .replace(/(\+?\d{1,4}[\s\-./]?)?\(?\d{2,5}\)?[\s\-./]?\d{3,10}[\s\-./]?\d{0,10}/g, (m) => {
