@@ -25,6 +25,14 @@ export interface BlacklistPattern {
     feedback?: string;
 }
 
+export interface BlacklistRegexPattern {
+    pattern: string;
+    regex: RegExp;
+    reason: string;
+    category: BlacklistPattern['category'];
+    feedback?: string;
+}
+
 /**
  * ~70 forbidden patterns. Case-insensitive matching.
  * These destroy authenticity and must never appear in generated cover letters.
@@ -378,6 +386,18 @@ export const BLACKLIST_PATTERNS: BlacklistPattern[] = [
         category: 'ai_marker',
         feedback: 'Formuliere den Satz um: Beschreibe direkt, was du schätzt, statt einen Kontrast aufzubauen.',
     },
+    {
+        pattern: 'Aufrichtigkeit, mit der',
+        reason: 'Allwissende Firmen-Haltung. Der Bewerber kann nicht wissen, ob ein Unternehmen aufrichtig handelt.',
+        category: 'ai_marker',
+        feedback: 'Formuliere bescheiden aus ICH-Perspektive: "Mich spricht an, dass..." oder "Auf eurer Website habe ich gelesen, dass...". Keine objektive Aussage über die innere Haltung der Firma.',
+    },
+    {
+        pattern: 'sincerity with which',
+        reason: 'Omniscient company attitude. The applicant cannot know whether a company acts with sincerity.',
+        category: 'ai_marker',
+        feedback: 'Rewrite from an I-perspective: "What appealed to me was..." or "When I read that...". Do not state an inner company attitude as fact.',
+    },
 
     // ─── NEW: Merged from Judge DE_BLACKLIST / EN_BLACKLIST (2026-04-09) ──────────
     {
@@ -553,6 +573,16 @@ export const BLACKLIST_PATTERNS: BlacklistPattern[] = [
     },
 ];
 
+export const BLACKLIST_REGEX_PATTERNS: BlacklistRegexPattern[] = [
+    {
+        pattern: 'kein/nicht X, sondern Y',
+        regex: /\b(?:nicht|kein(?:e|er|es|em|en)?)\b[^.!?\n]{1,120}?\bsondern\b/i,
+        reason: 'Generisches Kontrastmuster. Es klingt rhetorisch gebaut und widerspricht Yanniks direkter Schreibweise.',
+        category: 'ai_marker',
+        feedback: 'Formuliere direkt, was passiert ist oder was du beobachtet hast. Keine Struktur "kein/nicht X, sondern Y".',
+    },
+];
+
 export interface FluffScanResult {
     found: boolean;
     matches: Array<{
@@ -573,6 +603,12 @@ export function scanForFluff(text: string): FluffScanResult {
 
     for (const { pattern, reason, category, feedback } of BLACKLIST_PATTERNS) {
         if (lowerText.includes(pattern.toLowerCase())) {
+            matches.push({ pattern, reason, category, feedback });
+        }
+    }
+
+    for (const { pattern, regex, reason, category, feedback } of BLACKLIST_REGEX_PATTERNS) {
+        if (regex.test(text)) {
             matches.push({ pattern, reason, category, feedback });
         }
     }
@@ -608,6 +644,8 @@ const T1_TIER_PATTERNS: string[] = [
     'Doch ich lernte schnell',
     'schnell den Sprung',
     'hat mich ein Gedanke begleitet',
+    'Aufrichtigkeit, mit der',
+    'kein/nicht X, sondern Y',
     'nicht nur',         // T1-V4: Most frequent blacklist leaker
     'Genau das ist',     // T1-V4: Bypasses ICH-perspective rule
     'wie treffend',      // T1-V4: Self-praise pattern
@@ -659,5 +697,6 @@ export function buildJudgeBlacklistSection(lang: 'de' | 'en' | 'es'): string {
         : 'VERBOTENE PHRASEN — GPT-BLACKLIST (jeder Fund = fail):';
 
     return `${header}
-${patterns.map(p => `- "${p.pattern}"`).join('\n')}`;
+${patterns.map(p => `- "${p.pattern}"`).join('\n')}
+${BLACKLIST_REGEX_PATTERNS.map(p => `- "${p.pattern}" (${p.reason})`).join('\n')}`;
 }

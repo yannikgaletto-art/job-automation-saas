@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
-import { BLACKLIST_PATTERNS } from './anti-fluff-blacklist';
+import { scanForFluff } from './anti-fluff-blacklist';
 
 export interface ValidationResult {
     isValid: boolean;
@@ -63,22 +63,19 @@ export function validateCoverLetter(
         warnings.push(`Company name only mentioned once (recommend: 2-3 times)`);
     }
 
-    // 3. FORBIDDEN PHRASES CHECK (centralized via BLACKLIST_PATTERNS — Single Source of Truth)
+    // 3. FORBIDDEN PHRASES CHECK (centralized via scanForFluff — Single Source of Truth)
     // Patterns with a `feedback` field are hard-stop phrases that have been observed to survive
     // the LLM Judge across MAX_ITERATIONS. Their feedback strings provide explicit re-generation
     // guidance to the sync-loop (§Fix F — Deterministic pre-delivery stop).
-    let forbiddenCount = 0;
-    const lowerText = coverLetter.toLowerCase();
+    const fluffScan = scanForFluff(coverLetter);
+    const forbiddenCount = fluffScan.matches.length;
 
-    for (const { pattern, reason, feedback } of BLACKLIST_PATTERNS) {
-        if (lowerText.includes(pattern.toLowerCase())) {
-            if (feedback) {
-                // Hard-stop phrase with explicit feedback → high-priority error
-                errors.push(`HARD_BLACKLIST: "${pattern}" — ${feedback}`);
-            } else {
-                errors.push(`Forbidden phrase detected: "${pattern}" - ${reason}`);
-            }
-            forbiddenCount++;
+    for (const { pattern, reason, feedback } of fluffScan.matches) {
+        if (feedback) {
+            // Hard-stop phrase with explicit feedback → high-priority error
+            errors.push(`HARD_BLACKLIST: "${pattern}" — ${feedback}`);
+        } else {
+            errors.push(`Forbidden phrase detected: "${pattern}" - ${reason}`);
         }
     }
 

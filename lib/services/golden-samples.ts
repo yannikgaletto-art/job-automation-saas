@@ -26,7 +26,7 @@ beim Lesen der Stellenausschreibung bei Siemens blieb ich an einem Gedanken haen
 \u201eQualitaetskontrolle beginnt und endet mit Schulung.\u201c
 \u2013 Kaoru Ishikawa
 
-Ishikawa spricht davon, dass nachhaltige Transformation kein Rollout, sondern ein Lernprozess sei. In diesem Lernprozess gehe es darum, die Haltungen der Menschen zu veraendern. Oder anders gefragt: Was nuetzt das praeziseste KI-Modell, wenn niemand versteht, welche Frage es eigentlich beantwortet? Diese Ueberzeugung zieht sich wie ein roter Faden durch meine Stationen. Da ich es auch in den Projekten im Industrial Metaverse erkenne, moechte ich mich kurz vorstellen.
+Ishikawa spricht davon, dass nachhaltige Transformation als Lernprozess verstanden werden muss. In diesem Lernprozess gehe es darum, die Haltungen der Menschen zu veraendern. Oder anders gefragt: Was nuetzt das praeziseste KI-Modell, wenn niemand versteht, welche Frage es eigentlich beantwortet? Diese Ueberzeugung zieht sich wie ein roter Faden durch meine Stationen. Da ich es auch in den Projekten im Industrial Metaverse erkenne, moechte ich mich kurz vorstellen.
 
 Was mich am Industrial Metaverse festhaelt ist die Idee, dass physische Prozesse und digitale Entscheidungen in Echtzeit synthetisieren. Genau diese Verbindung habe ich bei Ingrano Solutions von der anderen Seite kennengelernt: einem B2B-Beratungsunternehmen mit regulatorischem Handlungsbedarf durch NIS-2, in dem ich automatisierte Workflows fuer die Lead-Generierung konzipierte und Vertriebsprozesse in Close.io messbar machte. Die zentrale Frage war dabei immer dieselbe: Loesen wir das, was der Kunde wirklich braucht?
 
@@ -54,7 +54,7 @@ Charlie Munger hat einmal gesagt:
 \u201eAll I want to know is where I\u2019m going to die, so I\u2019ll never go there.\u201c
 \u2013 Charlie Munger
 
-Mit Blick auf Ihre Ausschreibung lassen sich Szenarioanalysen und M&A-Bewertungen erkennen. Mungers Prinzip ist dafuer keine Metapher sondern eine Methode: Systematisch ausschliessen, was nicht traegt, bevor man empfiehlt, was funktioniert. Und mit dieser Verbindung zwischen Modell und Urteil freue ich mich bei Ihnen als Finanzanalyst zu bewerben.
+Mit Blick auf Ihre Ausschreibung lassen sich Szenarioanalysen und M&A-Bewertungen erkennen. Mungers Prinzip beschreibt fuer mich eine Methode: systematisch ausschliessen, was nicht traegt, bevor man empfiehlt, was funktioniert. Und mit dieser Verbindung zwischen Modell und Urteil freue ich mich bei Ihnen als Finanzanalyst zu bewerben.
 
 Diese Verbindung habe ich bei Fraunhofer FOKUS systematisch erprobt. Als Projektleiter einer Quantum-Computing-Gruppe begleitete ich SpinOffs dabei, Technologiepotenziale in belastbare Business Cases zu uebersetzen; mit Marktgroessenanalysen, Wettbewerbsvergleichen und strukturierten Go-to-Market-Empfehlungen. Die wiederkehrende Herausforderung war die Frage dahinter: Welche Annahme traegt und welche bricht zuerst?
 
@@ -72,7 +72,7 @@ const FORMAL_ANNOTATIONS = `STIL-ANALYSE DIESES MUSTERS (was du uebernehmen soll
 - AKTIVE VERBEN: "erprobt", "begleitete", "identifizierte", "strukturierte", "machte quantifizierbar"
 - SCHLUSS: Kompakt, verbindlich, kein Pathos. Gemeinsame Kompetenz + Bewerbungssatz + Verfuegbarkeit.
 - SEMIKOLON statt Gedankenstrich: "zu uebersetzen; mit Marktgroessenanalysen"
-- KEINE allwissenden Wenn-dann-Wahrheiten, KEIN "nicht nur...sondern"`;
+- KEINE allwissenden Wenn-dann-Wahrheiten, KEIN "nicht/kein X, sondern Y"`;
 
 // ─── Public API ────────────────────────────────────────────────────────────────
 

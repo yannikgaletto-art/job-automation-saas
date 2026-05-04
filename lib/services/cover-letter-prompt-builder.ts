@@ -262,7 +262,7 @@ Der Output soll klingen, als hätte der Bewerber selbst geschrieben.
 Nutze die extrahierten Konjunktionen statt generischer Übergänge.
 Kalibriere deinen Output auf dieses Muster — übernimm den Stil, nicht den Inhalt.
 
-${!style.rhetorical_contrast_pattern ? t('VERBOTEN: Die Struktur "nicht [nur] X, sondern [auch] Y" — der User nutzt sie nie.', 'FORBIDDEN: The structure "not [only] X, but [also] Y" — the user never uses it.') : ''}
+${!style.rhetorical_contrast_pattern ? t('VERBOTEN: Die Struktur "nicht/kein X, sondern Y" — der User nutzt sie nie.', 'FORBIDDEN: The structure "not/no X, but Y" — the user never uses it.') : ''}
 ${!style.uses_em_dash ? t('VERBOTEN: Gedankenstriche (– oder —) als Satzzeichen.', 'FORBIDDEN: Em-dashes (– or —) as punctuation.') : ''}
 ${t(`SATZBAU: Max. ${style.max_commas_per_sentence ?? 1} Komma(s) pro Satz — exakt wie im Stil des Users.`, `SENTENCE STRUCTURE: Max. ${style.max_commas_per_sentence ?? 1} comma(s) per sentence — exactly like the user's style.`)}`
             // Partial style: use what we have (rhythm data) but note limited calibration
@@ -557,7 +557,7 @@ VERBOTEN: Mehr als 60 Wörter für diesen Block.`;
 Analysiere die Stellenbeschreibung auf implizite Probleme:
 - Explizit gesucht (z.B. Python, Teamführung) = Skill Match → direkt benennen
 - Impliziter Schmerz (z.B. "Aufbau eines neuen Teams" = Wachstumsproblem) → Zeige mit einer konkreten CV-Station, wo genau du das schon gelöst hast
-TON: Sachlich beobachten und Best-Practice-Transfer anbieten. Nicht "Ich bin der Ideale" oder "Ich werde das lösen" — sondern "Ich sehe [Problem]. Bei [Station] habe ich ähnliche Erfahrungen gesammelt."
+TON: Sachlich beobachten und Best-Practice-Transfer anbieten. Schreibe "Ich sehe [Problem]. Bei [Station] habe ich ähnliche Erfahrungen gesammelt." Vermeide "Ich bin der Ideale" und "Ich werde das lösen".
 VERBOTEN: Retter-Komplex, Heilsversprechen, Selbstbewertung als "idealer Kandidat".`;
     }
 
@@ -650,6 +650,7 @@ OUTPUT-REGELN (CRITICAL — NIEMALS BRECHEN):
 - ${t('Max. 2 Kommas pro Satz. Mehr Kommas = Satz aufteilen.', 'Max. 2 commas per sentence. More commas = split the sentence.')}
 - ${t('KEIN Gedankenstrich (– oder —) im Fließtext. EINZIGE AUSNAHME: Die Zitat-Signatur-Zeile (z.B. "– Autor"). Überall sonst: Nutze Semikolon (;) oder Punkt statt Gedankenstrich.', 'NO em-dash (– or —) in body text. ONLY EXCEPTION: The quote attribution line ("– Author"). Everywhere else: Use semicolons (;) or periods instead.', 'PROHIBIDO el guión largo (– o —) en el texto. ÚNICA EXCEPCIÓN: La línea de atribución de cita. Usa punto y coma (;) o punto.')}
 - ${t('TONALITÄT: Eloquenz + Bescheidenheit. Sei zuversichtlich aber nicht abgehoben. Zeige Lernbereitschaft statt Allwissenheit. GUT: "Ich gehe zuversichtlich ran", "Ich freue mich, von Ihrer Expertise zu lernen". VERBOTEN: "Ich bringe eine solide Grundlage", "Meine Erfahrung befähigt mich", "Genau das ist", "Die Kombination aus", "Diese Kombination aus".', 'TONE: Eloquence + Humility. Be confident yet grounded. Show eagerness to learn, not omniscience. GOOD: "I approach this with confidence", "I look forward to learning from your expertise". FORBIDDEN: "I bring a solid foundation", "My experience qualifies me", "That is exactly what".', 'TONO: Elocuencia + Humildad. Sé seguro pero sin arrogancia. PROHIBIDO: "Exactamente eso es".')}
+- ${t('FIRMENHALTUNG: Keine objektiven Urteile über innere Werte oder Absichten der Firma. VERBOTEN: "die Aufrichtigkeit, mit der ihr..." BESSER: "Mich spricht an, dass..." mit konkreter Quelle.', 'COMPANY ATTITUDE: Never state inner values or intentions as fact. FORBIDDEN: "the sincerity with which you..." BETTER: "What appealed to me was..." with a concrete source.')}
 - ${t('DOPPELPUNKTE: Kein Satz darf mit einem Doppelpunkt enden, gefolgt von Zeilenumbruch. EINZIGE AUSNAHME: Die Zitat-Signatur-Zeile.', 'COLONS: No sentence may end with a colon followed by a line break. ONLY EXCEPTION: The quote attribution line.')}
 
 === SEKTION 2: TONALITÄT & STIL (HÖCHSTE PRIORITÄT) ===
