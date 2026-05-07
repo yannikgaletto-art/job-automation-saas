@@ -51,6 +51,115 @@ interface CompanyResearchData {
 // ─── Exported Types (re-export for generator) ─────────────────────────────────
 export type { UserProfileData, JobData, CompanyResearchData };
 
+interface QuoteStyleMoveArgs {
+    isEnglish: boolean;
+    isDuForm: boolean;
+    companyName: string;
+    jobTitle: string;
+    quoteAuthor: string;
+    seed: string;
+}
+
+interface StyleMove {
+    id: string;
+    de: string;
+    en: string;
+}
+
+function stableMoveIndex(seed: string, count: number, salt: number): number {
+    let hash = salt;
+    for (let i = 0; i < seed.length; i++) {
+        hash = ((hash << 5) - hash + seed.charCodeAt(i)) >>> 0;
+    }
+    return hash % count;
+}
+
+export function buildQuoteStyleMoveSection(args: QuoteStyleMoveArgs): string {
+    const { isEnglish, isDuForm, companyName, jobTitle, quoteAuthor, seed } = args;
+    const pronoun = isDuForm ? 'euch' : 'Ihnen';
+
+    const openingMoves: StyleMove[] = [
+        {
+            id: 'opening-classic',
+            de: `Beim Lesen der Ausschreibung fuer ${jobTitle} bleibst du an EINEM konkreten Aufgabenwort haengen. Fuehre von dort bescheiden zum Zitat.`,
+            en: `Start from ONE concrete task word in the ${jobTitle} job ad. Move from that observation to the quote in a humble way.`,
+        },
+        {
+            id: 'opening-tension',
+            de: `Oeffne mit einem Spannungsfeld der Rolle: "[Pol A] und [Pol B] liegen in dieser Aufgabe nah beieinander." Danach fuehrt das Zitat in den Gedanken.`,
+            en: `Open with a role tension: "[pole A] and [pole B] sit close together in this role." Then let the quote carry the thought.`,
+        },
+        {
+            id: 'opening-question',
+            de: `Oeffne mit einer echten Frage aus der Rolle. Beispiel: "Beim Lesen eurer Ausschreibung stellte sich mir eine Frage: [kurze Frage]." Danach kommt das Zitat.`,
+            en: `Open with a real question from the role. Example: "Reading your job ad raised one question for me: [short question]." Then place the quote.`,
+        },
+        {
+            id: 'opening-station-echo',
+            de: `Oeffne ueber eine Erinnerung an eine eigene Station, ohne die Station schon auszuerzaehlen. Beispiel: "Eure Ausschreibung erinnerte mich an einen Moment, den ich aus meiner Arbeit kenne." Danach kommt das Zitat.`,
+            en: `Open through a memory from the applicant's own work, without telling the full station yet. Then place the quote.`,
+        },
+    ];
+
+    const bridgeMoves: StyleMove[] = [
+        {
+            id: 'bridge-personal-meaning',
+            de: `Bruecke als persoenliche Bedeutung: "Fuer mich bedeutet [Zitatgedanke], dass..." Danach kurz zur Rolle bei ${companyName}.`,
+            en: `Bridge through personal meaning: "For me, [quote idea] means that..." Then connect briefly to the role at ${companyName}.`,
+        },
+        {
+            id: 'bridge-role-question',
+            de: `Bruecke als Rollenfrage: "Auf diese Rolle bezogen heisst das fuer mich: [eigene Frage]." Danach Bewerbungssatz.`,
+            en: `Bridge as a role question: "Applied to this role, that means one question for me: [own question]." Then the application sentence.`,
+        },
+        {
+            id: 'bridge-learning-arc',
+            de: `Bruecke als Lernbogen: "Ich habe diesen Gedanken vor allem dort verstanden, wo..." Danach eine kurze Verbindung zur ersten CV-Station.`,
+            en: `Bridge as a learning arc: "I understood this thought most clearly when..." Then connect briefly to the first CV station.`,
+        },
+        {
+            id: 'bridge-decision-context',
+            de: `Bruecke als Entscheidungskontext: "Gerade bei [Aufgabe aus der Stelle] wird dieser Gedanke praktisch." Danach Vorstellung bei ${pronoun}.`,
+            en: `Bridge as a decision context: "Especially in [task from the role], this thought becomes practical." Then introduce the applicant.`,
+        },
+    ];
+
+    const closingMoves: StyleMove[] = [
+        {
+            id: 'closing-author-development',
+            de: `${quoteAuthor} darf im Schluss genannt werden, aber nur mit neuer Wendung: "Der Gedanke von ${quoteAuthor} bleibt fuer mich dort relevant, wo [konkrete Aufgabe] echte Orientierung braucht."`,
+            en: `${quoteAuthor} may appear in the closing, but only with a new turn: "${quoteAuthor}'s thought stays relevant to me where [specific task] needs real orientation."`,
+        },
+        {
+            id: 'closing-role-transfer',
+            de: `Schliesse ueber die Rolle, ohne den Autor zu nennen: "Fuer mich fuehrt dieser Gedanke direkt zu [konkrete Aufgabe]. Genau daran moechte ich bei ${companyName} mitarbeiten."`,
+            en: `Close through the role, without naming the author: "For me, this thought leads directly to [specific task]. That is what I would like to work on at ${companyName}."`,
+        },
+        {
+            id: 'closing-question-return',
+            de: `Schliesse ueber eine offene Frage: "Aus dem Zitat bleibt fuer mich vor allem eine Frage: [Frage aus Stelle]." Danach Verfuegbarkeit.`,
+            en: `Close through an open question: "What stays with me from the quote is one question: [role question]." Then availability.`,
+        },
+        {
+            id: 'closing-quiet-invitation',
+            de: `Schliesse leise und persoenlich: "Wenn dieser Eindruck fuer ${pronoun} anschlussfaehig ist, freue ich mich auf ein Gespraech."`,
+            en: `Close quietly and personally: "If this impression resonates with you, I would be happy to talk."`,
+        },
+    ];
+
+    const opening = openingMoves[stableMoveIndex(seed, openingMoves.length, 17)];
+    const bridge = bridgeMoves[stableMoveIndex(seed, bridgeMoves.length, 31)];
+    const closing = closingMoves[stableMoveIndex(seed, closingMoves.length, 47)];
+    const pick = (move: StyleMove) => isEnglish ? move.en : move.de;
+
+    return `[STYLE-MOVE-CARDS - VARIANZ GEGEN TEMPLATE-WIEDERHOLUNG]
+Nutze diese ausgewaehlten Moves als Stilfuehrung. Nicht wortwoertlich kopieren.
+OPENING ${opening.id}: ${pick(opening)}
+QUOTE-BRIDGE ${bridge.id}: ${pick(bridge)}
+CLOSING ${closing.id}: ${pick(closing)}
+WICHTIG: Wenn ein Move inhaltlich nicht passt, behalte die Funktion des Moves bei, aber formuliere ihn passend zur Stelle.`;
+}
+
 // ─── Main Builder ─────────────────────────────────────────────────────────────
 export function buildSystemPrompt(
     profile: UserProfileData,
@@ -364,6 +473,16 @@ ${(s.bullets || []).slice(0, 4).map(b => `     • ${b}`).join('\n')}
     // CONFLICTS RESOLVED: Blind Spot #1 (introFocus) + #3 (formal preset)
     const rawPingPong = ctx?.optInModules?.pingPong ?? ctx?.enablePingPong ?? false;
     const enablePingPong = rawPingPong && focus === 'quote' && (ctx?.tone?.preset ?? 'formal') !== 'formal';
+    const quoteStyleMoveSection = hasQuote && focus === 'quote' && (ctx?.tone?.preset ?? 'formal') === 'storytelling'
+        ? buildQuoteStyleMoveSection({
+            isEnglish,
+            isDuForm,
+            companyName,
+            jobTitle,
+            quoteAuthor: ctx!.selectedQuote!.author,
+            seed: `${ctx?.jobId || ''}|${companyName}|${jobTitle}|${ctx!.selectedQuote!.author}|${ctx!.selectedQuote!.quote}`,
+        })
+        : '';
 
     // ─── Zitat-Block (wiederverwendbar für Intro oder Body) ────────────────────
     const quoteIntroBlock = hasQuote ? `[REGEL: EINLEITUNG — JD → ZITAT → BRÜCKE]
@@ -371,11 +490,11 @@ Zitat (WORTWÖRTLICH übernehmen, NICHT übersetzen — Sprache beibehalten wie 
 "${ctx!.selectedQuote!.quote}"
 (Autor: ${ctx!.selectedQuote!.author})
 
+${quoteStyleMoveSection}
+
 AUFBAU (max. 80 Wörter ohne Zitat):
 1. EINLEITUNGSSATZ (1 Satz): Bezug auf Stellenanzeige oder Kernaufgabe, endet mit bescheidener Überleitung zum Zitat.
-   ✅ "Als ich eure Stelle als [Jobtitel] las, erinnerte ich mich an ein Zitat:"
-   ✅ "Beim Lesen eurer Ausschreibung fiel mir ein Gedanke ein, den ich mit euch teilen möchte:"
-   ✅ "Da ich auf eurer Website las, dass [konkreter Fakt], musste ich an ein Zitat denken:"
+   ${quoteStyleMoveSection ? 'PFLICHT: Nutze den OPENING-Move aus den STYLE-MOVE-CARDS oben.' : 'Waehle eine bescheidene ICH-Variante. Beispiele: "Als ich eure Stelle als [Jobtitel] las..." / "Da ich auf eurer Website las..."'}
    ❌ NIEMALS: "wie treffend", "wie präzise", "wie passend ein Gedanke" — das ist Selbstlob.
    PFLICHT: Formuliere BESCHEIDEN aus ICH-Perspektive. Nicht bewerten, nur teilen.
 
@@ -384,10 +503,9 @@ AUFBAU (max. 80 Wörter ohne Zitat):
    Die Signatur-Zeile ist PFLICHT. Autor NICHT zusätzlich im Fließtext nennen.
 
 3. BRÜCKE (1-2 Sätze): Verbinde den KONKRETEN GEDANKEN des Zitats mit der Stelle — IMMER in ICH-Perspektive.
-   ✅ "Für mich bedeutet [Zitat-Kerngedanke], dass [persönliche Reflexion]. Deshalb möchte ich mich als [Jobtitel] bei ${isDuForm ? 'euch' : 'Ihnen'} kurz vorstellen."
-   ✅ "[Zitat-Kerngedanke] begleitet mich durch viele Stationen. Deshalb möchte ich mich kurz vorstellen."
+   ${quoteStyleMoveSection ? 'PFLICHT: Nutze den QUOTE-BRIDGE-Move aus den STYLE-MOVE-CARDS oben.' : `✅ "Für mich bedeutet [Zitat-Kerngedanke], dass [persönliche Reflexion]. Deshalb möchte ich mich als [Jobtitel] bei ${isDuForm ? 'euch' : 'Ihnen'} kurz vorstellen."`}
    ❌ NIEMALS: "Genau das ist [Thema]" / "Das ist die Definition von" — das ist allwissend und anmaßend.
-   ❌ NIEMALS: Objekte oder Konzepte definieren. Immer persönlich: "Für mich bedeutet...", "Dieser Gedanke begleitet mich..."
+   ❌ NIEMALS: Objekte oder Konzepte definieren. Immer persönlich und konkret: "Für mich bedeutet..." / "Ich habe diesen Gedanken dort verstanden, wo..."
    TEST: Passt der Brückensatz nur zu DIESEM Zitat? Wenn er zu jedem Zitat passt → neu schreiben.
    STRUKTUR: Brücke + Bewerbungssatz gehören zum Einleitungsblock (kein eigener Absatz).
 ${enablePingPong ? `
@@ -918,7 +1036,8 @@ ${personaSection}
 ${t('SCHLUSS-REGELN (komprimiert):', 'CLOSING RULES (condensed):')}
 - ${t('VERBOTEN: Karriere-Zusammenfassung am Ende. Das ist Fuelltext.', 'FORBIDDEN: Career summary at the end. That is filler.')}
 ${hasQuote
-    ? `- ${t('KLAMMER-PFLICHT: Greife im Schlusssatz auf den Zitat-Gedanken zurueck — als inhaltliche Klammer. Nicht woertlich zitieren, sondern den GEDANKEN weiterentwickeln (z.B. Autor hatte recht; aber...).', 'BRACKET REQUIRED: Reference the quote idea in the closing — as a thematic bracket. Develop the THOUGHT (e.g. Author was right; but...).')}`
+    ? `- ${t('KLAMMER-PFLICHT: Greife im Schlusssatz auf den Zitat-Gedanken zurueck — als inhaltliche Klammer. Nicht woertlich zitieren, sondern den GEDANKEN weiterentwickeln.', 'BRACKET REQUIRED: Reference the quote idea in the closing — as a thematic bracket. Develop the THOUGHT.')}
+${quoteStyleMoveSection ? '- PFLICHT: Nutze den CLOSING-Move aus den STYLE-MOVE-CARDS oben. Keine Standard-Klammer automatisch wiederholen.' : ''}`
     : `- ${t('VERBOTEN: Zitat oder Hook aus der Einleitung NICHT wiederholen.', 'FORBIDDEN: Do NOT repeat the quote or hook from the opening.')}`}
 - ${t('Formuliere Vorfreude auf EINE konkrete Aufgabe aus der Stellenanzeige. Nenne dabei Jobtitel UND Firmenname im Schlusssatz. Eigene Worte.', 'Express anticipation for ONE specific task from the job ad. Include job title AND company name in the closing. Own words.')}
 - ${t('Schlusssatz: Warm + bescheiden + Verfuegbarkeit. Kein Verkaufs-CTA.', 'Closing sentence: Warm + humble + availability. No sales CTA.')}

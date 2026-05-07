@@ -32,12 +32,12 @@ Was mich am Industrial Metaverse festhaelt ist die Idee, dass physische Prozesse
 
 Fraunhofer FOKUS hat diese Frage fuer mich vertieft; da in diesem Umfeld Forschung und Markt selten dieselbe Sprache sprechen. Gleichzeitig braucht es die Faehigkeit \u201eGeschaeftsanforderungen fuer digitale Loesungen\u201c zu erheben. Als Projektleiter einer Quantum-Computing-Gruppe begleitete ich SpinOffs dabei, ihre Ideen in tragfaehige Business-Modelle zu uebersetzen; mit Kickoffs, OKR-Roadmaps und Stakeholdermanagement. Die eigentliche Herausforderung war dabei selten technischer Natur: Sie lag darin, Fachabteilungen frueh genug ins Boot zu holen, bevor eine Loesung fertig war. Der Antrieb dahinter blieb derselbe wie bei Ingrano: die Frage, ob das, was wir bauen, wirklich das loest, was gebraucht wird.
 
-Ishikawa hatte recht; aber der Lernprozess endet nicht bei Schulung. Er endet dort, wo jemand die Verbindung zwischen einer Entscheidung und ihrer Wirkung wirklich versteht. Genau das moechte ich als Junior Digitalization Consultant bei Siemens mitgestalten. Ich stehe in den naechsten Wochen flexibel fuer ein Gespraech zur Verfuegung.
+Der Gedanke von Ishikawa bleibt fuer mich dort relevant, wo Lernen in konkrete Entscheidungen uebersetzt werden muss. Genau an dieser Verbindung moechte ich als Junior Digitalization Consultant bei Siemens mitarbeiten. Ich stehe in den naechsten Wochen flexibel fuer ein Gespraech zur Verfuegung.
 
 Mit freundlichen Gruessen`;
 
 const STORYTELLING_ANNOTATIONS = `STIL-ANALYSE DIESES MUSTERS (was du uebernehmen sollst):
-- KLAMMER-TECHNIK: Zitat eroeffnet → Zitat-Rueckbezug im Schlusssatz ("Ishikawa hatte recht; aber...")
+- KLAMMER-TECHNIK: Zitat eroeffnet → Zitat-Rueckbezug im Schlusssatz mit neuer Wendung, ohne alte Autor-hatte-recht-Formel.
 - ROTER FADEN: Eine wiederkehrende Frage ("Loesen wir das, was der Kunde wirklich braucht?") verbindet die Stationen
 - RHETORISCHE FRAGE: "Was nuetzt das praeziseste KI-Modell, wenn niemand versteht...?" — max. 1x im Text
 - ICH-PERSPEKTIVE: Durchgehend. Keine allwissenden Firmen-Statements.
