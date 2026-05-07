@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import type { CoverLetterSetupContext } from '@/types/cover-letter-setup';
 import {
     buildQuoteStyleMoveSection,
@@ -92,6 +94,11 @@ const company: CompanyResearchData = {
     company_values: ['Human Empowerment', 'Technology'],
     current_challenges: ['Digitale Transformation in der Medizintechnik'],
 };
+const repoRoot = path.resolve(__dirname, '../../..');
+
+function readLocale(locale: 'de' | 'en' | 'es') {
+    return JSON.parse(fs.readFileSync(path.join(repoRoot, 'locales', `${locale}.json`), 'utf-8'));
+}
 
 describe('Cover Letter Prompt Builder quote style moves', () => {
     it('builds deterministic move cards with opening, bridge, and closing guidance', () => {
@@ -113,6 +120,8 @@ describe('Cover Letter Prompt Builder quote style moves', () => {
         expect(section).toMatch(/^CLOSING closing-/m);
         expect(section).not.toContain('hatte recht; aber');
         expect(section).not.toContain('Dieser Gedanke begleitet mich');
+        expect(section).not.toContain('wird dieser Gedanke praktisch');
+        expect(section).not.toContain('echte Orientierung');
     });
 
     it('varies move choices across different seeds without runtime randomness', () => {
@@ -144,9 +153,15 @@ describe('Cover Letter Prompt Builder quote style moves', () => {
         expect(prompt).toContain('PFLICHT: Nutze den OPENING-Move');
         expect(prompt).toContain('PFLICHT: Nutze den QUOTE-BRIDGE-Move');
         expect(prompt).toContain('PFLICHT: Nutze den CLOSING-Move');
+        expect(prompt).toContain('INFORMELL: Kein formeller Bewerbungssatz');
+        expect(prompt).toContain('ROTER-FADEN-FRAGE');
+        expect(prompt).toContain('MEIDE CHATGPT-VERSTAERKER');
         expect(prompt).not.toContain('hatte recht; aber');
         expect(prompt).not.toContain('Dieser Gedanke begleitet mich');
         expect(prompt).not.toContain('Beim Lesen eurer Ausschreibung fiel mir ein Gedanke ein');
+        expect(prompt).not.toContain('wird dieser Gedanke praktisch');
+        expect(prompt).not.toContain('Loesen wir das, was der Nutzer wirklich braucht');
+        expect(prompt).not.toContain('Menschen wirklich nutzen');
     });
 
     it('does not affect formal quote prompts', () => {
@@ -184,5 +199,16 @@ describe('Cover Letter Prompt Builder quote style moves', () => {
 
         expect(prompt).not.toContain('[STYLE-MOVE-CARDS');
         expect(prompt).not.toContain('PFLICHT: Nutze den OPENING-Move');
+    });
+});
+
+describe('Cover Letter tone labels', () => {
+    it('renames the visible storytelling/formal presets without changing internal keys', () => {
+        expect(readLocale('de').cover_letter.tone_storytelling).toBe('Informell');
+        expect(readLocale('de').cover_letter.tone_formal).toBe('Formell');
+        expect(readLocale('en').cover_letter.tone_storytelling).toBe('Informal');
+        expect(readLocale('en').cover_letter.tone_formal).toBe('Formal');
+        expect(readLocale('es').cover_letter.tone_storytelling).toBe('Informal');
+        expect(readLocale('es').cover_letter.tone_formal).toBe('Formal');
     });
 });

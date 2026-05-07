@@ -85,14 +85,14 @@ export function buildQuoteStyleMoveSection(args: QuoteStyleMoveArgs): string {
             en: `Start from ONE concrete task word in the ${jobTitle} job ad. Move from that observation to the quote in a humble way.`,
         },
         {
-            id: 'opening-tension',
-            de: `Oeffne mit einem Spannungsfeld der Rolle: "[Pol A] und [Pol B] liegen in dieser Aufgabe nah beieinander." Danach fuehrt das Zitat in den Gedanken.`,
-            en: `Open with a role tension: "[pole A] and [pole B] sit close together in this role." Then let the quote carry the thought.`,
+            id: 'opening-observation',
+            de: `Oeffne mit einer konkreten Beobachtung aus der Rolle, nicht mit einem grossen Spannungsfeld. Beispiel: "Beim Lesen blieb ich bei [konkrete Aufgabe] haengen, weil ich dazu eine Erfahrung aus meiner Arbeit mitbringe." Danach fuehrt das Zitat in den Gedanken.`,
+            en: `Open with a concrete observation from the role, not a broad tension. Example: "Reading the job ad, I paused at [specific task] because it connects to something I have worked on." Then let the quote carry the thought.`,
         },
         {
             id: 'opening-question',
-            de: `Oeffne mit einer echten Frage aus der Rolle. Beispiel: "Beim Lesen eurer Ausschreibung stellte sich mir eine Frage: [kurze Frage]." Danach kommt das Zitat.`,
-            en: `Open with a real question from the role. Example: "Reading your job ad raised one question for me: [short question]." Then place the quote.`,
+            de: `Oeffne mit einer konkreten Frage aus der Rolle. Beispiel: "Beim Lesen eurer Ausschreibung stellte sich mir eine Frage: [kurze Frage]." Danach kommt das Zitat.`,
+            en: `Open with a concrete question from the role. Example: "Reading your job ad raised one question for me: [short question]." Then place the quote.`,
         },
         {
             id: 'opening-station-echo',
@@ -104,13 +104,13 @@ export function buildQuoteStyleMoveSection(args: QuoteStyleMoveArgs): string {
     const bridgeMoves: StyleMove[] = [
         {
             id: 'bridge-personal-meaning',
-            de: `Bruecke als persoenliche Bedeutung: "Fuer mich bedeutet [Zitatgedanke], dass..." Danach kurz zur Rolle bei ${companyName}.`,
-            en: `Bridge through personal meaning: "For me, [quote idea] means that..." Then connect briefly to the role at ${companyName}.`,
+            de: `Bruecke als persoenliche Bedeutung: "Fuer mich bedeutet [Zitatgedanke], dass..." Danach kurz zur eigenen Erfahrung mit ${companyName}-Bezug, ohne Jobtitel im Intro.`,
+            en: `Bridge through personal meaning: "For me, [quote idea] means that..." Then connect briefly to the applicant's experience and ${companyName}, without naming the job title in the intro.`,
         },
         {
             id: 'bridge-role-question',
-            de: `Bruecke als Rollenfrage: "Auf diese Rolle bezogen heisst das fuer mich: [eigene Frage]." Danach Bewerbungssatz.`,
-            en: `Bridge as a role question: "Applied to this role, that means one question for me: [own question]." Then the application sentence.`,
+            de: `Bruecke als Rollenfrage: "Auf diese Rolle bezogen heisst das fuer mich: [eigene Frage]." Danach eine kurze persoenliche Einordnung, ohne formellen Bewerbungssatz.`,
+            en: `Bridge as a role question: "Applied to this role, that means one question for me: [own question]." Then add a short personal framing, without a formal application sentence.`,
         },
         {
             id: 'bridge-learning-arc',
@@ -118,17 +118,17 @@ export function buildQuoteStyleMoveSection(args: QuoteStyleMoveArgs): string {
             en: `Bridge as a learning arc: "I understood this thought most clearly when..." Then connect briefly to the first CV station.`,
         },
         {
-            id: 'bridge-decision-context',
-            de: `Bruecke als Entscheidungskontext: "Gerade bei [Aufgabe aus der Stelle] wird dieser Gedanke praktisch." Danach Vorstellung bei ${pronoun}.`,
-            en: `Bridge as a decision context: "Especially in [task from the role], this thought becomes practical." Then introduce the applicant.`,
+            id: 'bridge-experience-anchor',
+            de: `Bruecke als eigener Erfahrungsanschluss: "Mit [Aufgabe aus der Stelle] verbinde ich zuerst [konkrete Beobachtung aus eigener Arbeit]." Danach 1-2 Saetze zur persoenlichen Erfahrung. Kein "Wer ... muss ..." und kein Jobtitel im Intro.`,
+            en: `Bridge through the applicant's own experience: "With [task from the role], I first connect [specific observation from my own work]." Then add 1-2 sentences of personal experience. No "whoever ... must ..." and no job title in the intro.`,
         },
     ];
 
     const closingMoves: StyleMove[] = [
         {
             id: 'closing-author-development',
-            de: `${quoteAuthor} darf im Schluss genannt werden, aber nur mit neuer Wendung: "Der Gedanke von ${quoteAuthor} bleibt fuer mich dort relevant, wo [konkrete Aufgabe] echte Orientierung braucht."`,
-            en: `${quoteAuthor} may appear in the closing, but only with a new turn: "${quoteAuthor}'s thought stays relevant to me where [specific task] needs real orientation."`,
+            de: `${quoteAuthor} darf im Schluss genannt werden, aber nur mit neuer Wendung: "Der Gedanke von ${quoteAuthor} bleibt fuer mich dort relevant, wo [konkrete Aufgabe] klare Orientierung braucht."`,
+            en: `${quoteAuthor} may appear in the closing, but only with a new turn: "${quoteAuthor}'s thought stays relevant to me where [specific task] needs clear orientation."`,
         },
         {
             id: 'closing-role-transfer',
@@ -273,7 +273,7 @@ ${JSON.stringify(cvDataForPrompt, null, 2)}`;
 
     // ─── Tone Instructions (B1.5: Jeder Stil verändert GESAMTE Prompt-Struktur) ─
     const toneInstructions: Record<string, string> = {
-        'storytelling': `STIL: NARRATIV & PERSOENLICH
+        'storytelling': `STIL: INFORMELL, NARRATIV & PERSOENLICH
 ${hasQuote ? 'OEFFNUNG: Das Zitat und seine Formatierung werden durch Sektion 3 (Aufhaenger) gesteuert. Starte NACH dem Zitat-Block — beginne direkt mit der Bruecke zwischen dem Zitat und deiner persoenlichen Erfahrung, ohne nochmals ein Zitat zu eroeffnen.' : `OEFFNUNG (OHNE ZITAT — mit Firmenbezug):
 Beginne mit einem KONKRETEN Bezug zum Unternehmen oder zur Stellenanzeige. Max. 2-3 Saetze.
 MOEGLICHE OPENER (waehle EINE Variante):
@@ -293,6 +293,8 @@ DRAMATURGIE:
 - Erlaube 1-2 persoenliche Aussagen zur Motivation (aber kein Pathos)
 - Die rote Linie: Alle Absaetze fuehren logisch zur Bewerbung bei DIESER Firma
 RHETORISCHE WUERZUNG (PFLICHT in diesem Stil): Verwende MINDESTENS 1 rhetorisches Stilmittel (Trikolon, Asyndeton oder Anadiplose). Max. 2 gesamt.
+ROTER-FADEN-FRAGE: Wenn mindestens zwei CV-Stationen genutzt werden, endet genau einer der ersten Stationsabsaetze mit einer kurzen Frage aus der Arbeit. Der folgende Absatz greift diese Frage inhaltlich auf, ohne "die Antwort darauf" zu schreiben.
+MEIDE CHATGPT-VERSTAERKER: "wirklich", "echt", "wahrhaftig" nur wenn Teil eines Zitats; sonst konkret beschreiben, was du meinst.
 SCHLUSS-REGEL: Wird von Sektion 5 gesteuert — hier KEINE Schluss-Anweisungen.
 VERBOTEN: Aufzaehlungen, Bullet-Points-Stil, trockene Fakten ohne Kontext, "Mein Werdegang zeigt..."
 
@@ -304,7 +306,7 @@ BEISPIEL INTRO (mit Zitat, Du-Form — BESCHEIDEN, nicht selbstlobend):
 Die Sehnsucht nach dem eigenen Gestalten und damit Teams zu befaehigen sich selbst zu steuern begleiten mich durch viele Stationen in meiner Karriere. Gestalten braucht aber einen Ort, der das zulaesst und diesen Ort erkenne ich in Eurer Arbeit. Deshalb moechte ich mich kurz vorstellen."
 
 BEISPIEL STATIONS-ABSATZ (narrativ, mit JD-Fragment — ICH-Perspektive, nie allwissend):
-"Fuer mich bedeutet 'zwischen Technologie und Mensch vermittelt', die Faehigkeit zu besitzen, zwei Sprachen zu sprechen. Diese Uebersetzungsleistung habe ich als Projektleiter einer Quantum-Computing-Gruppe bei Fraunhofer FOKUS taeglich angewendet. Dort unterstuetzte ich Softwareentwickler dabei, ihre Ideen in marktfaehige Business-Modelle zu uebersetzen; mit Kickoffs, OKR-Roadmaps und Stakeholdermanagement. Die zentrale Frage war dabei immer: Loesen wir das, was der Nutzer wirklich braucht?"
+"Fuer mich bedeutet 'zwischen Technologie und Mensch vermittelt', die Faehigkeit zu besitzen, zwei Sprachen zu sprechen. Diese Uebersetzungsleistung habe ich als Projektleiter einer Quantum-Computing-Gruppe bei Fraunhofer FOKUS taeglich angewendet. Dort unterstuetzte ich Softwareentwickler dabei, ihre Ideen in marktfaehige Business-Modelle zu uebersetzen; mit Kickoffs, OKR-Roadmaps und Stakeholdermanagement. Die zentrale Frage war dabei immer: Loesen wir das, was der Nutzer im Alltag braucht?"
 --- ENDE FEW-SHOT ---`,
 
         'formal': `STIL: STRUKTURIERT & PRAEZISE (vereint klassisch-formelle Haltung mit datengetriebener Argumentation)
@@ -331,7 +333,7 @@ VERBOTEN: Umgangssprache, Emojis, "Ich brenne fuer", persoenliche Anekdoten ohne
 
 --- FEW-SHOT REFERENZ-BEISPIELE (Formal) ---
 BEISPIEL INTRO (ohne Zitat, Sie-Form):
-"Ihre Ausschreibung beschreibt eine Rolle, die ich aus verschiedenen Blickwinkeln kenne: als Berater bei Fraunhofer FOKUS, als Co-Founder bei Xorder Menues und zuletzt im B2B-Vertrieb bei Ingrano Solutions. Dabei stand haeufig dieselbe Frage im Mittelpunkt: Wie uebersetzt man eine gute Idee in etwas, das Menschen wirklich nutzen? Ich glaube, das ist genau das, was Sie mit der 'Bruecke zwischen Strategie und Umsetzung' meinen — und deshalb bewerbe ich mich als [Jobtitel] bei Ihnen."
+"Ihre Ausschreibung beschreibt eine Rolle, die ich aus verschiedenen Blickwinkeln kenne: als Berater bei Fraunhofer FOKUS, als Co-Founder bei Xorder Menues und zuletzt im B2B-Vertrieb bei Ingrano Solutions. Dabei stand haeufig dieselbe Frage im Mittelpunkt: Wie uebersetzt man eine gute Idee in etwas, das Menschen im Alltag nutzen? Ich glaube, das ist genau das, was Sie mit der 'Bruecke zwischen Strategie und Umsetzung' meinen — und deshalb bewerbe ich mich als [Jobtitel] bei Ihnen."
 
 BEISPIEL STATIONS-ABSATZ (strukturiert):
 "B2B-Kunden mit regulatorischem Handlungsbedarf zu identifizieren, Audit-Mandate strategisch zu platzieren und Stakeholder-Analysen fuer die Fuehrungsebene aufzubereiten, beschreibt meinen Alltag bei Ingrano Solutions. Zwei Dinge nehme ich aus dieser Zeit mit: Vertrieb funktioniert dann, wenn man das Problem des Kunden frueher versteht als er selbst. Und wirksame Angebote entstehen fast immer aus der Qualitaet der Fragen, die davor gestellt wurden."
@@ -504,7 +506,9 @@ AUFBAU (max. 80 Wörter ohne Zitat):
 
 3. BRÜCKE (1-2 Sätze): Verbinde den KONKRETEN GEDANKEN des Zitats mit der Stelle — IMMER in ICH-Perspektive.
    ${quoteStyleMoveSection ? 'PFLICHT: Nutze den QUOTE-BRIDGE-Move aus den STYLE-MOVE-CARDS oben.' : `✅ "Für mich bedeutet [Zitat-Kerngedanke], dass [persönliche Reflexion]. Deshalb möchte ich mich als [Jobtitel] bei ${isDuForm ? 'euch' : 'Ihnen'} kurz vorstellen."`}
+   ${quoteStyleMoveSection ? 'INFORMELL: Kein formeller Bewerbungssatz mit Jobtitel im Intro. Besser kurz persoenlich einordnen und dann in die erste Station fuehren.' : ''}
    ❌ NIEMALS: "Genau das ist [Thema]" / "Das ist die Definition von" — das ist allwissend und anmaßend.
+   ❌ NIEMALS: "Wer [Thema] wirklich/echt/wahrhaftig..." oder "Wer ... muss ..." — das klingt allwissend.
    ❌ NIEMALS: Objekte oder Konzepte definieren. Immer persönlich und konkret: "Für mich bedeutet..." / "Ich habe diesen Gedanken dort verstanden, wo..."
    TEST: Passt der Brückensatz nur zu DIESEM Zitat? Wenn er zu jedem Zitat passt → neu schreiben.
    STRUKTUR: Brücke + Bewerbungssatz gehören zum Einleitungsblock (kein eigener Absatz).

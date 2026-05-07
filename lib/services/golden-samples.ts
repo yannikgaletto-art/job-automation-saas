@@ -28,9 +28,9 @@ beim Lesen der Stellenausschreibung bei Siemens blieb ich an einem Gedanken haen
 
 Ishikawa spricht davon, dass nachhaltige Transformation als Lernprozess verstanden werden muss. In diesem Lernprozess gehe es darum, die Haltungen der Menschen zu veraendern. Oder anders gefragt: Was nuetzt das praeziseste KI-Modell, wenn niemand versteht, welche Frage es eigentlich beantwortet? Diese Ueberzeugung zieht sich wie ein roter Faden durch meine Stationen. Da ich es auch in den Projekten im Industrial Metaverse erkenne, moechte ich mich kurz vorstellen.
 
-Was mich am Industrial Metaverse festhaelt ist die Idee, dass physische Prozesse und digitale Entscheidungen in Echtzeit synthetisieren. Genau diese Verbindung habe ich bei Ingrano Solutions von der anderen Seite kennengelernt: einem B2B-Beratungsunternehmen mit regulatorischem Handlungsbedarf durch NIS-2, in dem ich automatisierte Workflows fuer die Lead-Generierung konzipierte und Vertriebsprozesse in Close.io messbar machte. Die zentrale Frage war dabei immer dieselbe: Loesen wir das, was der Kunde wirklich braucht?
+Was mich am Industrial Metaverse festhaelt ist die Idee, dass physische Prozesse und digitale Entscheidungen in Echtzeit synthetisieren. Genau diese Verbindung habe ich bei Ingrano Solutions von der anderen Seite kennengelernt: einem B2B-Beratungsunternehmen mit regulatorischem Handlungsbedarf durch NIS-2, in dem ich automatisierte Workflows fuer die Lead-Generierung konzipierte und Vertriebsprozesse in Close.io messbar machte. Die zentrale Frage war dabei immer dieselbe: Loesen wir das, was der Kunde konkret braucht?
 
-Fraunhofer FOKUS hat diese Frage fuer mich vertieft; da in diesem Umfeld Forschung und Markt selten dieselbe Sprache sprechen. Gleichzeitig braucht es die Faehigkeit \u201eGeschaeftsanforderungen fuer digitale Loesungen\u201c zu erheben. Als Projektleiter einer Quantum-Computing-Gruppe begleitete ich SpinOffs dabei, ihre Ideen in tragfaehige Business-Modelle zu uebersetzen; mit Kickoffs, OKR-Roadmaps und Stakeholdermanagement. Die eigentliche Herausforderung war dabei selten technischer Natur: Sie lag darin, Fachabteilungen frueh genug ins Boot zu holen, bevor eine Loesung fertig war. Der Antrieb dahinter blieb derselbe wie bei Ingrano: die Frage, ob das, was wir bauen, wirklich das loest, was gebraucht wird.
+Fraunhofer FOKUS hat diese Frage fuer mich vertieft; da in diesem Umfeld Forschung und Markt selten dieselbe Sprache sprechen. Gleichzeitig braucht es die Faehigkeit \u201eGeschaeftsanforderungen fuer digitale Loesungen\u201c zu erheben. Als Projektleiter einer Quantum-Computing-Gruppe begleitete ich SpinOffs dabei, ihre Ideen in tragfaehige Business-Modelle zu uebersetzen; mit Kickoffs, OKR-Roadmaps und Stakeholdermanagement. Die eigentliche Herausforderung war dabei selten technischer Natur: Sie lag darin, Fachabteilungen frueh genug ins Boot zu holen, bevor eine Loesung fertig war. Der Antrieb dahinter blieb derselbe wie bei Ingrano: die Frage, ob das, was wir bauen, das konkrete Problem loest.
 
 Der Gedanke von Ishikawa bleibt fuer mich dort relevant, wo Lernen in konkrete Entscheidungen uebersetzt werden muss. Genau an dieser Verbindung moechte ich als Junior Digitalization Consultant bei Siemens mitarbeiten. Ich stehe in den naechsten Wochen flexibel fuer ein Gespraech zur Verfuegung.
 
@@ -38,7 +38,7 @@ Mit freundlichen Gruessen`;
 
 const STORYTELLING_ANNOTATIONS = `STIL-ANALYSE DIESES MUSTERS (was du uebernehmen sollst):
 - KLAMMER-TECHNIK: Zitat eroeffnet → Zitat-Rueckbezug im Schlusssatz mit neuer Wendung, ohne alte Autor-hatte-recht-Formel.
-- ROTER FADEN: Eine wiederkehrende Frage ("Loesen wir das, was der Kunde wirklich braucht?") verbindet die Stationen
+- ROTER FADEN: Eine wiederkehrende Frage ("Loesen wir das, was der Kunde konkret braucht?") verbindet die Stationen
 - RHETORISCHE FRAGE: "Was nuetzt das praeziseste KI-Modell, wenn niemand versteht...?" — max. 1x im Text
 - ICH-PERSPEKTIVE: Durchgehend. Keine allwissenden Firmen-Statements.
 - UEBERGAENGE: Stationen durch gemeinsame Frage oder Skill verbunden, nicht durch Aufzaehlung (Anzahl der Stationen variiert je nach User)
