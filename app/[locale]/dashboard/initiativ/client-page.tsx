@@ -18,6 +18,7 @@ import {
     Search,
     ShieldCheck,
 } from 'lucide-react';
+import { buildInitiativInsight } from '@/lib/initiativ/insight';
 
 type StrengthsForm = {
     human_aspects: string;
@@ -102,7 +103,7 @@ export function InitiativClientPage() {
     const t = useTranslations('dashboard.initiativ');
     const locale = useLocale();
     const [showTour, setShowTour] = useState(true);
-    const [activeStep, setActiveStep] = useState<'strengths' | 'discovery'>('strengths');
+    const [activeStep, setActiveStep] = useState<'strengths' | 'discovery' | 'insight'>('strengths');
     const [tourStep, setTourStep] = useState(0);
     const [form, setForm] = useState<StrengthsForm>(EMPTY_FORM);
     const [discoveryForm, setDiscoveryForm] = useState<DiscoveryForm>(EMPTY_DISCOVERY_FORM);
@@ -111,6 +112,7 @@ export function InitiativClientPage() {
     const [discoverySchemaReady, setDiscoverySchemaReady] = useState(true);
     const [discoverySignals, setDiscoverySignals] = useState<DiscoverySignal[]>([]);
     const [discoveryError, setDiscoveryError] = useState(false);
+    const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -129,6 +131,20 @@ export function InitiativClientPage() {
     const canRunDiscovery = canOpenDiscovery && !discoveryLoading && Boolean(
         discoveryForm.branche.trim() || discoveryForm.region.trim() || discoveryForm.focus.trim()
     );
+    const selectedSignal = useMemo(
+        () => discoverySignals.find((signal) => signal.id === selectedSignalId) ?? null,
+        [discoverySignals, selectedSignalId]
+    );
+    const selectedInsight = useMemo(() => {
+        if (!selectedSignal) return null;
+
+        return buildInitiativInsight({
+            signal: selectedSignal,
+            professionalResults: form.professional_results,
+            peerPerspective: form.peer_perspective,
+            focus: discoveryForm.focus,
+        });
+    }, [discoveryForm.focus, form.peer_perspective, form.professional_results, selectedSignal]);
     const currentTourIcon = TOUR_ICONS[tourStep];
 
     useEffect(() => {
@@ -185,6 +201,7 @@ export function InitiativClientPage() {
         setForm((current) => ({ ...current, [key]: value }));
         setSaved(false);
         setActiveStep('strengths');
+        setSelectedSignalId(null);
         setError(null);
     };
 
@@ -227,6 +244,7 @@ export function InitiativClientPage() {
 
     const updateDiscoveryField = (key: keyof DiscoveryForm, value: string) => {
         setDiscoveryForm((current) => ({ ...current, [key]: value }));
+        setSelectedSignalId(null);
         setDiscoveryError(false);
     };
 
@@ -255,13 +273,20 @@ export function InitiativClientPage() {
                 return;
             }
 
+            const signals = Array.isArray(data.signals) ? data.signals : [];
             setDiscoverySchemaReady(data.schemaReady !== false);
-            setDiscoverySignals(Array.isArray(data.signals) ? data.signals : []);
+            setDiscoverySignals(signals);
+            setSelectedSignalId(null);
         } catch {
             setDiscoveryError(true);
         } finally {
             setDiscoveryLoading(false);
         }
+    };
+
+    const openInsight = (signalId: string) => {
+        setSelectedSignalId(signalId);
+        setActiveStep('insight');
     };
 
     const formatDate = (value: string) => {
@@ -301,7 +326,10 @@ export function InitiativClientPage() {
             <section className="grid gap-4 md:grid-cols-3">
                 {STEP_ICONS.map((Icon, index) => {
                     const key = index === 0 ? 'strengths' : index === 1 ? 'signals' : 'brief';
-                    const active = (index === 0 && activeStep === 'strengths') || (index === 1 && activeStep === 'discovery');
+                    const active =
+                        (index === 0 && activeStep === 'strengths')
+                        || (index === 1 && activeStep === 'discovery')
+                        || (index === 2 && activeStep === 'insight');
                     return (
                         <article
                             key={key}
@@ -501,7 +529,7 @@ export function InitiativClientPage() {
                         </div>
                     </aside>
                 </section>
-            ) : (
+            ) : activeStep === 'discovery' ? (
                 <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="space-y-6">
                         <div className="rounded-lg border border-[#E7E7E5] bg-white p-6 shadow-sm">
@@ -623,7 +651,12 @@ export function InitiativClientPage() {
                             ) : (
                                 <div className="space-y-3">
                                     {discoverySignals.map((signal) => (
-                                        <article key={signal.id} className="rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-4">
+                                        <article
+                                            key={signal.id}
+                                            className={`rounded-lg border bg-[#FAFAF9] p-4 ${
+                                                selectedSignalId === signal.id ? 'border-[#012e7a]' : 'border-[#E7E7E5]'
+                                            }`}
+                                        >
                                             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                                 <div>
                                                     <div className="flex flex-wrap items-center gap-2">
@@ -657,15 +690,25 @@ export function InitiativClientPage() {
                                                 <p className="text-xs text-[#8E8D89]">
                                                     {signal.sourceName} · {formatDate(signal.triggerDate)}
                                                 </p>
-                                                <a
-                                                    href={signal.sourceUrl}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="inline-flex items-center gap-2 text-sm font-semibold text-[#012e7a] transition-colors hover:text-[#001f52]"
-                                                >
-                                                    {t('source_open')}
-                                                    <ExternalLink className="h-3.5 w-3.5" />
-                                                </a>
+                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                                    <a
+                                                        href={signal.sourceUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#C8D4EA] bg-white px-3 py-2 text-sm font-semibold text-[#012e7a] transition-colors hover:bg-[#F4F7FC]"
+                                                    >
+                                                        {t('source_open')}
+                                                        <ExternalLink className="h-3.5 w-3.5" />
+                                                    </a>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openInsight(signal.id)}
+                                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#012e7a] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#001f52]"
+                                                    >
+                                                        {t('insight_open')}
+                                                        <ArrowRight className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
                                             </div>
                                         </article>
                                     ))}
@@ -696,16 +739,144 @@ export function InitiativClientPage() {
                             </p>
                             <button
                                 type="button"
-                                disabled
-                                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#C8D4EA] bg-white px-4 py-2 text-sm font-semibold text-[#73726E]"
+                                disabled={!selectedSignal}
+                                onClick={() => selectedSignal && openInsight(selectedSignal.id)}
+                                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#C8D4EA] bg-white px-4 py-2 text-sm font-semibold text-[#012e7a] transition-colors hover:bg-[#F4F7FC] disabled:cursor-not-allowed disabled:text-[#73726E] disabled:hover:bg-white"
                             >
                                 <FileText className="h-4 w-4" />
-                                {t('brief_locked')}
+                                {selectedSignal ? t('insight_selected') : t('brief_locked')}
                             </button>
                         </div>
                     </aside>
                 </section>
-            )}
+            ) : selectedInsight ? (
+                <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="rounded-lg border border-[#E7E7E5] bg-white p-6 shadow-sm">
+                        <button
+                            type="button"
+                            onClick={() => setActiveStep('discovery')}
+                            className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#73726E] transition-colors hover:text-[#012e7a]"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            {t('insight_back')}
+                        </button>
+
+                        <div className="mb-6">
+                            <h2 className="text-xl font-semibold text-[#37352F]">
+                                {t('insight_title')}
+                            </h2>
+                            <p className="mt-2 text-sm leading-6 text-[#73726E]">
+                                {t('insight_body')}
+                            </p>
+                        </div>
+
+                        <div className="grid gap-4">
+                            <div className="rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-4">
+                                <p className="text-xs font-semibold uppercase tracking-normal text-[#8E8D89]">
+                                    {t('insight_strength_label')}
+                                </p>
+                                <p className="mt-2 text-sm font-semibold leading-6 text-[#37352F]">
+                                    {selectedInsight.strengthText ?? t('insight_strength_fallback')}
+                                </p>
+                                <p className="mt-2 text-xs leading-5 text-[#73726E]">
+                                    {selectedInsight.strengthSource === 'profile_fallback'
+                                        ? t('insight_strength_private_guard')
+                                        : t(`insight_strength_source_${selectedInsight.strengthSource}`)}
+                                </p>
+                            </div>
+
+                            <div className="rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-4">
+                                <p className="text-xs font-semibold uppercase tracking-normal text-[#8E8D89]">
+                                    {t('insight_signal_label')}
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <h3 className="text-base font-semibold text-[#37352F]">
+                                        {selectedInsight.companyName}
+                                    </h3>
+                                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                        selectedInsight.confidence === 'green'
+                                            ? 'bg-green-50 text-green-700'
+                                            : selectedInsight.confidence === 'yellow'
+                                                ? 'bg-amber-50 text-amber-700'
+                                                : 'bg-[#F1F1EF] text-[#73726E]'
+                                    }`}>
+                                        {t(`confidence_${selectedInsight.confidence}`)}
+                                    </span>
+                                </div>
+                                <p className="mt-2 text-sm leading-6 text-[#37352F]">
+                                    {selectedInsight.signalAnchor || t('discovery_no_summary')}
+                                </p>
+                                <a
+                                    href={selectedInsight.sourceUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[#012e7a] transition-colors hover:text-[#001f52]"
+                                >
+                                    {selectedInsight.sourceName} · {formatDate(selectedInsight.triggerDate)}
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                            </div>
+
+                            <div className="rounded-lg border border-[#C8D4EA] bg-[#F8FAFE] p-4">
+                                <p className="text-xs font-semibold uppercase tracking-normal text-[#012e7a]">
+                                    {t('insight_bridge_label')}
+                                </p>
+                                <p className="mt-2 text-sm leading-6 text-[#37352F]">
+                                    {t('insight_bridge_text', {
+                                        company: selectedInsight.companyName,
+                                        strength: selectedInsight.strengthText ?? t('insight_strength_fallback'),
+                                    })}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex flex-col gap-3 border-t border-[#E7E7E5] pt-5 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-xs leading-5 text-[#73726E]">
+                                {t('insight_privacy_note')}
+                            </p>
+                            <button
+                                type="button"
+                                disabled
+                                className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#C8D4EA] bg-white px-5 py-2.5 text-sm font-semibold text-[#73726E]"
+                            >
+                                <FileText className="h-4 w-4" />
+                                {t('brief_prepare_locked')}
+                            </button>
+                        </div>
+                    </div>
+
+                    <aside className="space-y-4">
+                        <div className="rounded-lg border border-[#E7E7E5] bg-white p-5 shadow-sm">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-[#37352F]">
+                                <ShieldCheck className="h-4 w-4 text-[#012e7a]" />
+                                {t('discovery_rules_title')}
+                            </div>
+                            <ul className="mt-3 space-y-2 text-sm leading-6 text-[#73726E]">
+                                <li>{t('discovery_rule_1')}</li>
+                                <li>{t('discovery_rule_2')}</li>
+                                <li>{t('discovery_rule_3')}</li>
+                            </ul>
+                        </div>
+
+                        <div className="rounded-lg border border-dashed border-[#B9C7E3] bg-[#F8FAFE] p-5">
+                            <h2 className="text-base font-semibold text-[#37352F]">
+                                {t('next_title')}
+                            </h2>
+                            <p className="mt-2 text-sm leading-6 text-[#73726E]">
+                                {t('next_body_step3')}
+                            </p>
+                            <button
+                                type="button"
+                                disabled
+                                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#C8D4EA] bg-white px-4 py-2 text-sm font-semibold text-[#73726E]"
+                            >
+                                <FileText className="h-4 w-4" />
+                                {t('brief_prepare_locked')}
+                            </button>
+                        </div>
+                    </aside>
+                </section>
+            ) : null}
         </div>
     );
 }
