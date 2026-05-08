@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+
+const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+);
 
 /**
  * GET /api/documents/download?id=<documentId>
@@ -44,9 +51,10 @@ export async function GET(req: NextRequest) {
         }
 
         // 2. Download file from Supabase Storage
-        const { data: fileData, error: downloadError } = await supabase
+        const bucketName = doc.document_type === 'cv' ? 'cvs' : 'cover-letters';
+        const { data: fileData, error: downloadError } = await supabaseAdmin
             .storage
-            .from('documents')
+            .from(bucketName)
             .download(storagePath);
 
         if (downloadError || !fileData) {

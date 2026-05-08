@@ -38,6 +38,7 @@ type CategoryMap = Record<string, string[]>; // categoryName → [documentId, ..
 const STORAGE_KEY = 'pathly_cl_categories';
 const COLLAPSED_KEY = 'pathly_cl_collapsed';
 // User-scoped key — prevents one account's dismissed state leaking to another account on same browser
+const cvHintKey = (uid: string) => `pathly_cv_hint_dismissed_${uid}`;
 const clHintKey = (uid: string) => `pathly_cl_hint_dismissed_${uid}`;
 
 function formatDate(dateStr: string, locale: string) {
@@ -109,7 +110,13 @@ export function ActiveCVCard() {
     const [reparsingId, setReparsingId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
 
-    // CL upload hint dialog
+    // CV / CL upload hint dialogs
+    const [showCvHint, setShowCvHint] = useState(false);
+    const [isCvDismissing, setIsCvDismissing] = useState(false);
+    const [pendingCvFile, setPendingCvFile] = useState<File | null>(null);
+    const cvHintDismissedRef = useRef(false);
+    const cvHintSeenRef = useRef(false); // true once popup has been shown this session
+
     const [showClHint, setShowClHint] = useState(false);
     const [isClDismissing, setIsClDismissing] = useState(false);
     const [pendingClFile, setPendingClFile] = useState<File | null>(null);
@@ -125,11 +132,60 @@ export function ActiveCVCard() {
                 setUserId(uid);
                 if (!uid) return;
                 try {
+                    cvHintDismissedRef.current = localStorage.getItem(cvHintKey(uid)) === 'true';
                     clHintDismissedRef.current = localStorage.getItem(clHintKey(uid)) === 'true';
                 } catch {}
             });
         });
     }, []);
+
+    // ── CV Hint handlers ──────────────────────────────────────────────────────
+    const handleCvUploadClick = () => {
+        if (cvHintDismissedRef.current || cvHintSeenRef.current) {
+            cvRef.current?.click();
+        } else {
+            cvHintSeenRef.current = true;
+            setShowCvHint(true);
+        }
+    };
+
+    const handleCvHintContinue = () => {
+        setShowCvHint(false);
+        if (pendingCvFile) {
+            handleUpload(pendingCvFile, 'cv');
+            setPendingCvFile(null);
+        } else {
+            cvRef.current?.click();
+        }
+    };
+
+    const handleCvHintDismissForever = () => {
+        if (isCvDismissing) return;
+        setIsCvDismissing(true);
+        try { if (userId) localStorage.setItem(cvHintKey(userId), 'true'); } catch {}
+        cvHintDismissedRef.current = true;
+        const pending = pendingCvFile;
+        setPendingCvFile(null);
+        setTimeout(() => {
+            setShowCvHint(false);
+            setIsCvDismissing(false);
+            if (pending) {
+                handleUpload(pending, 'cv');
+            } else {
+                cvRef.current?.click();
+            }
+        }, 1000);
+    };
+
+    const handleCvFileSelect = (file: File) => {
+        if (cvHintDismissedRef.current || cvHintSeenRef.current) {
+            handleUpload(file, 'cv');
+        } else {
+            cvHintSeenRef.current = true;
+            setPendingCvFile(file);
+            setShowCvHint(true);
+        }
+    };
 
     // ── CL Hint handlers ──────────────────────────────────────────────────────
     const handleClUploadClick = () => {
@@ -461,7 +517,7 @@ export function ActiveCVCard() {
                     <Button
                         variant="secondary"
                         className="text-xs h-8"
-                        onClick={() => cvRef.current?.click()}
+                        onClick={handleCvUploadClick}
                         disabled={isUploading || cvDocs.length >= 1}
                         title={cvDocs.length >= 1 ? t('cv_max_reached') : undefined}
                     >
@@ -475,7 +531,7 @@ export function ActiveCVCard() {
                 ) : cvDocs.length === 0 ? (
                     <div
                         className="border-2 border-dashed border-[#E7E7E5] rounded-lg p-5 text-center cursor-pointer hover:border-[#012e7a]/40 hover:bg-[#F0F7FF]/30 transition-all"
-                        onClick={() => cvRef.current?.click()}
+                        onClick={handleCvUploadClick}
                     >
                         <Plus className="w-5 h-5 text-[#A8A29E] mx-auto mb-1" />
                         <p className="text-sm text-[#73726E]">{t('no_cv_uploaded')}</p>
@@ -486,7 +542,7 @@ export function ActiveCVCard() {
                     </ul>
                 )}
                 <input ref={cvRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) { handleUpload(f, 'cv'); e.target.value = ''; } }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { handleCvFileSelect(f); e.target.value = ''; } }}
                 />
             </div>
 
@@ -644,6 +700,71 @@ export function ActiveCVCard() {
                     onChange={e => { const f = e.target.files?.[0]; if (f) { handleClFileSelect(f); e.target.value = ''; } }}
                 />
             </div>
+            {/* CV Upload Hint Dialog */}
+            {showCvHint && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+                        onClick={() => { if (!isCvDismissing) { setShowCvHint(false); setPendingCvFile(null); } }}
+                    />
+                    <div className="relative bg-white rounded-2xl shadow-2xl border border-[#E7E7E5] w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <div className="flex items-start gap-3 mb-4">
+                                <div className="p-2 bg-[#012e7a]/10 rounded-xl shrink-0">
+                                    <FileText className="w-5 h-5 text-[#012e7a]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-semibold text-[#37352F] leading-snug">
+                                        {t('cv_hint_title')}
+                                    </h3>
+                                    <p className="text-sm text-[#73726E] mt-1">
+                                        {t('cv_hint_description')}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mb-5 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-3">
+                                <p className="mb-2 text-xs font-semibold text-[#37352F]">
+                                    {t('cv_hint_example_label')}
+                                </p>
+                                <ul className="space-y-1 text-xs leading-5 text-[#73726E]">
+                                    <li>{t('cv_hint_bullet_1')}</li>
+                                    <li>{t('cv_hint_bullet_2')}</li>
+                                    <li>{t('cv_hint_bullet_3')}</li>
+                                </ul>
+                            </div>
+
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={handleCvHintContinue}
+                                    className="w-full px-4 py-2.5 bg-[#012e7a] text-white text-sm font-medium rounded-lg hover:bg-[#011f5e] transition-colors"
+                                >
+                                    {t('cv_hint_continue')}
+                                </button>
+                                <button
+                                    onClick={handleCvHintDismissForever}
+                                    className="flex items-center justify-center gap-2 w-full py-1"
+                                    disabled={isCvDismissing}
+                                >
+                                    <span className={`relative w-7 h-4 rounded-full flex-shrink-0 transition-colors duration-300 ${
+                                        isCvDismissing ? 'bg-[#012e7a]' : 'bg-[#E7E7E5]'
+                                    }`}>
+                                        <span className={`absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300 ${
+                                            isCvDismissing ? 'left-3.5 bg-white' : 'left-0.5 bg-[#A8A29E]'
+                                        }`} />
+                                    </span>
+                                    <span className={`text-xs transition-colors duration-300 ${
+                                        isCvDismissing ? 'text-[#012e7a] font-medium' : 'text-[#A8A29E]'
+                                    }`}>
+                                        {t('cv_hint_dismiss')}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
             {/* CL Upload Hint Dialog */}
             {showClHint && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center">
