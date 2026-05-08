@@ -47,4 +47,41 @@ describe('initiativ preview trigger seed', () => {
         expect(signals.every((signal) => signal.confidence === 'green')).toBe(true);
         expect(signals.every((signal) => signal.sourceUrl.startsWith('https://'))).toBe(true);
     });
+
+    it('covers the preview query for finance consulting in Berlin', () => {
+        const rows = buildPreviewTriggerRows(new Date('2026-05-08T12:00:00.000Z'));
+        const dbFilteredRows = rows.filter((row) =>
+            row.branche.toLocaleLowerCase('de-DE').includes('finanzen')
+            && row.region.toLocaleLowerCase('de-DE').includes('berlin')
+        );
+
+        const signals = buildDiscoverySignals(
+            dbFilteredRows.map((row, index) => ({
+                id: `preview-finance-${index}`,
+                trigger_type: row.trigger_type,
+                company_name: row.company_name,
+                company_url: row.company_url,
+                branche: row.branche,
+                region: row.region,
+                source_url: row.source_url,
+                source_name: row.source_name,
+                trigger_date: row.trigger_date,
+                trigger_summary: row.trigger_summary,
+            })) satisfies RawInitiativTrigger[],
+            {
+                branche: 'Finanzen',
+                region: 'Berlin',
+                focus: 'Consulting',
+            },
+        );
+
+        expect(signals).toHaveLength(3);
+        expect(signals.map((signal) => signal.companyName)).toEqual([
+            'Berlin Hyp',
+            're:cap',
+            'Pliant',
+        ]);
+        expect(signals.every((signal) => signal.confidence === 'green')).toBe(true);
+        expect(signals.every((signal) => signal.sourceUrl.startsWith('https://'))).toBe(true);
+    });
 });

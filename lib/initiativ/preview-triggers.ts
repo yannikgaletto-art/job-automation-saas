@@ -89,6 +89,57 @@ export const PREVIEW_INITIATIV_TRIGGERS: PreviewInitiativTriggerRow[] = [
             match_terms: ['Innovationsberatung', 'Berlin', 'Design Thinking', 'GovTech', 'Digitalisierung'],
         },
     },
+    {
+        trigger_type: 'gf_change',
+        company_name: 're:cap',
+        company_url: 'https://www.re-cap.com/',
+        branche: 'Finanzen, Fintech, Corporate Finance, Consulting, Prozessautomatisierung',
+        region: 'Berlin',
+        source_url: 'https://www.re-cap.com/en-gb/press/fintech-expert-philipp-schaaf-becomes-the-new-coo-of-re-cap',
+        source_name: 're:cap Press',
+        trigger_date: '2025-05-21T00:00:00.000Z',
+        trigger_summary:
+            're:cap ernennt einen neuen COO, um Struktur, Prozessmodell und Skalierung weiterzuentwickeln. Das Signal passt zu Finanzen, Consulting, Operations und automatisierten Finanzprozessen.',
+        raw_content: {
+            seed: 'initiativ_preview',
+            source_kind: 'public_press_release',
+            match_terms: ['Finanzen', 'Berlin', 'Consulting', 'Fintech', 'Prozessautomatisierung'],
+        },
+    },
+    {
+        trigger_type: 'funding',
+        company_name: 'Pliant',
+        company_url: 'https://www.getpliant.com/',
+        branche: 'Finanzen, Fintech, B2B Payments, Consulting, Prozessautomatisierung',
+        region: 'Berlin',
+        source_url: 'https://www.getpliant.com/en/press/series-b',
+        source_name: 'Pliant Press',
+        trigger_date: '2025-04-28T00:00:00.000Z',
+        trigger_summary:
+            'Pliant meldet eine Series-B-Finanzierung ueber 40 Millionen US-Dollar und internationale Expansion. Das Signal passt zu Finanzen, Payment-Prozessen, Consulting und Skalierung.',
+        raw_content: {
+            seed: 'initiativ_preview',
+            source_kind: 'public_press_release',
+            match_terms: ['Finanzen', 'Berlin', 'Consulting', 'Payments', 'Expansion'],
+        },
+    },
+    {
+        trigger_type: 'press_release',
+        company_name: 'Berlin Hyp',
+        company_url: 'https://www.berlinhyp.de/',
+        branche: 'Finanzen, Immobilienfinanzierung, Banking, Consulting, Transformation',
+        region: 'Berlin',
+        source_url: 'https://www.lbbw.de/artikel/pressemitteilung/lbbw-schliesst-rechtliche-intergation-der-berlin-hyp-erfolgreich-ab_akgdxyae4x_d.html',
+        source_name: 'LBBW / Berlin Hyp',
+        trigger_date: '2025-08-01T00:00:00.000Z',
+        trigger_summary:
+            'LBBW buendelt die gewerbliche Immobilienfinanzierung unter Berlin Hyp und beschreibt Integration, Prozessvereinfachung und Synergien. Das Signal passt zu Finanzen, Consulting und Transformation.',
+        raw_content: {
+            seed: 'initiativ_preview',
+            source_kind: 'public_press_release',
+            match_terms: ['Finanzen', 'Berlin', 'Consulting', 'Immobilienfinanzierung', 'Transformation'],
+        },
+    },
 ];
 
 export function buildPreviewTriggerRows(seedDate = new Date()): PreviewInitiativTriggerRow[] {
