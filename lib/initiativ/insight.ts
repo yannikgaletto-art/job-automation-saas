@@ -28,6 +28,8 @@ export type InitiativInsight = {
     signalAnchor: string;
     strengthText: string | null;
     strengthSource: InsightStrengthSource;
+    bridgeTheme: string;
+    hasConcreteStrength: boolean;
     confidence: InsightSignal['confidence'];
 };
 
@@ -64,14 +66,48 @@ function tokens(value: string): string[] {
         .slice(0, 12);
 }
 
-function pickBestLine(lines: string[], haystack: string): string | null {
-    if (lines.length === 0) return null;
+const VAGUE_STRENGTH_PATTERNS = [
+    /\b(vieles|alles|diverses|verschiedenes|einiges)\s+gemacht\b/i,
+    /\b(sehr|ziemlich)\s+(gut|stark)\b/i,
+    /\bmotiviert\b/i,
+    /\bteamfaehig\b/i,
+    /\bteamfähig\b/i,
+];
+
+const CONCRETE_RESULT_PATTERNS = [
+    /\b(aufgebaut|entwickelt|bewertet|implementiert|optimiert|moderiert|gefuehrt|geführt|begleitet|uebersetzt|übersetzt|analysiert|befaehigt|befähigt|verantwortet|skaliert)\b/i,
+    /\b(projekt|strategie|partnerschaft|transformation|automatisierung|design thinking|workshop|kpi|daten|ki|stakeholder|prozess)\b/i,
+    /\d/,
+];
+
+function isVagueStrengthLine(line: string): boolean {
+    const clean = normalize(line);
+    const tokenCount = tokens(clean).length;
+    if (tokenCount < 3) return true;
+
+    return VAGUE_STRENGTH_PATTERNS.some((pattern) => pattern.test(clean));
+}
+
+function isConcreteProfessionalLine(line: string): boolean {
+    if (isVagueStrengthLine(line)) return false;
+    return CONCRETE_RESULT_PATTERNS.some((pattern) => pattern.test(line));
+}
+
+function pickBestLine(
+    lines: string[],
+    haystack: string,
+    options: { requireConcreteResult?: boolean } = {},
+): string | null {
+    const usableLines = lines.filter((line) =>
+        options.requireConcreteResult ? isConcreteProfessionalLine(line) : !isVagueStrengthLine(line)
+    );
+    if (usableLines.length === 0) return null;
 
     const haystackTokens = new Set(tokens(haystack));
-    let best = lines[0];
+    let best = usableLines[0];
     let bestScore = -1;
 
-    for (const line of lines) {
+    for (const line of usableLines) {
         const score = tokens(line).filter((token) => haystackTokens.has(token)).length;
         if (score > bestScore) {
             best = line;
@@ -80,6 +116,16 @@ function pickBestLine(lines: string[], haystack: string): string | null {
     }
 
     return best;
+}
+
+function pickBridgeTheme(input: BuildInitiativInsightInput): string {
+    const focus = input.focus?.trim();
+    if (focus) return focus;
+
+    const firstBranch = input.signal.branche?.split(',').map((part) => part.trim()).find(Boolean);
+    if (firstBranch) return firstBranch;
+
+    return input.signal.summary || input.signal.companyName;
 }
 
 export function buildInitiativInsight(input: BuildInitiativInsightInput): InitiativInsight {
@@ -91,7 +137,7 @@ export function buildInitiativInsight(input: BuildInitiativInsightInput): Initia
         input.focus,
     ].filter(Boolean).join(' ');
 
-    const professionalLine = pickBestLine(asLines(input.professionalResults), haystack);
+    const professionalLine = pickBestLine(asLines(input.professionalResults), haystack, { requireConcreteResult: true });
     const peerLine = professionalLine ? null : pickBestLine(asLines(input.peerPerspective), haystack);
 
     return {
@@ -107,6 +153,8 @@ export function buildInitiativInsight(input: BuildInitiativInsightInput): Initia
             : peerLine
                 ? 'peer_perspective'
                 : 'profile_fallback',
+        bridgeTheme: pickBridgeTheme(input),
+        hasConcreteStrength: Boolean(professionalLine ?? peerLine),
         confidence: input.signal.confidence,
     };
 }

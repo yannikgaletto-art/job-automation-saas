@@ -771,50 +771,87 @@ export function InitiativClientPage() {
                         </div>
 
                         <div className="grid gap-4">
-                            <div className="rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-4">
-                                <p className="text-xs font-semibold uppercase tracking-normal text-[#8E8D89]">
-                                    {t('insight_strength_label')}
-                                </p>
-                                <p className="mt-2 text-sm font-semibold leading-6 text-[#37352F]">
-                                    {selectedInsight.strengthText ?? t('insight_strength_fallback')}
-                                </p>
-                                <p className="mt-2 text-xs leading-5 text-[#73726E]">
-                                    {selectedInsight.strengthSource === 'profile_fallback'
-                                        ? t('insight_strength_private_guard')
-                                        : t(`insight_strength_source_${selectedInsight.strengthSource}`)}
-                                </p>
-                            </div>
-
-                            <div className="rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-4">
-                                <p className="text-xs font-semibold uppercase tracking-normal text-[#8E8D89]">
-                                    {t('insight_signal_label')}
-                                </p>
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    <h3 className="text-base font-semibold text-[#37352F]">
-                                        {selectedInsight.companyName}
-                                    </h3>
-                                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                        selectedInsight.confidence === 'green'
-                                            ? 'bg-green-50 text-green-700'
-                                            : selectedInsight.confidence === 'yellow'
-                                                ? 'bg-amber-50 text-amber-700'
-                                                : 'bg-[#F1F1EF] text-[#73726E]'
-                                    }`}>
-                                        {t(`confidence_${selectedInsight.confidence}`)}
-                                    </span>
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] lg:items-stretch">
+                                <div className="rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-normal text-[#8E8D89]">
+                                        {t('insight_strength_label')}
+                                    </p>
+                                    <p className="mt-2 text-sm font-semibold leading-6 text-[#37352F]">
+                                        {selectedInsight.strengthText ?? t('insight_strength_missing')}
+                                    </p>
+                                    <p className="mt-2 text-xs leading-5 text-[#73726E]">
+                                        {selectedInsight.hasConcreteStrength
+                                            ? t(`insight_strength_source_${selectedInsight.strengthSource}`)
+                                            : t('insight_strength_needs_concrete')}
+                                    </p>
                                 </div>
-                                <p className="mt-2 text-sm leading-6 text-[#37352F]">
-                                    {selectedInsight.signalAnchor || t('discovery_no_summary')}
-                                </p>
-                                <a
-                                    href={selectedInsight.sourceUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[#012e7a] transition-colors hover:text-[#001f52]"
-                                >
-                                    {selectedInsight.sourceName} · {formatDate(selectedInsight.triggerDate)}
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                </a>
+
+                                <div className="flex items-center justify-center" aria-hidden="true">
+                                    <svg
+                                        className="hidden h-full min-h-32 w-16 lg:block"
+                                        viewBox="0 0 64 144"
+                                        preserveAspectRatio="none"
+                                    >
+                                        <path
+                                            d="M8 72 C20 72 26 42 32 42 C38 42 44 72 56 72"
+                                            fill="none"
+                                            stroke="#8EA6D4"
+                                            strokeWidth="2"
+                                        />
+                                        <path
+                                            d="M8 72 C20 72 26 102 32 102 C38 102 44 72 56 72"
+                                            fill="none"
+                                            stroke="#8EA6D4"
+                                            strokeDasharray="5 5"
+                                            strokeWidth="2"
+                                        />
+                                        <circle cx="8" cy="72" r="4" fill="#012e7a" />
+                                        <circle cx="56" cy="72" r="4" fill="#012e7a" />
+                                    </svg>
+                                    <svg className="h-10 w-8 lg:hidden" viewBox="0 0 32 40">
+                                        <path
+                                            d="M16 2 C16 12 16 22 16 38"
+                                            fill="none"
+                                            stroke="#8EA6D4"
+                                            strokeDasharray="5 5"
+                                            strokeWidth="2"
+                                        />
+                                        <circle cx="16" cy="5" r="4" fill="#012e7a" />
+                                        <circle cx="16" cy="35" r="4" fill="#012e7a" />
+                                    </svg>
+                                </div>
+
+                                <div className="rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-normal text-[#8E8D89]">
+                                        {t('insight_signal_label')}
+                                    </p>
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                        <h3 className="text-base font-semibold text-[#37352F]">
+                                            {selectedInsight.companyName}
+                                        </h3>
+                                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                            selectedInsight.confidence === 'green'
+                                                ? 'bg-green-50 text-green-700'
+                                                : selectedInsight.confidence === 'yellow'
+                                                    ? 'bg-amber-50 text-amber-700'
+                                                    : 'bg-[#F1F1EF] text-[#73726E]'
+                                        }`}>
+                                            {t(`confidence_${selectedInsight.confidence}`)}
+                                        </span>
+                                    </div>
+                                    <p className="mt-2 text-sm leading-6 text-[#37352F]">
+                                        {selectedInsight.signalAnchor || t('discovery_no_summary')}
+                                    </p>
+                                    <a
+                                        href={selectedInsight.sourceUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[#012e7a] transition-colors hover:text-[#001f52]"
+                                    >
+                                        {selectedInsight.sourceName} · {formatDate(selectedInsight.triggerDate)}
+                                        <ExternalLink className="h-3.5 w-3.5" />
+                                    </a>
+                                </div>
                             </div>
 
                             <div className="rounded-lg border border-[#C8D4EA] bg-[#F8FAFE] p-4">
@@ -822,10 +859,15 @@ export function InitiativClientPage() {
                                     {t('insight_bridge_label')}
                                 </p>
                                 <p className="mt-2 text-sm leading-6 text-[#37352F]">
-                                    {t('insight_bridge_text', {
-                                        company: selectedInsight.companyName,
-                                        strength: selectedInsight.strengthText ?? t('insight_strength_fallback'),
-                                    })}
+                                    {selectedInsight.hasConcreteStrength
+                                        ? t('insight_bridge_text', {
+                                            company: selectedInsight.companyName,
+                                            strength: selectedInsight.strengthText ?? t('insight_strength_fallback'),
+                                            theme: selectedInsight.bridgeTheme,
+                                        })
+                                        : t('insight_bridge_text_fallback', {
+                                            theme: selectedInsight.bridgeTheme,
+                                        })}
                                 </p>
                             </div>
                         </div>

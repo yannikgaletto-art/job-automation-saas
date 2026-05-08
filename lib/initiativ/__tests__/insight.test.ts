@@ -53,4 +53,35 @@ describe('buildInitiativInsight', () => {
         expect(insight.strengthSource).toBe('peer_perspective');
         expect(insight.strengthText).toBe('strukturiert in komplexen Transformationsprozessen');
     });
+
+    it('ignores vague professional filler and chooses a concrete result', () => {
+        const insight = buildInitiativInsight({
+            signal,
+            professionalResults: [
+                'Ich habe Vieles gemacht.',
+                'Strategische Partnerschaften aufgebaut; gesellschaftliche und wirtschaftliche Wirkung von KI-Projekten bewertet.',
+            ].join('\n'),
+            peerPerspective: '',
+            focus: 'Consulting',
+        });
+
+        expect(insight.strengthSource).toBe('professional_results');
+        expect(insight.strengthText).toContain('Strategische Partnerschaften');
+        expect(insight.strengthText).not.toContain('Vieles gemacht');
+        expect(insight.hasConcreteStrength).toBe(true);
+        expect(insight.bridgeTheme).toBe('Consulting');
+    });
+
+    it('does not treat vague professional filler as an evidence-based strength', () => {
+        const insight = buildInitiativInsight({
+            signal,
+            professionalResults: 'Ich habe Vieles gemacht.',
+            peerPerspective: '',
+            focus: 'Design Thinking',
+        });
+
+        expect(insight.strengthSource).toBe('profile_fallback');
+        expect(insight.strengthText).toBeNull();
+        expect(insight.hasConcreteStrength).toBe(false);
+    });
 });
