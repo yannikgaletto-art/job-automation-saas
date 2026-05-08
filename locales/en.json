@@ -61,6 +61,7 @@
       "todays_goals": "Today's Goals",
       "job_search": "Job Search",
       "job_queue": "Job Queue",
+      "initiativ": "Initiative",
       "analytics": "Analytics",
       "coaching": "Coaching",
       "community": "Community (Beta)",
@@ -75,6 +76,22 @@
       "main": "Main",
       "community": "Sustainability",
       "tools": "Tools"
+    },
+    "initiativ": {
+      "eyebrow": "Preview",
+      "title": "Unsolicited applications",
+      "subtitle": "Pathly is preparing real unsolicited applications here. Later suggestions will use public signals, your profile and clear source checks.",
+      "status_label": "Status:",
+      "status_value": "Safe preview active",
+      "step_label": "Step {number}",
+      "strengths_title": "Translate strengths",
+      "strengths_body": "Private notes stay with you. Pathly will only use the professional translation for suggestions.",
+      "signals_title": "Check company signals",
+      "signals_body": "Triggers like press, funding or regulation will only be stored with sources.",
+      "brief_title": "Prepare the init brief",
+      "brief_body": "The brief stays short, concrete and verifiable. No automatic sending.",
+      "next_title": "Next build step",
+      "next_body": "Next, we will add discovery and the strengths profile behind this. This page is intentionally just the safe entry shell."
     },
     "todays_goals": {
       "title": "Today's Goals",

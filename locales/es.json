@@ -61,6 +61,7 @@
       "todays_goals": "Objetivos de hoy",
       "job_search": "Buscar empleo",
       "job_queue": "Cola de empleos",
+      "initiativ": "Iniciativa",
       "analytics": "Análisis",
       "coaching": "Coaching",
       "community": "Comunidad (Beta)",
@@ -75,6 +76,22 @@
       "main": "Principal",
       "community": "Sostenibilidad",
       "tools": "Herramientas"
+    },
+    "initiativ": {
+      "eyebrow": "Vista previa",
+      "title": "Candidaturas espontáneas",
+      "subtitle": "Pathly prepara aquí candidaturas espontáneas reales. Más adelante, las sugerencias usarán señales públicas, tu perfil y una revisión clara de fuentes.",
+      "status_label": "Estado:",
+      "status_value": "Vista previa segura activa",
+      "step_label": "Paso {number}",
+      "strengths_title": "Traducir fortalezas",
+      "strengths_body": "Tus notas privadas se quedan contigo. Pathly usará solo la traducción profesional para sugerencias.",
+      "signals_title": "Revisar señales de empresa",
+      "signals_body": "Los disparadores como prensa, financiación o regulación se guardarán solo con fuentes.",
+      "brief_title": "Preparar la carta inicial",
+      "brief_body": "La carta será breve, concreta y verificable. Sin envío automático.",
+      "next_title": "Siguiente paso de construcción",
+      "next_body": "A continuación añadiremos discovery y el perfil de fortalezas. Esta página es solo la entrada segura."
     },
     "todays_goals": {
       "title": "Objetivos de hoy",

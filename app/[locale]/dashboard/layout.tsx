@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Sidebar, NavSection, NavItem } from '@/components/motion/sidebar';
-import { Home, Search, Inbox, BarChart3, Users, Heart, Shield, Settings, MessageSquare, Mic, User } from 'lucide-react';
+import { Home, Search, Inbox, BarChart3, Users, Heart, Shield, Settings, MessageSquare, Mic, User, Send } from 'lucide-react';
 import { PomodoroMiniWidget } from './components/pomodoro-mini-widget';
 import { usePathname } from '@/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -238,6 +238,7 @@ function DashboardLayoutInner({
                         />
                         <NavItem icon={Search} label={t('nav.job_search')} href={`/${locale}/dashboard/job-search`} shortcut="S" />
                         <NavItem icon={Inbox} label={t('nav.job_queue')} href={`/${locale}/dashboard/job-queue`} shortcut="Q" />
+                        <NavItem icon={Send} label={t('nav.initiativ')} href={`/${locale}/dashboard/initiativ`} />
                         <NavItem icon={BarChart3} label={t('nav.analytics')} href={`/${locale}/dashboard/analytics`} shortcut="A" />
                         <NavItem icon={MessageSquare} label={t('nav.coaching')} href={`/${locale}/dashboard/coaching`} shortcut="I" />
                     </NavSection>

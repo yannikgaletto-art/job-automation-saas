@@ -61,6 +61,7 @@
       "todays_goals": "Tagesziele",
       "job_search": "Job Suche",
       "job_queue": "Job Queue",
+      "initiativ": "Initiativ",
       "analytics": "Analytics",
       "coaching": "Coaching",
       "community": "Community (Beta)",
@@ -75,6 +76,22 @@
       "main": "Hauptmenü",
       "community": "Nachhaltigkeit",
       "tools": "Tools"
+    },
+    "initiativ": {
+      "eyebrow": "Preview",
+      "title": "Initiativbewerbungen",
+      "subtitle": "Pathly bereitet hier echte Initiativbewerbungen vor. Die Vorschläge basieren später auf öffentlichen Signalen, deinem Profil und klarer Quellenprüfung.",
+      "status_label": "Status:",
+      "status_value": "Sichere Vorschau aktiv",
+      "step_label": "Schritt {number}",
+      "strengths_title": "Stärken übersetzen",
+      "strengths_body": "Private Notizen bleiben bei dir. Pathly nutzt später nur die berufliche Übersetzung für Vorschläge.",
+      "signals_title": "Firmensignale prüfen",
+      "signals_body": "Trigger wie Presse, Funding oder Regulierung werden erst mit Quellen gespeichert.",
+      "brief_title": "Init-Brief vorbereiten",
+      "brief_body": "Der Brief bleibt kurz, konkret und prüfbar. Kein automatischer Versand.",
+      "next_title": "Nächster Ausbauschritt",
+      "next_body": "Als Nächstes bauen wir Discovery und Stärkenprofil kontrolliert dahinter. Diese Seite ist bewusst nur die sichere Einstiegsschale."
     },
     "todays_goals": {
       "title": "Tagesziele",
