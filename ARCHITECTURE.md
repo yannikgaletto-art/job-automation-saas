@@ -54,6 +54,7 @@ Last Updated: 2026-04-18
 - `/dashboard/coaching` (Interview-Training: Sessions, Analyse, Empfehlungen)
 - `/dashboard/community` (Skill-Share, Career, Entrepreneurship Boards)
 - `/dashboard/extension` (Chrome Extension Infos)
+- `/dashboard/initiativ` (Preview-Flow für echte Initiativbewerbungen; Step 1 speichert `user_profiles.life_strengths`)
 - `/dashboard/job-queue` (Verwaltung von Jobs & Bewerbungen — Workflow-Steps)
 - `/dashboard/job-search` (Suche nach neuen Jobs via SerpAPI Pipeline)
 - `/dashboard/profil` (Persönliche Dokumente — CV & Cover Letter Upload, Verwaltung)
@@ -83,6 +84,9 @@ Last Updated: 2026-04-18
 
 #### Job Search
 - `/api/job-search/query` (POST — AI-gestützte Jobsuche)
+
+#### Initiativbewerbungen
+- `/api/initiativ/life-strengths` (GET/POST — Auth-guarded Stärkenprofil; schreibt `user_profiles.life_strengths` mit Read-Back-Verifikation, keine AI-Calls)
 
 #### Cover Letter (8 Endpunkte)
 - `/api/cover-letter/generate` (POST — Zentrale Generierung)

@@ -338,6 +338,7 @@ if (error || !user) {
 - Admin-Routen (`/api/admin/*`) brauchen zusätzlich Admin-Role-Check
 - Service Role Key darf NIEMALS im Frontend erscheinen
 - Error-Responses dürfen KEINE internen Stack Traces oder DB-Details leaken
+- `/api/initiativ/life-strengths` folgt diesem Contract und gibt `success: true` erst nach Write→Read-Back-Verifikation von `user_profiles.life_strengths` zurück.
 
 ---
 
