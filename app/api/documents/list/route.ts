@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { isMissingOriginColumnError } from '@/lib/documents/list-documents';
 
 export async function GET() {
     try {
@@ -12,10 +13,12 @@ export async function GET() {
             return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
         }
 
-        const { data: documents, error } = await supabase
+        const baseQuery = () => supabase
             .from('documents')
             .select('id, document_type, created_at, file_url_encrypted, metadata')
             .eq('user_id', user.id)
+
+        let { data: documents, error } = await baseQuery()
             // §Settings-Gate: Exclude AI-generated cover letters — they live exclusively
             // in the Job Queue (step-4-cover-letter). Settings shows ONLY user-uploaded docs.
             // NULL-safe: .neq() in Supabase/Postgres evaluates NULL != 'generated' as NULL (not TRUE),
@@ -23,6 +26,13 @@ export async function GET() {
             // Fix: explicitly include rows where origin is NULL (uploaded docs) OR not 'generated'.
             .or('origin.is.null,origin.neq.generated')
             .order('created_at', { ascending: false });
+
+        if (isMissingOriginColumnError(error)) {
+            console.warn('[documents/list] origin column missing; falling back to unfiltered document list');
+            const fallback = await baseQuery().order('created_at', { ascending: false });
+            documents = fallback.data;
+            error = fallback.error;
+        }
 
         if (error) {
             console.error('❌ Failed to fetch documents:', error);
