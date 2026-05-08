@@ -127,7 +127,11 @@
       "next_title": "Nächster Ausbauschritt",
       "next_body": "Als Nächstes bauen wir Discovery und Stärkenprofil kontrolliert dahinter. Diese Seite ist bewusst nur die sichere Einstiegsschale.",
       "next_body_step1": "Als Nächstes verbinden wir dein Stärkenprofil mit geprüften Firmensignalen. Das bleibt noch gesperrt, bis der Save-Pfad stabil getestet ist.",
-      "discovery_locked": "Discovery folgt"
+      "discovery_locked": "Discovery folgt",
+      "cv_suggestions_title": "Aus deinem Lebenslauf übernehmen",
+      "cv_suggestions_loading": "Pathly liest deine gespeicherten CV-Stationen...",
+      "cv_suggestions_empty": "Im gespeicherten Lebenslauf wurden noch keine klaren Ergebnis-Sätze gefunden.",
+      "cv_suggestions_no_cv": "In dieser Preview-Umgebung ist noch kein Lebenslauf im Profil gespeichert."
     },
     "todays_goals": {
       "title": "Tagesziele",

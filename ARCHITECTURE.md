@@ -86,6 +86,7 @@ Last Updated: 2026-04-18
 - `/api/job-search/query` (POST — AI-gestützte Jobsuche)
 
 #### Initiativbewerbungen
+- `/api/initiativ/cv-suggestions` (GET — liest `user_profiles.cv_structured_data` und schlägt berufliche Ergebnis-Sätze deterministisch vor, keine AI-Calls)
 - `/api/initiativ/life-strengths` (GET/POST — Auth-guarded Stärkenprofil; schreibt `user_profiles.life_strengths` mit Read-Back-Verifikation, keine AI-Calls)
 
 #### Cover Letter (8 Endpunkte)

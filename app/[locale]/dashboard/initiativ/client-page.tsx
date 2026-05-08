@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import {
     AlertCircle,
     ArrowRight,
+    BriefcaseBusiness,
     Building2,
     CheckCircle2,
     Compass,
@@ -25,6 +26,12 @@ type LifeStrengthsPayload = {
     human_aspects?: string[];
     professional_results?: string[];
     peer_perspective?: string[];
+};
+
+type CvResultSuggestion = {
+    id: string;
+    text: string;
+    source: string;
 };
 
 const EMPTY_FORM: StrengthsForm = {
@@ -66,6 +73,9 @@ export function InitiativClientPage() {
     const [saved, setSaved] = useState(false);
     const [schemaReady, setSchemaReady] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [cvSuggestions, setCvSuggestions] = useState<CvResultSuggestion[]>([]);
+    const [cvSuggestionsLoading, setCvSuggestionsLoading] = useState(true);
+    const [hasCvProfile, setHasCvProfile] = useState(true);
 
     const filledCount = useMemo(
         () => FIELD_KEYS.reduce((total, key) => total + countLines(form[key]), 0),
@@ -79,8 +89,12 @@ export function InitiativClientPage() {
 
         async function loadLifeStrengths() {
             try {
-                const response = await fetch('/api/initiativ/life-strengths');
+                const [response, suggestionsResponse] = await Promise.all([
+                    fetch('/api/initiativ/life-strengths'),
+                    fetch('/api/initiativ/cv-suggestions'),
+                ]);
                 const data = await response.json();
+                const suggestionsData = await suggestionsResponse.json();
                 if (cancelled) return;
 
                 if (!response.ok || !data.success) {
@@ -99,10 +113,18 @@ export function InitiativClientPage() {
                     setSaved(true);
                     setShowTour(false);
                 }
+
+                if (suggestionsResponse.ok && suggestionsData.success) {
+                    setHasCvProfile(Boolean(suggestionsData.hasCv));
+                    setCvSuggestions(Array.isArray(suggestionsData.suggestions) ? suggestionsData.suggestions : []);
+                } else {
+                    setHasCvProfile(false);
+                }
             } catch {
                 if (!cancelled) setError('load_failed');
             } finally {
                 if (!cancelled) setLoading(false);
+                if (!cancelled) setCvSuggestionsLoading(false);
             }
         }
 
@@ -116,6 +138,16 @@ export function InitiativClientPage() {
         setForm((current) => ({ ...current, [key]: value }));
         setSaved(false);
         setError(null);
+    };
+
+    const addProfessionalResult = (text: string) => {
+        const currentLines = form.professional_results
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+        const alreadyExists = currentLines.some((line) => line.toLocaleLowerCase('de-DE') === text.toLocaleLowerCase('de-DE'));
+        if (alreadyExists) return;
+        updateField('professional_results', [...currentLines, text].join('\n'));
     };
 
     const handleSave = async () => {
@@ -276,6 +308,41 @@ export function InitiativClientPage() {
                                         placeholder={t(`${key}_placeholder`)}
                                         className="mt-2 w-full resize-none rounded-lg border border-[#E7E7E5] bg-white px-3 py-2 text-sm leading-6 text-[#37352F] placeholder-[#A8A29E] outline-none transition-all focus:border-[#012e7a] focus:ring-2 focus:ring-[#012e7a]/20"
                                     />
+                                    {key === 'professional_results' && (
+                                        <div className="mt-3 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-3">
+                                            <div className="flex items-center gap-2 text-xs font-semibold text-[#37352F]">
+                                                <BriefcaseBusiness className="h-3.5 w-3.5 text-[#012e7a]" />
+                                                {t('cv_suggestions_title')}
+                                            </div>
+                                            {cvSuggestionsLoading ? (
+                                                <p className="mt-2 text-xs leading-5 text-[#73726E]">
+                                                    {t('cv_suggestions_loading')}
+                                                </p>
+                                            ) : cvSuggestions.length > 0 ? (
+                                                <div className="mt-3 space-y-2">
+                                                    {cvSuggestions.map((suggestion) => (
+                                                        <button
+                                                            key={suggestion.id}
+                                                            type="button"
+                                                            onClick={() => addProfessionalResult(suggestion.text)}
+                                                            className="block w-full rounded-md border border-[#E7E7E5] bg-white px-3 py-2 text-left transition-colors hover:border-[#012e7a] hover:bg-[#F4F7FC]"
+                                                        >
+                                                            <span className="block text-xs font-semibold text-[#37352F]">
+                                                                {suggestion.text}
+                                                            </span>
+                                                            <span className="mt-1 block text-[11px] text-[#8E8D89]">
+                                                                {suggestion.source}
+                                                            </span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="mt-2 text-xs leading-5 text-[#73726E]">
+                                                    {hasCvProfile ? t('cv_suggestions_empty') : t('cv_suggestions_no_cv')}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

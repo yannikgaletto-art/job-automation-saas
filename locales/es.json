@@ -127,7 +127,11 @@
       "next_title": "Siguiente paso de construcción",
       "next_body": "A continuación añadiremos discovery y el perfil de fortalezas. Esta página es solo la entrada segura.",
       "next_body_step1": "A continuación conectaremos tu perfil de fortalezas con señales de empresa verificadas. Sigue bloqueado hasta probar bien el guardado.",
-      "discovery_locked": "Discovery seguirá"
+      "discovery_locked": "Discovery seguirá",
+      "cv_suggestions_title": "Usar desde tu CV",
+      "cv_suggestions_loading": "Pathly está leyendo tus puestos guardados del CV...",
+      "cv_suggestions_empty": "Aún no se encontraron frases claras de resultados en el CV guardado.",
+      "cv_suggestions_no_cv": "En este entorno Preview aún no hay ningún CV guardado en el perfil."
     },
     "todays_goals": {
       "title": "Objetivos de hoy",
