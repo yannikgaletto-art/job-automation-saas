@@ -53,6 +53,53 @@ function includesNeedle(haystack: string | null | undefined, needle: string): bo
     return normalize(haystack).includes(normalize(needle));
 }
 
+function normalizedTerms(value: string | null | undefined): string[] {
+    return normalize(value)
+        .split(/[^\p{L}\p{N}]+/u)
+        .map((term) => term.trim())
+        .filter(Boolean);
+}
+
+function matchesBranche(rowBranche: string | null | undefined, queryBranche: string): boolean {
+    if (!queryBranche) return false;
+
+    const queryTerms = normalizedTerms(queryBranche);
+    if (queryTerms.length === 1 && queryTerms[0].length <= 3) {
+        return normalizedTerms(rowBranche).includes(queryTerms[0]);
+    }
+
+    return includesNeedle(rowBranche, queryBranche);
+}
+
+function normalizedRegionToken(region: string): string {
+    return normalize(region)
+        .replace(/[^\p{L}\p{N}]+/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+export function isBroadDiscoveryRegion(region: string): boolean {
+    const normalized = normalizedRegionToken(region);
+    return [
+        'de',
+        'deutschland',
+        'deutschlandweit',
+        'germany',
+        'bundesweit',
+        'dach',
+    ].includes(normalized);
+}
+
+export function shouldApplyStrictDiscoveryRegionFilter(region: string): boolean {
+    return Boolean(region) && !isBroadDiscoveryRegion(region);
+}
+
+function matchesRegion(rowRegion: string | null | undefined, queryRegion: string): boolean {
+    if (!queryRegion) return false;
+    if (isBroadDiscoveryRegion(queryRegion)) return Boolean(rowRegion?.trim());
+    return includesNeedle(rowRegion, queryRegion);
+}
+
 function focusTokens(focus: string): string[] {
     return focus
         .split(/\s+/)
@@ -87,8 +134,8 @@ export function buildDiscoverySignals(
 
     return rows.map((row) => {
         const reasons: DiscoveryMatchReason[] = [];
-        if (query.branche && includesNeedle(row.branche, query.branche)) reasons.push('branche');
-        if (query.region && includesNeedle(row.region, query.region)) reasons.push('region');
+        if (matchesBranche(row.branche, query.branche)) reasons.push('branche');
+        if (matchesRegion(row.region, query.region)) reasons.push('region');
 
         const focusHaystack = [
             row.company_name,

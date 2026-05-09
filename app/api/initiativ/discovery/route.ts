@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import {
     buildDiscoverySignals,
     sanitizeDiscoveryQuery,
+    shouldApplyStrictDiscoveryRegionFilter,
     type RawInitiativTrigger,
 } from '@/lib/initiativ/discovery';
 
@@ -29,8 +30,9 @@ export async function GET(request: NextRequest) {
             .order('trigger_date', { ascending: false })
             .limit(50);
 
-        if (query.branche) dbQuery = dbQuery.ilike('branche', `%${query.branche}%`);
-        if (query.region) dbQuery = dbQuery.ilike('region', `%${query.region}%`);
+        if (shouldApplyStrictDiscoveryRegionFilter(query.region)) {
+            dbQuery = dbQuery.ilike('region', `%${query.region}%`);
+        }
 
         const { data, error } = await dbQuery;
 
@@ -48,7 +50,9 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'initiativ.discovery.load_failed' }, { status: 500 });
         }
 
-        const signals = buildDiscoverySignals((data ?? []) as RawInitiativTrigger[], query).slice(0, 10);
+        const signals = buildDiscoverySignals((data ?? []) as RawInitiativTrigger[], query)
+            .filter((signal) => !query.branche || signal.matchReasons.includes('branche'))
+            .slice(0, 10);
 
         return NextResponse.json({
             success: true,

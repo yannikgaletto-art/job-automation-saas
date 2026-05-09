@@ -1,4 +1,8 @@
-import { buildDiscoverySignals, sanitizeDiscoveryQuery } from '../discovery';
+import {
+    buildDiscoverySignals,
+    sanitizeDiscoveryQuery,
+    shouldApplyStrictDiscoveryRegionFilter,
+} from '../discovery';
 
 describe('sanitizeDiscoveryQuery', () => {
     it('trims and limits user input', () => {
@@ -50,5 +54,63 @@ describe('buildDiscoverySignals', () => {
         expect(signals[0].id).toBe('1');
         expect(signals[0].confidence).toBe('green');
         expect(signals[0].matchReasons).toEqual(['branche', 'focus']);
+    });
+
+    it('treats Germany as a broad region for German city-level preview signals', () => {
+        const signals = buildDiscoverySignals([
+            {
+                id: '1',
+                trigger_type: 'press_release',
+                company_name: '9X',
+                company_url: null,
+                branche: 'Innovationsberatung, KI-Beratung, Prozessautomatisierung',
+                region: 'Berlin',
+                source_url: 'https://example.com/9x',
+                source_name: 'Presseportal',
+                trigger_date: '2025-12-08T00:00:00.000Z',
+                trigger_summary: 'Berliner KI-Beratungsunternehmen begleitet Prozessautomatisierung.',
+            },
+        ], {
+            branche: 'KI',
+            region: 'Deutschland',
+            focus: 'Beratung',
+        });
+
+        expect(signals).toHaveLength(1);
+        expect(signals[0].confidence).toBe('green');
+        expect(signals[0].matchReasons).toEqual(['branche', 'region', 'focus']);
+    });
+
+    it('does not match short branch queries inside unrelated words', () => {
+        const signals = buildDiscoverySignals([
+            {
+                id: '1',
+                trigger_type: 'press_release',
+                company_name: 'Berlin Hyp',
+                company_url: null,
+                branche: 'Finanzen, Immobilienfinanzierung, Banking, Consulting',
+                region: 'Berlin',
+                source_url: 'https://example.com/berlin-hyp',
+                source_name: 'LBBW',
+                trigger_date: '2025-08-01T00:00:00.000Z',
+                trigger_summary: 'Integration und Prozessvereinfachung im Finanzumfeld.',
+            },
+        ], {
+            branche: 'KI',
+            region: 'Deutschland',
+            focus: 'Beratung',
+        });
+
+        expect(signals).toHaveLength(1);
+        expect(signals[0].matchReasons).toEqual(['region']);
+        expect(signals[0].confidence).toBe('yellow');
+    });
+});
+
+describe('shouldApplyStrictDiscoveryRegionFilter', () => {
+    it('does not apply a city-level database filter for broad regions', () => {
+        expect(shouldApplyStrictDiscoveryRegionFilter('Deutschland')).toBe(false);
+        expect(shouldApplyStrictDiscoveryRegionFilter('DACH')).toBe(false);
+        expect(shouldApplyStrictDiscoveryRegionFilter('Berlin')).toBe(true);
     });
 });
