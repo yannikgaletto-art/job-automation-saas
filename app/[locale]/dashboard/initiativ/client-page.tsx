@@ -7,7 +7,6 @@ import {
     ArrowLeft,
     ArrowRight,
     BriefcaseBusiness,
-    Building2,
     CheckCircle2,
     Compass,
     ExternalLink,
@@ -19,6 +18,13 @@ import {
     ShieldCheck,
 } from 'lucide-react';
 import { buildInitiativInsight } from '@/lib/initiativ/insight';
+import { VoiceTextarea } from '@/components/initiativ/VoiceTextarea';
+import { InitiativStepper, type InitiativStep } from '@/components/initiativ/InitiativStepper';
+import {
+    isCsvTokenActive,
+    localeForVoice,
+    toggleCsvToken,
+} from '@/lib/initiativ/discovery-form-helpers';
 
 type StrengthsForm = {
     human_aspects: string;
@@ -72,13 +78,17 @@ const EMPTY_DISCOVERY_FORM: DiscoveryForm = {
 };
 
 const FIELD_KEYS = ['human_aspects', 'professional_results', 'peer_perspective'] as const;
-const STEP_ICONS = [Radar, Building2, FileText] as const;
 const TOUR_ICONS = [Compass, ShieldCheck, Radar] as const;
 const LOCALE_TAG: Record<string, string> = {
     de: 'de-DE',
     en: 'en-US',
     es: 'es-ES',
 };
+
+const TOUR_STORAGE_KEY = 'pathly:initiativ:tour:dismissed:v1';
+
+const BRANCHE_CHIP_KEYS = ['ki', 'beratung', 'nachhaltigkeit', 'fintech', 'healthtech', 'industrie40'] as const;
+const REGION_CHIP_KEYS = ['berlin', 'muenchen', 'hamburg', 'nrw', 'dach', 'remote'] as const;
 
 function listToText(value: unknown): string {
     if (!Array.isArray(value)) return '';
@@ -102,8 +112,9 @@ function mapErrorToKey(error: string | null) {
 export function InitiativClientPage() {
     const t = useTranslations('dashboard.initiativ');
     const locale = useLocale();
+    const voiceLocale = localeForVoice(locale);
     const [showTour, setShowTour] = useState(true);
-    const [activeStep, setActiveStep] = useState<'strengths' | 'discovery' | 'insight'>('strengths');
+    const [activeStep, setActiveStep] = useState<InitiativStep>('strengths');
     const [tourStep, setTourStep] = useState(0);
     const [form, setForm] = useState<StrengthsForm>(EMPTY_FORM);
     const [discoveryForm, setDiscoveryForm] = useState<DiscoveryForm>(EMPTY_DISCOVERY_FORM);
@@ -153,6 +164,27 @@ export function InitiativClientPage() {
         });
     }, [discoveryForm.focus, form.peer_perspective, form.professional_results, selectedSignal]);
     const currentTourIcon = TOUR_ICONS[tourStep];
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            if (window.localStorage.getItem(TOUR_STORAGE_KEY) === '1') {
+                setShowTour(false);
+            }
+        } catch {
+            // localStorage may be unavailable in private mode — fall through and keep tour state.
+        }
+    }, []);
+
+    const dismissTour = () => {
+        setShowTour(false);
+        if (typeof window === 'undefined') return;
+        try {
+            window.localStorage.setItem(TOUR_STORAGE_KEY, '1');
+        } catch {
+            // ignore
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -343,42 +375,29 @@ export function InitiativClientPage() {
                         {t('subtitle')}
                     </p>
                 </div>
-                <div className="rounded-lg border border-[#E7E7E5] bg-white px-4 py-3 text-sm text-[#73726E] shadow-sm">
+                <div className="rounded-full border border-[#E7E7E5] bg-white px-3 py-1 text-xs text-[#73726E] shadow-sm">
                     <span className="font-semibold text-[#37352F]">{t('status_label')}</span>{' '}
                     {schemaReady ? t('status_value') : t('status_schema_missing')}
                 </div>
             </header>
 
-            <section className="grid gap-4 md:grid-cols-3">
-                {STEP_ICONS.map((Icon, index) => {
-                    const key = index === 0 ? 'strengths' : index === 1 ? 'signals' : 'brief';
-                    const active =
-                        (index === 0 && activeStep === 'strengths')
-                        || (index === 1 && activeStep === 'discovery')
-                        || (index === 2 && activeStep === 'insight');
-                    return (
-                        <article
-                            key={key}
-                            className={`rounded-lg border bg-white p-5 shadow-sm ${active ? 'border-[#012e7a]' : 'border-[#E7E7E5]'}`}
-                        >
-                            <div className="mb-4 flex items-center justify-between">
-                                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${active ? 'bg-[#EAF0FB] text-[#012e7a]' : 'bg-[#F4F7FC] text-[#73726E]'}`}>
-                                    <Icon className="h-5 w-5" />
-                                </div>
-                                <span className="text-xs font-semibold text-[#A8A29E]">
-                                    {t('step_label', { number: index + 1 })}
-                                </span>
-                            </div>
-                            <h2 className="text-base font-semibold text-[#37352F]">
-                                {t(`${key}_title`)}
-                            </h2>
-                            <p className="mt-2 text-sm leading-6 text-[#73726E]">
-                                {t(`${key}_body`)}
-                            </p>
-                        </article>
-                    );
+            <InitiativStepper
+                activeStep={activeStep}
+                progressLabel={t('stepper_progress', {
+                    current: activeStep === 'strengths' ? 1 : activeStep === 'discovery' ? 2 : 3,
+                    total: 3,
                 })}
-            </section>
+                steps={[
+                    { key: 'strengths', label: t('stepper_step_strengths'), enabled: true },
+                    { key: 'discovery', label: t('stepper_step_signals'), enabled: canOpenDiscovery },
+                    { key: 'insight', label: t('stepper_step_brief'), enabled: Boolean(selectedSignal) },
+                ]}
+                onStepClick={(step) => {
+                    if (step === 'strengths') setActiveStep('strengths');
+                    else if (step === 'discovery' && canOpenDiscovery) setActiveStep('discovery');
+                    else if (step === 'insight' && selectedSignal) setActiveStep('insight');
+                }}
+            />
 
             {showTour ? (
                 <section className="rounded-lg border border-[#E7E7E5] bg-white p-6 shadow-sm">
@@ -407,7 +426,7 @@ export function InitiativClientPage() {
                         <div className="flex shrink-0 gap-2">
                             <button
                                 type="button"
-                                onClick={() => setShowTour(false)}
+                                onClick={dismissTour}
                                 className="rounded-lg border border-[#E7E7E5] bg-white px-4 py-2 text-sm font-semibold text-[#73726E] transition-colors hover:bg-[#F7F7F5] hover:text-[#37352F]"
                             >
                                 {t('tour_skip')}
@@ -416,7 +435,7 @@ export function InitiativClientPage() {
                                 type="button"
                                 onClick={() => {
                                     if (tourStep >= 2) {
-                                        setShowTour(false);
+                                        dismissTour();
                                     } else {
                                         setTourStep((step) => step + 1);
                                     }
@@ -430,15 +449,21 @@ export function InitiativClientPage() {
                     </div>
                 </section>
             ) : activeStep === 'strengths' ? (
-                <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <section>
                     <div className="rounded-lg border border-[#E7E7E5] bg-white p-6 shadow-sm">
-                        <div className="mb-5">
-                            <h2 className="text-xl font-semibold text-[#37352F]">
-                                {t('step1_title')}
-                            </h2>
-                            <p className="mt-2 text-sm leading-6 text-[#73726E]">
-                                {t('step1_body')}
-                            </p>
+                        <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <h2 className="text-xl font-semibold text-[#37352F]">
+                                    {t('step1_title')}
+                                </h2>
+                                <p className="mt-2 text-sm leading-6 text-[#73726E]">
+                                    {t('step1_body')}
+                                </p>
+                            </div>
+                            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#E7E7E5] bg-[#FAFAF9] px-2.5 py-1 text-xs font-medium text-[#73726E]">
+                                <ShieldCheck className="h-3.5 w-3.5 text-[#012e7a]" />
+                                {t('privacy_title')}
+                            </span>
                         </div>
 
                         <div className="space-y-5">
@@ -450,15 +475,21 @@ export function InitiativClientPage() {
                                     <p className="mt-1 text-xs leading-5 text-[#8E8D89]">
                                         {t(`${key}_hint`)}
                                     </p>
-                                    <textarea
-                                        id={key}
-                                        value={form[key]}
-                                        maxLength={900}
-                                        rows={4}
-                                        onChange={(event) => updateField(key, event.target.value)}
-                                        placeholder={t(`${key}_placeholder`)}
-                                        className="mt-2 w-full resize-none rounded-lg border border-[#E7E7E5] bg-white px-3 py-2 text-sm leading-6 text-[#37352F] placeholder-[#A8A29E] outline-none transition-all focus:border-[#012e7a] focus:ring-2 focus:ring-[#012e7a]/20"
-                                    />
+                                    <div className="mt-2">
+                                        <VoiceTextarea
+                                            id={key}
+                                            value={form[key]}
+                                            onChange={(next) => updateField(key, next)}
+                                            placeholder={t(`${key}_placeholder`)}
+                                            rows={4}
+                                            maxLength={900}
+                                            locale={voiceLocale}
+                                            micLabelStart={t('voice_start')}
+                                            micLabelStop={t('voice_stop')}
+                                            micLabelTranscribing={t('voice_transcribing')}
+                                            micErrorLabel={t('voice_error')}
+                                        />
+                                    </div>
                                     {key === 'professional_results' && (
                                         <div className="mt-3 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-3">
                                             <div className="flex items-center gap-2 text-xs font-semibold text-[#37352F]">
@@ -506,57 +537,40 @@ export function InitiativClientPage() {
                         )}
 
                         <div className="mt-6 flex flex-col gap-3 border-t border-[#E7E7E5] pt-5 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="text-xs text-[#73726E]">
-                                {t('step1_counter', { count: filledCount })}
+                            <div className="flex items-center gap-2 text-xs text-[#73726E]">
+                                {saved ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                                ) : (
+                                    <ShieldCheck className="h-3.5 w-3.5 text-[#012e7a]" />
+                                )}
+                                <span>{saved ? t('step1_inline_status', { count: filledCount }) : t('step1_counter', { count: filledCount })}</span>
                             </div>
-                            <button
-                                type="button"
-                                disabled={!canSave}
-                                onClick={handleSave}
-                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#012e7a] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#001f52] disabled:cursor-not-allowed disabled:bg-[#C8D4EA]"
-                            >
-                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                {saving ? t('save_saving') : t('save_button')}
-                            </button>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                <button
+                                    type="button"
+                                    disabled={!canSave}
+                                    onClick={handleSave}
+                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#012e7a] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#001f52] disabled:cursor-not-allowed disabled:bg-[#C8D4EA]"
+                                >
+                                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                    {saving ? t('save_saving') : t('save_button')}
+                                </button>
+                                {canOpenDiscovery && (
+                                    <button
+                                        type="button"
+                                        onClick={openDiscovery}
+                                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#C8D4EA] bg-white px-4 py-2 text-sm font-semibold text-[#012e7a] transition-colors hover:bg-[#F4F7FC]"
+                                    >
+                                        {t('step1_inline_next')}
+                                        <ArrowRight className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
-
-                    <aside className="space-y-4">
-                        <div className="rounded-lg border border-[#E7E7E5] bg-white p-5 shadow-sm">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-[#37352F]">
-                                {saved ? (
-                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                ) : (
-                                    <ShieldCheck className="h-4 w-4 text-[#012e7a]" />
-                                )}
-                                {saved ? t('saved_title') : t('privacy_title')}
-                            </div>
-                            <p className="mt-2 text-sm leading-6 text-[#73726E]">
-                                {saved ? t('saved_body') : t('privacy_body')}
-                            </p>
-                        </div>
-
-                        <div className="rounded-lg border border-dashed border-[#B9C7E3] bg-[#F8FAFE] p-5">
-                            <h2 className="text-base font-semibold text-[#37352F]">
-                                {t('next_title')}
-                            </h2>
-                            <p className="mt-2 text-sm leading-6 text-[#73726E]">
-                                {t('next_body_step1')}
-                            </p>
-                            <button
-                                type="button"
-                                disabled={!canOpenDiscovery}
-                                onClick={openDiscovery}
-                                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#C8D4EA] bg-white px-4 py-2 text-sm font-semibold text-[#012e7a] transition-colors hover:bg-[#F4F7FC] disabled:cursor-not-allowed disabled:text-[#73726E] disabled:hover:bg-white"
-                            >
-                                <Building2 className="h-4 w-4" />
-                                {canOpenDiscovery ? t('discovery_open') : t('discovery_locked')}
-                            </button>
-                        </div>
-                    </aside>
                 </section>
             ) : activeStep === 'discovery' ? (
-                <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <section>
                     <div className="space-y-6">
                         <div className="rounded-lg border border-[#E7E7E5] bg-white p-6 shadow-sm">
                             <button
@@ -578,30 +592,82 @@ export function InitiativClientPage() {
                             </div>
 
                             <div className="grid gap-4 md:grid-cols-2">
-                                <label className="block">
-                                    <span className="text-sm font-semibold text-[#37352F]">
+                                <div>
+                                    <label htmlFor="discovery-branche" className="block text-sm font-semibold text-[#37352F]">
                                         {t('discovery_branche_label')}
-                                    </span>
+                                    </label>
+                                    <div
+                                        role="group"
+                                        aria-label={t('quick_branche_label')}
+                                        className="mt-2 flex flex-wrap gap-1.5"
+                                    >
+                                        {BRANCHE_CHIP_KEYS.map((key) => {
+                                            const label = t(`chip_branche_${key}`);
+                                            const active = isCsvTokenActive(discoveryForm.branche, label);
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    aria-pressed={active}
+                                                    onClick={() => updateDiscoveryField('branche', toggleCsvToken(discoveryForm.branche, label))}
+                                                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                                        active
+                                                            ? 'border-[#012e7a] bg-[#012e7a] text-white'
+                                                            : 'border-[#E7E7E5] bg-white text-[#73726E] hover:border-[#C8D4EA] hover:text-[#012e7a]'
+                                                    }`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                     <input
+                                        id="discovery-branche"
                                         type="text"
                                         value={discoveryForm.branche}
                                         onChange={(event) => updateDiscoveryField('branche', event.target.value)}
                                         placeholder={t('discovery_branche_placeholder')}
                                         className="mt-2 w-full rounded-lg border border-[#E7E7E5] bg-white px-3 py-2 text-sm text-[#37352F] placeholder-[#A8A29E] outline-none transition-all focus:border-[#012e7a] focus:ring-2 focus:ring-[#012e7a]/20"
                                     />
-                                </label>
-                                <label className="block">
-                                    <span className="text-sm font-semibold text-[#37352F]">
+                                </div>
+                                <div>
+                                    <label htmlFor="discovery-region" className="block text-sm font-semibold text-[#37352F]">
                                         {t('discovery_region_label')}
-                                    </span>
+                                    </label>
+                                    <div
+                                        role="group"
+                                        aria-label={t('quick_region_label')}
+                                        className="mt-2 flex flex-wrap gap-1.5"
+                                    >
+                                        {REGION_CHIP_KEYS.map((key) => {
+                                            const label = t(`chip_region_${key}`);
+                                            const active = isCsvTokenActive(discoveryForm.region, label);
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    aria-pressed={active}
+                                                    onClick={() => updateDiscoveryField('region', toggleCsvToken(discoveryForm.region, label))}
+                                                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                                        active
+                                                            ? 'border-[#012e7a] bg-[#012e7a] text-white'
+                                                            : 'border-[#E7E7E5] bg-white text-[#73726E] hover:border-[#C8D4EA] hover:text-[#012e7a]'
+                                                    }`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                     <input
+                                        id="discovery-region"
                                         type="text"
                                         value={discoveryForm.region}
                                         onChange={(event) => updateDiscoveryField('region', event.target.value)}
                                         placeholder={t('discovery_region_placeholder')}
                                         className="mt-2 w-full rounded-lg border border-[#E7E7E5] bg-white px-3 py-2 text-sm text-[#37352F] placeholder-[#A8A29E] outline-none transition-all focus:border-[#012e7a] focus:ring-2 focus:ring-[#012e7a]/20"
                                     />
-                                </label>
+                                </div>
                                 <label className="block md:col-span-2">
                                     <span className="text-sm font-semibold text-[#37352F]">
                                         {t('discovery_focus_label')}
@@ -616,6 +682,10 @@ export function InitiativClientPage() {
                                     />
                                 </label>
                             </div>
+
+                            <p className="mt-4 text-xs leading-5 text-[#8E8D89]">
+                                {t('step2_inline_disclaimer')}
+                            </p>
 
                             {discoveryError && (
                                 <div className="mt-5 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -784,37 +854,6 @@ export function InitiativClientPage() {
                         </div>
                     </div>
 
-                    <aside className="space-y-4">
-                        <div className="rounded-lg border border-[#E7E7E5] bg-white p-5 shadow-sm">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-[#37352F]">
-                                <ShieldCheck className="h-4 w-4 text-[#012e7a]" />
-                                {t('discovery_rules_title')}
-                            </div>
-                            <ul className="mt-3 space-y-2 text-sm leading-6 text-[#73726E]">
-                                <li>{t('discovery_rule_1')}</li>
-                                <li>{t('discovery_rule_2')}</li>
-                                <li>{t('discovery_rule_3')}</li>
-                            </ul>
-                        </div>
-
-                        <div className="rounded-lg border border-dashed border-[#B9C7E3] bg-[#F8FAFE] p-5">
-                            <h2 className="text-base font-semibold text-[#37352F]">
-                                {t('next_title')}
-                            </h2>
-                            <p className="mt-2 text-sm leading-6 text-[#73726E]">
-                                {t('next_body_step2')}
-                            </p>
-                            <button
-                                type="button"
-                                disabled={!selectedSignal}
-                                onClick={() => selectedSignal && openInsight(selectedSignal.id)}
-                                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#C8D4EA] bg-white px-4 py-2 text-sm font-semibold text-[#012e7a] transition-colors hover:bg-[#F4F7FC] disabled:cursor-not-allowed disabled:text-[#73726E] disabled:hover:bg-white"
-                            >
-                                <FileText className="h-4 w-4" />
-                                {selectedSignal ? t('insight_selected') : t('brief_locked')}
-                            </button>
-                        </div>
-                    </aside>
                 </section>
             ) : selectedInsight ? (
                 <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
