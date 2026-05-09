@@ -166,3 +166,20 @@ export function buildDiscoverySignals(
         return new Date(b.triggerDate).getTime() - new Date(a.triggerDate).getTime();
     });
 }
+
+export function filterDiscoverySignalsForQuery(
+    rows: RawInitiativTrigger[],
+    query: DiscoveryQuery,
+): InitiativDiscoverySignal[] {
+    return buildDiscoverySignals(rows, query)
+        .filter((signal) => !query.branche || signal.matchReasons.includes('branche'));
+}
+
+export function shouldRetryDiscoveryWithoutRegion(
+    query: DiscoveryQuery,
+    signals: InitiativDiscoverySignal[],
+): boolean {
+    return Boolean(query.branche)
+        && shouldApplyStrictDiscoveryRegionFilter(query.region)
+        && signals.length === 0;
+}

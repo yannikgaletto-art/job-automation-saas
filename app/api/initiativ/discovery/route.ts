@@ -3,11 +3,28 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import {
-    buildDiscoverySignals,
+    filterDiscoverySignalsForQuery,
     sanitizeDiscoveryQuery,
     shouldApplyStrictDiscoveryRegionFilter,
+    shouldRetryDiscoveryWithoutRegion,
     type RawInitiativTrigger,
 } from '@/lib/initiativ/discovery';
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+async function loadTriggerRows(supabase: SupabaseClient, region: string) {
+    let dbQuery = supabase
+        .from('initiativ_triggers')
+        .select('id, trigger_type, company_name, company_url, branche, region, source_url, source_name, trigger_date, trigger_summary')
+        .order('trigger_date', { ascending: false })
+        .limit(50);
+
+    if (shouldApplyStrictDiscoveryRegionFilter(region)) {
+        dbQuery = dbQuery.ilike('region', `%${region}%`);
+    }
+
+    return dbQuery;
+}
 
 export async function GET(request: NextRequest) {
     try {
@@ -24,17 +41,7 @@ export async function GET(request: NextRequest) {
             focus: request.nextUrl.searchParams.get('focus'),
         });
 
-        let dbQuery = supabase
-            .from('initiativ_triggers')
-            .select('id, trigger_type, company_name, company_url, branche, region, source_url, source_name, trigger_date, trigger_summary')
-            .order('trigger_date', { ascending: false })
-            .limit(50);
-
-        if (shouldApplyStrictDiscoveryRegionFilter(query.region)) {
-            dbQuery = dbQuery.ilike('region', `%${query.region}%`);
-        }
-
-        const { data, error } = await dbQuery;
+        const { data, error } = await loadTriggerRows(supabase, query.region);
 
         if (error) {
             if (error.code === '42P01' || error.message.toLocaleLowerCase('en-US').includes('does not exist')) {
@@ -50,14 +57,28 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'initiativ.discovery.load_failed' }, { status: 500 });
         }
 
-        const signals = buildDiscoverySignals((data ?? []) as RawInitiativTrigger[], query)
-            .filter((signal) => !query.branche || signal.matchReasons.includes('branche'))
-            .slice(0, 10);
+        let signals = filterDiscoverySignalsForQuery((data ?? []) as RawInitiativTrigger[], query);
+        let regionFallback = false;
+
+        if (shouldRetryDiscoveryWithoutRegion(query, signals)) {
+            const fallbackResult = await loadTriggerRows(supabase, '');
+
+            if (fallbackResult.error) {
+                console.error('[initiativ/discovery] fallback load failed:', fallbackResult.error.message);
+                return NextResponse.json({ error: 'initiativ.discovery.load_failed' }, { status: 500 });
+            }
+
+            signals = filterDiscoverySignalsForQuery((fallbackResult.data ?? []) as RawInitiativTrigger[], query);
+            regionFallback = signals.length > 0;
+        }
+
+        signals = signals.slice(0, 10);
 
         return NextResponse.json({
             success: true,
             schemaReady: true,
             query,
+            regionFallback,
             signals,
         });
     } catch (error) {

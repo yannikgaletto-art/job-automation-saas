@@ -1,7 +1,9 @@
 import {
     buildDiscoverySignals,
+    filterDiscoverySignalsForQuery,
     sanitizeDiscoveryQuery,
     shouldApplyStrictDiscoveryRegionFilter,
+    shouldRetryDiscoveryWithoutRegion,
 } from '../discovery';
 
 describe('sanitizeDiscoveryQuery', () => {
@@ -112,5 +114,37 @@ describe('shouldApplyStrictDiscoveryRegionFilter', () => {
         expect(shouldApplyStrictDiscoveryRegionFilter('Deutschland')).toBe(false);
         expect(shouldApplyStrictDiscoveryRegionFilter('DACH')).toBe(false);
         expect(shouldApplyStrictDiscoveryRegionFilter('Berlin')).toBe(true);
+    });
+});
+
+describe('shouldRetryDiscoveryWithoutRegion', () => {
+    it('retries only when a concrete region blocks all branch matches', () => {
+        const query = {
+            branche: 'KI',
+            region: 'München',
+            focus: 'Consulting',
+        };
+
+        expect(shouldRetryDiscoveryWithoutRegion(query, [])).toBe(true);
+
+        const fallbackSignals = filterDiscoverySignalsForQuery([
+            {
+                id: '1',
+                trigger_type: 'press_release',
+                company_name: '9X',
+                company_url: null,
+                branche: 'Innovationsberatung, KI-Beratung, Prozessautomatisierung',
+                region: 'Berlin',
+                source_url: 'https://example.com/9x',
+                source_name: 'Presseportal',
+                trigger_date: '2025-12-08T00:00:00.000Z',
+                trigger_summary: 'Berliner KI-Beratungsunternehmen begleitet Prozessautomatisierung.',
+            },
+        ], query);
+
+        expect(fallbackSignals).toHaveLength(1);
+        expect(fallbackSignals[0].matchReasons).toEqual(['branche']);
+        expect(shouldRetryDiscoveryWithoutRegion(query, fallbackSignals)).toBe(false);
+        expect(shouldRetryDiscoveryWithoutRegion({ ...query, region: 'Deutschland' }, [])).toBe(false);
     });
 });

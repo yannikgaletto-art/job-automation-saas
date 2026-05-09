@@ -1,4 +1,9 @@
-import { buildDiscoverySignals, type RawInitiativTrigger } from '../discovery';
+import {
+    buildDiscoverySignals,
+    filterDiscoverySignalsForQuery,
+    shouldRetryDiscoveryWithoutRegion,
+    type RawInitiativTrigger,
+} from '../discovery';
 import {
     buildPreviewTriggerRows,
     PREVIEW_INITIATIV_TRIGGERS,
@@ -114,5 +119,49 @@ describe('initiativ preview trigger seed', () => {
         expect(signals.some((signal) => signal.companyName === 'Berlin Hyp')).toBe(false);
         expect(signals.every((signal) => signal.matchReasons.includes('region'))).toBe(true);
         expect(signals.every((signal) => signal.sourceUrl.startsWith('https://'))).toBe(true);
+    });
+
+    it('falls back from unsupported city filters to source-backed national preview signals', () => {
+        const rows = buildPreviewTriggerRows(new Date('2026-05-09T12:00:00.000Z'));
+        const query = {
+            branche: 'KI',
+            region: 'München',
+            focus: 'Consulting',
+        };
+
+        const strictRows = rows.filter((row) =>
+            row.region.toLocaleLowerCase('de-DE').includes('münchen')
+        );
+        const strictSignals = filterDiscoverySignalsForQuery([], query);
+
+        expect(strictRows).toHaveLength(0);
+        expect(strictSignals).toHaveLength(0);
+        expect(shouldRetryDiscoveryWithoutRegion(query, strictSignals)).toBe(true);
+
+        const fallbackSignals = filterDiscoverySignalsForQuery(
+            rows.map((row, index) => ({
+                id: `preview-ai-munich-fallback-${index}`,
+                trigger_type: row.trigger_type,
+                company_name: row.company_name,
+                company_url: row.company_url,
+                branche: row.branche,
+                region: row.region,
+                source_url: row.source_url,
+                source_name: row.source_name,
+                trigger_date: row.trigger_date,
+                trigger_summary: row.trigger_summary,
+            })) satisfies RawInitiativTrigger[],
+            query,
+        );
+
+        expect(fallbackSignals).toHaveLength(2);
+        expect(fallbackSignals.map((signal) => signal.companyName)).toEqual([
+            '9X',
+            'wirDesign communication AG',
+        ]);
+        expect(fallbackSignals.every((signal) => signal.confidence === 'yellow')).toBe(true);
+        expect(fallbackSignals.every((signal) => (
+            signal.matchReasons.includes('branche') && !signal.matchReasons.includes('region')
+        ))).toBe(true);
     });
 });
