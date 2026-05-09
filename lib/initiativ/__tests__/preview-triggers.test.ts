@@ -159,7 +159,10 @@ describe('initiativ preview trigger seed', () => {
             '9X',
             'wirDesign communication AG',
         ]);
-        expect(fallbackSignals.every((signal) => signal.confidence === 'yellow')).toBe(true);
+        // After region-mismatch-penalty (2026-05-09): fallback signals from a different city
+        // are capped to 'gray' confidence so the UI doesn't claim a "Starker Fit" for a
+        // München query that returned Berlin rows.
+        expect(fallbackSignals.every((signal) => signal.confidence === 'gray')).toBe(true);
         expect(fallbackSignals.every((signal) => (
             signal.matchReasons.includes('branche') && !signal.matchReasons.includes('region')
         ))).toBe(true);

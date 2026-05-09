@@ -114,6 +114,16 @@ function confidenceFromReasons(reasons: DiscoveryMatchReason[]): DiscoveryConfid
     return 'gray';
 }
 
+export function applyRegionMismatchPenalty(
+    confidence: DiscoveryConfidence,
+    matchReasons: DiscoveryMatchReason[],
+    queryRegion: string,
+): DiscoveryConfidence {
+    if (!shouldApplyStrictDiscoveryRegionFilter(queryRegion)) return confidence;
+    if (matchReasons.includes('region')) return confidence;
+    return 'gray';
+}
+
 export function sanitizeDiscoveryQuery(input: {
     branche?: unknown;
     region?: unknown;
@@ -145,6 +155,9 @@ export function buildDiscoverySignals(
         ].filter(Boolean).join(' ');
         if (tokens.some((token) => includesNeedle(focusHaystack, token))) reasons.push('focus');
 
+        const baseConfidence = confidenceFromReasons(reasons);
+        const confidence = applyRegionMismatchPenalty(baseConfidence, reasons, query.region);
+
         return {
             id: row.id,
             triggerType: row.trigger_type,
@@ -156,13 +169,18 @@ export function buildDiscoverySignals(
             sourceName: row.source_name || 'Quelle',
             triggerDate: row.trigger_date,
             summary: row.trigger_summary || '',
-            confidence: confidenceFromReasons(reasons),
+            confidence,
             matchReasons: reasons,
         };
     }).sort((a, b) => {
         const confidenceWeight: Record<DiscoveryConfidence, number> = { green: 3, yellow: 2, gray: 1 };
         const confidenceDelta = confidenceWeight[b.confidence] - confidenceWeight[a.confidence];
         if (confidenceDelta !== 0) return confidenceDelta;
+
+        const aHasRegion = a.matchReasons.includes('region') ? 1 : 0;
+        const bHasRegion = b.matchReasons.includes('region') ? 1 : 0;
+        if (aHasRegion !== bHasRegion) return bHasRegion - aHasRegion;
+
         return new Date(b.triggerDate).getTime() - new Date(a.triggerDate).getTime();
     });
 }

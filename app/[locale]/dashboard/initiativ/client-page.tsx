@@ -112,6 +112,9 @@ export function InitiativClientPage() {
     const [discoverySchemaReady, setDiscoverySchemaReady] = useState(true);
     const [discoverySignals, setDiscoverySignals] = useState<DiscoverySignal[]>([]);
     const [discoveryError, setDiscoveryError] = useState(false);
+    const [regionFallback, setRegionFallback] = useState(false);
+    const [appliedRegion, setAppliedRegion] = useState('');
+    const [regionStrict, setRegionStrict] = useState(false);
     const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -131,6 +134,10 @@ export function InitiativClientPage() {
     const canRunDiscovery = canOpenDiscovery && !discoveryLoading && Boolean(
         discoveryForm.branche.trim() || discoveryForm.region.trim() || discoveryForm.focus.trim()
     );
+    const displayedSignals = useMemo(() => {
+        if (!regionStrict) return discoverySignals;
+        return discoverySignals.filter((signal) => signal.matchReasons.includes('region'));
+    }, [discoverySignals, regionStrict]);
     const selectedSignal = useMemo(
         () => discoverySignals.find((signal) => signal.id === selectedSignalId) ?? null,
         [discoverySignals, selectedSignalId]
@@ -253,17 +260,25 @@ export function InitiativClientPage() {
         setActiveStep('discovery');
     };
 
-    const runDiscovery = async () => {
-        if (!canRunDiscovery) return;
+    const runDiscoveryWith = async (formOverride: Partial<DiscoveryForm> = {}) => {
+        if (!canOpenDiscovery || discoveryLoading) return;
+        const effectiveForm: DiscoveryForm = { ...discoveryForm, ...formOverride };
+        const branche = effectiveForm.branche.trim();
+        const region = effectiveForm.region.trim();
+        const focus = effectiveForm.focus.trim();
+        if (!branche && !region && !focus) return;
+
         setDiscoveryLoading(true);
         setDiscoverySearched(true);
         setDiscoveryError(false);
+        setRegionStrict(false);
+        setAppliedRegion(region);
 
         try {
             const params = new URLSearchParams();
-            if (discoveryForm.branche.trim()) params.set('branche', discoveryForm.branche.trim());
-            if (discoveryForm.region.trim()) params.set('region', discoveryForm.region.trim());
-            if (discoveryForm.focus.trim()) params.set('focus', discoveryForm.focus.trim());
+            if (branche) params.set('branche', branche);
+            if (region) params.set('region', region);
+            if (focus) params.set('focus', focus);
 
             const response = await fetch(`/api/initiativ/discovery?${params.toString()}`);
             const data = await response.json();
@@ -276,12 +291,23 @@ export function InitiativClientPage() {
             const signals = Array.isArray(data.signals) ? data.signals : [];
             setDiscoverySchemaReady(data.schemaReady !== false);
             setDiscoverySignals(signals);
+            setRegionFallback(Boolean(data.regionFallback));
             setSelectedSignalId(null);
         } catch {
             setDiscoveryError(true);
         } finally {
             setDiscoveryLoading(false);
         }
+    };
+
+    const runDiscovery = () => {
+        if (!canRunDiscovery) return;
+        runDiscoveryWith();
+    };
+
+    const expandRegionToDach = () => {
+        setDiscoveryForm((current) => ({ ...current, region: 'DACH' }));
+        runDiscoveryWith({ region: 'DACH' });
     };
 
     const openInsight = (signalId: string) => {
@@ -632,9 +658,48 @@ export function InitiativClientPage() {
                                     </p>
                                 </div>
                                 <span className="shrink-0 rounded-full border border-[#E7E7E5] px-3 py-1 text-xs font-semibold text-[#73726E]">
-                                    {t('discovery_results_count', { count: discoverySignals.length })}
+                                    {t('discovery_results_count', { count: displayedSignals.length })}
                                 </span>
                             </div>
+
+                            {regionFallback && !regionStrict && discoverySignals.length > 0 && appliedRegion && (
+                                <div className="mb-4 flex flex-col gap-3 rounded-lg border border-[#F1D9A6] bg-[#FFFBEF] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-sm leading-6 text-[#7A5A12]">
+                                        {t('discovery_region_fallback_banner', { region: appliedRegion })}
+                                    </p>
+                                    <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                                        <button
+                                            type="button"
+                                            onClick={() => setRegionStrict(true)}
+                                            className="inline-flex items-center justify-center rounded-lg border border-[#E1C68C] bg-white px-3 py-1.5 text-xs font-semibold text-[#7A5A12] transition-colors hover:bg-[#FFF6E0]"
+                                        >
+                                            {t('discovery_region_strict', { region: appliedRegion })}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={expandRegionToDach}
+                                            className="inline-flex items-center justify-center rounded-lg bg-[#012e7a] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#001f52]"
+                                        >
+                                            {t('discovery_region_expand')}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {regionStrict && appliedRegion && (
+                                <div className="mb-4 flex flex-col gap-2 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-xs leading-5 text-[#73726E]">
+                                        {t('discovery_region_strict_active', { region: appliedRegion, count: displayedSignals.length })}
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setRegionStrict(false)}
+                                        className="text-xs font-semibold text-[#012e7a] transition-colors hover:text-[#001f52]"
+                                    >
+                                        {t('discovery_region_strict_undo')}
+                                    </button>
+                                </div>
+                            )}
 
                             {discoveryLoading ? (
                                 <div className="rounded-lg border border-dashed border-[#C8D4EA] bg-[#F8FAFE] p-5 text-sm text-[#73726E]">
@@ -644,13 +709,15 @@ export function InitiativClientPage() {
                                 <div className="rounded-lg border border-dashed border-[#C8D4EA] bg-[#F8FAFE] p-5 text-sm text-[#73726E]">
                                     {t('discovery_initial_empty')}
                                 </div>
-                            ) : discoverySignals.length === 0 ? (
+                            ) : displayedSignals.length === 0 ? (
                                 <div className="rounded-lg border border-dashed border-[#C8D4EA] bg-[#F8FAFE] p-5 text-sm leading-6 text-[#73726E]">
-                                    {t('discovery_empty')}
+                                    {regionStrict
+                                        ? t('discovery_region_strict_empty', { region: appliedRegion })
+                                        : t('discovery_empty')}
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {discoverySignals.map((signal) => (
+                                    {displayedSignals.map((signal) => (
                                         <article
                                             key={signal.id}
                                             className={`rounded-lg border bg-[#FAFAF9] p-4 ${
