@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils';
 import QRCode from 'qrcode';
 import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
 import { sanitizeCvPreviewDrafts } from '@/lib/utils/cv-inline-editor-helpers';
+import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
+import { useDashboardTour, type TourStep } from '@/app/[locale]/dashboard/hooks/useDashboardTour';
 
 
 const DynamicPdfViewer = dynamic(
@@ -45,6 +47,7 @@ export interface OptimizerWizardProps {
     liveMatchResult?: any | null
     onGoToCoverLetter?: () => void
     onComplete?: () => void
+    onQrTokenCreated?: () => void
 }
 
 // --- Cancel Button for CV Optimizer (appears after 15s) ---
@@ -68,7 +71,7 @@ function OptCancelButton({ onCancel, label }: { onCancel: () => void; label: str
     );
 }
 
-export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onComplete }: OptimizerWizardProps) {
+export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onComplete, onQrTokenCreated }: OptimizerWizardProps) {
     const t = useTranslations('cv_optimizer');
     const locale = useLocale();
     const { showPaywall } = useCreditExhausted();
@@ -131,6 +134,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     const [qrBase64, setQrBase64] = useState<string | undefined>(undefined);
     const [qrLoading, setQrLoading] = useState(false);
     const [showQrDialog, setShowQrDialog] = useState(false);
+    const [qrTourEnabled, setQrTourEnabled] = useState(false);
 
     // ATS warning for Tech template
     const [showTechAtsWarning, setShowTechAtsWarning] = useState(false);
@@ -386,6 +390,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
         if (res.success) {
             setStep(2); // -> Preview
             onComplete?.();
+            setQrTourEnabled(true);
             // Signal preview tour: fires once per job on first preview visit
             if (typeof window !== 'undefined') {
                 sessionStorage.setItem('pathly_cv_preview_first_visit', '1');
@@ -445,6 +450,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
 
     // -- QR-Video: Button opens dialog or toggles off --
     const handleQrToggle = () => {
+        setQrTourEnabled(false);
         if (qrEnabled) {
             // Toggle off — no dialog needed
             setQrEnabled(false);
@@ -476,6 +482,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
             const base64 = await QRCode.toDataURL(qrUrl, { width: 200, margin: 1 });
             setQrBase64(base64);
             setQrEnabled(true);
+            onQrTokenCreated?.();
         } catch (err) {
             console.error('[QR Toggle] Error:', err);
         } finally {
@@ -514,6 +521,20 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
         () => activePdfData ? sanitizeCvPreviewDrafts(activePdfData) : null,
         [activePdfData],
     );
+
+    const qrTourSteps = useMemo<TourStep[]>(() => [
+        {
+            targetSelector: '[data-tour="cv-qr-video-letter"]',
+            position: 'bottom',
+            titleKey: 'cv_optimizer.qr_spotlight_title',
+            bodyKey: 'cv_optimizer.qr_spotlight_body',
+        },
+    ], []);
+
+    const qrTour = useDashboardTour('cv-qr-video-letter', qrTourSteps, {
+        delayMs: 700,
+        enabled: qrTourEnabled && step === 2 && !!renderedPdfData && !showQrDialog,
+    });
 
     if (isLoading) {
         return <div className="p-10 flex justify-center"><LoadingSpinner className="w-8 h-8 text-[#012e7a]" /></div>;
@@ -868,6 +889,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                             <button
                                 onClick={handleQrToggle}
                                 disabled={qrLoading}
+                                data-tour="cv-qr-video-letter"
                                 className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all
                                     ${qrEnabled
                                         ? 'bg-[#012e7a] text-white shadow-sm'
@@ -1000,6 +1022,16 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                     </div>
                 </div>
             </CustomDialog>
+
+            {qrTour.isActive && qrTour.step && (
+                <GuidedTourOverlay
+                    step={qrTour.step}
+                    currentStep={qrTour.currentStep}
+                    totalSteps={qrTour.totalSteps}
+                    onNext={qrTour.nextStep}
+                    onSkip={qrTour.skipTour}
+                />
+            )}
 
             {/* ATS Warning Dialog – Tech Template */}
             <CustomDialog isOpen={showTechAtsWarning} onClose={handleTechAtsWarningStay} title={t('tech_ats_warning_title')}>

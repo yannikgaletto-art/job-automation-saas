@@ -1827,6 +1827,16 @@
     "step_indicator": "Step {current} of {total}",
     "cv_preview_format_title": "Does the layout look off?",
     "cv_preview_format_body": "If your CV has too much whitespace or sections appear misaligned, click <b>\"Fix Formatting\"</b>. Pathly will automatically fix the layout. <b>Free, once per job.</b>",
+    "cv_optimizer": {
+      "qr_spotlight_title": "QR Video Letter",
+      "qr_spotlight_body": "Your optimized CV can now include a <b>personal QR code</b>. Recruiters open a short video where you show motivation, personality and fit."
+    },
+    "video_letter": {
+      "bullets_spotlight_title": "Bullet Points",
+      "bullets_spotlight_body": "Use bullet points when you want to speak freely. Pathly structures the key blocks, keywords and examples without scripting every sentence.",
+      "teleprompter_spotlight_title": "Teleprompter",
+      "teleprompter_spotlight_body": "Use the teleprompter when you want to read a finished text with confidence. You can set the speed and run it during recording."
+    },
     "job_queue": {
       "empty_step1_title": "Your application hub",
       "empty_step1_body": "Here you manage all roles you want to track. Pathly analyses each role automatically. <b>You can work on up to 5 active jobs at a time.</b> Click the button to get started.",
