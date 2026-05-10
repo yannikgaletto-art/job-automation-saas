@@ -1672,6 +1672,18 @@
     "button_next": "Siguiente",
     "button_start": "¡Vamos!",
     "step_indicator": "Paso {current} de {total}",
+    "cv_preview_format_title": "¿El diseño se ve raro?",
+    "cv_preview_format_body": "Si tu CV tiene demasiado espacio en blanco o secciones desplazadas, haz clic en <b>\"Corregir formato\"</b>. Pathly corrige el diseño automáticamente. <b>Gratis, una vez por oferta.</b>",
+    "cv_optimizer": {
+      "qr_spotlight_title": "QR Video Letter",
+      "qr_spotlight_body": "Tu CV optimizado ahora puede incluir un <b>código QR personal</b>. Los reclutadores abren un video breve donde muestras motivación, personalidad y encaje."
+    },
+    "video_letter": {
+      "bullets_spotlight_title": "Puntos clave",
+      "bullets_spotlight_body": "Usa puntos clave si quieres hablar con libertad. Pathly estructura los bloques, keywords y ejemplos importantes sin escribir cada frase.",
+      "teleprompter_spotlight_title": "Teleprompter",
+      "teleprompter_spotlight_body": "Usa el teleprompter si quieres leer un texto terminado con seguridad. Puedes ajustar la velocidad y dejarlo correr durante la grabación."
+    },
     "job_queue": {
       "empty_step1_title": "Tu centro de candidaturas",
       "empty_step1_body": "Aquí gestionas todos los puestos que quieres seguir. Pathly analiza cada puesto automáticamente. <b>Puedes trabajar con hasta 5 empleos activos a la vez.</b> Haz clic en el botón para empezar.",

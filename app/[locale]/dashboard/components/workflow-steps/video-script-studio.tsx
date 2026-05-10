@@ -14,6 +14,8 @@ import { KeywordSidebar } from './script-studio/keyword-sidebar';
 import { ScriptPreview } from './script-studio/script-preview';
 import type { PreGenParams } from './script-studio/pre-generation-modal';
 import { useCreditExhausted } from '@/app/[locale]/dashboard/hooks/credit-exhausted-context';
+import { GuidedTourOverlay } from '@/components/dashboard/guided-tour-overlay';
+import { useDashboardTour, type TourStep } from '../../hooks/useDashboardTour';
 
 // --- Types ---
 
@@ -234,6 +236,26 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
     const [state, dispatch] = useReducer(reducer, initialState);
     const { showPaywall } = useCreditExhausted();
 
+    const modeTourSteps = useMemo<TourStep[]>(() => [
+        {
+            targetSelector: '[data-tour="video-mode-bullets"]',
+            position: 'bottom',
+            titleKey: 'video_letter.bullets_spotlight_title',
+            bodyKey: 'video_letter.bullets_spotlight_body',
+        },
+        {
+            targetSelector: '[data-tour="video-mode-teleprompter"]',
+            position: 'bottom',
+            titleKey: 'video_letter.teleprompter_spotlight_title',
+            bodyKey: 'video_letter.teleprompter_spotlight_body',
+        },
+    ], []);
+
+    const modeTour = useDashboardTour('video-letter-modes', modeTourSteps, {
+        delayMs: 800,
+        enabled: state.phase === 'editing' && !state.showOverwriteConfirm,
+    });
+
     // Initial load
     useEffect(() => {
         const load = async () => {
@@ -409,114 +431,126 @@ export function VideoScriptStudio({ jobId, onReady, onScriptFound }: VideoScript
 
     // Editing state — main UI
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white border border-gray-200 rounded-xl overflow-hidden"
-        >
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <ModeToggle mode={state.mode} onChange={(m) => dispatch({ type: 'SET_MODE', mode: m })} />
-                    <button
-                        onClick={() => dispatch({ type: 'TOGGLE_PREVIEW' })}
-                        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition"
-                    >
-                        {state.showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        {state.showPreview ? t('editor_editor') : t('editor_preview')}
-                    </button>
+        <>
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white border border-gray-200 rounded-xl overflow-hidden"
+            >
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <ModeToggle mode={state.mode} onChange={(m) => dispatch({ type: 'SET_MODE', mode: m })} />
+                        <button
+                            onClick={() => dispatch({ type: 'TOGGLE_PREVIEW' })}
+                            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition"
+                        >
+                            {state.showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            {state.showPreview ? t('editor_editor') : t('editor_preview')}
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {state.lastSaved && (
+                            <span className="text-xs text-gray-400">
+                                {t('editor_saved_at', { time: new Date(state.lastSaved).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) })}
+                            </span>
+                        )}
+                        <button
+                            onClick={handleSave}
+                            disabled={state.isSaving}
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-md transition flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                            {state.isSaving ? <LoadingSpinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                            {t('editor_save')}
+                        </button>
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    {state.lastSaved && (
-                        <span className="text-xs text-gray-400">
-                            {t('editor_saved_at', { time: new Date(state.lastSaved).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) })}
-                        </span>
-                    )}
-                    <button
-                        onClick={handleSave}
-                        disabled={state.isSaving}
-                        className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-md transition flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                        {state.isSaving ? <LoadingSpinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                        {t('editor_save')}
-                    </button>
-                </div>
-            </div>
 
-            {/* Body */}
-            <div className="flex">
-                {/* Main content area */}
-                <div className="flex-1 p-5">
-                    {/* Overwrite Confirm Banner (Fix 8) */}
-                    {state.showOverwriteConfirm && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between gap-4 mb-3">
-                            <p className="text-sm text-amber-800">
-                                {t('editor_overwrite_banner')}
-                            </p>
-                            <div className="flex gap-2 shrink-0">
-                                <button
-                                    onClick={() => { dispatch({ type: 'HIDE_OVERWRITE_CONFIRM' }); handleGenerate(true); }}
-                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-md transition"
-                                >
-                                    {t('editor_overwrite_btn')}
-                                </button>
-                                <button
-                                    onClick={() => dispatch({ type: 'HIDE_OVERWRITE_CONFIRM' })}
-                                    className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-md transition"
-                                >
-                                    {t('editor_keep_btn')}
-                                </button>
+                {/* Body */}
+                <div className="flex">
+                    {/* Main content area */}
+                    <div className="flex-1 p-5">
+                        {/* Overwrite Confirm Banner (Fix 8) */}
+                        {state.showOverwriteConfirm && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between gap-4 mb-3">
+                                <p className="text-sm text-amber-800">
+                                    {t('editor_overwrite_banner')}
+                                </p>
+                                <div className="flex gap-2 shrink-0">
+                                    <button
+                                        onClick={() => { dispatch({ type: 'HIDE_OVERWRITE_CONFIRM' }); handleGenerate(true); }}
+                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-md transition"
+                                    >
+                                        {t('editor_overwrite_btn')}
+                                    </button>
+                                    <button
+                                        onClick={() => dispatch({ type: 'HIDE_OVERWRITE_CONFIRM' })}
+                                        className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-md transition"
+                                    >
+                                        {t('editor_keep_btn')}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {state.showPreview ? (
-                        <ScriptPreview
-                            blocks={state.blocks}
-                            mode={state.mode}
-                            wpmSpeed={state.wpmSpeed}
-                            onWpmChange={(wpm) => dispatch({ type: 'SET_WPM', wpm })}
-                        />
-                    ) : (
-                        <BlockEditor
-                            blocks={state.blocks}
-                            onChange={(blocks) => dispatch({ type: 'SET_BLOCKS', blocks })}
-                            mode={state.mode}
-                        />
-                    )}
+                        {state.showPreview ? (
+                            <ScriptPreview
+                                blocks={state.blocks}
+                                mode={state.mode}
+                                wpmSpeed={state.wpmSpeed}
+                                onWpmChange={(wpm) => dispatch({ type: 'SET_WPM', wpm })}
+                            />
+                        ) : (
+                            <BlockEditor
+                                blocks={state.blocks}
+                                onChange={(blocks) => dispatch({ type: 'SET_BLOCKS', blocks })}
+                                mode={state.mode}
+                            />
+                        )}
 
-                    {/* Warnings */}
-                    {state.warnings.length > 0 && (
-                        <div className="mt-4 space-y-1">
-                            {state.warnings.map((w, i) => (
-                                <p key={i} className="text-xs text-amber-600">⚠ {w}</p>
-                            ))}
-                        </div>
-                    )}
+                        {/* Warnings */}
+                        {state.warnings.length > 0 && (
+                            <div className="mt-4 space-y-1">
+                                {state.warnings.map((w, i) => (
+                                    <p key={i} className="text-xs text-amber-600">⚠ {w}</p>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Keyword Sidebar */}
+                    <div className="w-64 border-l border-gray-100 p-4 bg-gray-50/50">
+                        <KeywordSidebar
+                            keywords={state.categorizedKeywords}
+                            blocks={state.blocks}
+                            mirrorPhrases={state.mirrorPhrases}
+                        />
+                    </div>
                 </div>
 
-                {/* Keyword Sidebar */}
-                <div className="w-64 border-l border-gray-100 p-4 bg-gray-50/50">
-                    <KeywordSidebar
-                        keywords={state.categorizedKeywords}
-                        blocks={state.blocks}
-                        mirrorPhrases={state.mirrorPhrases}
-                    />
+                {/* Footer — Action Button */}
+                <div className="px-5 py-4 border-t border-gray-100 flex justify-end">
+                    <button
+                        onClick={async () => {
+                            await handleSave();
+                            onReady({ blocks: state.blocks, mode: state.mode, wpmSpeed: state.wpmSpeed });
+                        }}
+                        className="px-6 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white font-medium rounded-lg transition flex items-center gap-2"
+                    >
+                        {t('editor_start_recording')} <ChevronRight className="w-4 h-4" />
+                    </button>
                 </div>
-            </div>
+            </motion.div>
 
-            {/* Footer — Action Button */}
-            <div className="px-5 py-4 border-t border-gray-100 flex justify-end">
-                <button
-                    onClick={async () => {
-                        await handleSave();
-                        onReady({ blocks: state.blocks, mode: state.mode, wpmSpeed: state.wpmSpeed });
-                    }}
-                    className="px-6 py-2.5 bg-[#012e7a] hover:bg-[#012e7a]/90 text-white font-medium rounded-lg transition flex items-center gap-2"
-                >
-                    {t('editor_start_recording')} <ChevronRight className="w-4 h-4" />
-                </button>
-            </div>
-        </motion.div>
+            {modeTour.isActive && modeTour.step && (
+                <GuidedTourOverlay
+                    step={modeTour.step}
+                    currentStep={modeTour.currentStep}
+                    totalSteps={modeTour.totalSteps}
+                    onNext={modeTour.nextStep}
+                    onSkip={modeTour.skipTour}
+                />
+            )}
+        </>
     );
 }

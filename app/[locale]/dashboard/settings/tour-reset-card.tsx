@@ -13,10 +13,13 @@ import { useTranslations } from 'next-intl';
 const TOUR_KEYS = [
     'pathly_tour_completed_goals',
     'pathly_tour_completed_job-queue',
+    'pathly_tour_completed_job-search',
+    'pathly_tour_completed_coaching',
+    'pathly_tour_completed_cv-qr-video-letter',
+    'pathly_tour_completed_video-letter-modes',
     // Legacy global hint keys (for browsers that dismissed before user-scoping was added)
     'pathly_cv_hint_dismissed',
     'pathly_cl_hint_dismissed',
-    // Future tabs: 'pathly_tour_completed_coaching', 'pathly_tour_completed_job-search'
 ];
 
 export function TourResetCard() {

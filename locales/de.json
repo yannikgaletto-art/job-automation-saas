@@ -1691,6 +1691,16 @@
     "step_indicator": "Schritt {current} von {total}",
     "cv_preview_format_title": "Sieht das Layout komisch aus?",
     "cv_preview_format_body": "Falls dein Lebenslauf zu viel Leerraum hat oder Abschnitte verschoben sind, klicke auf <b>\"Formatierung korrigieren\"</b>. Pathly überarbeitet das Layout automatisch. <b>Einmalig und kostenlos</b> pro Job.",
+    "cv_optimizer": {
+      "qr_spotlight_title": "QR-Video-Letter",
+      "qr_spotlight_body": "Dein optimierter Lebenslauf kann jetzt einen <b>persönlichen QR-Code</b> enthalten. Recruiter öffnen darüber ein kurzes Video, in dem du Motivation, Persönlichkeit und Passung zeigst."
+    },
+    "video_letter": {
+      "bullets_spotlight_title": "Stichpunkte",
+      "bullets_spotlight_body": "Nutze Stichpunkte, wenn du frei sprechen willst. Pathly strukturiert die wichtigsten Blöcke, Keywords und Beispiele, ohne dir jeden Satz vorzuschreiben.",
+      "teleprompter_spotlight_title": "Teleprompter",
+      "teleprompter_spotlight_body": "Nutze den Teleprompter, wenn du einen fertigen Text sicher ablesen willst. Du kannst die Geschwindigkeit einstellen und während der Aufnahme mitlaufen lassen."
+    },
     "job_queue": {
       "empty_step1_title": "Deine Bewerbungsablage",
       "empty_step1_body": "Hier verwaltest du alle Stellen die du im Blick behalten willst. Pathly analysiert jede Stelle automatisch. <b>Du kannst bis zu 5 aktive Jobs gleichzeitig bearbeiten.</b> Klicke auf den Button um loszulegen.",

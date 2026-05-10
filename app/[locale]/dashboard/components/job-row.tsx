@@ -580,6 +580,9 @@ export function JobRow({ job, expanded, onToggle, onReanalyze, onConfirm, onDele
                                     onComplete={() => {
                                         setOptimisticStep(prev => Math.max(prev ?? job.workflowStep, 80));
                                     }}
+                                    onQrTokenCreated={() => {
+                                        setVideoUnlocked(true);
+                                    }}
                                 />
                             </div>
                         )}

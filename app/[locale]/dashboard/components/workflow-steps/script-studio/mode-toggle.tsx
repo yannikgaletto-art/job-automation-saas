@@ -16,6 +16,7 @@ export function ModeToggle({ mode, onChange }: ModeToggleProps) {
                 <button
                     key={m}
                     onClick={() => onChange(m)}
+                    data-tour={m === 'bullets' ? 'video-mode-bullets' : 'video-mode-teleprompter'}
                     className={`relative px-4 py-2 text-sm font-medium rounded-md transition-colors ${
                         mode === m ? 'text-white' : 'text-gray-600 hover:text-gray-900'
                     }`}
