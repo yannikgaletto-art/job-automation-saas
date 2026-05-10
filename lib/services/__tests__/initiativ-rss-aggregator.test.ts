@@ -111,6 +111,89 @@ describe('extractCompanyName', () => {
         const result = extractCompanyName(`${longName} sammelt Geld`);
         if (result) expect(result.length).toBeLessThanOrEqual(120);
     });
+
+    // ------------------------------------------------------------------
+    // Regression: live DEV-rows 2026-05-10
+    // 7 known bug-classes from real RSS data; each MUST behave correctly
+    // after the heuristic-hardening Welle 3a.5.
+    // ------------------------------------------------------------------
+
+    describe('Regression Welle 3a.5 — geo-prefix stripping', () => {
+        it('"Delft-based FrostByte secures..." → "FrostByte"', () => {
+            expect(extractCompanyName('Delft-based FrostByte secures a cool €1.3 million to scale cryogenic electronics')).toBe('FrostByte');
+        });
+
+        it('"London-based CodeWords raises..." → "CodeWords"', () => {
+            expect(extractCompanyName('London-based CodeWords raises €7.6 million to help businesses run on AI autopilot')).toBe('CodeWords');
+        });
+
+        it('"London-based Laka sets M&A..." → "Laka"', () => {
+            expect(extractCompanyName('London-based Laka sets M&A strategy in motion with acquisition of VeloLife')).toBe('Laka');
+        });
+
+        it('Berlin-Brandenburg-based Foo bleibt nach Strip = "Foo"', () => {
+            expect(extractCompanyName('Berlin-Brandenburg-based Foo raises seed')).toBe('Foo');
+        });
+
+        it('case-insensitive geo-strip', () => {
+            expect(extractCompanyName('Munich-based Bar startet Plattform')).toBe('Bar');
+        });
+    });
+
+    describe('Regression Welle 3a.5 — determiner-led headline-noise', () => {
+        it('"Dieses Startup erhöht jedes Jahr..." → null', () => {
+            expect(extractCompanyName('Dieses Startup erhöht jedes Jahr automatisch die Gehälter aller Mitarbeiter')).toBeNull();
+        });
+
+        it('"Die KI-Revolution frisst ihre Kinder: Deepl..." → null', () => {
+            expect(extractCompanyName('Die KI-Revolution frisst ihre Kinder: Deepl streicht 250 Mitarbeiter')).toBeNull();
+        });
+
+        it('"Ein Wort bringt ein Berliner KI-Startup..." → null', () => {
+            expect(extractCompanyName('Ein Wort bringt ein Berliner KI-Startup jetzt vor Gericht: „Steuerberater"')).toBeNull();
+        });
+
+        it('"Diese Firma wird nicht überleben" → null', () => {
+            expect(extractCompanyName('Diese Firma wird nicht überleben')).toBeNull();
+        });
+
+        it('Defense: "Die Foo GmbH übernimmt" — Suffix vorhanden → kept', () => {
+            expect(extractCompanyName('Die Foo GmbH übernimmt Konkurrenten')).toBe('Die Foo GmbH');
+        });
+    });
+
+    describe('Regression Welle 3a.5 — person-title stripping & person-name reject', () => {
+        it('"Food-Influencer Stefano Zarrella bringt..." → null (person, kein Company)', () => {
+            expect(extractCompanyName('Food-Influencer Stefano Zarrella bringt Tiefkühlpizza für 6,50 Euro auf den Markt')).toBeNull();
+        });
+
+        it('"CEO Max Mustermann tritt zurück" → null (Person)', () => {
+            // Pattern C ('tritt zurück' im COMPANY_VERB-Set) matched → "CEO Max Mustermann" → strip → "Max Mustermann" → person → null
+            expect(extractCompanyName('CEO Max Mustermann tritt zurück')).toBeNull();
+        });
+
+        it('"Gründer Anna Schmidt launcht Plattform" → null (Person)', () => {
+            expect(extractCompanyName('Gründer Anna Schmidt launcht Plattform')).toBeNull();
+        });
+
+        it('Defense: "Anna Schmidt GmbH übernimmt" — Suffix → kept', () => {
+            expect(extractCompanyName('Anna Schmidt GmbH übernimmt Konkurrenten')).toBe('Anna Schmidt GmbH');
+        });
+    });
+
+    describe('Regression Welle 3a.5 — defense for previously-correct extractions', () => {
+        it('"Wie das KI-Startup Logicc in nur 6,5 Monaten..." → "Logicc"', () => {
+            expect(extractCompanyName('Wie das KI-Startup Logicc in nur 6,5 Monaten die erste Million ARR knackte')).toBe('Logicc');
+        });
+
+        it('"SAP kauft deutsches KI-Startup Prior Labs..." → "Prior Labs"', () => {
+            expect(extractCompanyName('SAP kauft deutsches KI-Startup Prior Labs – und will über eine Milliarde Euro investieren')).toBe('Prior Labs');
+        });
+
+        it('"Berlin Tech AG übernimmt..." bleibt "Berlin Tech AG"', () => {
+            expect(extractCompanyName('Berlin Tech AG übernimmt Konkurrenten')).toBe('Berlin Tech AG');
+        });
+    });
 });
 
 // ============================================================================

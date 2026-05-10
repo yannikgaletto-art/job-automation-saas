@@ -122,15 +122,85 @@ const PATTERN_D = new RegExp(`^(${COMPANY_TOKEN}(?:\\s+${COMPANY_TOKEN}){1,2})`,
 // (e.g. "Berlin Tech AG") are kept.
 const GENERIC_SINGLE_WORDS = new Set([
     'der', 'die', 'das', 'the', 'neue', 'neuer', 'new', 'big', 'eine', 'ein', 'a',
+    'dieses', 'diese', 'dieser', 'this',
     'berlin', 'münchen', 'hamburg', 'köln', 'frankfurt', 'stuttgart',
     'studie', 'report', 'bericht', 'markt', 'branche', 'analyse',
     'wirtschaft', 'industrie', 'business', 'news', 'wachstum',
 ]);
 
+// Determiners — if the FIRST token is one of these AND the candidate has no
+// company-suffix (GmbH/AG/...), it's almost certainly headline-noise like
+// "Dieses Startup will...", "Die KI-Revolution frisst...", "Ein Wort bringt...".
+const DETERMINER_PREFIX = new Set([
+    'die', 'der', 'das', 'dieses', 'diese', 'dieser', 'this',
+    'ein', 'eine', 'einer', 'the',
+]);
+
+// Person-title prefixes — strip these so we can re-evaluate the rest.
+// Examples: "Food-Influencer Stefano Zarrella", "CEO Max Mustermann".
+const PERSON_TITLE_RE = /^(?:[A-ZÄÖÜ][a-zäöüß]+-)?(?:Influencer|Influencerin|CEO|CFO|CTO|COO|CMO|CIO|CSO|Gründer|Gründerin|Mitgründer|Mitgründerin|Co-?Founder|Founder|Director|Manager|Geschäftsführer(?:in)?|Vorstand|Vorständin|Vorstandschef(?:in)?)\s+/i;
+
+// Strip "Delft-based / London-based / Berlin-Brandenburg-based" geo-prefixes.
+const GEO_PREFIX_RE = /^[A-ZÄÖÜ][\wäöüß]*(?:-[\wäöüß]+)*-based\s+/i;
+
+// "Firstname Lastname" pattern: exactly 2 capitalised name-tokens, no digits,
+// no company suffix, no hyphens — looks like a person, not a company.
+const NAME_TOKEN_RE = /^[A-ZÄÖÜ][a-zäöüß]+$/;
+
+const COMPANY_SUFFIX_RE = /\b(?:GmbH|AG|SE|KG|Inc\.?|Ltd\.?|LLC|UG|S\.?A\.?|N\.?V\.?|B\.?V\.?)\b/i;
+
+function hasCompanySuffix(candidate: string): boolean {
+    return COMPANY_SUFFIX_RE.test(candidate);
+}
+
+function looksLikePersonName(candidate: string): boolean {
+    if (hasCompanySuffix(candidate)) return false;
+    if (/\d/.test(candidate)) return false;
+    const tokens = candidate.trim().split(/\s+/);
+    if (tokens.length !== 2) return false;
+    return NAME_TOKEN_RE.test(tokens[0]) && NAME_TOKEN_RE.test(tokens[1]);
+}
+
 function isAllGenericWords(candidate: string): boolean {
     const tokens = candidate.trim().toLocaleLowerCase('de-DE').split(/\s+/);
     if (tokens.length === 0) return true;
     return tokens.every((t) => GENERIC_SINGLE_WORDS.has(t));
+}
+
+function startsWithDeterminer(candidate: string): boolean {
+    const first = candidate.trim().split(/\s+/)[0]?.toLocaleLowerCase('de-DE') ?? '';
+    return DETERMINER_PREFIX.has(first);
+}
+
+function postProcessCandidate(raw: string): string | null {
+    let cleaned = raw.trim();
+
+    // 1. Strip geo-prefix: "Delft-based FrostByte" → "FrostByte"
+    const beforeGeo = cleaned;
+    cleaned = cleaned.replace(GEO_PREFIX_RE, '').trim();
+    if (cleaned !== beforeGeo && cleaned.length === 0) return null;
+
+    // 2. Strip person-title prefix: "Food-Influencer Stefano Zarrella" → "Stefano Zarrella".
+    //    We track whether a person-title was actually stripped — only THEN do we
+    //    dare reject the rest as a person-name (otherwise we'd false-reject
+    //    legit two-word company names like "Berlin Tech" or "Prior Labs").
+    const beforeTitle = cleaned;
+    cleaned = cleaned.replace(PERSON_TITLE_RE, '').trim();
+    const stripppedPersonTitle = cleaned !== beforeTitle;
+    if (cleaned.length < 2) return null;
+
+    // 3. Reject person-name pattern, but ONLY if a person-title was just
+    //    stripped (strong signal we're in person-context, not company).
+    if (stripppedPersonTitle && looksLikePersonName(cleaned)) return null;
+
+    // 4. Reject all-generic candidates ("Der Markt", "The big news")
+    if (isAllGenericWords(cleaned)) return null;
+
+    // 5. Reject determiner-led candidates without company suffix:
+    //    "Dieses Startup", "Die KI-Revolution", "Ein Wort"
+    if (startsWithDeterminer(cleaned) && !hasCompanySuffix(cleaned)) return null;
+
+    return cleaned.slice(0, MAX_COMPANY_LENGTH);
 }
 
 export function extractCompanyName(title: string): string | null {
@@ -146,10 +216,8 @@ export function extractCompanyName(title: string): string | null {
 
     for (const raw of candidates) {
         if (!raw) continue;
-        const candidate = raw.trim();
-        if (candidate.length < 2) continue;
-        if (isAllGenericWords(candidate)) continue;
-        return candidate.slice(0, MAX_COMPANY_LENGTH);
+        const cleaned = postProcessCandidate(raw);
+        if (cleaned) return cleaned;
     }
 
     return null;
