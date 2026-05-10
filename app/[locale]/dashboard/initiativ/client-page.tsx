@@ -2,20 +2,25 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
+import Link from 'next/link';
 import {
     AlertCircle,
     ArrowLeft,
     ArrowRight,
     BriefcaseBusiness,
+    Check,
     CheckCircle2,
+    ChevronDown,
     Compass,
     ExternalLink,
     FileText,
     Loader2,
+    Plus,
     Radar,
     Save,
     Search,
     ShieldCheck,
+    X,
 } from 'lucide-react';
 import { buildInitiativInsight } from '@/lib/initiativ/insight';
 import { VoiceTextarea } from '@/components/initiativ/VoiceTextarea';
@@ -254,6 +259,56 @@ export function InitiativClientPage() {
         updateField('professional_results', [...currentLines, text].join('\n'));
     };
 
+    const removeProfessionalResult = (text: string) => {
+        const lowered = text.toLocaleLowerCase('de-DE');
+        const remaining = form.professional_results
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .filter((line) => line.toLocaleLowerCase('de-DE') !== lowered);
+        updateField('professional_results', remaining.join('\n'));
+    };
+
+    const toggleProfessionalResult = (text: string) => {
+        const lowered = text.toLocaleLowerCase('de-DE');
+        const present = form.professional_results
+            .split(/\r?\n/)
+            .map((line) => line.trim().toLocaleLowerCase('de-DE'))
+            .includes(lowered);
+        if (present) removeProfessionalResult(text);
+        else addProfessionalResult(text);
+    };
+
+    const selectedResultLines = useMemo(
+        () => form.professional_results
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean),
+        [form.professional_results]
+    );
+    const selectedResultsLowercase = useMemo(
+        () => new Set(selectedResultLines.map((line) => line.toLocaleLowerCase('de-DE'))),
+        [selectedResultLines]
+    );
+
+    const groupedCvSuggestions = useMemo(() => {
+        const groups = new Map<string, CvResultSuggestion[]>();
+        for (const suggestion of cvSuggestions) {
+            const list = groups.get(suggestion.source) ?? [];
+            list.push(suggestion);
+            groups.set(suggestion.source, list);
+        }
+        return Array.from(groups.entries()).map(([source, items]) => ({ source, items }));
+    }, [cvSuggestions]);
+
+    const [expandedStation, setExpandedStation] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!expandedStation && groupedCvSuggestions.length > 0) {
+            setExpandedStation(groupedCvSuggestions[0].source);
+        }
+    }, [expandedStation, groupedCvSuggestions]);
+
     const handleSave = async () => {
         if (!canSave) return;
         setSaving(true);
@@ -362,23 +417,15 @@ export function InitiativClientPage() {
 
     return (
         <div className="mx-auto max-w-6xl space-y-8 pb-12">
-            <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#C8D4EA] bg-[#F4F7FC] px-3 py-1 text-xs font-semibold text-[#012e7a]">
-                        <Compass className="h-3.5 w-3.5" />
-                        {t('eyebrow')}
-                    </div>
-                    <h1 className="text-3xl font-semibold tracking-normal text-[#37352F]">
-                        {t('title')}
-                    </h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-[#73726E]">
-                        {t('subtitle')}
+            <header>
+                <h1 className="text-3xl font-semibold tracking-normal text-[#37352F]">
+                    {t('title')}
+                </h1>
+                {!schemaReady && (
+                    <p className="mt-2 text-xs text-[#B7470F]">
+                        {t('status_schema_missing')}
                     </p>
-                </div>
-                <div className="rounded-full border border-[#E7E7E5] bg-white px-3 py-1 text-xs text-[#73726E] shadow-sm">
-                    <span className="font-semibold text-[#37352F]">{t('status_label')}</span>{' '}
-                    {schemaReady ? t('status_value') : t('status_schema_missing')}
-                </div>
+                )}
             </header>
 
             <InitiativStepper
@@ -451,82 +498,135 @@ export function InitiativClientPage() {
             ) : activeStep === 'strengths' ? (
                 <section>
                     <div className="rounded-lg border border-[#E7E7E5] bg-white p-6 shadow-sm">
-                        <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="space-y-7">
                             <div>
-                                <h2 className="text-xl font-semibold text-[#37352F]">
-                                    {t('step1_title')}
-                                </h2>
-                                <p className="mt-2 text-sm leading-6 text-[#73726E]">
-                                    {t('step1_body')}
+                                <label htmlFor="human_aspects" className="block text-base font-semibold text-[#37352F]">
+                                    {t('human_aspects_label')}
+                                </label>
+                                <p className="mt-1 text-xs leading-5 text-[#8E8D89]">
+                                    {t('human_aspects_hint')}
                                 </p>
-                            </div>
-                            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#E7E7E5] bg-[#FAFAF9] px-2.5 py-1 text-xs font-medium text-[#73726E]">
-                                <ShieldCheck className="h-3.5 w-3.5 text-[#012e7a]" />
-                                {t('privacy_title')}
-                            </span>
-                        </div>
-
-                        <div className="space-y-5">
-                            {FIELD_KEYS.map((key) => (
-                                <div key={key}>
-                                    <label htmlFor={key} className="block text-sm font-semibold text-[#37352F]">
-                                        {t(`${key}_label`)}
-                                    </label>
-                                    <p className="mt-1 text-xs leading-5 text-[#8E8D89]">
-                                        {t(`${key}_hint`)}
-                                    </p>
-                                    <div className="mt-2">
-                                        <VoiceTextarea
-                                            id={key}
-                                            value={form[key]}
-                                            onChange={(next) => updateField(key, next)}
-                                            placeholder={t(`${key}_placeholder`)}
-                                            rows={4}
-                                            maxLength={900}
-                                            locale={voiceLocale}
-                                            micLabelStart={t('voice_start')}
-                                            micLabelStop={t('voice_stop')}
-                                            micLabelTranscribing={t('voice_transcribing')}
-                                            micErrorLabel={t('voice_error')}
-                                        />
-                                    </div>
-                                    {key === 'professional_results' && (
-                                        <div className="mt-3 rounded-lg border border-[#E7E7E5] bg-[#FAFAF9] p-3">
-                                            <div className="flex items-center gap-2 text-xs font-semibold text-[#37352F]">
-                                                <BriefcaseBusiness className="h-3.5 w-3.5 text-[#012e7a]" />
-                                                {t('cv_suggestions_title')}
-                                            </div>
-                                            {cvSuggestionsLoading ? (
-                                                <p className="mt-2 text-xs leading-5 text-[#73726E]">
-                                                    {t('cv_suggestions_loading')}
-                                                </p>
-                                            ) : cvSuggestions.length > 0 ? (
-                                                <div className="mt-3 space-y-2">
-                                                    {cvSuggestions.map((suggestion) => (
-                                                        <button
-                                                            key={suggestion.id}
-                                                            type="button"
-                                                            onClick={() => addProfessionalResult(suggestion.text)}
-                                                            className="block w-full rounded-md border border-[#E7E7E5] bg-white px-3 py-2 text-left transition-colors hover:border-[#012e7a] hover:bg-[#F4F7FC]"
-                                                        >
-                                                            <span className="block text-xs font-semibold text-[#37352F]">
-                                                                {suggestion.text}
-                                                            </span>
-                                                            <span className="mt-1 block text-[11px] text-[#8E8D89]">
-                                                                {suggestion.source}
-                                                            </span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="mt-2 text-xs leading-5 text-[#73726E]">
-                                                    {hasCvProfile ? t('cv_suggestions_empty') : t('cv_suggestions_no_cv')}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
+                                <div className="mt-3">
+                                    <VoiceTextarea
+                                        id="human_aspects"
+                                        value={form.human_aspects}
+                                        onChange={(next) => updateField('human_aspects', next)}
+                                        placeholder={t('human_aspects_placeholder')}
+                                        rows={4}
+                                        maxLength={900}
+                                        locale={voiceLocale}
+                                        micLabelStart={t('voice_start')}
+                                        micLabelStop={t('voice_stop')}
+                                        micLabelTranscribing={t('voice_transcribing')}
+                                        micErrorLabel={t('voice_error')}
+                                    />
                                 </div>
-                            ))}
+                            </div>
+
+                            <div>
+                                <label className="block text-base font-semibold text-[#37352F]">
+                                    {t('professional_results_label')}
+                                </label>
+                                <p className="mt-1 text-xs leading-5 text-[#8E8D89]">
+                                    {t('professional_results_hint')}
+                                </p>
+
+                                {selectedResultLines.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-1.5">
+                                        {selectedResultLines.map((line) => (
+                                            <button
+                                                key={line}
+                                                type="button"
+                                                onClick={() => removeProfessionalResult(line)}
+                                                title={t('remove_result')}
+                                                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#012e7a] bg-[#012e7a] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[#001f52]"
+                                            >
+                                                <span className="truncate max-w-[28ch]">{line}</span>
+                                                <X className="h-3 w-3 shrink-0" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {cvSuggestionsLoading ? (
+                                    <p className="mt-3 text-xs leading-5 text-[#73726E]">
+                                        {t('cv_suggestions_loading')}
+                                    </p>
+                                ) : !hasCvProfile ? (
+                                    <div className="mt-3 flex flex-col gap-2 rounded-lg border border-dashed border-[#C8D4EA] bg-[#F8FAFE] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <p className="text-xs leading-5 text-[#73726E]">
+                                            {t('cv_suggestions_no_cv')}
+                                        </p>
+                                        <Link
+                                            href={`/${locale}/dashboard/profil`}
+                                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#C8D4EA] bg-white px-3 py-1.5 text-xs font-semibold text-[#012e7a] transition-colors hover:bg-[#EAF0FB]"
+                                        >
+                                            <BriefcaseBusiness className="h-3.5 w-3.5" />
+                                            {t('cv_suggestions_no_cv_link')}
+                                        </Link>
+                                    </div>
+                                ) : groupedCvSuggestions.length === 0 ? (
+                                    <p className="mt-3 text-xs leading-5 text-[#73726E]">
+                                        {t('cv_suggestions_empty')}
+                                    </p>
+                                ) : (
+                                    <div className="mt-3 overflow-hidden rounded-lg border border-[#E7E7E5]">
+                                        {groupedCvSuggestions.map(({ source, items }, index) => {
+                                            const isExpanded = expandedStation === source;
+                                            const selectedInGroup = items.filter((item) => selectedResultsLowercase.has(item.text.toLocaleLowerCase('de-DE'))).length;
+                                            return (
+                                                <div key={source} className={index > 0 ? 'border-t border-[#E7E7E5]' : ''}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setExpandedStation((prev) => (prev === source ? null : source))}
+                                                        aria-expanded={isExpanded}
+                                                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[#F4F7FC]"
+                                                    >
+                                                        <span className="flex min-w-0 items-center gap-2">
+                                                            <BriefcaseBusiness className="h-3.5 w-3.5 shrink-0 text-[#012e7a]" />
+                                                            <span className="truncate text-sm font-semibold text-[#37352F]">
+                                                                {source}
+                                                            </span>
+                                                            {selectedInGroup > 0 && (
+                                                                <span className="shrink-0 rounded-full bg-[#EAF0FB] px-2 py-0.5 text-[11px] font-semibold text-[#012e7a]">
+                                                                    {selectedInGroup}
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                        <ChevronDown className={`h-4 w-4 shrink-0 text-[#73726E] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                    </button>
+                                                    {isExpanded && (
+                                                        <div className="space-y-1.5 border-t border-[#E7E7E5] bg-[#FAFAF9] px-3 py-3">
+                                                            {items.map((item) => {
+                                                                const selected = selectedResultsLowercase.has(item.text.toLocaleLowerCase('de-DE'));
+                                                                return (
+                                                                    <button
+                                                                        key={item.id}
+                                                                        type="button"
+                                                                        onClick={() => toggleProfessionalResult(item.text)}
+                                                                        className={`flex w-full items-start gap-2 rounded-md border px-3 py-2 text-left transition-colors ${
+                                                                            selected
+                                                                                ? 'border-[#012e7a] bg-[#EAF0FB]'
+                                                                                : 'border-[#E7E7E5] bg-white hover:border-[#C8D4EA] hover:bg-[#F4F7FC]'
+                                                                        }`}
+                                                                    >
+                                                                        <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${selected ? 'bg-[#012e7a] text-white' : 'border border-[#C8D4EA] text-[#73726E]'}`}>
+                                                                            {selected ? <Check className="h-3 w-3" /> : <Plus className="h-2.5 w-2.5" />}
+                                                                        </span>
+                                                                        <span className="text-xs leading-5 text-[#37352F]">
+                                                                            {item.text}
+                                                                        </span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {errorKey && (

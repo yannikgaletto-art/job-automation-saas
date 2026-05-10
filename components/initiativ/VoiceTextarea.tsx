@@ -20,7 +20,7 @@ type VoiceTextareaProps = {
     onTranscribeError?: (message: string) => void;
 };
 
-const MAX_RECORDING_MS = 5 * 60 * 1000;
+const MAX_RECORDING_MS = 60 * 1000;
 
 export function VoiceTextarea({
     id,
