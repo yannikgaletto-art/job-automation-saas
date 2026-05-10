@@ -570,6 +570,7 @@ import { getCVText } from '@/lib/services/cv-text-retriever';
 | Pfad | Begründung |
 |---|---|
 | **Document Processor (PII-Extraktion)** | Self-Referential: Claude muss PII sehen um sie zu extrahieren. Datentransfer-Minimierung via Text-Slice (3000 chars) statt Sanitizer. |
+| **Initiativ Discovery — Perplexity Verifier** | Sendet ausschließlich öffentliche Firmen-Daten an Perplexity (US): `companyName`, `triggerType`, `sourceUrl` aus `initiativ_triggers` (RSS-Public-News). Keine User-PII (kein User-Name, keine E-Mail, keine User-ID) im Prompt. Geprüft per Test `lib/services/__tests__/initiativ-perplexity-verifier.test.ts → "DSGVO: enthält KEINE PII"`. Verarbeitung im Auftrag, Cost-Cap 1.0 ct/Discovery (model: `sonar`, max 10 Firmen pro Batch, low-context). |
 
 ### Neue Features — Checkliste
 
