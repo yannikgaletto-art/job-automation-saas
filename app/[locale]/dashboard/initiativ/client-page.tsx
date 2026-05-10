@@ -527,189 +527,185 @@ export function InitiativClientPage() {
                     </div>
                 </section>
             ) : activeStep === 'strengths' ? (
-                <section>
+                <section className="space-y-5">
                     <div className="rounded-lg border border-[#E7E7E5] bg-white p-6 shadow-sm">
-                        <div className="space-y-7">
-                            <div>
-                                <label htmlFor="human_aspects" className="block text-base font-semibold text-[#37352F]">
-                                    {t('human_aspects_label')}
-                                </label>
-                                <p className="mt-1 text-xs leading-5 text-[#8E8D89]">
-                                    {t('human_aspects_hint')}
-                                </p>
-                                <div className="mt-3">
-                                    <VoiceTextarea
-                                        id="human_aspects"
-                                        value={form.human_aspects}
-                                        onChange={(next) => updateField('human_aspects', next)}
-                                        placeholder={t('human_aspects_placeholder')}
-                                        rows={4}
-                                        maxLength={900}
-                                        locale={voiceLocale}
-                                        micLabelStart={t('voice_start')}
-                                        micLabelStop={t('voice_stop')}
-                                        micLabelTranscribing={t('voice_transcribing')}
-                                        micErrorLabel={t('voice_error')}
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-base font-semibold text-[#37352F]">
-                                    {t('professional_results_label')}
-                                </label>
-                                <p className="mt-1 text-xs leading-5 text-[#8E8D89]">
-                                    {t('professional_results_hint')}
-                                </p>
-
-                                {selectedResultRows.length > 0 && (
-                                    <div className="mt-3">
-                                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#8E8D89]">
-                                            {t('selected_results_title')}
-                                        </p>
-                                        <ul className="space-y-1.5">
-                                            {selectedResultRows.map(({ line, company }) => (
-                                                <li
-                                                    key={line}
-                                                    className="flex items-start gap-2 rounded-lg border border-[#C8D4EA] bg-[#EAF0FB] px-3 py-2"
-                                                >
-                                                    <span className="flex-1 text-xs leading-5 text-[#37352F]">
-                                                        <span className="font-semibold text-[#012e7a]">{company}:</span>{' '}
-                                                        {line}
-                                                    </span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeProfessionalResult(line)}
-                                                        aria-label={t('remove_result')}
-                                                        title={t('remove_result')}
-                                                        className="mt-0.5 shrink-0 rounded-full p-1 text-[#012e7a] transition-colors hover:bg-[#C8D4EA]"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-
-                                {cvSuggestionsLoading ? (
-                                    <p className="mt-3 text-xs leading-5 text-[#73726E]">
-                                        {t('cv_suggestions_loading')}
-                                    </p>
-                                ) : !hasCvProfile ? (
-                                    <div className="mt-3 flex flex-col gap-2 rounded-lg border border-dashed border-[#C8D4EA] bg-[#F8FAFE] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                                        <p className="text-xs leading-5 text-[#73726E]">
-                                            {t('cv_suggestions_no_cv')}
-                                        </p>
-                                        <Link
-                                            href={`/${locale}/dashboard/profil`}
-                                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#C8D4EA] bg-white px-3 py-1.5 text-xs font-semibold text-[#012e7a] transition-colors hover:bg-[#EAF0FB]"
-                                        >
-                                            <BriefcaseBusiness className="h-3.5 w-3.5" />
-                                            {t('cv_suggestions_no_cv_link')}
-                                        </Link>
-                                    </div>
-                                ) : groupedCvSuggestions.length === 0 ? (
-                                    <p className="mt-3 text-xs leading-5 text-[#73726E]">
-                                        {t('cv_suggestions_empty')}
-                                    </p>
-                                ) : (
-                                    <div className="mt-3 overflow-hidden rounded-lg border border-[#E7E7E5]">
-                                        {groupedCvSuggestions.map(({ source, items }, index) => {
-                                            const isExpanded = expandedStation === source;
-                                            const selectedInGroup = items.filter((item) => selectedResultsLowercase.has(item.text.toLocaleLowerCase('de-DE'))).length;
-                                            return (
-                                                <div key={source} className={index > 0 ? 'border-t border-[#E7E7E5]' : ''}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setExpandedStation((prev) => (prev === source ? null : source))}
-                                                        aria-expanded={isExpanded}
-                                                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[#F4F7FC]"
-                                                    >
-                                                        <span className="flex min-w-0 items-center gap-2">
-                                                            <BriefcaseBusiness className="h-3.5 w-3.5 shrink-0 text-[#012e7a]" />
-                                                            <span className="truncate text-sm font-semibold text-[#37352F]">
-                                                                {source}
-                                                            </span>
-                                                            {selectedInGroup > 0 && (
-                                                                <span className="shrink-0 rounded-full bg-[#EAF0FB] px-2 py-0.5 text-[11px] font-semibold text-[#012e7a]">
-                                                                    {selectedInGroup}
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                        <ChevronDown className={`h-4 w-4 shrink-0 text-[#73726E] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                                    </button>
-                                                    {isExpanded && (
-                                                        <div className="space-y-1.5 border-t border-[#E7E7E5] bg-[#FAFAF9] px-3 py-3">
-                                                            {items.map((item) => {
-                                                                const selected = selectedResultsLowercase.has(item.text.toLocaleLowerCase('de-DE'));
-                                                                return (
-                                                                    <button
-                                                                        key={item.id}
-                                                                        type="button"
-                                                                        onClick={() => toggleProfessionalResult(item.text)}
-                                                                        className={`flex w-full items-start gap-2 rounded-md border px-3 py-2 text-left transition-colors ${
-                                                                            selected
-                                                                                ? 'border-[#012e7a] bg-[#EAF0FB]'
-                                                                                : 'border-[#E7E7E5] bg-white hover:border-[#C8D4EA] hover:bg-[#F4F7FC]'
-                                                                        }`}
-                                                                    >
-                                                                        <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${selected ? 'bg-[#012e7a] text-white' : 'border border-[#C8D4EA] text-[#73726E]'}`}>
-                                                                            {selected ? <Check className="h-3 w-3" /> : <Plus className="h-2.5 w-2.5" />}
-                                                                        </span>
-                                                                        <span className="text-xs leading-5 text-[#37352F]">
-                                                                            {item.text}
-                                                                        </span>
-                                                                    </button>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
+                        <label htmlFor="human_aspects" className="block text-base font-semibold text-[#37352F]">
+                            {t('human_aspects_label')}
+                        </label>
+                        <p className="mt-1 text-xs leading-5 text-[#8E8D89]">
+                            {t('human_aspects_hint')}
+                        </p>
+                        <div className="mt-3">
+                            <VoiceTextarea
+                                id="human_aspects"
+                                value={form.human_aspects}
+                                onChange={(next) => updateField('human_aspects', next)}
+                                placeholder={t('human_aspects_placeholder')}
+                                rows={4}
+                                maxLength={900}
+                                locale={voiceLocale}
+                                micLabelStart={t('voice_start')}
+                                micLabelStop={t('voice_stop')}
+                                micLabelTranscribing={t('voice_transcribing')}
+                                micErrorLabel={t('voice_error')}
+                            />
                         </div>
+                    </div>
 
-                        {errorKey && (
-                            <div className="mt-5 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                                <span>{t(errorKey)}</span>
+                    <div className="rounded-lg border border-[#E7E7E5] bg-white p-6 shadow-sm">
+                        <label className="block text-base font-semibold text-[#37352F]">
+                            {t('professional_results_label')}
+                        </label>
+                        <p className="mt-1 text-xs leading-5 text-[#8E8D89]">
+                            {t('professional_results_hint')}
+                        </p>
+
+                        {selectedResultRows.length > 0 && (
+                            <div className="mt-3">
+                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#8E8D89]">
+                                    {t('selected_results_title')}
+                                </p>
+                                <ul className="space-y-1.5">
+                                    {selectedResultRows.map(({ line, company }) => (
+                                        <li
+                                            key={line}
+                                            className="flex items-start gap-2 rounded-lg border border-[#C8D4EA] bg-[#EAF0FB] px-3 py-2"
+                                        >
+                                            <span className="flex-1 text-xs leading-5 text-[#37352F]">
+                                                <span className="font-semibold text-[#012e7a]">{company}:</span>{' '}
+                                                {line}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeProfessionalResult(line)}
+                                                aria-label={t('remove_result')}
+                                                title={t('remove_result')}
+                                                className="mt-0.5 shrink-0 rounded-full p-1 text-[#012e7a] transition-colors hover:bg-[#C8D4EA]"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
                             </div>
                         )}
 
-                        <div className="mt-6 flex flex-col gap-3 border-t border-[#E7E7E5] pt-5 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-center gap-2 text-xs text-[#73726E]">
-                                {saved ? (
-                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                                ) : (
-                                    <ShieldCheck className="h-3.5 w-3.5 text-[#012e7a]" />
-                                )}
-                                <span>{saved ? t('step1_inline_status', { count: filledCount }) : t('step1_counter', { count: filledCount })}</span>
+                        {cvSuggestionsLoading ? (
+                            <p className="mt-3 text-xs leading-5 text-[#73726E]">
+                                {t('cv_suggestions_loading')}
+                            </p>
+                        ) : !hasCvProfile ? (
+                            <div className="mt-3 flex flex-col gap-2 rounded-lg border border-dashed border-[#C8D4EA] bg-[#F8FAFE] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                <p className="text-xs leading-5 text-[#73726E]">
+                                    {t('cv_suggestions_no_cv')}
+                                </p>
+                                <Link
+                                    href={`/${locale}/dashboard/profil`}
+                                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#C8D4EA] bg-white px-3 py-1.5 text-xs font-semibold text-[#012e7a] transition-colors hover:bg-[#EAF0FB]"
+                                >
+                                    <BriefcaseBusiness className="h-3.5 w-3.5" />
+                                    {t('cv_suggestions_no_cv_link')}
+                                </Link>
                             </div>
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        ) : groupedCvSuggestions.length === 0 ? (
+                            <p className="mt-3 text-xs leading-5 text-[#73726E]">
+                                {t('cv_suggestions_empty')}
+                            </p>
+                        ) : (
+                            <div className="mt-3 overflow-hidden rounded-lg border border-[#E7E7E5]">
+                                {groupedCvSuggestions.map(({ source, items }, index) => {
+                                    const isExpanded = expandedStation === source;
+                                    const selectedInGroup = items.filter((item) => selectedResultsLowercase.has(item.text.toLocaleLowerCase('de-DE'))).length;
+                                    return (
+                                        <div key={source} className={index > 0 ? 'border-t border-[#E7E7E5]' : ''}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setExpandedStation((prev) => (prev === source ? null : source))}
+                                                aria-expanded={isExpanded}
+                                                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[#F4F7FC]"
+                                            >
+                                                <span className="flex min-w-0 items-center gap-2">
+                                                    <BriefcaseBusiness className="h-3.5 w-3.5 shrink-0 text-[#012e7a]" />
+                                                    <span className="truncate text-sm font-semibold text-[#37352F]">
+                                                        {source}
+                                                    </span>
+                                                    {selectedInGroup > 0 && (
+                                                        <span className="shrink-0 rounded-full bg-[#EAF0FB] px-2 py-0.5 text-[11px] font-semibold text-[#012e7a]">
+                                                            {selectedInGroup}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <ChevronDown className={`h-4 w-4 shrink-0 text-[#73726E] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {isExpanded && (
+                                                <div className="space-y-1.5 border-t border-[#E7E7E5] bg-[#FAFAF9] px-3 py-3">
+                                                    {items.map((item) => {
+                                                        const selected = selectedResultsLowercase.has(item.text.toLocaleLowerCase('de-DE'));
+                                                        return (
+                                                            <button
+                                                                key={item.id}
+                                                                type="button"
+                                                                onClick={() => toggleProfessionalResult(item.text)}
+                                                                className={`flex w-full items-start gap-2 rounded-md border px-3 py-2 text-left transition-colors ${
+                                                                    selected
+                                                                        ? 'border-[#012e7a] bg-[#EAF0FB]'
+                                                                        : 'border-[#E7E7E5] bg-white hover:border-[#C8D4EA] hover:bg-[#F4F7FC]'
+                                                                }`}
+                                                            >
+                                                                <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${selected ? 'bg-[#012e7a] text-white' : 'border border-[#C8D4EA] text-[#73726E]'}`}>
+                                                                    {selected ? <Check className="h-3 w-3" /> : <Plus className="h-2.5 w-2.5" />}
+                                                                </span>
+                                                                <span className="text-xs leading-5 text-[#37352F]">
+                                                                    {item.text}
+                                                                </span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {errorKey && (
+                        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                            <span>{t(errorKey)}</span>
+                        </div>
+                    )}
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-2 text-xs text-[#73726E]">
+                            {saved ? (
+                                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                            ) : (
+                                <ShieldCheck className="h-3.5 w-3.5 text-[#012e7a]" />
+                            )}
+                            <span>{saved ? t('step1_inline_status', { count: filledCount }) : t('step1_counter', { count: filledCount })}</span>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <button
+                                type="button"
+                                disabled={!canSave}
+                                onClick={handleSave}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#012e7a] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#001f52] disabled:cursor-not-allowed disabled:bg-[#C8D4EA]"
+                            >
+                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                {saving ? t('save_saving') : t('save_button')}
+                            </button>
+                            {canOpenDiscovery && (
                                 <button
                                     type="button"
-                                    disabled={!canSave}
-                                    onClick={handleSave}
-                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#012e7a] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#001f52] disabled:cursor-not-allowed disabled:bg-[#C8D4EA]"
+                                    onClick={openDiscovery}
+                                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#C8D4EA] bg-white px-4 py-2 text-sm font-semibold text-[#012e7a] transition-colors hover:bg-[#F4F7FC]"
                                 >
-                                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                    {saving ? t('save_saving') : t('save_button')}
+                                    {t('step1_inline_next')}
+                                    <ArrowRight className="h-3.5 w-3.5" />
                                 </button>
-                                {canOpenDiscovery && (
-                                    <button
-                                        type="button"
-                                        onClick={openDiscovery}
-                                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#C8D4EA] bg-white px-4 py-2 text-sm font-semibold text-[#012e7a] transition-colors hover:bg-[#F4F7FC]"
-                                    >
-                                        {t('step1_inline_next')}
-                                        <ArrowRight className="h-3.5 w-3.5" />
-                                    </button>
-                                )}
-                            </div>
+                            )}
                         </div>
                     </div>
                 </section>
