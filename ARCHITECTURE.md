@@ -88,6 +88,9 @@ Last Updated: 2026-04-18
 #### Initiativbewerbungen
 - `/api/initiativ/cv-suggestions` (GET — liest `user_profiles.cv_structured_data` und schlägt berufliche Ergebnis-Sätze deterministisch vor, keine AI-Calls)
 - `/api/initiativ/life-strengths` (GET/POST — Auth-guarded Stärkenprofil; schreibt `user_profiles.life_strengths` mit Read-Back-Verifikation, keine AI-Calls)
+- `/api/initiativ/discovery` (GET — Discovery-Pipeline; Tier-1 RSS aus `initiativ_triggers` + statische Regulatory-Trigger via `findRegulatoryTriggersForCompany()`, keine AI-Calls)
+- `/api/initiativ/aggregate` (POST — Manual-Trigger für RSS-Aggregator, ENV-Secret `X-Pathly-Admin-Secret`, dev-only, läuft ansonsten täglich via Inngest-Cron `initiativRssAggregator` 07:00 Berlin)
+- `/api/initiativ/transcribe` (POST — Voice-Note-Transkription via OpenAI Whisper-1)
 
 #### Cover Letter (8 Endpunkte)
 - `/api/cover-letter/generate` (POST — Zentrale Generierung)

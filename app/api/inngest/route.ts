@@ -9,6 +9,7 @@ import { volunteeringScraper } from '@/lib/inngest/volunteering-scraper';
 import { generateCoachingReport } from '@/lib/inngest/coaching-report-pipeline';
 import { videoDeleteScheduled, videoCleanupCron } from '@/lib/inngest/video-cleanup';
 import { polishCoverLetter } from '@/lib/inngest/cover-letter-polish';
+import { initiativRssAggregator } from '@/lib/inngest/initiativ-rss-aggregator';
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -21,5 +22,6 @@ export const { GET, POST, PUT } = serve({
         videoDeleteScheduled,
         videoCleanupCron,
         polishCoverLetter,
+        initiativRssAggregator,
     ]
 });
