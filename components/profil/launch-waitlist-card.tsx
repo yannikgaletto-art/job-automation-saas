@@ -8,17 +8,34 @@
  * Selecting a plan tracks the intent via PostHog and stores it in waitlist_leads.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { ChevronDown, Check, Loader2 } from 'lucide-react';
 
-type PlanOption = 'starter' | 'durchstarter' | 'quarterly';
+type PlanOption = 'free' | 'starter' | 'durchstarter' | 'quarterly' | 'custom';
 
-const PLANS: { id: PlanOption; priceLabel: string; period: string }[] = [
-    { id: 'starter', priceLabel: '9,90 €', period: '/Monat' },
-    { id: 'durchstarter', priceLabel: '19,90 €', period: '/Monat' },
-    { id: 'quarterly', priceLabel: '24,90 €', period: '/Quartal' },
+const PLANS: { id: PlanOption }[] = [
+    { id: 'free' },
+    { id: 'starter' },
+    { id: 'durchstarter' },
+    { id: 'quarterly' },
+    { id: 'custom' },
 ];
+
+const CUSTOM_MIN_EUR = 5;
+const CUSTOM_MAX_EUR = 100;
+const CUSTOM_CREDITS_PER_EUR = 2.25;
+
+function calculateCustomBenefits(amountEur: number) {
+    const boundedAmount = Math.min(CUSTOM_MAX_EUR, Math.max(CUSTOM_MIN_EUR, amountEur));
+    const credits = Math.max(5, Math.floor((boundedAmount * CUSTOM_CREDITS_PER_EUR) / 5) * 5);
+
+    return {
+        credits,
+        coachingSessions: Math.max(1, Math.floor(credits / 3)),
+        jobSearches: credits,
+    };
+}
 
 export function LaunchWaitlistCard() {
     const t = useTranslations('profil.launch_waitlist');
@@ -26,9 +43,15 @@ export function LaunchWaitlistCard() {
 
     const [expanded, setExpanded] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState<PlanOption | null>(null);
+    const [customAmountEur, setCustomAmountEur] = useState(15);
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState('');
+
+    const customBenefits = useMemo(
+        () => calculateCustomBenefits(customAmountEur),
+        [customAmountEur]
+    );
 
     const handleSubmit = useCallback(async () => {
         if (!selectedPlan) return;
@@ -39,7 +62,11 @@ export function LaunchWaitlistCard() {
             const res = await fetch('/api/waitlist/intent', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan: selectedPlan, locale }),
+                body: JSON.stringify({
+                    plan: selectedPlan,
+                    locale,
+                    customAmountEur: selectedPlan === 'custom' ? customAmountEur : undefined,
+                }),
             });
 
             if (!res.ok) {
@@ -58,7 +85,7 @@ export function LaunchWaitlistCard() {
         } finally {
             setSubmitting(false);
         }
-    }, [selectedPlan, locale, t]);
+    }, [selectedPlan, locale, customAmountEur, t]);
 
     // ── Submitted state ───────────────────────────────────────────────
     if (submitted) {
@@ -93,45 +120,98 @@ export function LaunchWaitlistCard() {
             <div
                 className="overflow-hidden transition-all duration-300 ease-out"
                 style={{
-                    maxHeight: expanded ? '400px' : '0px',
+                    maxHeight: expanded ? '760px' : '0px',
                     opacity: expanded ? 1 : 0,
                 }}
             >
                 <div className="pt-1 space-y-2">
                     {PLANS.map((plan) => {
                         const isActive = selectedPlan === plan.id;
+                        const priceLabel = plan.id === 'custom'
+                            ? t('plan_custom_price', { amount: customAmountEur })
+                            : t(`plan_${plan.id}_price`);
                         return (
-                            <button
-                                key={plan.id}
-                                onClick={() => setSelectedPlan(plan.id)}
-                                className={[
-                                    'w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left',
-                                    isActive
-                                        ? 'border-[#012e7a] bg-[#012e7a]/5 ring-1 ring-[#012e7a]/20'
-                                        : 'border-[#E7E7E5] bg-white hover:border-[#012e7a]/30 hover:bg-[#FAFAF9]',
-                                ].join(' ')}
-                            >
-                                <div className="flex items-center gap-3">
-                                    {/* Radio indicator */}
-                                    <div className={[
-                                        'w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all',
-                                        isActive ? 'border-[#012e7a] bg-[#012e7a]' : 'border-[#D0D0CE]',
+                            <div key={plan.id} className="space-y-2">
+                                <button
+                                    onClick={() => setSelectedPlan(plan.id)}
+                                    className={[
+                                        'w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border transition-all text-left',
+                                        isActive
+                                            ? 'border-[#012e7a] bg-[#012e7a]/5 ring-1 ring-[#012e7a]/20'
+                                            : 'border-[#E7E7E5] bg-white hover:border-[#012e7a]/30 hover:bg-[#FAFAF9]',
                                     ].join(' ')}>
-                                        {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        {/* Radio indicator */}
+                                        <div className={[
+                                            'w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all shrink-0',
+                                            isActive ? 'border-[#012e7a] bg-[#012e7a]' : 'border-[#D0D0CE]',
+                                        ].join(' ')}>
+                                            {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-[#37352F]">
+                                                {t(`plan_${plan.id}`)}
+                                            </p>
+                                            <p className="text-[10px] text-[#73726E] mt-0.5">
+                                                {t(`plan_${plan.id}_desc`)}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-[#37352F]">
-                                            {t(`plan_${plan.id}`)}
+                                    <span className="text-sm font-semibold text-[#012e7a] tabular-nums whitespace-nowrap">
+                                        {priceLabel}<span className="text-[10px] font-normal text-[#73726E]">{t(`plan_${plan.id}_period`)}</span>
+                                    </span>
+                                </button>
+
+                                {plan.id === 'custom' && isActive && (
+                                    <div className="px-4 py-3 rounded-xl border border-[#E7E7E5] bg-[#FAFAF9] space-y-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <label htmlFor="custom-waitlist-amount" className="text-xs font-medium text-[#37352F]">
+                                                {t('custom_amount_label')}
+                                            </label>
+                                            <span className="text-xs font-semibold text-[#012e7a] tabular-nums">
+                                                {t('custom_amount_value', { amount: customAmountEur })}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                id="custom-waitlist-amount"
+                                                type="range"
+                                                min={CUSTOM_MIN_EUR}
+                                                max={CUSTOM_MAX_EUR}
+                                                step={1}
+                                                value={customAmountEur}
+                                                onChange={(event) => setCustomAmountEur(Number(event.target.value))}
+                                                className="w-full accent-[#012e7a]"
+                                            />
+                                            <input
+                                                type="number"
+                                                min={CUSTOM_MIN_EUR}
+                                                max={CUSTOM_MAX_EUR}
+                                                step={1}
+                                                value={customAmountEur}
+                                                onChange={(event) => {
+                                                    const nextValue = Number(event.target.value);
+                                                    if (Number.isFinite(nextValue)) {
+                                                        setCustomAmountEur(Math.min(CUSTOM_MAX_EUR, Math.max(CUSTOM_MIN_EUR, nextValue)));
+                                                    }
+                                                }}
+                                                aria-label={t('custom_amount_label')}
+                                                className="w-16 rounded-lg border border-[#D0D0CE] bg-white px-2 py-1 text-xs text-[#37352F] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#012e7a]/20"
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-[#73726E]">
+                                            {t('custom_preview', {
+                                                credits: customBenefits.credits,
+                                                coaching: customBenefits.coachingSessions,
+                                                searches: customBenefits.jobSearches,
+                                            })}
                                         </p>
-                                        <p className="text-[10px] text-[#73726E] mt-0.5">
-                                            {t(`plan_${plan.id}_desc`)}
+                                        <p className="text-[10px] text-[#B4B4B0]">
+                                            {t('custom_range_hint')}
                                         </p>
                                     </div>
-                                </div>
-                                <span className="text-sm font-semibold text-[#012e7a] tabular-nums whitespace-nowrap">
-                                    {plan.priceLabel}<span className="text-[10px] font-normal text-[#73726E]">{plan.period}</span>
-                                </span>
-                            </button>
+                                )}
+                            </div>
                         );
                     })}
 

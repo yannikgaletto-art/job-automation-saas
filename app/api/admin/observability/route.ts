@@ -30,6 +30,16 @@ function getRedis(): Redis | null {
     return _redis;
 }
 
+function getWaitlistPlanIntent(planPreference: string | null, utmSource: string | null) {
+    if (utmSource?.startsWith('waitlist_plan:')) {
+        const planPart = utmSource.split(';').find(part => part.startsWith('waitlist_plan:'));
+        const plan = planPart?.split(':')[1];
+        if (plan) return plan;
+    }
+
+    return planPreference ?? 'nicht angegeben';
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface Alert {
@@ -460,7 +470,7 @@ async function fetchInternal(): Promise<InternalData> {
 
             // Waitlist plan intents
             admin.from('waitlist_leads')
-                .select('plan_preference'),
+                .select('plan_preference, utm_source'),
 
             // §COHORT: Count active users (free/starter/durchstarter) for progress bar
             admin.from('user_credits')
@@ -551,7 +561,10 @@ async function fetchInternal(): Promise<InternalData> {
         // Waitlist plan intents
         const planIntents: Record<string, number> = {};
         for (const w of waitlistRes.data ?? []) {
-            const plan = (w.plan_preference as string) ?? 'nicht angegeben';
+            const plan = getWaitlistPlanIntent(
+                (w.plan_preference as string | null) ?? null,
+                (w.utm_source as string | null) ?? null
+            );
             planIntents[plan] = (planIntents[plan] || 0) + 1;
         }
 

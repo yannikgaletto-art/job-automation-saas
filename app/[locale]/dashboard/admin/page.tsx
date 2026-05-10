@@ -33,6 +33,7 @@ type WaitlistLead = {
     source: string;
     locale: string;
     plan_preference: string | null;
+    utm_source: string | null;
     confirmed_at: string | null;
     created_at: string;
 };
@@ -102,6 +103,65 @@ function formatRelative(d: string | null | undefined) {
     if (hrs < 24) return `vor ${hrs}h`;
     const days = Math.floor(hrs / 24);
     return `vor ${days}d`;
+}
+
+type WaitlistPlanMetadata = {
+    plan: string;
+    amountEur?: number;
+    credits?: number;
+    coaching?: number;
+    searches?: number;
+};
+
+function formatEuro(value: number | undefined) {
+    if (value == null) return '';
+    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
+}
+
+function parseWaitlistPlanMetadata(value: string | null): WaitlistPlanMetadata | null {
+    if (!value?.startsWith('waitlist_plan:')) return null;
+
+    const metadata: Partial<WaitlistPlanMetadata> = {};
+    for (const part of value.split(';')) {
+        const [key, raw] = part.split(':');
+        if (!key || raw == null) continue;
+        if (key === 'waitlist_plan') metadata.plan = raw;
+        else if (key === 'amount_eur') metadata.amountEur = Number(raw);
+        else if (key === 'credits') metadata.credits = Number(raw);
+        else if (key === 'coaching') metadata.coaching = Number(raw);
+        else if (key === 'searches') metadata.searches = Number(raw);
+    }
+
+    return metadata.plan ? metadata as WaitlistPlanMetadata : null;
+}
+
+function getWaitlistDisplayPlan(lead: WaitlistLead) {
+    return parseWaitlistPlanMetadata(lead.utm_source)?.plan ?? lead.plan_preference;
+}
+
+function getWaitlistPlanLabel(lead: WaitlistLead) {
+    const metadata = parseWaitlistPlanMetadata(lead.utm_source);
+    const plan = metadata?.plan ?? lead.plan_preference;
+
+    if (plan === 'free') return 'Free';
+    if (plan === 'starter') return 'Starter';
+    if (plan === 'durchstarter') return 'Durchstarter';
+    if (plan === 'quarterly') return 'Quartalspaket';
+    if (plan === 'custom') {
+        const amount = formatEuro(metadata?.amountEur);
+        return amount ? `Individuell ${amount}` : 'Individuell';
+    }
+
+    return plan ?? '—';
+}
+
+function getWaitlistPlanStyle(plan: string | null) {
+    if (plan === 'durchstarter') return 'bg-purple-50 text-purple-700 border border-purple-200';
+    if (plan === 'starter') return 'bg-blue-50 text-blue-700 border border-blue-200';
+    if (plan === 'quarterly') return 'bg-teal-50 text-teal-700 border border-teal-200';
+    if (plan === 'custom') return 'bg-amber-50 text-amber-700 border border-amber-200';
+    if (plan === 'free') return 'bg-green-50 text-green-700 border border-green-200';
+    return 'bg-gray-100 text-gray-600';
 }
 
 // ── Inline Components ──────────────────────────────────────────────────────
@@ -942,45 +1002,49 @@ function TabUsers({
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#E7E7E5]">
-                            {leads.map(lead => (
-                                <tr key={lead.id} className="hover:bg-[#FAFAF9] transition-colors">
-                                    <td className="px-5 py-3 font-medium text-[#37352F]">{lead.email}</td>
-                                    <td className="px-5 py-3 text-center">
-                                        {lead.plan_preference ? (
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                lead.plan_preference === 'durchstarter'
-                                                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                                                    : lead.plan_preference === 'starter'
-                                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                                    : lead.plan_preference === 'quarterly'
-                                                    ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                                                    : 'bg-gray-100 text-gray-600'
-                                            }`}>
-                                                {lead.plan_preference === 'quarterly' ? 'Quartalspaket' : lead.plan_preference}
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs text-[#B4B4B0]">—</span>
-                                        )}
-                                    </td>
-                                    <td className="px-5 py-3 text-center">
-                                        {lead.confirmed_at ? (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200"><CheckCircle className="w-3 h-3" />Bestätigt</span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"><Clock className="w-3 h-3" />Offen</span>
-                                        )}
-                                    </td>
-                                    <td className="px-5 py-3 text-center"><span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{lead.locale?.toUpperCase() || 'DE'}</span></td>
-                                    <td className="px-5 py-3 text-[#73726E] text-xs capitalize">{lead.source}</td>
-                                    <td className="px-5 py-3 text-[#73726E] text-xs">{formatDate(lead.created_at)}</td>
-                                    <td className="px-5 py-3">
-                                        <div className="flex items-center justify-end">
-                                            <button onClick={() => handleDeleteLead(lead.id, lead.email)} disabled={actionLoading === lead.id} className="p-1.5 text-[#73726E] hover:text-red-600 hover:bg-red-50 rounded-md transition-all disabled:opacity-40" title="Lead löschen">
-                                                {actionLoading === lead.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {leads.map(lead => {
+                                const planMetadata = parseWaitlistPlanMetadata(lead.utm_source);
+                                const displayPlan = getWaitlistDisplayPlan(lead);
+
+                                return (
+                                    <tr key={lead.id} className="hover:bg-[#FAFAF9] transition-colors">
+                                        <td className="px-5 py-3 font-medium text-[#37352F]">{lead.email}</td>
+                                        <td className="px-5 py-3 text-center">
+                                            {displayPlan ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getWaitlistPlanStyle(displayPlan)}`}>
+                                                        {getWaitlistPlanLabel(lead)}
+                                                    </span>
+                                                    {planMetadata?.credits != null && (
+                                                        <span className="text-[10px] text-[#73726E]">
+                                                            {planMetadata.credits} Credits · {planMetadata.coaching ?? 0} Coaching · {planMetadata.searches ?? 0} Jobsuchen
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-[#B4B4B0]">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-5 py-3 text-center">
+                                            {lead.confirmed_at ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200"><CheckCircle className="w-3 h-3" />Bestätigt</span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"><Clock className="w-3 h-3" />Offen</span>
+                                            )}
+                                        </td>
+                                        <td className="px-5 py-3 text-center"><span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{lead.locale?.toUpperCase() || 'DE'}</span></td>
+                                        <td className="px-5 py-3 text-[#73726E] text-xs capitalize">{lead.source}</td>
+                                        <td className="px-5 py-3 text-[#73726E] text-xs">{formatDate(lead.created_at)}</td>
+                                        <td className="px-5 py-3">
+                                            <div className="flex items-center justify-end">
+                                                <button onClick={() => handleDeleteLead(lead.id, lead.email)} disabled={actionLoading === lead.id} className="p-1.5 text-[#73726E] hover:text-red-600 hover:bg-red-50 rounded-md transition-all disabled:opacity-40" title="Lead löschen">
+                                                    {actionLoading === lead.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 )}
