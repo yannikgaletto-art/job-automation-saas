@@ -100,6 +100,15 @@ function listToText(value: unknown): string {
     return value.filter((entry): entry is string => typeof entry === 'string').join('\n');
 }
 
+/**
+ * Source labels follow `${role} · ${company}` from cv-suggestions.ts.
+ * Display the company part — closest to what the user wrote in the brief.
+ */
+function extractCompanyFromSource(source: string): string {
+    const parts = source.split(' · ').map((p) => p.trim()).filter(Boolean);
+    return parts[parts.length - 1] || source;
+}
+
 function countLines(value: string): number {
     return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
 }
@@ -290,6 +299,28 @@ export function InitiativClientPage() {
         () => new Set(selectedResultLines.map((line) => line.toLocaleLowerCase('de-DE'))),
         [selectedResultLines]
     );
+
+    const cvSuggestionsBySource = useMemo(() => {
+        const lookup = new Map<string, string>();
+        for (const suggestion of cvSuggestions) {
+            lookup.set(suggestion.text.toLocaleLowerCase('de-DE'), suggestion.source);
+        }
+        return lookup;
+    }, [cvSuggestions]);
+
+    /**
+     * Selected lines that came from the CV (i.e. match a current suggestion).
+     * Legacy free-text from the pre-Phase-2.5 textarea is intentionally hidden:
+     * the picker is the only entry point in the new UI, so an entry without a
+     * suggestion match has no station-context to render against.
+     */
+    const selectedResultRows = useMemo(() => {
+        return selectedResultLines.flatMap((line) => {
+            const source = cvSuggestionsBySource.get(line.toLocaleLowerCase('de-DE'));
+            if (!source) return [];
+            return [{ line, source, company: extractCompanyFromSource(source) }];
+        });
+    }, [selectedResultLines, cvSuggestionsBySource]);
 
     const groupedCvSuggestions = useMemo(() => {
         const groups = new Map<string, CvResultSuggestion[]>();
@@ -531,20 +562,33 @@ export function InitiativClientPage() {
                                     {t('professional_results_hint')}
                                 </p>
 
-                                {selectedResultLines.length > 0 && (
-                                    <div className="mt-3 flex flex-wrap gap-1.5">
-                                        {selectedResultLines.map((line) => (
-                                            <button
-                                                key={line}
-                                                type="button"
-                                                onClick={() => removeProfessionalResult(line)}
-                                                title={t('remove_result')}
-                                                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#012e7a] bg-[#012e7a] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[#001f52]"
-                                            >
-                                                <span className="truncate max-w-[28ch]">{line}</span>
-                                                <X className="h-3 w-3 shrink-0" />
-                                            </button>
-                                        ))}
+                                {selectedResultRows.length > 0 && (
+                                    <div className="mt-3">
+                                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#8E8D89]">
+                                            {t('selected_results_title')}
+                                        </p>
+                                        <ul className="space-y-1.5">
+                                            {selectedResultRows.map(({ line, company }) => (
+                                                <li
+                                                    key={line}
+                                                    className="flex items-start gap-2 rounded-lg border border-[#C8D4EA] bg-[#EAF0FB] px-3 py-2"
+                                                >
+                                                    <span className="flex-1 text-xs leading-5 text-[#37352F]">
+                                                        <span className="font-semibold text-[#012e7a]">{company}:</span>{' '}
+                                                        {line}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeProfessionalResult(line)}
+                                                        aria-label={t('remove_result')}
+                                                        title={t('remove_result')}
+                                                        className="mt-0.5 shrink-0 rounded-full p-1 text-[#012e7a] transition-colors hover:bg-[#C8D4EA]"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
                                     </div>
                                 )}
 

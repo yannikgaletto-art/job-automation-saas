@@ -104,7 +104,7 @@
       "step1_body": "Escribe puntos breves. Cada línea se guarda como un elemento separado.",
       "human_aspects_label": "¿Qué te hace única o único?",
       "human_aspects_hint": "Cuéntanos contextos privados que muestren tus habilidades reales.",
-      "human_aspects_placeholder": "p. ej. cuidadora familiar\np. ej. madre de dos hijos\np. ej. voluntariado en una asociación",
+      "human_aspects_placeholder": "p. ej. Caminé el Camino de Santiago.\np. ej. Hago voluntariado en una asociación.\np. ej. Crié a dos hijos.",
       "professional_results_label": "Elige tus resultados profesionales",
       "professional_results_hint": "Haz clic en una estación para añadir resultados. Permite selección múltiple.",
       "professional_results_placeholder": "p. ej. 7 años de PMO\np. ej. guié stakeholders durante una reestructuración\np. ej. construí un proceso de reporting",
