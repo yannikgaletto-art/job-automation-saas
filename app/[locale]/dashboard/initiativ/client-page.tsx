@@ -808,19 +808,26 @@ export function InitiativClientPage() {
                                         className="mt-2 w-full rounded-lg border border-[#E7E7E5] bg-white px-3 py-2 text-sm text-[#37352F] placeholder-[#A8A29E] outline-none transition-all focus:border-[#012e7a] focus:ring-2 focus:ring-[#012e7a]/20"
                                     />
                                 </div>
-                                <label className="block md:col-span-2">
-                                    <span className="text-sm font-semibold text-[#37352F]">
+                                <div className="md:col-span-2">
+                                    <label htmlFor="discovery-focus" className="block text-sm font-semibold text-[#37352F]">
                                         {t('discovery_focus_label')}
-                                    </span>
-                                    <textarea
-                                        value={discoveryForm.focus}
-                                        onChange={(event) => updateDiscoveryField('focus', event.target.value)}
-                                        placeholder={t('discovery_focus_placeholder')}
-                                        rows={3}
-                                        maxLength={180}
-                                        className="mt-2 w-full resize-none rounded-lg border border-[#E7E7E5] bg-white px-3 py-2 text-sm leading-6 text-[#37352F] placeholder-[#A8A29E] outline-none transition-all focus:border-[#012e7a] focus:ring-2 focus:ring-[#012e7a]/20"
-                                    />
-                                </label>
+                                    </label>
+                                    <div className="mt-2">
+                                        <VoiceTextarea
+                                            id="discovery-focus"
+                                            value={discoveryForm.focus}
+                                            onChange={(next) => updateDiscoveryField('focus', next)}
+                                            placeholder={t('discovery_focus_placeholder')}
+                                            rows={3}
+                                            maxLength={180}
+                                            locale={voiceLocale}
+                                            micLabelStart={t('voice_start')}
+                                            micLabelStop={t('voice_stop')}
+                                            micLabelTranscribing={t('voice_transcribing')}
+                                            micErrorLabel={t('voice_error')}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             <p className="mt-4 text-xs leading-5 text-[#8E8D89]">
