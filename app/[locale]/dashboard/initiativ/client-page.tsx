@@ -23,6 +23,7 @@ import {
     X,
 } from 'lucide-react';
 import { buildInitiativInsight } from '@/lib/initiativ/insight';
+import type { RegulatoryTrigger } from '@/lib/services/regulatory-triggers';
 import { VoiceTextarea } from '@/components/initiativ/VoiceTextarea';
 import { InitiativStepper, type InitiativStep } from '@/components/initiativ/InitiativStepper';
 import {
@@ -136,6 +137,7 @@ export function InitiativClientPage() {
     const [discoverySearched, setDiscoverySearched] = useState(false);
     const [discoverySchemaReady, setDiscoverySchemaReady] = useState(true);
     const [discoverySignals, setDiscoverySignals] = useState<DiscoverySignal[]>([]);
+    const [discoveryRegulatory, setDiscoveryRegulatory] = useState<RegulatoryTrigger[]>([]);
     const [discoveryError, setDiscoveryError] = useState(false);
     const [regionFallback, setRegionFallback] = useState(false);
     const [appliedRegion, setAppliedRegion] = useState('');
@@ -407,8 +409,10 @@ export function InitiativClientPage() {
             }
 
             const signals = Array.isArray(data.signals) ? data.signals : [];
+            const regulatory = Array.isArray(data.regulatoryTriggers) ? data.regulatoryTriggers : [];
             setDiscoverySchemaReady(data.schemaReady !== false);
             setDiscoverySignals(signals);
+            setDiscoveryRegulatory(regulatory);
             setRegionFallback(Boolean(data.regionFallback));
             setSelectedSignalId(null);
         } catch {
@@ -916,6 +920,53 @@ export function InitiativClientPage() {
                                         {t('discovery_region_strict_undo')}
                                     </button>
                                 </div>
+                            )}
+
+                            {discoveryRegulatory.length > 0 && (
+                                <section className="mb-5 rounded-lg border border-[#E5E1D5] bg-[#FBF8F0] p-4">
+                                    <header className="mb-3 flex items-start gap-3">
+                                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#7A5A12]" />
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-[#37352F]">
+                                                {t('regulatory_section_title')}
+                                            </h3>
+                                            <p className="mt-1 text-xs leading-5 text-[#73726E]">
+                                                {t('regulatory_section_body')}
+                                            </p>
+                                        </div>
+                                    </header>
+                                    <ul className="space-y-2">
+                                        {discoveryRegulatory.map((trigger) => (
+                                            <li
+                                                key={trigger.id}
+                                                className="rounded-md border border-[#E5E1D5] bg-white px-3 py-3"
+                                            >
+                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-semibold text-[#37352F]">
+                                                            {trigger.name}
+                                                        </p>
+                                                        <p className="mt-1 text-xs leading-5 text-[#73726E]">
+                                                            {trigger.shortDescription}
+                                                        </p>
+                                                        <p className="mt-2 text-[11px] uppercase tracking-wide text-[#8E8D89]">
+                                                            {t('regulatory_inkraft', { date: formatDate(trigger.inkraft) })}
+                                                        </p>
+                                                    </div>
+                                                    <a
+                                                        href={trigger.sourceUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#E5E1D5] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#7A5A12] transition-colors hover:bg-[#FFF6E0]"
+                                                    >
+                                                        {t('regulatory_source_open')}
+                                                        <ExternalLink className="h-3 w-3" />
+                                                    </a>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </section>
                             )}
 
                             {discoveryLoading ? (

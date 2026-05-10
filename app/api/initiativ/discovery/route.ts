@@ -9,6 +9,7 @@ import {
     shouldRetryDiscoveryWithoutRegion,
     type RawInitiativTrigger,
 } from '@/lib/initiativ/discovery';
+import { findRegulatoryTriggersForCompany } from '@/lib/services/regulatory-triggers';
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -43,6 +44,10 @@ export async function GET(request: NextRequest) {
 
         const { data, error } = await loadTriggerRows(supabase, query.region);
 
+        // Tier-1 Regulatory: statisch, branche-getrieben, unabhängig vom DB-State.
+        // Wird auch ausgeliefert wenn die Trigger-Tabelle noch leer ist.
+        const regulatoryTriggers = findRegulatoryTriggersForCompany(query.branche);
+
         if (error) {
             if (error.code === '42P01' || error.message.toLocaleLowerCase('en-US').includes('does not exist')) {
                 return NextResponse.json({
@@ -50,6 +55,7 @@ export async function GET(request: NextRequest) {
                     schemaReady: false,
                     query,
                     signals: [],
+                    regulatoryTriggers,
                 });
             }
 
@@ -80,6 +86,7 @@ export async function GET(request: NextRequest) {
             query,
             regionFallback,
             signals,
+            regulatoryTriggers,
         });
     } catch (error) {
         console.error('[initiativ/discovery] fatal:', error);
