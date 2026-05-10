@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Sidebar, NavSection, NavItem } from '@/components/motion/sidebar';
-import { Home, Search, Inbox, BarChart3, Users, Heart, Shield, Settings, MessageSquare, Mic, User } from 'lucide-react';
+import { Home, Search, Inbox, BarChart3, Heart, Shield, Settings, MessageSquare, Mic, User } from 'lucide-react';
 import { PomodoroMiniWidget } from './components/pomodoro-mini-widget';
 import { usePathname } from '@/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -243,7 +243,6 @@ function DashboardLayoutInner({
                     </NavSection>
 
                     <NavSection title={t('nav_section.community')}>
-                        <NavItem icon={Users} label={t('nav.community')} href={`/${locale}/dashboard/community`} shortcut="C" />
                         <NavItem icon={Heart} label={t('nav.volunteering')} href={`/${locale}/dashboard/volunteering`} shortcut="E" />
                     </NavSection>
 
