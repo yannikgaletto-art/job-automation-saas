@@ -546,8 +546,9 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
     ], []);
 
     const atsTour = useDashboardTour('cv-ats-template', atsTourSteps, {
-        delayMs: 900,
-        enabled: step === 2
+        delayMs: 700,
+        enabled: qrTourEnabled
+            && step === 2
             && !!renderedPdfData
             && !showQrDialog
             && !showTechAtsWarning

@@ -43,4 +43,15 @@ describe('CV optimizer spotlight copy', () => {
     it('registers the ATS spotlight for tour resets', () => {
         expect(DASHBOARD_TOUR_IDS).toContain('cv-ats-template');
     });
+
+    it('gates the ATS spotlight on the same first-preview trigger and delay as QR', () => {
+        const source = fs.readFileSync(
+            path.join(__dirname, '../../components/cv-optimizer/OptimizerWizard.tsx'),
+            'utf8'
+        );
+        const atsTourBlock = source.match(/const atsTour = useDashboardTour\('cv-ats-template'[\s\S]*?\n    \}\);/);
+
+        expect(atsTourBlock?.[0]).toContain('delayMs: 700');
+        expect(atsTourBlock?.[0]).toContain('enabled: qrTourEnabled');
+    });
 });
