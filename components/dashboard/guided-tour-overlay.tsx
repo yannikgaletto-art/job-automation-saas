@@ -17,6 +17,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Sparkles, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { TourStep } from '@/app/[locale]/dashboard/hooks/useDashboardTour';
+import {
+    getTooltipMaxHeight,
+    TOOLTIP_VIEWPORT_MARGIN,
+} from './guided-tour-overlay-helpers';
 
 interface GuidedTourOverlayProps {
     step: TourStep;
@@ -154,6 +158,8 @@ export function GuidedTourOverlay({
 
     // ── Tooltip positioning ─────────────────────────────────────
     const tooltipStyle = getTooltipPosition(step.position, targetRect, vw, vh);
+    const tooltipTop = getPixelValue(tooltipStyle.top, TOOLTIP_VIEWPORT_MARGIN);
+    const tooltipMaxHeight = getTooltipMaxHeight(tooltipTop, vh);
 
     const isLastStep = currentStep === totalSteps - 1;
 
@@ -213,88 +219,103 @@ export function GuidedTourOverlay({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -8, scale: 0.96 }}
                     transition={{ duration: 0.3, delay: 0.1 }}
-                    className="bg-white rounded-2xl shadow-2xl border border-[#E7E7E5] p-6 max-w-sm"
+                    className="bg-white rounded-2xl shadow-2xl border border-[#E7E7E5] max-w-sm overflow-hidden flex flex-col"
                     style={{
                         position: 'fixed',
                         ...tooltipStyle,
+                        maxHeight: `${tooltipMaxHeight}px`,
                         zIndex: 62,
                         pointerEvents: 'auto',
                     }}
                 >
-                    {/* Step indicator */}
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-[#f0f4ff] flex items-center justify-center">
-                                <Sparkles className="w-4 h-4 text-[#002e7a]" />
+                    <div className="p-6 pb-0 shrink-0">
+                        {/* Step indicator */}
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-[#f0f4ff] flex items-center justify-center">
+                                    <Sparkles className="w-4 h-4 text-[#002e7a]" />
+                                </div>
+                                <span className="text-[10px] font-semibold text-[#A8A29E] uppercase tracking-wider">
+                                    {t('step_indicator', { current: currentStep + 1, total: totalSteps })}
+                                </span>
                             </div>
-                            <span className="text-[10px] font-semibold text-[#A8A29E] uppercase tracking-wider">
-                                {t('step_indicator', { current: currentStep + 1, total: totalSteps })}
-                            </span>
+                            <button
+                                onClick={onSkip}
+                                className="p-1 text-[#A8A29E] hover:text-[#37352F] transition-colors rounded-md hover:bg-[#F5F5F4]"
+                                title="Tour überspringen"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
-                        <button
-                            onClick={onSkip}
-                            className="p-1 text-[#A8A29E] hover:text-[#37352F] transition-colors rounded-md hover:bg-[#F5F5F4]"
-                            title="Tour überspringen"
+
+                        {/* Step progress dots */}
+                        <div className="flex gap-1.5 mb-4">
+                            {Array.from({ length: totalSteps }).map((_, i) => (
+                                <div
+                                    key={i}
+                                    className={`h-1 rounded-full transition-all duration-300 ${
+                                        i <= currentStep
+                                            ? 'bg-[#002e7a] flex-[2]'
+                                            : 'bg-[#E7E7E5] flex-1'
+                                    }`}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Title */}
+                        <h3 className="text-base font-bold text-[#37352F] mb-3">
+                            {t(step.titleKey)}
+                        </h3>
+                    </div>
+
+                    <div className="px-6 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                        {/* Optional image */}
+                        {step.imageUrl && (
+                            <div className="mb-3 rounded-lg overflow-hidden border border-[#E7E7E5] bg-white">
+                                <img
+                                    src={step.imageUrl}
+                                    alt=""
+                                    className="max-w-full w-auto max-h-[42vh] h-auto mx-auto"
+                                    loading="eager"
+                                />
+                            </div>
+                        )}
+
+                        {/* Body — supports <b>bold</b> via next-intl rich text */}
+                        <p className="text-sm text-[#73726E] leading-relaxed pb-4">
+                            {t.rich(step.bodyKey, {
+                                b: (chunks) => (
+                                    <strong className="font-semibold text-[#002e7a]">{chunks}</strong>
+                                ),
+                            })}
+                        </p>
+                    </div>
+
+                    <div className="p-6 pt-3 shrink-0 bg-white border-t border-[#E7E7E5]">
+                        {/* Action button */}
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={onNext}
+                            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors bg-[#002e7a] text-white hover:bg-[#001d4f]`}
                         >
-                            <X className="w-4 h-4" />
-                        </button>
+                            {isLastStep ? t('button_start') : t('button_next')}
+                            <ArrowRight className="w-4 h-4" />
+                        </motion.button>
                     </div>
-
-                    {/* Step progress dots */}
-                    <div className="flex gap-1.5 mb-4">
-                        {Array.from({ length: totalSteps }).map((_, i) => (
-                            <div
-                                key={i}
-                                className={`h-1 rounded-full transition-all duration-300 ${
-                                    i <= currentStep
-                                        ? 'bg-[#002e7a] flex-[2]'
-                                        : 'bg-[#E7E7E5] flex-1'
-                                }`}
-                            />
-                        ))}
-                    </div>
-
-                    {/* Title */}
-                    <h3 className="text-base font-bold text-[#37352F] mb-2">
-                        {t(step.titleKey)}
-                    </h3>
-
-                    {/* Optional image */}
-                    {step.imageUrl && (
-                        <div className="mb-3 rounded-lg overflow-hidden border border-[#E7E7E5]">
-                            <img
-                                src={step.imageUrl}
-                                alt=""
-                                className="w-full h-auto"
-                                loading="eager"
-                            />
-                        </div>
-                    )}
-
-                    {/* Body — supports <b>bold</b> via next-intl rich text */}
-                    <p className="text-sm text-[#73726E] leading-relaxed mb-5">
-                        {t.rich(step.bodyKey, {
-                            b: (chunks) => (
-                                <strong className="font-semibold text-[#002e7a]">{chunks}</strong>
-                            ),
-                        })}
-                    </p>
-
-                    {/* Action button */}
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={onNext}
-                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors bg-[#002e7a] text-white hover:bg-[#001d4f]`}
-                    >
-                        {isLastStep ? t('button_start') : t('button_next')}
-                        <ArrowRight className="w-4 h-4" />
-                    </motion.button>
                 </motion.div>
             </AnimatePresence>
         </>,
         document.body
     );
+}
+
+function getPixelValue(value: React.CSSProperties['top'], fallback: number): number {
+    if (typeof value === 'number') return value;
+    if (typeof value !== 'string') return fallback;
+
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 // ── Smart tooltip positioning ─────────────────────────────────
