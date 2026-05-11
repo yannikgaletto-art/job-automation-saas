@@ -1688,13 +1688,15 @@
     "step3_title": "Pomodoro Technique",
     "step3_body": "At Pathly we love working with the <b>Pomodoro Technique</b>. Focused work blocks with short breaks. It is the fastest way to make progress. Ready to start?",
     "button_next": "Next",
-    "button_start": "Let's go!",
+    "button_start": "Let's go",
     "step_indicator": "Step {current} of {total}",
     "cv_preview_format_title": "Does the layout look off?",
     "cv_preview_format_body": "If your CV has too much whitespace or sections appear misaligned, click <b>\"Fix Formatting\"</b>. Pathly will automatically fix the layout. <b>Free, once per job.</b>",
     "cv_optimizer": {
       "qr_spotlight_title": "QR Video Letter",
-      "qr_spotlight_body": "Your optimized CV can now include a <b>personal QR code</b>. Recruiters open a short video where you show motivation, personality and fit."
+      "qr_spotlight_body": "Your optimized CV can now include a personal QR code. Recruiters open a short video where you show your motivation. This increases the chances of getting a job interview. The data is stored on EU servers for a maximum of 14 days. You can delete it again at any time.",
+      "ats_spotlight_title": "ATS Template",
+      "ats_spotlight_body": "We recommend using this template because its structure and layout can be read more easily by a bot. Designs and multiple columns are harder to recognize."
     },
     "video_letter": {
       "bullets_spotlight_title": "Bullet Points",

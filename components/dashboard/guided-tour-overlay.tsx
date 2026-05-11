@@ -300,7 +300,7 @@ export function GuidedTourOverlay({
                             className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors bg-[#002e7a] text-white hover:bg-[#001d4f]`}
                         >
                             {isLastStep ? t('button_start') : t('button_next')}
-                            <ArrowRight className="w-4 h-4" />
+                            {!isLastStep && <ArrowRight className="w-4 h-4" />}
                         </motion.button>
                     </div>
                 </motion.div>

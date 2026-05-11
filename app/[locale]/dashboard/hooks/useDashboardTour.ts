@@ -23,6 +23,7 @@ export const DASHBOARD_TOUR_IDS = [
     'job-search',
     'coaching',
     'cv-qr-video-letter',
+    'cv-ats-template',
     'video-letter-modes',
 ] as const;
 

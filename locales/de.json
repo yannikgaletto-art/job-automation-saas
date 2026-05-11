@@ -1688,13 +1688,15 @@
     "step3_title": "Pomodoro Technik",
     "step3_body": "Bei Pathly arbeiten wir am liebsten mit der <b>Pomodoro Technik</b>. Fokussierte Arbeitsblöcke mit kurzen Pausen. So kommst du am schnellsten voran. Bereit zu starten?",
     "button_next": "Weiter",
-    "button_start": "Los geht's!",
+    "button_start": "Los gehts",
     "step_indicator": "Schritt {current} von {total}",
     "cv_preview_format_title": "Sieht das Layout komisch aus?",
     "cv_preview_format_body": "Falls dein Lebenslauf zu viel Leerraum hat oder Abschnitte verschoben sind, klicke auf <b>\"Formatierung korrigieren\"</b>. Pathly überarbeitet das Layout automatisch. <b>Einmalig und kostenlos</b> pro Job.",
     "cv_optimizer": {
       "qr_spotlight_title": "QR-Video-Letter",
-      "qr_spotlight_body": "Dein optimierter Lebenslauf kann jetzt einen <b>persönlichen QR-Code</b> enthalten. Recruiter öffnen darüber ein kurzes Video, in dem du Motivation, Persönlichkeit und Passung zeigst."
+      "qr_spotlight_body": "Dein optimierter Lebenslauf kann jetzt einen persönlichen QR-Code enthalten. Recruiter öffnen darüber ein kurzes Video, in dem du Motivation zeigst. Damit erhöhen wir die Wahrscheinlichkeiten für ein Job-Interview. Die Daten werden maximal 14 Tage auf den EU-Servern gespeichert. Du kannst es jederzeit wieder löschen.",
+      "ats_spotlight_title": "ATS-Template",
+      "ats_spotlight_body": "Wir empfehlen dieses Template zu nehmen, da die Struktur und Gliederung von einem Bot besser gelesen werden kann. Designs und mehrere Spalten sind schwieriger zu erkennen."
     },
     "video_letter": {
       "bullets_spotlight_title": "Stichpunkte",

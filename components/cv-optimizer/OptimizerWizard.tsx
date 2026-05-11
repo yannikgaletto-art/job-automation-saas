@@ -536,6 +536,24 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
         enabled: qrTourEnabled && step === 2 && !!renderedPdfData && !showQrDialog,
     });
 
+    const atsTourSteps = useMemo<TourStep[]>(() => [
+        {
+            targetSelector: '[data-tour="cv-ats-template"]',
+            position: 'bottom',
+            titleKey: 'cv_optimizer.ats_spotlight_title',
+            bodyKey: 'cv_optimizer.ats_spotlight_body',
+        },
+    ], []);
+
+    const atsTour = useDashboardTour('cv-ats-template', atsTourSteps, {
+        delayMs: 900,
+        enabled: step === 2
+            && !!renderedPdfData
+            && !showQrDialog
+            && !showTechAtsWarning
+            && !qrTour.isActive,
+    });
+
     if (isLoading) {
         return <div className="p-10 flex justify-center"><LoadingSpinner className="w-8 h-8 text-[#012e7a]" /></div>;
     }
@@ -862,6 +880,7 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                                 {TEMPLATES.map((tmpl) => (
                                     <button
                                         key={tmpl.id}
+                                        data-tour={tmpl.id === 'valley' ? 'cv-ats-template' : undefined}
                                         onClick={() => handleTemplateSwitchInPreview(tmpl.id)}
                                         className={`
                                             px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all
@@ -1030,6 +1049,16 @@ export function OptimizerWizard({ jobId, liveMatchResult, onGoToCoverLetter, onC
                     totalSteps={qrTour.totalSteps}
                     onNext={qrTour.nextStep}
                     onSkip={qrTour.skipTour}
+                />
+            )}
+
+            {atsTour.isActive && atsTour.step && !qrTour.isActive && (
+                <GuidedTourOverlay
+                    step={atsTour.step}
+                    currentStep={atsTour.currentStep}
+                    totalSteps={atsTour.totalSteps}
+                    onNext={atsTour.nextStep}
+                    onSkip={atsTour.skipTour}
                 />
             )}
 
