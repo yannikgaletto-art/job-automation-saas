@@ -9,15 +9,9 @@
 import { useState } from 'react';
 import { RotateCcw, CheckCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { resetDashboardTourCompletion } from '../hooks/useDashboardTour';
 
-const TOUR_KEYS = [
-    'pathly_tour_completed_goals',
-    'pathly_tour_completed_job-queue',
-    'pathly_tour_completed_job-search',
-    'pathly_tour_completed_coaching',
-    'pathly_tour_completed_cv-qr-video-letter',
-    'pathly_tour_completed_video-letter-modes',
-    // Legacy global hint keys (for browsers that dismissed before user-scoping was added)
+const LEGACY_HINT_KEYS = [
     'pathly_cv_hint_dismissed',
     'pathly_cl_hint_dismissed',
 ];
@@ -27,8 +21,10 @@ export function TourResetCard() {
     const t = useTranslations('settings');
 
     async function handleReset() {
-        // Clear global keys (legacy + tours)
-        TOUR_KEYS.forEach((key) => localStorage.removeItem(key));
+        resetDashboardTourCompletion();
+
+        // Clear legacy global hint keys.
+        LEGACY_HINT_KEYS.forEach((key) => localStorage.removeItem(key));
 
         // Clear user-scoped hint keys
         try {
